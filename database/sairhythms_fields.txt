@@ -1,0 +1,16 @@
+audio_link
+beat
+deity
+golden_voice
+language
+level
+lyrics
+meaning
+raga
+songtags
+tempo
+title
+title2
+ulink
+url
+video_link

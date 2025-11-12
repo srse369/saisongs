@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+/* Custom component classes */
+.card {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  border: 1px solid rgb(229 231 235);
+}
+
+.dark .card {
+  background-color: rgb(31 41 55);
+  border-color: rgb(55 65 81);
+}
+
+/* Custom animations */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Presentation mode utility classes */
+.presentation-slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background: linear-gradient(to bottom right, rgb(30 58 138), rgb(88 28 135));
+  color: white;
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .presentation-slide {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .presentation-slide {
+    padding: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .presentation-slide {
+    padding: 3rem;
+  }
+}
+
+.presentation-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  color: rgb(191 219 254);
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 640px) {
+  .presentation-title {
+    font-size: 1.875rem;
+    margin-bottom: 1.5rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .presentation-title {
+    font-size: 2.25rem;
+    margin-bottom: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .presentation-title {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .presentation-title {
+    font-size: 3.75rem;
+  }
+}
+
+.presentation-content {
+  font-size: 1.875rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.625;
+  white-space: pre-line;
+}
+
+@media (min-width: 640px) {
+  .presentation-content {
+    font-size: 2.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .presentation-content {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .presentation-content {
+    font-size: 3.75rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .presentation-content {
+    font-size: 4.5rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .presentation-content {
+    font-size: 6rem;
+  }
+}
+
+.presentation-translation {
+  font-size: 1.25rem;
+  text-align: center;
+  line-height: 1.625;
+  color: rgb(219 234 254);
+  white-space: pre-line;
+}
+
+@media (min-width: 640px) {
+  .presentation-translation {
+    font-size: 1.5rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .presentation-translation {
+    font-size: 1.875rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .presentation-translation {
+    font-size: 2.25rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .presentation-translation {
+    font-size: 3rem;
+  }
+}
