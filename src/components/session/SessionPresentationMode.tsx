@@ -99,7 +99,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
     }
   }, [showOverlay]);
 
-  // Handle keyboard navigation across slides
+  // Handle keyboard navigation and mouse movement across slides
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Show overlay on any key press
@@ -137,8 +137,17 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
       }
     };
 
+    const handleMouseMove = () => {
+      // Show overlay on mouse movement
+      setShowOverlay(true);
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
   }, [slides.length]);
 
   // Handle fullscreen changes
@@ -175,6 +184,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
 
   const handleNavigate = (index: number) => {
     setCurrentSlideIndex(index);
+    setShowOverlay(true); // Show overlay when clicking navigation buttons
   };
 
   if (loading) {
@@ -208,14 +218,16 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         <SlideView slide={currentSlide} showTranslation={true} />
       </div>
 
-      {/* Navigation controls at bottom center */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
-        <SlideNavigation
-          currentSlide={currentSlideIndex}
-          totalSlides={slides.length}
-          onNavigate={handleNavigate}
-        />
-      </div>
+      {/* Navigation controls at bottom center - auto-hide after 2 seconds */}
+      {showOverlay && (
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 transition-opacity duration-300">
+          <SlideNavigation
+            currentSlide={currentSlideIndex}
+            totalSlides={slides.length}
+            onNavigate={handleNavigate}
+          />
+        </div>
+      )}
 
       {/* Control buttons - top right */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">

@@ -3,7 +3,8 @@ import type { Song, Slide } from '../types';
 /**
  * Maximum number of lines per slide before splitting
  */
-const MAX_LINES_PER_SLIDE = 6;
+const MAX_LINES_PER_SLIDE_WITH_TRANSLATION = 6;
+const MAX_LINES_PER_SLIDE_WITHOUT_TRANSLATION = 8;
 
 /**
  * Strips HTML tags from a string and decodes HTML entities
@@ -27,7 +28,8 @@ function stripHtml(html: string): string {
 /**
  * Generates slides from a song's lyrics and translation.
  * Splits lyrics by double line breaks (verses) and creates one slide per verse.
- * If a verse exceeds MAX_LINES_PER_SLIDE, it will be split into multiple slides.
+ * If a verse exceeds the max lines threshold, it will be split into multiple slides.
+ * Uses 8 lines max when translation exists, 10 lines max when no translation.
  * 
  * @param song - The song object with cached lyrics and meaning
  * @returns Array of Slide objects ready for presentation
@@ -47,50 +49,135 @@ export function generateSlides(song: Song): Slide[] {
     }];
   }
   
-  // Split lyrics into verses by double line breaks
-  const verses = song.lyrics
-    .split('\n\n')
-    .map(v => v.trim())
-    .filter(v => v.length > 0);
+  // Count total lines in lyrics (ignoring double line breaks)
+  const allLines = song.lyrics.split('\n').filter(line => line.trim().length > 0);
+  const totalLineCount = allLines.length;
+  
+  // Check if lyrics have double line breaks (verse structure)
+  const hasDoubleLineBreaks = song.lyrics.includes('\n\n');
   
   // Split translation/meaning into verses if it exists
-  // Strip HTML tags if present and split by double newlines
+  // Keep HTML tags intact for rendering
   const translationVerses = song.meaning
-    ? stripHtml(song.meaning)
+    ? song.meaning
         .split('\n\n')
         .map(v => v.trim())
         .filter(v => v.length > 0)
     : [];
   
-  verses.forEach((verse, verseIndex) => {
-    const lines = verse.split('\n');
-    const translationLines = translationVerses[verseIndex]?.split('\n') || [];
+  // If total lines <= 10, ignore verse breaks and show everything in one slide
+  if (totalLineCount <= 10) {
+    // Get first translation if exists
+    let translationText = translationVerses[0] || '';
     
-    // If verse is short enough, create a single slide
-    if (lines.length <= MAX_LINES_PER_SLIDE) {
+    // Always limit translation to 4 lines maximum
+    if (translationText) {
+      const translationStripped = stripHtml(translationText);
+      const translationLines = translationStripped.split('\n');
+      if (translationLines.length > 4) {
+        const parts = translationText.split(/(<br\s*\/?>|\n)/i);
+        let lineCount = 0;
+        let result = '';
+        for (const part of parts) {
+          if (part.match(/(<br\s*\/?>|\n)/i)) {
+            lineCount++;
+            if (lineCount >= 4) break;
+            result += part;
+          } else {
+            result += part;
+          }
+        }
+        translationText = result;
+      }
+    }
+    
+    // Show all lyrics in one slide
+    slides.push({
+      index: 0,
+      content: allLines.join('\n'),
+      translation: translationText || undefined,
+      songName: song.name,
+    });
+  } else if (hasDoubleLineBreaks) {
+    // Total lines > 10 and has verse structure - respect the verse breaks
+    const verses = song.lyrics
+      .split('\n\n')
+      .map(v => v.trim())
+      .filter(v => v.length > 0);
+    
+    verses.forEach((verse, verseIndex) => {
+      // Get corresponding translation
+      let translationText = translationVerses[verseIndex] || '';
+      
+      // Always limit translation to 4 lines maximum
+      if (translationText) {
+        const translationStripped = stripHtml(translationText);
+        const translationLines = translationStripped.split('\n');
+        if (translationLines.length > 4) {
+          const parts = translationText.split(/(<br\s*\/?>|\n)/i);
+          let lineCount = 0;
+          let result = '';
+          for (const part of parts) {
+            if (part.match(/(<br\s*\/?>|\n)/i)) {
+              lineCount++;
+              if (lineCount >= 4) break;
+              result += part;
+            } else {
+              result += part;
+            }
+          }
+          translationText = result;
+        }
+      }
+      
+      // Create one slide per verse (entire section)
       slides.push({
         index: slides.length,
         content: verse,
-        translation: translationVerses[verseIndex],
+        translation: translationText || undefined,
         songName: song.name,
       });
-    } else {
-      // Split long verse into multiple slides
-      for (let i = 0; i < lines.length; i += MAX_LINES_PER_SLIDE) {
-        const slideLines = lines.slice(i, i + MAX_LINES_PER_SLIDE);
-        const slideTranslationLines = translationLines.slice(i, i + MAX_LINES_PER_SLIDE);
-        
-        slides.push({
-          index: slides.length,
-          content: slideLines.join('\n'),
-          translation: slideTranslationLines.length > 0 
-            ? slideTranslationLines.join('\n') 
-            : undefined,
-          songName: song.name,
-        });
+    });
+  } else {
+    // Total lines > 10 but no verse structure - split into 10 lines per slide
+    const maxLinesPerSlide = 10;
+    
+    // Get first translation if exists
+    let translationText = translationVerses[0] || '';
+    
+    // Always limit translation to 4 lines maximum
+    if (translationText) {
+      const translationStripped = stripHtml(translationText);
+      const translationLines = translationStripped.split('\n');
+      if (translationLines.length > 4) {
+        const parts = translationText.split(/(<br\s*\/?>|\n)/i);
+        let lineCount = 0;
+        let result = '';
+        for (const part of parts) {
+          if (part.match(/(<br\s*\/?>|\n)/i)) {
+            lineCount++;
+            if (lineCount >= 4) break;
+            result += part;
+          } else {
+            result += part;
+          }
+        }
+        translationText = result;
       }
     }
-  });
+    
+    // Split into chunks of 10 lines
+    for (let i = 0; i < allLines.length; i += maxLinesPerSlide) {
+      const slideLines = allLines.slice(i, i + maxLinesPerSlide);
+      
+      slides.push({
+        index: slides.length,
+        content: slideLines.join('\n'),
+        translation: i === 0 ? translationText : undefined, // Only show translation on first slide
+        songName: song.name,
+      });
+    }
+  }
 
   // Annotate slides with per-song slide number and total
   const total = slides.length || 1;

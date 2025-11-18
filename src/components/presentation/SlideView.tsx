@@ -11,11 +11,31 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
   const sessionSongIndex = (slide as any).sessionSongIndex;
   const totalSongs = (slide as any).totalSongs;
   
+  // Calculate dynamic font size based on number of lines
+  const lyricsLines = slide.content.split('\n').length;
+  const getLyricsFontSize = () => {
+    if (lyricsLines <= 4) return 'text-3xl sm:text-3xl md:text-4xl lg:text-4xl';
+    if (lyricsLines <= 6) return 'text-2xl sm:text-3xl md:text-3xl lg:text-4xl';
+    if (lyricsLines <= 8) return 'text-2xl sm:text-2xl md:text-3xl lg:text-3xl';
+    if (lyricsLines <= 10) return 'text-xl sm:text-2xl md:text-2xl lg:text-3xl';
+    return 'text-lg sm:text-xl md:text-xl lg:text-2xl';
+  };
+  
+  // Calculate translation font size (if translation exists)
+  const translationLines = slide.translation ? slide.translation.split(/\n|<br\s*\/?>/i).length : 0;
+  const getTranslationFontSize = () => {
+    if (translationLines <= 2) return 'text-xl sm:text-xl md:text-2xl lg:text-2xl';
+    if (translationLines <= 4) return 'text-lg sm:text-xl md:text-xl lg:text-2xl';
+    return 'text-base sm:text-lg md:text-lg lg:text-xl';
+  };
+  
+  const hasTranslation = showTranslation && slide.translation;
+  
   return (
     <div className="presentation-slide">
       {/* Song number and slide position at top-left */}
       {(sessionSongIndex || (slide.songSlideCount && slide.songSlideCount > 1 && slide.songSlideNumber)) && (
-        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 text-[1.05rem] sm:text-[1.125rem] text-blue-100/80 bg-gray-800/25 rounded-lg px-3 py-2">
+        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 text-[0.95rem] sm:text-[1rem] text-blue-100/80 bg-gray-800/25 rounded-lg px-2 py-1 z-10">
           {sessionSongIndex && totalSongs && (
             <div>Song {sessionSongIndex}/{totalSongs}</div>
           )}
@@ -25,35 +45,44 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         </div>
       )}
 
-      {/* Song name at top */}
-      <div className="w-full max-w-6xl mb-4 sm:mb-6 md:mb-8 lg:mb-10">
-        <h1 className="presentation-title">
-          {slide.songName}
-        </h1>
+      {/* Song name at top - 15% of screen */}
+      <div className="w-full max-w-6xl border-2 border-blue-400/[0.03] rounded-lg p-2 sm:p-3" style={{ height: '15%' }}>
+        <div className="h-full flex items-center justify-center">
+          <h1 className="presentation-title">
+            {slide.songName}
+          </h1>
+        </div>
       </div>
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full max-w-6xl px-2 sm:px-4 presentation-main">
+      {/* Main content area - 60% (with translation) or 80% (without) */}
+      <div 
+        className="w-full max-w-6xl px-2 sm:px-4 presentation-main overflow-auto"
+        style={{ height: hasTranslation ? '60%' : '80%' }}
+      >
         {/* Original lyrics */}
-        <div className="mb-4 sm:mb-6 md:mb-8">
-          <p className="presentation-content">
+        <div className="border-2 border-blue-400/[0.03] rounded-lg p-3 sm:p-4 w-full h-full flex items-start justify-center">
+          <p className={`text-center font-bold leading-relaxed whitespace-pre-wrap ${getLyricsFontSize()}`} style={{ color: 'inherit' }}>
             {slide.content}
           </p>
         </div>
-
-        {/* Translation (if available and showTranslation is true) */}
-        {showTranslation && slide.translation && (
-          <div className="mt-4 sm:mt-6 md:mt-8 pt-4 sm:pt-6 md:pt-8 border-t-2 border-blue-400/30 w-full">
-            <p className="presentation-translation">
-              {slide.translation}
-            </p>
-          </div>
-        )}
       </div>
+
+      {/* Translation (if available and showTranslation is true) - 25% of screen */}
+      {hasTranslation && slide.translation && (
+        <div className="w-full max-w-6xl px-2 sm:px-4 overflow-auto" style={{ height: '25%' }}>
+          <div className="border-2 border-blue-400/[0.03] rounded-lg p-3 sm:p-4 w-full h-full flex items-start justify-center">
+            <div 
+              className={`text-center leading-relaxed ${getTranslationFontSize()}`}
+              style={{ color: 'inherit' }}
+              dangerouslySetInnerHTML={{ __html: slide.translation }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Singer / pitch (when available) at bottom-left */}
       {(slide.singerName || slide.pitch) && (
-        <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 text-[1.05rem] sm:text-[1.125rem] text-blue-100/70">
+        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 text-[0.95rem] sm:text-[1rem] text-blue-100/70">
           {slide.singerName && (
             <span>
               Singer: {slide.singerName}
@@ -70,8 +99,8 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
 
       {/* Next-song hint at bottom-right */}
       {slide.nextSongName && (
-        <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 text-right">
-          <div className="text-[1.05rem] sm:text-[1.125rem] text-blue-100/80">
+        <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 text-right">
+          <div className="text-[0.95rem] sm:text-[1rem] text-blue-100/80">
             {slide.nextIsContinuation ? (
               <>Next: {slide.nextSongName} (contd.)</>
             ) : (
