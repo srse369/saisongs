@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useDatabase } from '../hooks/useDatabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,6 +12,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { isConnected, connectionError, resetConnection } = useDatabase();
+  const { isAuthenticated, logout } = useAuth();
 
   // Initialize dark mode from localStorage or system preference
   useEffect(() => {
@@ -89,8 +91,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               <Link to="/admin/pitches" className={getLinkClasses('/admin/pitches')}>
                 Pitches
               </Link>
-              <Link to="/presentation" className={getLinkClasses('/presentation')}>
-                Presentation
+              <Link to="/session" className={getLinkClasses('/session')}>
+                Session
               </Link>
               
               {/* Dark mode toggle */}
@@ -111,8 +113,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 )}
               </button>
               
-              {/* Database connection indicator */}
-              <div className="ml-2 flex items-center">
+              {/* Database connection indicator + Admin mode indicator */}
+              <div className="ml-2 flex items-center space-x-2">
                 {isConnected ? (
                   <div className="flex items-center text-green-600 dark:text-green-400" title="Database connected">
                     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -130,6 +132,60 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </svg>
                   </button>
                 )}
+
+                {/* Admin mode indicator */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isAuthenticated) {
+                      // Switch from admin mode back to view mode
+                      logout();
+                    } else {
+                      // In view mode: attempt to enter admin mode by opening the password dialog
+                      const event = new KeyboardEvent('keydown', {
+                        key: 'i',
+                        code: 'KeyI',
+                        ctrlKey: true,
+                        shiftKey: true,
+                        bubbles: true,
+                      });
+                      window.dispatchEvent(event);
+                    }
+                  }}
+                  className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-medium border ${
+                    isAuthenticated
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                      : 'bg-gray-50 border-gray-300 text-gray-600'
+                  }`}
+                  title={
+                    isAuthenticated
+                      ? 'Admin mode is active (edit/delete/pitch actions enabled)'
+                      : 'View-only mode (admin actions disabled)'
+                  }
+                >
+                  <svg
+                    className={`w-3 h-3 mr-1 ${
+                      isAuthenticated ? 'text-emerald-600' : 'text-gray-500'
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 11c.828 0 1.5-.672 1.5-1.5S12.828 8 12 8s-1.5.672-1.5 1.5S11.172 11 12 11z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 11V7a5 5 0 10-10 0v4M7 11h10v8H7z"
+                    />
+                  </svg>
+                  {isAuthenticated ? 'Admin mode' : 'View mode'}
+                </button>
               </div>
             </nav>
 
@@ -200,11 +256,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Manage Pitches
               </Link>
               <Link
-                to="/presentation"
-                className={`block ${getLinkClasses('/presentation')}`}
+                to="/session"
+                className={`block ${getLinkClasses('/session')}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                Presentation
+                Session
               </Link>
               
               {/* Database status in mobile menu */}

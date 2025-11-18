@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
 import type { Song } from '../../types';
 import { Modal } from '../common/Modal';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { useSession } from '../../contexts/SessionContext';
 
 interface SongListProps {
   songs: Song[];
   onEdit: (song: Song) => void;
   onDelete: (id: string) => Promise<void>;
+  onView: (song: Song) => void;
   loading?: boolean;
 }
 
-export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, loading = false }) => {
+export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onView, loading = false }) => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const { addSong, songIds } = useSession();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [songToDelete, setSongToDelete] = useState<Song | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -35,6 +42,15 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, loa
   const handleDeleteCancel = () => {
     setDeleteModalOpen(false);
     setSongToDelete(null);
+  };
+
+  const handlePresent = (song: Song) => {
+    // Single-song presentation uses the /presentation/:songId route
+    navigate(`/presentation/${song.id}`);
+  };
+
+  const handleViewPitches = (song: Song) => {
+    navigate(`/admin/pitches?songId=${song.id}`);
   };
 
   if (loading) {
@@ -77,7 +93,10 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, loa
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                <h3
+                  className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-2 cursor-pointer hover:underline"
+                  onClick={() => onView(song)}
+                >
                   {song.name}
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
@@ -115,20 +134,54 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, loa
                     </span>
                   )}
                 </div>
+                {song.audioLink && (
+                  <div className="mt-3">
+                    <audio
+                      controls
+                      className="w-full max-w-xs"
+                    >
+                      <source src={song.audioLink} />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                )}
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+              <div className="flex flex-col items-end gap-2 flex-shrink-0">
                 <button
-                  onClick={() => onEdit(song)}
-                  className="px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors whitespace-nowrap"
+                  onClick={() => addSong(song.id)}
+                  disabled={songIds.includes(song.id)}
+                  className="px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Edit
+                  {songIds.includes(song.id) ? 'In Session' : 'Add to Session'}
                 </button>
                 <button
-                  onClick={() => handleDeleteClick(song)}
-                  className="px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors whitespace-nowrap"
+                  onClick={() => handlePresent(song)}
+                  className="px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors whitespace-nowrap"
                 >
-                  Delete
+                  Present
                 </button>
+                <button
+                  onClick={() => handleViewPitches(song)}
+                  className="px-3 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors whitespace-nowrap"
+                >
+                  Pitches
+                </button>
+                {isAuthenticated && (
+                  <>
+                    <button
+                      onClick={() => onEdit(song)}
+                      className="px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors whitespace-nowrap"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(song)}
+                      className="px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors whitespace-nowrap"
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

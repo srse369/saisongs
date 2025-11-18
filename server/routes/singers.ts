@@ -18,6 +18,16 @@ router.get('/', async (req, res) => {
     res.json(singers);
   } catch (error) {
     console.error('Error fetching singers:', error);
+    // Return empty array if database not configured or connection failed (for development)
+    if (error instanceof Error && (
+      error.message.includes('not configured') ||
+      error.message.includes('connection request timeout') ||
+      error.message.includes('connection failed') ||
+      error.message.includes('TLS handshake')
+    )) {
+      console.log('⚠️  Database not ready, returning empty array');
+      return res.json([]);
+    }
     res.status(500).json({ error: 'Failed to fetch singers' });
   }
 });

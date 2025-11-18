@@ -49,6 +49,18 @@ export interface Slide {
   content: string;
   translation?: string;
   songName: string;
+  singerName?: string;
+  pitch?: string;
+  /** 1-based position of this slide within its song, when the song spans multiple slides */
+  songSlideNumber?: number;
+  /** Total number of slides for this song, when the song spans multiple slides */
+  songSlideCount?: number;
+  /** Metadata about the next slide, for UI hints */
+  nextSongName?: string;
+  nextSingerName?: string;
+  nextPitch?: string;
+  /** True when the next slide is the same song continued */
+  nextIsContinuation?: boolean;
 }
 
 export interface SongWithPitches extends Song {

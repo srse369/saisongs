@@ -195,8 +195,8 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
           errors: result.errors,
         }));
         
-        // Refresh song list after successful import
-        await fetchSongs();
+        // Refresh song list after successful import (force network fetch)
+        await fetchSongs(true);
       } else {
         // Critical error occurred
         setImportState((prev) => ({
@@ -274,8 +274,8 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
           errors: result.errors,
         }));
         
-        // Refresh song list after successful import
-        await fetchSongs();
+        // Refresh song list after successful import (force network fetch)
+        await fetchSongs(true);
       } else {
         // Critical error occurred
         setImportState((prev) => ({

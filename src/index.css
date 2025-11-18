@@ -108,71 +108,23 @@
 }
 
 .presentation-content {
-  font-size: 1.875rem;
+  font-size: clamp(1.25rem, 3vw, 2.5rem);
   font-weight: 600;
   text-align: center;
   line-height: 1.625;
   white-space: pre-line;
 }
 
-@media (min-width: 640px) {
-  .presentation-content {
-    font-size: 2.25rem;
-  }
-}
-
-@media (min-width: 768px) {
-  .presentation-content {
-    font-size: 3rem;
-  }
-}
-
-@media (min-width: 1024px) {
-  .presentation-content {
-    font-size: 3.75rem;
-  }
-}
-
-@media (min-width: 1280px) {
-  .presentation-content {
-    font-size: 4.5rem;
-  }
-}
-
-@media (min-width: 1536px) {
-  .presentation-content {
-    font-size: 6rem;
-  }
-}
-
 .presentation-translation {
-  font-size: 1.25rem;
+  font-size: clamp(1rem, 2vw, 1.75rem);
   text-align: center;
   line-height: 1.625;
   color: rgb(219 234 254);
   white-space: pre-line;
 }
 
-@media (min-width: 640px) {
-  .presentation-translation {
-    font-size: 1.5rem;
-  }
-}
-
-@media (min-width: 768px) {
-  .presentation-translation {
-    font-size: 1.875rem;
-  }
-}
-
-@media (min-width: 1024px) {
-  .presentation-translation {
-    font-size: 2.25rem;
-  }
-}
-
-@media (min-width: 1280px) {
-  .presentation-translation {
-    font-size: 3rem;
-  }
+/* Constrain main content area so long verses don't overflow the screen */
+.presentation-main {
+  max-height: 75vh;
+  overflow-y: auto;
 }

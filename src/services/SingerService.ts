@@ -1,4 +1,4 @@
-import databaseService from './DatabaseService';
+import apiClient from './ApiClient';
 import type {
   Singer,
   CreateSingerInput,
@@ -11,10 +11,26 @@ import {
 } from '../types';
 
 /**
- * SingerService handles all CRUD operations for singers
- * Uses parameterized queries to prevent SQL injection
+ * SingerService handles all CRUD operations for singers via API
  */
 class SingerService {
+  /**
+   * Maps a raw API row into the strongly typed Singer shape,
+   * normalizing key casing and converting timestamps to Date.
+   */
+  private mapApiSinger(row: any): Singer {
+    const id = row.id ?? row.ID;
+    const name = row.name ?? row.NAME;
+    const createdRaw = row.createdAt ?? row.created_at ?? row.CREATED_AT;
+    const updatedRaw = row.updatedAt ?? row.updated_at ?? row.UPDATED_AT;
+
+    return {
+      id,
+      name,
+      createdAt: createdRaw ? new Date(createdRaw) : new Date(),
+      updatedAt: updatedRaw ? new Date(updatedRaw) : new Date(),
+    };
+  }
   /**
    * Validates singer input data
    * @throws ValidationError if validation fails
@@ -39,30 +55,13 @@ class SingerService {
   }
 
   /**
-   * Converts database row to Singer object with proper date parsing
-   */
-  private mapRowToSinger(row: any): Singer {
-    return {
-      id: row.id,
-      name: row.name,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-    };
-  }
-
-  /**
    * Retrieves all singers from the database
    * @returns Array of all singers
    */
   async getAllSingers(): Promise<Singer[]> {
     try {
-      const sql = `
-        SELECT id, name, created_at, updated_at
-        FROM singers
-        ORDER BY name ASC
-      `;
-      const rows = await databaseService.query(sql);
-      return rows.map(row => this.mapRowToSinger(row));
+      const raw = await apiClient.getSingers();
+      return (raw as any[]).map((row) => this.mapApiSinger(row));
     } catch (error) {
       console.error('Error fetching all singers:', error);
       throw new DatabaseError(
@@ -80,20 +79,14 @@ class SingerService {
    */
   async getSingerById(id: string): Promise<Singer | null> {
     try {
-      const sql = `
-        SELECT id, name, created_at, updated_at
-        FROM singers
-        WHERE id = $1
-      `;
-      const rows = await databaseService.query(sql, [id]);
-      
-      if (rows.length === 0) {
-        return null;
-      }
-      
-      return this.mapRowToSinger(rows[0]);
+      const raw = await apiClient.getSinger(id);
+      if (!raw) return null;
+      return this.mapApiSinger(raw as any);
     } catch (error) {
       console.error('Error fetching singer by ID:', error);
+      if (error instanceof Error && error.message.includes('404')) {
+        return null;
+      }
       throw new DatabaseError(
         ErrorCode.QUERY_ERROR,
         `Failed to fetch singer with ID: ${id}`,
@@ -111,14 +104,18 @@ class SingerService {
     this.validateSingerInput(input);
 
     try {
-      const sql = `
-        INSERT INTO singers (name)
-        VALUES ($1)
-        RETURNING id, name, created_at, updated_at
-      `;
-      const rows = await databaseService.query(sql, [input.name.trim()]);
+      // Create on the server
+      await apiClient.createSinger({
+        name: input.name.trim(),
+      });
 
-      return this.mapRowToSinger(rows[0]);
+      // Re-fetch all singers and pick the one that matches by name,
+      // or fall back to the last item (names are unique in typical use).
+      const all = await this.getAllSingers();
+      const created =
+        all.find((s) => s.name === input.name.trim()) ?? all[all.length - 1];
+
+      return created;
     } catch (error) {
       console.error('Error creating singer:', error);
       throw new DatabaseError(
@@ -138,25 +135,11 @@ class SingerService {
   async updateSinger(id: string, input: UpdateSingerInput): Promise<Singer | null> {
     this.validateSingerInput(input, true);
 
-    if (input.name === undefined) {
-      // No fields to update, just return the existing singer
-      return this.getSingerById(id);
-    }
-
     try {
-      const sql = `
-        UPDATE singers
-        SET name = $1, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2
-        RETURNING id, name, created_at, updated_at
-      `;
-      const rows = await databaseService.query(sql, [input.name.trim(), id]);
-
-      if (rows.length === 0) {
-        return null;
-      }
-
-      return this.mapRowToSinger(rows[0]);
+      await apiClient.updateSinger(id, {
+        name: input.name?.trim(),
+      });
+      return this.getSingerById(id);
     } catch (error) {
       console.error('Error updating singer:', error);
       throw new DatabaseError(
@@ -174,20 +157,11 @@ class SingerService {
    */
   async deleteSinger(id: string): Promise<boolean> {
     try {
-      const sql = `
-        DELETE FROM singers
-        WHERE id = $1
-        RETURNING id
-      `;
-      const rows = await databaseService.query(sql, [id]);
-      return rows.length > 0;
+      await apiClient.deleteSinger(id);
+      return true;
     } catch (error) {
       console.error('Error deleting singer:', error);
-      throw new DatabaseError(
-        ErrorCode.QUERY_ERROR,
-        `Failed to delete singer with ID: ${id}`,
-        error
-      );
+      return false;
     }
   }
 }

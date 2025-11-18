@@ -14,16 +14,17 @@ A web-based song presentation system that displays devotional songs (bhajans) in
 ## Tech Stack
 
 - **Frontend**: React 19 + TypeScript + Vite
+- **Backend**: Express.js + TypeScript
 - **Styling**: Tailwind CSS
-- **Database**: Neon Serverless PostgreSQL
+- **Database**: Oracle Database
 - **Routing**: React Router
-- **Deployment**: GitHub Pages
+- **Deployment**: GitHub Pages or VPS
 
 ## Project Structure
 
 ```
 .
-├── src/
+├── src/                    # Frontend source code
 │   ├── components/
 │   │   ├── admin/          # Admin/management components
 │   │   ├── presentation/   # Slideshow components
@@ -32,19 +33,25 @@ A web-based song presentation system that displays devotional songs (bhajans) in
 │   ├── hooks/              # Custom React hooks
 │   ├── services/           # Database service layer
 │   ├── types/              # TypeScript type definitions
-│   ├── utils/              # Utility functions
-│   ├── App.tsx             # Main app component
-│   └── main.tsx            # Entry point
-├── public/                 # Static assets
-└── index.html             # HTML entry point
+│   └── utils/              # Utility functions
+├── server/                 # Backend source code
+│   ├── routes/             # API routes
+│   └── services/           # Backend services
+├── database/               # Database schemas and migrations
+├── deploy/                 # Deployment configurations
+│   ├── local/              # Local development config
+│   └── remote/             # Remote server deployment
+├── docs/                   # Documentation
+└── public/                 # Static assets
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ and npm
-- A Neon PostgreSQL database account ([sign up here](https://console.neon.tech/))
+- Node.js 20+ and npm
+- Oracle Database access
+- (Optional) Remote server for production deployment
 
 ### Installation
 
@@ -55,19 +62,26 @@ A web-based song presentation system that displays devotional songs (bhajans) in
    ```
 
 3. Set up environment variables:
-   - Copy `.env.local.template` to `.env.local`
-   - Add your Neon connection string:
+   - Copy the template file:
+     ```bash
+     cp deploy/local/.env.local.template .env.local
      ```
-     VITE_NEON_CONNECTION_STRING=postgresql://[user]:[password]@[host]/[database]?sslmode=require
+   - Edit `.env.local` with your Oracle database credentials:
      ```
-   - Set an admin password for the bulk import feature:
-     ```
-     VITE_ADMIN_PASSWORD=your_secure_admin_password_here
+     DB_USER=your_db_username
+     DB_PASSWORD=your_db_password
+     DB_CONNECTION_STRING=your_connection_string
+     ADMIN_PASSWORD=your_secure_admin_password_here
      ```
 
 4. Run the development server:
    ```bash
-   npm run dev
+   # Start both frontend and backend
+   npm run dev:all
+   
+   # Or run separately:
+   npm run dev        # Frontend only (port 5173)
+   npm run dev:server # Backend only (port 3001)
    ```
 
 5. Open [http://localhost:5173](http://localhost:5173) in your browser
@@ -84,30 +98,14 @@ The built files will be in the `dist/` directory.
 
 ### Quick Setup
 
-1. **Create the schema** on your Neon database:
-   - Option A: Use the Neon SQL Editor (recommended)
-     - Go to [Neon Console](https://console.neon.tech/)
-     - Navigate to your project and branch
-     - Open SQL Editor and run the contents of `database/schema.sql`
-   
-   - Option B: Use the setup script
-     ```bash
-     cd database
-     ./setup.sh "your_neon_connection_string"
-     ```
+1. **Create the schema** on your Oracle database:
+   - Run the contents of `database/schema_oracle.sql` in your Oracle database
+   - You can use SQL*Plus, SQL Developer, or any Oracle SQL client
 
-2. **Optional**: Load sample data for testing
-   ```bash
-   cd database
-   ./seed.sh "your_neon_connection_string"
-   ```
-   
-   This will populate your database with:
-   - 5 sample singers
-   - 8 devotional songs with lyrics and translations
-   - 14 pitch associations
-   
-   See [`database/SEED_GUIDE.md`](./database/SEED_GUIDE.md) for quick instructions or [`database/README.md`](./database/README.md) for detailed setup information.
+2. **Load sample data** (optional):
+   - See the `database/` directory for sample data files
+   - Refer to [`database/README_DATA_LOADING.md`](./database/README_DATA_LOADING.md) for loading instructions
+   - See [`database/ORACLE_MIGRATION.md`](./database/ORACLE_MIGRATION.md) for migration details
 
 ### Database Schema
 
@@ -116,15 +114,36 @@ The application uses three main tables:
 - **singers**: Stores singer/vocalist profiles
 - **song_singer_pitches**: Associates songs with singers and pitch information
 
-See the complete schema in `database/schema.sql`
+See the complete schema in `database/schema_oracle.sql`
 
-## Deployment to GitHub Pages
+## Deployment
+
+### Option 1: VPS/Remote Server (Recommended for Full Stack)
+
+Deploy to a remote server (e.g., 141.148.149.54) with full backend support:
+
+```bash
+# One-time setup on server
+ssh ubuntu@141.148.149.54
+bash deploy/remote/server-setup.sh
+
+# Deploy from local machine
+./deploy/remote/deploy.sh production
+# or
+npm run deploy:vps
+```
+
+See **[docs/DEPLOYMENT_VPS.md](./docs/DEPLOYMENT_VPS.md)** for detailed instructions.
+
+### Option 2: GitHub Pages (Frontend Only)
+
+Deploy static frontend to GitHub Pages:
 
 1. Update the `base` path in `vite.config.ts` to match your repository name
 2. Build the project: `npm run build`
-3. Deploy the `dist/` folder to the `gh-pages` branch
+3. Deploy: `npm run deploy`
 
-A GitHub Actions workflow will be added in a later task for automated deployment.
+See **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** for detailed GitHub Pages deployment instructions.
 
 ## Admin Features
 
@@ -152,10 +171,19 @@ The application includes a hidden bulk import feature for administrators to impo
 
 ## Development
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
+### Available Scripts
+
+- `npm run dev` - Start frontend development server
+- `npm run dev:server` - Start backend development server
+- `npm run dev:all` - Start both frontend and backend
+- `npm run build` - Build frontend for production (GitHub Pages)
+- `npm run build:vps` - Build frontend for VPS deployment
+- `npm run build:server` - Build backend for production
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
+- `npm run test` - Run tests
+- `npm run deploy` - Deploy to GitHub Pages
+- `npm run deploy:vps` - Deploy to VPS server
 
 ## License
 

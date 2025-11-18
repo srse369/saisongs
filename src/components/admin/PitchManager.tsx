@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { usePitches } from '../../contexts/PitchContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
 import { PitchForm } from './PitchForm';
 import { PitchList } from './PitchList';
-import type { SongSingerPitch, CreatePitchInput } from '../../types';
+import type { SongSingerPitch, CreatePitchInput, Song } from '../../types';
+import { Modal } from '../common/Modal';
+import { SongDetails } from './SongDetails';
 
 export const PitchManager: React.FC = () => {
   const { 
     pitches, 
     loading: pitchLoading, 
     error: pitchError,
+    fetchAllPitches,
     createPitch, 
     updatePitch, 
     deletePitch,
@@ -35,12 +39,37 @@ export const PitchManager: React.FC = () => {
 
   const [showForm, setShowForm] = useState(false);
   const [editingPitch, setEditingPitch] = useState<SongSingerPitch | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const songFilterId = searchParams.get('songId') || '';
+  const singerFilterId = searchParams.get('singerId') || '';
 
-  // Fetch songs and singers on mount
+  const [viewingSong, setViewingSong] = useState<Song | null>(null);
+
+  // Fetch songs, singers, and all existing pitch associations when needed.
+  // We avoid refetching on every tab entry by only loading when the in-memory
+  // collections are empty (e.g. first load or after a full reload).
   useEffect(() => {
-    fetchSongs();
-    fetchSingers();
-  }, [fetchSongs, fetchSingers]);
+    if (!songsLoading && songs.length === 0) {
+      fetchSongs();
+    }
+    if (!singersLoading && singers.length === 0) {
+      fetchSingers();
+    }
+    if (!pitchLoading && pitches.length === 0) {
+      fetchAllPitches();
+    }
+  }, [
+    fetchSongs,
+    fetchSingers,
+    fetchAllPitches,
+    songsLoading,
+    singersLoading,
+    pitchLoading,
+    songs.length,
+    singers.length,
+    pitches.length,
+  ]);
 
   const handleCreateClick = () => {
     setEditingPitch(null);
@@ -84,13 +113,151 @@ export const PitchManager: React.FC = () => {
   const error = pitchError || songsError || singersError;
   const loading = pitchLoading || songsLoading || singersLoading;
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+
+  // Clear search when Escape key is pressed while on this tab
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSearchTerm('');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleClearFilters = () => {
+    // Clear query params and local search input
+    const next = new URLSearchParams(searchParams);
+    next.delete('songId');
+    next.delete('singerId');
+    setSearchParams(next);
+    setSearchTerm('');
+  };
+
+  const filteredPitches = pitches.filter((p) => {
+    // If navigated here with a specific songId, only show pitches for that song
+    if (songFilterId && p.songId !== songFilterId) {
+      return false;
+    }
+
+    // If navigated here with a specific singerId, only show pitches for that singer
+    if (singerFilterId && p.singerId !== singerFilterId) {
+      return false;
+    }
+
+    if (!searchTerm.trim()) return true;
+    const q = searchTerm.toLowerCase();
+
+    const song = songs.find((s) => s.id === p.songId);
+    const singer = singers.find((s) => s.id === p.singerId);
+
+    return (
+      p.pitch.toLowerCase().includes(q) ||
+      song?.name.toLowerCase().includes(q) ||
+      singer?.name.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Pitch Management</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Associate singers with songs and their pitch information
-        </p>
+        <div className="flex flex-col gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Pitch Management</h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Associate singers with songs and their pitch information
+            </p>
+            {(songFilterId || singerFilterId) && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                {songFilterId && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                    <span className="font-medium mr-1">Song:</span>
+                    <span>
+                      {songs.find((s) => s.id === songFilterId)?.name || 'Unknown song'}
+                    </span>
+                  </span>
+                )}
+                {singerFilterId && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-100">
+                    <span className="font-medium mr-1">Singer:</span>
+                    <span>
+                      {singers.find((s) => s.id === singerFilterId)?.name || 'Unknown singer'}
+                    </span>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="inline-flex items-center px-3 py-1 rounded-full border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto items-stretch sm:items-center">
+            <div className="relative flex-1 sm:w-80">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                placeholder="Search by song, singer, or pitch..."
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <svg
+                className="w-4 h-4 text-gray-400 absolute left-3 top-2.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-4.35-4.35M9.5 17a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
+                />
+              </svg>
+            </div>
+            <div className="flex flex-row gap-2 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  fetchSongs();
+                  fetchSingers();
+                  fetchAllPitches();
+                }}
+                disabled={loading}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h5M20 20v-5h-5M5.455 19.545A8 8 0 0115 5.34M18.545 4.455A8 8 0 019 18.66"
+                  />
+                </svg>
+                Refresh
+              </button>
+              {!showForm && (
+                <button
+                  onClick={handleCreateClick}
+                  disabled={loading || songs.length === 0 || singers.length === 0}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Create New Pitch
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Error Message */}
@@ -107,29 +274,6 @@ export const PitchManager: React.FC = () => {
           >
             Dismiss
           </button>
-        </div>
-      )}
-
-      {/* Create Button */}
-      {!showForm && (
-        <div className="mb-6">
-          <button
-            onClick={handleCreateClick}
-            disabled={loading || songs.length === 0 || singers.length === 0}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Create New Pitch Association
-          </button>
-          {songs.length === 0 && !songsLoading && (
-            <p className="mt-2 text-sm text-gray-600">
-              Please create songs first before adding pitch associations.
-            </p>
-          )}
-          {singers.length === 0 && !singersLoading && (
-            <p className="mt-2 text-sm text-gray-600">
-              Please create singers first before adding pitch associations.
-            </p>
-          )}
         </div>
       )}
 
@@ -156,15 +300,29 @@ export const PitchManager: React.FC = () => {
         </div>
         <div className="p-6">
           <PitchList
-            pitches={pitches}
+            pitches={filteredPitches}
             songs={songs}
             singers={singers}
             onEdit={handleEditClick}
             onDelete={handleDelete}
+            onViewSong={(songId) => {
+              const song = songs.find((s) => s.id === songId) || null;
+              setViewingSong(song);
+            }}
             loading={loading}
           />
         </div>
       </div>
+
+      {viewingSong && (
+        <Modal
+          isOpen={!!viewingSong}
+          onClose={() => setViewingSong(null)}
+          title="Song Details"
+        >
+          <SongDetails song={viewingSong} />
+        </Modal>
+      )}
     </div>
   );
 };

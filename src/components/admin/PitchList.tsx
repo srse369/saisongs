@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import type { SongSingerPitch, Song, Singer } from '../../types';
 import { Modal } from '../common/Modal';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { useSession } from '../../contexts/SessionContext';
 
 interface PitchWithDetails extends SongSingerPitch {
   songName?: string;
@@ -13,6 +16,7 @@ interface PitchListProps {
   singers: Singer[];
   onEdit: (pitch: SongSingerPitch) => void;
   onDelete: (id: string) => Promise<void>;
+  onViewSong: (songId: string) => void;
   loading?: boolean;
 }
 
@@ -22,8 +26,12 @@ export const PitchList: React.FC<PitchListProps> = ({
   singers, 
   onEdit, 
   onDelete, 
+  onViewSong,
   loading = false 
 }) => {
+  const navigate = useNavigate();
+  const { addSong, songIds } = useSession();
+  const { isAuthenticated } = useAuth();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [pitchToDelete, setPitchToDelete] = useState<PitchWithDetails | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -60,6 +68,18 @@ export const PitchList: React.FC<PitchListProps> = ({
   const handleDeleteCancel = () => {
     setDeleteModalOpen(false);
     setPitchToDelete(null);
+  };
+
+  const handlePresent = (pitch: PitchWithDetails) => {
+    const params = new URLSearchParams();
+    if (pitch.singerName) {
+      params.set('singerName', pitch.singerName);
+    }
+    if (pitch.pitch) {
+      params.set('pitch', pitch.pitch);
+    }
+    const query = params.toString();
+    navigate(`/presentation/${pitch.songId}${query ? `?${query}` : ''}`);
   };
 
   if (loading) {
@@ -116,7 +136,13 @@ export const PitchList: React.FC<PitchListProps> = ({
             {enrichedPitches.map((pitch) => (
               <tr key={pitch.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{pitch.songName}</div>
+                  <button
+                    type="button"
+                    onClick={() => onViewSong(pitch.songId)}
+                    className="text-left text-sm font-medium text-blue-700 hover:underline"
+                  >
+                    {pitch.songName}
+                  </button>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">{pitch.singerName}</div>
@@ -125,18 +151,37 @@ export const PitchList: React.FC<PitchListProps> = ({
                   <div className="text-sm text-gray-900 font-semibold">{pitch.pitch}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => onEdit(pitch)}
-                    className="text-blue-600 hover:text-blue-900 mr-4"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteClick(pitch)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    Delete
-                  </button>
+                  <div className="flex flex-col items-end gap-2">
+                    <button
+                      onClick={() => addSong(pitch.songId, pitch.singerId, pitch.pitch)}
+                      disabled={songIds.includes(pitch.songId)}
+                      className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {songIds.includes(pitch.songId) ? 'In Session' : 'Add to Session'}
+                    </button>
+                    <button
+                      onClick={() => handlePresent(pitch)}
+                      className="text-green-600 hover:text-green-900"
+                    >
+                      Present
+                    </button>
+                    {isAuthenticated && (
+                      <>
+                        <button
+                          onClick={() => onEdit(pitch)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(pitch)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

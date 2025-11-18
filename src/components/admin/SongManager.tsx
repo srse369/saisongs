@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSongs } from '../../contexts/SongContext';
 import { SongForm } from './SongForm';
 import { SongList } from './SongList';
+import { SongDetails } from './SongDetails';
 import { Modal } from '../common/Modal';
 import type { Song, CreateSongInput } from '../../types';
 
@@ -19,10 +20,19 @@ export const SongManager: React.FC = () => {
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
+  const [viewingSong, setViewingSong] = useState<Song | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [visibleCount, setVisibleCount] = useState(50);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    fetchSongs();
-  }, [fetchSongs]);
+    // Only fetch songs if we don't already have them loaded.
+    // AppContent will warm up the cache on initial app load; this is a
+    // safety net for direct navigation or hard reloads.
+    if (!loading && songs.length === 0) {
+      fetchSongs();
+    }
+  }, [fetchSongs, loading, songs.length]);
 
   const handleCreateClick = () => {
     setEditingSong(null);
@@ -32,6 +42,10 @@ export const SongManager: React.FC = () => {
   const handleEditClick = (song: Song) => {
     setEditingSong(song);
     setIsFormModalOpen(true);
+  };
+
+  const handleViewClick = (song: Song) => {
+    setViewingSong(song);
   };
 
   const handleFormCancel = () => {
@@ -63,10 +77,87 @@ export const SongManager: React.FC = () => {
     await deleteSong(id);
   };
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+
+  // Clear search when Escape key is pressed while on this tab
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSearchTerm('');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const filteredSongs = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return songs;
+
+    return songs.filter((song) => {
+      const fields = [
+        song.name,
+        song.title,
+        song.title2,
+        song.language,
+        song.deity,
+        song.tempo,
+        song.beat,
+        song.raga,
+        song.level,
+        song.sairhythmsUrl,
+        song.lyrics,
+        song.meaning,
+      ];
+
+      return fields.some((field) =>
+        field ? field.toString().toLowerCase().includes(query) : false
+      );
+    });
+  }, [songs, searchTerm]);
+
+  // Reset visible songs when search or underlying list changes
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [searchTerm, songs.length]);
+
+  const displayedSongs = useMemo(
+    () => filteredSongs.slice(0, visibleCount),
+    [filteredSongs, visibleCount]
+  );
+
+  // Lazy-load more songs as the user scrolls near the bottom
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting) {
+          setVisibleCount((prev) =>
+            Math.min(prev + 50, filteredSongs.length)
+          );
+        }
+      },
+      {
+        root: null,
+        rootMargin: '0px',
+        threshold: 1.0,
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [filteredSongs.length]);
+
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8 animate-fade-in">
       <div className="mb-6 sm:mb-8">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 sm:mb-6">
+        <div className="flex flex-col gap-4 mb-4 sm:mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-1">
               Song Management
@@ -75,15 +166,57 @@ export const SongManager: React.FC = () => {
               Create and manage your song library
             </p>
           </div>
-          <button
-            onClick={handleCreateClick}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Create New Song
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 sm:min-w-[260px]">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={handleSearchChange}
+                placeholder="Search by name, title, lyrics, language, deity..."
+                className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
+              />
+              <svg
+                className="w-4 h-4 text-gray-400 absolute left-3 top-2.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-4.35-4.35M9.5 17a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
+                />
+              </svg>
+            </div>
+            <div className="flex flex-row gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => fetchSongs(true)}
+                disabled={loading}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h5M20 20v-5h-5M5.455 19.545A8 8 0 0115 5.34M18.545 4.455A8 8 0 019 18.66"
+                  />
+                </svg>
+                Refresh
+              </button>
+              <button
+                onClick={handleCreateClick}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create New Song
+              </button>
+            </div>
+          </div>
         </div>
 
         {error && (
@@ -122,11 +255,24 @@ export const SongManager: React.FC = () => {
       </div>
 
       <SongList
-        songs={songs}
+        songs={displayedSongs}
         onEdit={handleEditClick}
         onDelete={handleDelete}
         loading={loading}
+        onView={handleViewClick}
       />
+
+      {/* Lazy-load sentinel / status */}
+      <div
+        ref={loadMoreRef}
+        className="mt-4 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400"
+      >
+        {displayedSongs.length < filteredSongs.length
+          ? 'Scroll to load more songs...'
+          : filteredSongs.length > 0
+          ? 'All songs loaded'
+          : null}
+      </div>
 
       <Modal
         isOpen={isFormModalOpen}
@@ -139,6 +285,17 @@ export const SongManager: React.FC = () => {
           onCancel={handleFormCancel}
         />
       </Modal>
+
+      {/* View-only metadata modal */}
+      {viewingSong && (
+        <Modal
+          isOpen={!!viewingSong}
+          onClose={() => setViewingSong(null)}
+          title="Song Details"
+        >
+          <SongDetails song={viewingSong} />
+        </Modal>
+      )}
     </div>
   );
 };

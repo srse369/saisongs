@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { databaseService } from '../services/DatabaseService';
+import apiClient from '../services/ApiClient';
 import { useToast } from '../contexts/ToastContext';
 
 interface UseDatabaseReturn {
@@ -11,7 +11,7 @@ interface UseDatabaseReturn {
 }
 
 /**
- * Hook to manage database connection state and health checks
+ * Hook to manage API backend connection state and health checks
  */
 export const useDatabase = (): UseDatabaseReturn => {
   const [isConnected, setIsConnected] = useState(false);
@@ -24,16 +24,10 @@ export const useDatabase = (): UseDatabaseReturn => {
     setConnectionError(null);
     
     try {
-      const healthy = await databaseService.testConnection();
-      setIsConnected(healthy);
-      
-      if (!healthy) {
-        const error = 'Database connection is not healthy';
-        setConnectionError(error);
-        toast.error(error);
-      }
+      await apiClient.healthCheck();
+      setIsConnected(true);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to check database connection';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to connect to backend API';
       setConnectionError(errorMessage);
       setIsConnected(false);
       toast.error(errorMessage);
@@ -47,11 +41,10 @@ export const useDatabase = (): UseDatabaseReturn => {
     setConnectionError(null);
     
     try {
-      await databaseService.resetConnection();
-      toast.info('Database connection reset. Reconnecting...');
+      toast.info('Reconnecting to backend...');
       await checkConnection();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to reset database connection';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reconnect to backend API';
       setConnectionError(errorMessage);
       toast.error(errorMessage);
     } finally {

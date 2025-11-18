@@ -1,5 +1,5 @@
 // Export all services for convenient importing
-export { default as databaseService } from './DatabaseService';
+// DatabaseService is server-side only, not exported for frontend use
 export { default as songService } from './SongService';
 export { default as singerService } from './SingerService';
 export { default as pitchService } from './PitchService';

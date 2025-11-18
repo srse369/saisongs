@@ -24,6 +24,16 @@ router.get('/', async (req, res) => {
     res.json(pitches);
   } catch (error) {
     console.error('Error fetching pitches:', error);
+    // Return empty array if database not configured or connection failed (for development)
+    if (error instanceof Error && (
+      error.message.includes('not configured') ||
+      error.message.includes('connection request timeout') ||
+      error.message.includes('connection failed') ||
+      error.message.includes('TLS handshake')
+    )) {
+      console.log('⚠️  Database not ready, returning empty array');
+      return res.json([]);
+    }
     res.status(500).json({ error: 'Failed to fetch pitches' });
   }
 });
@@ -81,6 +91,16 @@ router.get('/song/:songId', async (req, res) => {
     res.json(pitches);
   } catch (error) {
     console.error('Error fetching song pitches:', error);
+    // Return empty array if database not configured or connection failed (for development)
+    if (error instanceof Error && (
+      error.message.includes('not configured') ||
+      error.message.includes('connection request timeout') ||
+      error.message.includes('connection failed') ||
+      error.message.includes('TLS handshake')
+    )) {
+      console.log('⚠️  Database not ready, returning empty array');
+      return res.json([]);
+    }
     res.status(500).json({ error: 'Failed to fetch song pitches' });
   }
 });
@@ -106,16 +126,14 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { song_id, singer_id, pitch } = req.body;
+    const { pitch } = req.body;
 
     await databaseService.query(`
       UPDATE song_singer_pitches SET
-        song_id = HEXTORAW(:1),
-        singer_id = HEXTORAW(:2),
-        pitch = :3,
+        pitch = :1,
         updated_at = CURRENT_TIMESTAMP
-      WHERE RAWTOHEX(id) = :4
-    `, [song_id, singer_id, pitch, id]);
+      WHERE RAWTOHEX(id) = :2
+    `, [pitch, id]);
 
     res.json({ message: 'Pitch association updated successfully' });
   } catch (error) {

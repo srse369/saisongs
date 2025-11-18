@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { Singer } from '../../types';
 import { Modal } from '../common/Modal';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SingerListProps {
   singers: Singer[];
@@ -10,6 +12,8 @@ interface SingerListProps {
 }
 
 export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelete, loading = false }) => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [singerToDelete, setSingerToDelete] = useState<Singer | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -35,6 +39,10 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
   const handleDeleteCancel = () => {
     setDeleteModalOpen(false);
     setSingerToDelete(null);
+  };
+
+  const handleViewPitches = (singer: Singer) => {
+    navigate(`/admin/pitches?singerId=${singer.id}`);
   };
 
   if (loading) {
@@ -69,36 +77,52 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {singers.map((singer) => (
-          <div
-            key={singer.id}
-            className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow p-4"
-          >
-            <div className="flex flex-col h-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {singer.name}
-              </h3>
-              <p className="text-xs text-gray-500 mb-3">
-                Added {singer.createdAt.toLocaleDateString()}
-              </p>
-              <div className="flex justify-end space-x-2 mt-auto">
-                <button
-                  onClick={() => onEdit(singer)}
-                  className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDeleteClick(singer)}
-                  className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg shadow-sm">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Name
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {singers.map((singer) => (
+              <tr key={singer.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-gray-900">{singer.name}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                  <button
+                    onClick={() => handleViewPitches(singer)}
+                    className="inline-flex items-center px-3 py-1.5 rounded-md text-indigo-600 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    Pitches
+                  </button>
+                  {isAuthenticated && (
+                    <>
+                      <button
+                        onClick={() => onEdit(singer)}
+                        className="inline-flex items-center px-3 py-1.5 rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(singer)}
+                        className="inline-flex items-center px-3 py-1.5 rounded-md text-red-600 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <Modal

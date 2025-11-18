@@ -1,10 +1,11 @@
 /**
- * ImportService orchestrates the bulk import process from sairhythms.org
- * Handles song discovery, matching, and database operations
+ * ImportService orchestrates the bulk import process from sairhythms.org.
+ * Handles song discovery, matching, and database operations.
  */
 
 import songService from './SongService';
 import sairhythmsScraperService, { type DiscoveredSong } from './SairhythmsScraperService';
+import type { Song } from '../types';
 
 /**
  * Tracks progress during the import process
@@ -40,22 +41,39 @@ export interface ImportResult {
  */
 class ImportService {
 
+  /**
+   * Maximum number of songs to process concurrently during import.
+   * This allows us to perform "batched" imports without overloading the API/DB.
+   */
+  private static readonly BATCH_SIZE = 10;
 
   /**
-   * Processes a single discovered song (create or update)
-   * Uses UPSERT so we don't need to check for existing songs
+   * Processes a single discovered song (create or update) using an in-memory cache
+   * of existing songs keyed by sairhythmsUrl. This avoids fetching all songs
+   * for every record and lets us perform a true UPSERT behavior.
+   *
    * @param discovered - Song discovered from sairhythms.org
+   * @param existingByUrl - Map of existing songs keyed by sairhythmsUrl
    * @returns 'created' or 'updated' to indicate the operation performed
    */
   private async processSong(
-    discovered: DiscoveredSong
+    discovered: DiscoveredSong,
+    existingByUrl: Map<string, Song>
   ): Promise<'created' | 'updated'> {
-    // Get the existing song count to determine if this is create or update
-    const existingSongs = await songService.getAllSongs();
-    const existingCount = existingSongs.filter(s => s.sairhythmsUrl === discovered.url).length;
-    
-    // Create/update song with all data (UPSERT handles duplicates)
-    await songService.createSong({
+    const existing = existingByUrl.get(discovered.url);
+
+    // Debug: Log data being passed
+    console.log('🔍 ImportService.processSong:', {
+      name: discovered.name,
+      url: discovered.url?.substring(0, 80),
+      has_lyrics: !!(discovered as any).lyrics,
+      lyrics_length: ((discovered as any).lyrics || '').length,
+      has_meaning: !!(discovered as any).meaning,
+      meaning_length: ((discovered as any).meaning || '').length,
+      operation: existing ? 'update' : 'create',
+    });
+
+    const payload = {
       name: discovered.name,
       sairhythmsUrl: discovered.url,
       title: (discovered as any).title,
@@ -73,9 +91,21 @@ class ImportService {
       videoLink: (discovered as any).video_link,
       ulink: (discovered as any).ulink,
       goldenVoice: (discovered as any).golden_voice === 'yes',
-    });
-    
-    return existingCount > 0 ? 'updated' : 'created';
+    };
+
+    if (existing) {
+      // Update existing song
+      const updated = await songService.updateSong(existing.id, payload as any);
+      if (updated) {
+        existingByUrl.set(discovered.url, updated);
+      }
+      return 'updated';
+    } else {
+      // Create new song
+      const created = await songService.createSong(payload);
+      existingByUrl.set(discovered.url, created);
+      return 'created';
+    }
   }
 
   /**
@@ -101,43 +131,50 @@ class ImportService {
     const errors: ImportError[] = [];
     
     try {
-      // Process each song
-      for (const discovered of songs) {
-        stats.currentSong = discovered.name;
-        
-        try {
-          // Process the song (UPSERT handles create or update)
-          const operation = await this.processSong(discovered);
-          
-          // Update statistics
-          if (operation === 'created') {
-            stats.created++;
-          } else {
-            stats.updated++;
-          }
-          
-          stats.processed++;
-          
-          // Report progress after each song with updated statistics
-          onProgress({ ...stats });
-          
-        } catch (error) {
-          // Collect error without stopping import process
-          stats.failed++;
-          
-          // Include song name and error message in error collection
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          errors.push({
-            songName: discovered.name,
-            error: errorMessage
-          });
-          
-          // Log error for debugging
-          console.error(`Failed to import song "${discovered.name}":`, errorMessage);
-          
-          // Report progress even after errors
-          onProgress({ ...stats });
-        }
+      // Build a cache of existing songs keyed by sairhythmsUrl so we can do UPSERTs efficiently
+      const existingSongs = await songService.getAllSongs();
+      const existingByUrl = new Map<string, Song>(
+        existingSongs
+          .filter(s => !!s.sairhythmsUrl)
+          .map(s => [s.sairhythmsUrl, s])
+      );
+
+      // Process songs in small concurrent batches to speed up imports
+      for (let i = 0; i < songs.length; i += ImportService.BATCH_SIZE) {
+        const batch = songs.slice(i, i + ImportService.BATCH_SIZE);
+
+        await Promise.all(
+          batch.map(async (discovered) => {
+            stats.currentSong = discovered.name;
+
+            try {
+              const operation = await this.processSong(discovered, existingByUrl);
+
+              // Update statistics
+              if (operation === 'created') {
+                stats.created++;
+              } else {
+                stats.updated++;
+              }
+
+              stats.processed++;
+            } catch (error) {
+              // Collect error without stopping import process
+              stats.failed++;
+
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              errors.push({
+                songName: discovered.name,
+                error: errorMessage,
+              });
+
+              console.error(`Failed to import song "${discovered.name}":`, errorMessage);
+            } finally {
+              // Report progress after each song with updated statistics
+              onProgress({ ...stats });
+            }
+          })
+        );
       }
       
       // Clear current song after completion
@@ -187,44 +224,48 @@ class ImportService {
       // Step 1: Discover all songs from sairhythms.org
       const discoveredSongs = await sairhythmsScraperService.discoverAllSongs();
       stats.total = discoveredSongs.length;
+
+      // Step 2: Build a cache of existing songs keyed by sairhythmsUrl
+      const existingSongs = await songService.getAllSongs();
+      const existingByUrl = new Map<string, Song>(
+        existingSongs
+          .filter(s => !!s.sairhythmsUrl)
+          .map(s => [s.sairhythmsUrl, s])
+      );
       
-      // Step 2: Process each discovered song
-      for (const discovered of discoveredSongs) {
-        stats.currentSong = discovered.name;
-        
-        try {
-          // Process the song (UPSERT handles create or update)
-          const operation = await this.processSong(discovered);
-          
-          // Update statistics
-          if (operation === 'created') {
-            stats.created++;
-          } else {
-            stats.updated++;
-          }
-          
-          stats.processed++;
-          
-          // Report progress after each song with updated statistics
-          onProgress({ ...stats });
-          
-        } catch (error) {
-          // Collect error without stopping import process
-          stats.failed++;
-          
-          // Include song name and error message in error collection
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          errors.push({
-            songName: discovered.name,
-            error: errorMessage
-          });
-          
-          // Log error for debugging
-          console.error(`Failed to import song "${discovered.name}":`, errorMessage);
-          
-          // Report progress even after errors
-          onProgress({ ...stats });
-        }
+      // Step 3: Process discovered songs in concurrent batches
+      for (let i = 0; i < discoveredSongs.length; i += ImportService.BATCH_SIZE) {
+        const batch = discoveredSongs.slice(i, i + ImportService.BATCH_SIZE);
+
+        await Promise.all(
+          batch.map(async (discovered) => {
+            stats.currentSong = discovered.name;
+
+            try {
+              const operation = await this.processSong(discovered, existingByUrl);
+
+              if (operation === 'created') {
+                stats.created++;
+              } else {
+                stats.updated++;
+              }
+
+              stats.processed++;
+            } catch (error) {
+              stats.failed++;
+
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              errors.push({
+                songName: discovered.name,
+                error: errorMessage,
+              });
+
+              console.error(`Failed to import song "${discovered.name}":`, errorMessage);
+            } finally {
+              onProgress({ ...stats });
+            }
+          })
+        );
       }
       
       // Clear current song after completion

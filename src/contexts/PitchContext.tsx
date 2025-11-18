@@ -8,6 +8,7 @@ interface PitchContextState {
   pitches: SongSingerPitch[];
   loading: boolean;
   error: ServiceError | null;
+  fetchAllPitches: () => Promise<void>;
   getPitchesForSong: (songId: string) => Promise<void>;
   getPitchesForSinger: (singerId: string) => Promise<void>;
   createPitch: (input: CreatePitchInput) => Promise<SongSingerPitch | null>;
@@ -31,6 +32,24 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
   const clearError = useCallback(() => {
     setError(null);
   }, []);
+
+  const fetchAllPitches = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const all = await pitchService.getAllPitches();
+      setPitches(all);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch pitches';
+      setError({
+        code: 'UNKNOWN_ERROR',
+        message: errorMessage,
+      });
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   const getPitchesForSong = useCallback(async (songId: string) => {
     setLoading(true);
@@ -139,6 +158,7 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
     pitches,
     loading,
     error,
+    fetchAllPitches,
     getPitchesForSong,
     getPitchesForSinger,
     createPitch,

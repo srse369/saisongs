@@ -1,4 +1,4 @@
-import databaseService from './DatabaseService';
+import apiClient from './ApiClient';
 import type {
   SongSingerPitch,
   CreatePitchInput,
@@ -12,8 +12,9 @@ import {
 
 /**
  * PitchService handles CRUD operations for pitch associations
- * Manages the many-to-many relationship between songs and singers
- * Uses parameterized queries to prevent SQL injection
+ * Manages the many-to-many relationship between songs and singers.
+ * All API rows are normalized into the core SongSingerPitch shape so
+ * the rest of the app can rely on consistent field names.
  */
 class PitchService {
   /**
@@ -46,17 +47,43 @@ class PitchService {
   }
 
   /**
-   * Converts database row to SongSingerPitch object with proper date parsing
+   * Converts a raw API/database row to SongSingerPitch with proper field names
+   * and date parsing. Handles different key casings.
    */
   private mapRowToPitch(row: any): SongSingerPitch {
+    const id = row.id ?? row.ID;
+    const songId = row.songId ?? row.song_id ?? row.SONG_ID;
+    const singerId = row.singerId ?? row.singer_id ?? row.SINGER_ID;
+    const createdRaw = row.createdAt ?? row.created_at ?? row.CREATED_AT;
+    const updatedRaw = row.updatedAt ?? row.updated_at ?? row.UPDATED_AT;
+
     return {
-      id: row.id,
-      songId: row.song_id,
-      singerId: row.singer_id,
-      pitch: row.pitch,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
+      id,
+      songId,
+      singerId,
+      // Oracle / driver may expose this as `pitch` or `PITCH`
+      pitch: row.pitch ?? row.PITCH,
+      createdAt: createdRaw ? new Date(createdRaw) : new Date(),
+      updatedAt: updatedRaw ? new Date(updatedRaw) : new Date(),
     };
+  }
+
+  /**
+   * Retrieves all pitch associations in the system.
+   * @returns Array of normalized pitch associations
+   */
+  async getAllPitches(): Promise<SongSingerPitch[]> {
+    try {
+      const raw = await apiClient.getPitches();
+      return (raw as any[]).map((row) => this.mapRowToPitch(row));
+    } catch (error) {
+      console.error('Error fetching all pitches:', error);
+      throw new DatabaseError(
+        ErrorCode.QUERY_ERROR,
+        'Failed to fetch pitches',
+        error
+      );
+    }
   }
 
   /**
@@ -66,25 +93,12 @@ class PitchService {
    */
   async getPitchesForSong(songId: string): Promise<Array<SongSingerPitch & { singerName: string }>> {
     try {
-      const sql = `
-        SELECT 
-          ssp.id, 
-          ssp.song_id, 
-          ssp.singer_id, 
-          ssp.pitch, 
-          ssp.created_at, 
-          ssp.updated_at,
-          s.name as singer_name
-        FROM song_singer_pitches ssp
-        JOIN singers s ON ssp.singer_id = s.id
-        WHERE ssp.song_id = $1
-        ORDER BY s.name ASC
-      `;
-      const rows = await databaseService.query(sql, [songId]);
-      return rows.map(row => ({
-        ...this.mapRowToPitch(row),
-        singerName: row.singer_name,
-      }));
+      const raw = await apiClient.getSongPitches(songId);
+      return (raw as any[]).map((row) => {
+        const base = this.mapRowToPitch(row) as any;
+        base.singerName = row.singer_name ?? row.SINGER_NAME;
+        return base;
+      });
     } catch (error) {
       console.error('Error fetching pitches for song:', error);
       throw new DatabaseError(
@@ -102,25 +116,15 @@ class PitchService {
    */
   async getPitchesForSinger(singerId: string): Promise<Array<SongSingerPitch & { songName: string }>> {
     try {
-      const sql = `
-        SELECT 
-          ssp.id, 
-          ssp.song_id, 
-          ssp.singer_id, 
-          ssp.pitch, 
-          ssp.created_at, 
-          ssp.updated_at,
-          s.name as song_name
-        FROM song_singer_pitches ssp
-        JOIN songs s ON ssp.song_id = s.id
-        WHERE ssp.singer_id = $1
-        ORDER BY s.name ASC
-      `;
-      const rows = await databaseService.query(sql, [singerId]);
-      return rows.map(row => ({
-        ...this.mapRowToPitch(row),
-        songName: row.song_name,
-      }));
+      // For now, get all pitches and filter - the API can be enhanced later
+      const raw = await apiClient.getPitches();
+      const mapped = (raw as any[]).map((row) => {
+        const base = this.mapRowToPitch(row) as any;
+        base.songName = row.song_name ?? row.SONG_NAME;
+        base.singerName = row.singer_name ?? row.SINGER_NAME;
+        return base;
+      });
+      return mapped.filter((p) => p.singerId === singerId);
     } catch (error) {
       console.error('Error fetching pitches for singer:', error);
       throw new DatabaseError(
@@ -140,18 +144,29 @@ class PitchService {
     this.validatePitchInput(input);
 
     try {
-      const sql = `
-        INSERT INTO song_singer_pitches (song_id, singer_id, pitch)
-        VALUES ($1, $2, $3)
-        RETURNING id, song_id, singer_id, pitch, created_at, updated_at
-      `;
-      const rows = await databaseService.query(sql, [
-        input.songId.trim(),
-        input.singerId.trim(),
-        input.pitch.trim(),
-      ]);
+      // Create the association on the server
+      await apiClient.createPitch({
+        song_id: input.songId.trim(),
+        singer_id: input.singerId.trim(),
+        pitch: input.pitch.trim(),
+      });
 
-      return this.mapRowToPitch(rows[0]);
+      // Fetch all pitches and find the one we just created by (songId, singerId, pitch)
+      const raw = await apiClient.getPitches();
+      const match = (raw as any[]).find(
+        (row) =>
+          (row.song_id ?? row.SONG_ID) === input.songId.trim() &&
+          (row.singer_id ?? row.SINGER_ID) === input.singerId.trim() &&
+          row.pitch === input.pitch.trim()
+      );
+
+      if (!match) {
+        // Fallback: just map the last row if we can't find an exact match
+        const last = (raw as any[])[(raw as any[]).length - 1];
+        return this.mapRowToPitch(last);
+      }
+
+      return this.mapRowToPitch(match);
     } catch (error: any) {
       console.error('Error creating pitch:', error);
       
@@ -183,29 +198,16 @@ class PitchService {
 
     if (input.pitch === undefined) {
       // No fields to update, fetch and return existing pitch
-      const sql = `
-        SELECT id, song_id, singer_id, pitch, created_at, updated_at
-        FROM song_singer_pitches
-        WHERE id = $1
-      `;
-      const rows = await databaseService.query(sql, [id]);
-      return rows.length > 0 ? this.mapRowToPitch(rows[0]) : null;
+      const raw = await apiClient.getPitch(id);
+      return raw ? this.mapRowToPitch(raw as any) : null;
     }
 
     try {
-      const sql = `
-        UPDATE song_singer_pitches
-        SET pitch = $1, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2
-        RETURNING id, song_id, singer_id, pitch, created_at, updated_at
-      `;
-      const rows = await databaseService.query(sql, [input.pitch.trim(), id]);
-
-      if (rows.length === 0) {
-        return null;
-      }
-
-      return this.mapRowToPitch(rows[0]);
+      await apiClient.updatePitch(id, {
+        pitch: input.pitch.trim(),
+      });
+      const raw = await apiClient.getPitch(id);
+      return raw ? this.mapRowToPitch(raw as any) : null;
     } catch (error) {
       console.error('Error updating pitch:', error);
       throw new DatabaseError(
@@ -223,20 +225,11 @@ class PitchService {
    */
   async deletePitch(id: string): Promise<boolean> {
     try {
-      const sql = `
-        DELETE FROM song_singer_pitches
-        WHERE id = $1
-        RETURNING id
-      `;
-      const rows = await databaseService.query(sql, [id]);
-      return rows.length > 0;
+      await apiClient.deletePitch(id);
+      return true;
     } catch (error) {
       console.error('Error deleting pitch:', error);
-      throw new DatabaseError(
-        ErrorCode.QUERY_ERROR,
-        `Failed to delete pitch association with ID: ${id}`,
-        error
-      );
+      return false;
     }
   }
 
@@ -248,18 +241,10 @@ class PitchService {
    */
   async getPitchBySongAndSinger(songId: string, singerId: string): Promise<SongSingerPitch | null> {
     try {
-      const sql = `
-        SELECT id, song_id, singer_id, pitch, created_at, updated_at
-        FROM song_singer_pitches
-        WHERE song_id = $1 AND singer_id = $2
-      `;
-      const rows = await databaseService.query(sql, [songId, singerId]);
-      
-      if (rows.length === 0) {
-        return null;
-      }
-      
-      return this.mapRowToPitch(rows[0]);
+      const raw = await apiClient.getSongPitches(songId);
+      const mapped = (raw as any[]).map((row) => this.mapRowToPitch(row));
+      const pitch = mapped.find((p) => p.singerId === singerId);
+      return pitch || null;
     } catch (error) {
       console.error('Error fetching pitch by song and singer:', error);
       throw new DatabaseError(

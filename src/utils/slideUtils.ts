@@ -42,6 +42,8 @@ export function generateSlides(song: Song): Slide[] {
       index: 0,
       content: 'Song lyrics not available.\nPlease re-import this song.',
       songName: song.name,
+      songSlideNumber: 1,
+      songSlideCount: 1,
     }];
   }
   
@@ -89,6 +91,12 @@ export function generateSlides(song: Song): Slide[] {
       }
     }
   });
-  
-  return slides;
+
+  // Annotate slides with per-song slide number and total
+  const total = slides.length || 1;
+  return slides.map((slide) => ({
+    ...slide,
+    songSlideNumber: slide.index + 1,
+    songSlideCount: total,
+  }));
 }

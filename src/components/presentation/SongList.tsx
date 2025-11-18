@@ -1,16 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SearchBar } from '../common/SearchBar';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
+import { usePitches } from '../../contexts/PitchContext';
 
 interface SongListProps {
   onSongSelect: (songId: string) => void;
 }
 
 export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
-  const { songs, loading: songsLoading, fetchSongs, searchSongsWithFilter } = useSongs();
+  const { songs, loading: songsLoading, fetchSongs } = useSongs();
   const { singers, fetchSingers } = useSingers();
+  const { pitches, getPitchesForSinger } = usePitches();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSingerId, setSelectedSingerId] = useState<string>('');
@@ -21,21 +23,47 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
     fetchSingers();
   }, [fetchSongs, fetchSingers]);
 
-  // Perform search when query or singer filter changes
-  const performSearch = useCallback(async () => {
-    if (searchQuery.trim() || selectedSingerId) {
-      // Use search with filter
-      await searchSongsWithFilter(searchQuery, selectedSingerId || undefined);
-    } else {
-      // No search query or filter, fetch all songs
-      await fetchSongs();
-    }
-  }, [searchQuery, selectedSingerId, searchSongsWithFilter, fetchSongs]);
-
-  // Trigger search when query or singer changes
+  // When singer filter changes, fetch pitches for that singer so we can filter locally by songId
   useEffect(() => {
-    performSearch();
-  }, [performSearch]);
+    if (selectedSingerId) {
+      getPitchesForSinger(selectedSingerId);
+    }
+  }, [selectedSingerId, getPitchesForSinger]);
+
+  // Derive filtered songs using in-memory filtering (fast, no extra network calls)
+  const filteredSongs = useMemo(() => {
+    let base = songs;
+
+    // If a singer is selected, restrict songs to those that have a pitch entry for that singer
+    if (selectedSingerId) {
+      const songIdsForSinger = new Set(pitches.map(p => p.songId));
+      base = base.filter(song => songIdsForSinger.has(song.id));
+    }
+
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return base;
+    }
+
+    return base.filter(song => {
+      const fields = [
+        song.name,
+        song.title,
+        song.title2,
+        song.language,
+        song.deity,
+        song.tempo,
+        song.beat,
+        song.raga,
+        song.level,
+        song.sairhythmsUrl,
+      ];
+
+      return fields.some(field =>
+        field ? field.toString().toLowerCase().includes(query) : false
+      );
+    });
+  }, [songs, searchQuery, selectedSingerId, pitches]);
 
   const handleSongClick = (songId: string) => {
     onSongSelect(songId);
@@ -96,7 +124,7 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
 
       {/* Song list */}
       <div className="space-y-3 sm:space-y-4">
-        {songs.length === 0 ? (
+        {filteredSongs.length === 0 ? (
           <div className="text-center py-12 sm:py-16 text-gray-500 dark:text-gray-400">
             <svg className="mx-auto h-12 w-12 sm:h-16 sm:w-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
@@ -105,7 +133,7 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
             <p className="text-sm mt-2">Try adjusting your search or filter</p>
           </div>
         ) : (
-          songs.map(song => (
+          filteredSongs.map(song => (
             <button
               key={song.id}
               onClick={() => handleSongClick(song.id)}

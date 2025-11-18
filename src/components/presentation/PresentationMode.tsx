@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { SlideView } from './SlideView';
 import { SlideNavigation } from './SlideNavigation';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { useSongs } from '../../contexts/SongContext';
 import { generateSlides } from '../../utils/slideUtils';
-import type { Slide } from '../../types';
+import type { Slide, Song } from '../../types';
+import apiClient from '../../services/ApiClient';
+import { useSearchParams } from 'react-router-dom';
 
 interface PresentationModeProps {
   songId: string;
@@ -12,13 +13,15 @@ interface PresentationModeProps {
 }
 
 export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onExit }) => {
-  const { getSongById } = useSongs();
-  
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [searchParams] = useSearchParams();
+  const singerName = searchParams.get('singerName') || undefined;
+  const pitch = searchParams.get('pitch') || undefined;
 
   // Load song and generate slides
   useEffect(() => {
@@ -26,14 +29,41 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
       setLoading(true);
       setError(null);
       try {
-        const song = await getSongById(songId);
+        // Fetch the song directly from the API to avoid interfering with global SongContext state
+        const song = (await apiClient.getSong(songId)) as Song | null;
         if (!song) {
           setError('Song not found');
           return;
         }
 
-        // Generate slides from the cached song data
-        const generatedSlides = generateSlides(song);
+        // Generate slides from the song data and attach optional singer/pitch (if provided)
+        const baseSlides = generateSlides(song).map((slide) => ({
+          ...slide,
+          singerName,
+          pitch,
+        }));
+
+        // Attach "next" metadata for single-song presentation
+        const generatedSlides = baseSlides.map((slide, index) => {
+          const next = baseSlides[index + 1];
+          if (!next) return slide;
+
+          if (next.songName === slide.songName) {
+            return {
+              ...slide,
+              nextSongName: slide.songName,
+              nextIsContinuation: true,
+            };
+          }
+
+          return {
+            ...slide,
+            nextSongName: next.songName,
+            nextSingerName: next.singerName,
+            nextPitch: next.pitch,
+            nextIsContinuation: false,
+          };
+        });
         setSlides(generatedSlides);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load song');
@@ -43,7 +73,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     };
 
     loadSong();
-  }, [songId, getSongById]);
+  }, [songId, singerName, pitch]);
 
   // Handle keyboard navigation
   useEffect(() => {

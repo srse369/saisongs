@@ -83,6 +83,16 @@ class SongService {
   async createSong(input: CreateSongInput): Promise<Song> {
     this.validateSongInput(input);
 
+    // Debug: Log what SongService is sending to API
+    console.log('🚀 SongService.createSong:', {
+      name: input.name,
+      sairhythmsUrl: input.sairhythmsUrl?.substring(0, 50),
+      has_lyrics: !!input.lyrics,
+      lyrics_length: (input.lyrics || '').length,
+      has_meaning: !!input.meaning,
+      meaning_length: (input.meaning || '').length
+    });
+
     try {
       return await apiClient.createSong({
         name: input.name.trim(),
@@ -183,6 +193,31 @@ class SongService {
         error
       );
     }
+  }
+
+  /**
+   * Searches songs with an optional singer filter.
+   *
+   * NOTE: Currently, singer filtering is not wired through the backend yet,
+   * so this implementation performs a text search only and ignores the
+   * singerId parameter. This preserves the API surface that the UI expects
+   * and avoids runtime errors, while still providing useful search behavior.
+   */
+  async searchSongsWithFilter(query: string, _singerId?: string): Promise<Song[]> {
+    // For now, reuse the existing text search; singer filter can be added later
+    return this.searchSongs(query);
+  }
+
+  /**
+   * Retrieves songs for a given singer.
+   *
+   * NOTE: The song–singer relationship is currently managed via the
+   * song_singer_pitches table and a dedicated pitches API. Until a dedicated
+   * backend endpoint exists, this returns all songs so that callers have a
+   * safe fallback without breaking the UI.
+   */
+  async getSongsBySinger(_singerId: string): Promise<Song[]> {
+    return this.getAllSongs();
   }
 }
 

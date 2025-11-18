@@ -4,11 +4,14 @@ import type { Song, CreateSongInput, UpdateSongInput, ServiceError } from '../ty
 import { songService } from '../services';
 import { useToast } from './ToastContext';
 
+const SONGS_CACHE_KEY = 'songStudio:songsCache';
+const SONGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 interface SongContextState {
   songs: Song[];
   loading: boolean;
   error: ServiceError | null;
-  fetchSongs: () => Promise<void>;
+  fetchSongs: (forceRefresh?: boolean) => Promise<void>;
   getSongById: (id: string) => Promise<Song | null>;
   createSong: (input: CreateSongInput) => Promise<Song | null>;
   updateSong: (id: string, input: UpdateSongInput) => Promise<Song | null>;
@@ -35,12 +38,51 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
     setError(null);
   }, []);
 
-  const fetchSongs = useCallback(async () => {
+  const fetchSongs = useCallback(async (forceRefresh: boolean = false) => {
     setLoading(true);
     setError(null);
     try {
-      const songs = await songService.getAllSongs();
-      setSongs(songs);
+      // Try to hydrate from browser cache first to speed up page load,
+      // unless the caller explicitly requested a forced refresh.
+      if (!forceRefresh && typeof window !== 'undefined') {
+        const cachedRaw = window.localStorage.getItem(SONGS_CACHE_KEY);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw) as {
+              timestamp: number;
+              songs: Song[];
+            };
+            const now = Date.now();
+            if (cached.timestamp && now - cached.timestamp < SONGS_CACHE_TTL_MS && Array.isArray(cached.songs)) {
+              const hydratedSongs: Song[] = cached.songs.map((s: any) => ({
+                ...s,
+                createdAt: s.createdAt ? new Date(s.createdAt) : new Date(),
+                updatedAt: s.updatedAt ? new Date(s.updatedAt) : new Date(),
+              }));
+              setSongs(hydratedSongs);
+              setLoading(false);
+              return;
+            }
+          } catch {
+            // Ignore cache parse errors and fall back to network
+          }
+        }
+      }
+
+      // Fallback: fetch from backend
+      const freshSongs = await songService.getAllSongs();
+      setSongs(freshSongs);
+
+      // Persist to cache for subsequent loads
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(
+          SONGS_CACHE_KEY,
+          JSON.stringify({
+            timestamp: Date.now(),
+            songs: freshSongs,
+          })
+        );
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch songs';
       setError({

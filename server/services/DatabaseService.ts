@@ -1,26 +1,45 @@
 import oracledb from 'oracledb';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
 
 /**
  * DatabaseService handles all database connections and queries to Oracle Autonomous Database.
- * Uses the node-oracledb driver for Oracle database connectivity.
+ * Uses the node-oracledb driver for Oracle database connectivity with thin mode wallet support.
  */
 class DatabaseService {
   private pool: oracledb.Pool | null = null;
   private connectionConfig: oracledb.PoolAttributes;
 
   constructor() {
+    const walletPath = path.join(__dirname, '../../wallet');
+    console.log('📁 Oracle Wallet location:', walletPath);
+    console.log('ℹ️  Using Oracle thin client mode (oracledb 6.x)');
+    
+    // For thin mode, we need to specify wallet location in connection parameters
+    const walletLocation = walletPath;
+    const walletPassword = process.env.VITE_ORACLE_WALLET_PASSWORD || ''; // Wallet password set during download
+    
     // Get connection configuration from environment variables
     this.connectionConfig = {
       user: process.env.VITE_ORACLE_USER,
       password: process.env.VITE_ORACLE_PASSWORD,
       connectString: process.env.VITE_ORACLE_CONNECT_STRING,
+      walletLocation: walletLocation,
+      walletPassword: walletPassword,
       poolMin: 1,
       poolMax: 10,
       poolIncrement: 1,
+      queueTimeout: 5000, // Fail fast after 5 seconds instead of 60
+      connectTimeout: 5000, // Connection timeout of 5 seconds
     };
 
     if (!this.connectionConfig.user || !this.connectionConfig.password || !this.connectionConfig.connectString) {
@@ -59,7 +78,7 @@ class DatabaseService {
    * @returns Query result rows
    * @throws Error if query execution fails
    */
-  async query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+  async query<T = any>(sql: string, params: any[] | Record<string, any> = []): Promise<T[]> {
     await this.initPool();
 
     if (!this.pool) {
