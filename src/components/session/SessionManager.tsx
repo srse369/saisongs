@@ -1,19 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSession } from '../../contexts/SessionContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
+import { useNamedSessions } from '../../contexts/NamedSessionContext';
 import { useNavigate } from 'react-router-dom';
 import type { Song } from '../../types';
 import { Modal } from '../common/Modal';
 import { SongDetails } from '../admin/SongDetails';
+import { formatPitch } from '../../utils/pitchUtils';
 
 export const SessionManager: React.FC = () => {
-  const { entries, removeSong, clearSession, reorderSession } = useSession();
+  const { entries, removeSong, clearSession, reorderSession, addSong } = useSession();
   const { songs } = useSongs();
   const { singers } = useSingers();
+  const { sessions, createSession, setSessionItems, loadSession, currentSession } = useNamedSessions();
   const navigate = useNavigate();
 
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
+  const [sessionName, setSessionName] = useState('');
+  const [sessionDescription, setSessionDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [loadingSession, setLoadingSession] = useState(false);
+  const [sessionToLoad, setSessionToLoad] = useState<string | null>(null);
 
   const sessionItems = entries
     .map((entry) => {
@@ -69,6 +79,77 @@ export const SessionManager: React.FC = () => {
     reorderSession(order);
   };
 
+  const handleSaveSession = async () => {
+    if (!sessionName.trim()) {
+      alert('Please enter a session name');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Create the named session
+      const newSession = await createSession({
+        name: sessionName.trim(),
+        description: sessionDescription.trim() || undefined,
+      });
+
+      if (!newSession) {
+        return;
+      }
+
+      // Prepare session items from current session entries
+      const items = sessionItems.map(({ entry, singer }) => ({
+        songId: entry.songId,
+        singerId: singer?.id,
+        pitch: entry.pitch,
+      }));
+
+      // Save the items to the session
+      await setSessionItems(newSession.id, items);
+
+      // Reset form and close modal
+      setSessionName('');
+      setSessionDescription('');
+      setShowSaveModal(false);
+    } catch (error) {
+      console.error('Error saving session:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLoadSession = async (sessionId: string) => {
+    setLoadingSession(true);
+    setSessionToLoad(sessionId);
+    try {
+      await loadSession(sessionId);
+    } catch (error) {
+      console.error('Error loading session:', error);
+      alert('Failed to load session. Please try again.');
+      setLoadingSession(false);
+      setSessionToLoad(null);
+    }
+  };
+
+  // Effect to handle loading session items into live session
+  useEffect(() => {
+    if (sessionToLoad && currentSession && currentSession.id === sessionToLoad && currentSession.items) {
+      // Clear existing session first
+      clearSession();
+      
+      // Load songs into the active session context
+      currentSession.items.forEach(item => {
+        const singer = singers.find(s => s.id === item.singerId);
+        addSong(item.songId, singer?.id, item.pitch);
+      });
+      
+      setShowLoadModal(false);
+      setLoadingSession(false);
+      setSessionToLoad(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionToLoad, currentSession]);
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -88,14 +169,30 @@ export const SessionManager: React.FC = () => {
           >
             Present Session
           </button>
+          <button
+            type="button"
+            onClick={() => setShowLoadModal(true)}
+            className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+          >
+            Load Session
+          </button>
           {sessionItems.length > 0 && (
-            <button
-              type="button"
-              onClick={clearSession}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-            >
-              Clear Session
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setShowSaveModal(true)}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              >
+                Save Session
+              </button>
+              <button
+                type="button"
+                onClick={clearSession}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              >
+                Clear Session
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -166,7 +263,14 @@ export const SessionManager: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-gray-100">
-                      {entry.pitch ?? '—'}
+                      {entry.pitch ? (
+                        <>
+                          <span className="font-bold text-blue-600 dark:text-blue-400">{formatPitch(entry.pitch)}</span>
+                          <span className="text-gray-500 dark:text-gray-400 ml-2">({entry.pitch.replace('#', '♯')})</span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 align-top">
@@ -213,6 +317,130 @@ export const SessionManager: React.FC = () => {
           <SongDetails song={viewingSong} />
         </Modal>
       )}
+
+      {/* Save Session Modal */}
+      <Modal
+        isOpen={showSaveModal}
+        onClose={() => {
+          setShowSaveModal(false);
+          setSessionName('');
+          setSessionDescription('');
+        }}
+        title="Save Session"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Save the current session ({sessionItems.length} {sessionItems.length === 1 ? 'song' : 'songs'}) 
+            as a named session for easy reuse later.
+          </p>
+
+          <div>
+            <label htmlFor="session-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Session Name *
+            </label>
+            <input
+              id="session-name"
+              type="text"
+              value={sessionName}
+              onChange={(e) => setSessionName(e.target.value)}
+              placeholder="e.g., Sunday Bhajans, Festival Songs"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              disabled={saving}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="session-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description (optional)
+            </label>
+            <textarea
+              id="session-description"
+              value={sessionDescription}
+              onChange={(e) => setSessionDescription(e.target.value)}
+              placeholder="Add notes about this session..."
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              disabled={saving}
+            />
+          </div>
+
+          <div className="flex gap-2 justify-end pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setShowSaveModal(false);
+                setSessionName('');
+                setSessionDescription('');
+              }}
+              disabled={saving}
+              className="px-4 py-2 text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveSession}
+              disabled={saving || !sessionName.trim()}
+              className="px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Saving...' : 'Save Session'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Load Session Modal */}
+      <Modal
+        isOpen={showLoadModal}
+        onClose={() => setShowLoadModal(false)}
+        title="Load Session"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Select a saved session to load into your current live session. This will replace any songs currently in the live session.
+          </p>
+
+          {sessions.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No saved sessions found. Save your current session to create one.
+            </div>
+          ) : (
+            <div className="max-h-96 overflow-y-auto space-y-2">
+              {sessions.map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => handleLoadSession(session.id)}
+                  disabled={loadingSession}
+                  className="w-full text-left p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  <div className="font-semibold text-gray-900 dark:text-white">
+                    {session.name}
+                  </div>
+                  {session.description && (
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      {session.description}
+                    </div>
+                  )}
+                  <div className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                    Last saved: {new Date(session.updatedAt).toLocaleString()}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2 justify-end pt-4 border-t dark:border-gray-600">
+            <button
+              type="button"
+              onClick={() => setShowLoadModal(false)}
+              disabled={loadingSession}
+              className="px-4 py-2 text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+            >
+              {loadingSession ? 'Loading...' : 'Cancel'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

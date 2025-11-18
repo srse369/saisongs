@@ -6,6 +6,7 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  size?: 'default' | 'large';
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -13,6 +14,7 @@ export const Modal: React.FC<ModalProps> = ({
   onClose,
   title,
   children,
+  size = 'default',
 }) => {
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -40,12 +42,14 @@ export const Modal: React.FC<ModalProps> = ({
     }
   };
 
+  const maxWidthClass = size === 'large' ? 'max-w-5xl' : 'max-w-2xl';
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 animate-fade-in"
       onClick={handleBackdropClick}
     >
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-fade-in">
+      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl ${maxWidthClass} w-full max-h-[90vh] overflow-hidden flex flex-col animate-fade-in`}>
         <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">{title}</h2>
           <button

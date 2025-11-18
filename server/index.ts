@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import songsRouter from './routes/songs';
 import singersRouter from './routes/singers';
 import pitchesRouter from './routes/pitches';
+import sessionsRouter from './routes/sessions';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -25,6 +26,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/songs', songsRouter);
 app.use('/api/singers', singersRouter);
 app.use('/api/pitches', pitchesRouter);
+app.use('/api/sessions', sessionsRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

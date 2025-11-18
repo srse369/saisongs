@@ -11,6 +11,7 @@ import { PitchProvider, usePitches } from './contexts/PitchContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SessionProvider } from './contexts/SessionContext';
+import { NamedSessionProvider } from './contexts/NamedSessionContext';
 import { useAdminShortcut } from './hooks';
 import { useState, useEffect } from 'react';
 import './App.css';
@@ -115,11 +116,13 @@ function App() {
           <SongProvider>
             <SingerProvider>
               <PitchProvider>
-                <SessionProvider>
-                  <BrowserRouter>
-                    <AppContent />
-                  </BrowserRouter>
-                </SessionProvider>
+                <NamedSessionProvider>
+                  <SessionProvider>
+                    <BrowserRouter>
+                      <AppContent />
+                    </BrowserRouter>
+                  </SessionProvider>
+                </NamedSessionProvider>
               </PitchProvider>
             </SingerProvider>
           </SongProvider>

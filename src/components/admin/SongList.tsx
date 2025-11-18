@@ -152,7 +152,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                   disabled={songIds.includes(song.id)}
                   className="px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {songIds.includes(song.id) ? 'In Session' : 'Add to Session'}
+                  {songIds.includes(song.id) ? 'In Live' : 'Add to Live'}
                 </button>
                 <button
                   onClick={() => handlePresent(song)}

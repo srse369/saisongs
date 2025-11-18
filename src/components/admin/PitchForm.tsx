@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { SongSingerPitch, CreatePitchInput, Song, Singer } from '../../types';
+import { ALL_PITCH_OPTIONS, formatPitchWithName } from '../../utils/pitchUtils';
 
 interface PitchFormProps {
   pitch?: SongSingerPitch | null;
@@ -133,17 +134,22 @@ export const PitchForm: React.FC<PitchFormProps> = ({
         <label htmlFor="pitch-value" className="block text-sm font-medium text-gray-700 mb-1">
           Pitch <span className="text-red-500">*</span>
         </label>
-        <input
+        <select
           id="pitch-value"
-          type="text"
           value={pitchValue}
           onChange={(e) => setPitchValue(e.target.value)}
           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors.pitch ? 'border-red-500' : 'border-gray-300'
           }`}
-          placeholder="e.g., C, D#, G major"
           disabled={isSubmitting}
-        />
+        >
+          <option value="">Select a pitch</option>
+          {ALL_PITCH_OPTIONS.map((pitch) => (
+            <option key={pitch} value={pitch}>
+              {formatPitchWithName(pitch)}
+            </option>
+          ))}
+        </select>
         {errors.pitch && (
           <p className="mt-1 text-sm text-red-600">{errors.pitch}</p>
         )}

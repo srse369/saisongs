@@ -27,7 +27,7 @@ export const SlideNavigation: React.FC<SlideNavigationProps> = ({
   };
 
   return (
-    <div className="flex items-center justify-center gap-6 p-4 bg-gray-800/90 backdrop-blur-sm rounded-lg">
+    <div className="flex items-center justify-center gap-6 p-4 bg-gray-800/25 rounded-lg">
       {/* Previous button */}
       <button
         onClick={handlePrevious}

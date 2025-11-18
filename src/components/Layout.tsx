@@ -92,7 +92,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Pitches
               </Link>
               <Link to="/session" className={getLinkClasses('/session')}>
-                Session
+                Live
               </Link>
               
               {/* Dark mode toggle */}
@@ -260,7 +260,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className={`block ${getLinkClasses('/session')}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                Session
+                Live Session
               </Link>
               
               {/* Database status in mobile menu */}

@@ -4,6 +4,7 @@ import { Modal } from '../common/Modal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
+import { formatPitch, formatPitchWithName } from '../../utils/pitchUtils';
 
 interface PitchWithDetails extends SongSingerPitch {
   songName?: string;
@@ -148,7 +149,10 @@ export const PitchList: React.FC<PitchListProps> = ({
                   <div className="text-sm text-gray-900">{pitch.singerName}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900 font-semibold">{pitch.pitch}</div>
+                  <div className="text-sm text-gray-900">
+                    <span className="font-bold text-blue-600">{formatPitch(pitch.pitch)}</span>
+                    <span className="text-gray-500 ml-2">({pitch.pitch.replace('#', '♯')})</span>
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex flex-col items-end gap-2">
@@ -157,7 +161,7 @@ export const PitchList: React.FC<PitchListProps> = ({
                       disabled={songIds.includes(pitch.songId)}
                       className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {songIds.includes(pitch.songId) ? 'In Session' : 'Add to Session'}
+                      {songIds.includes(pitch.songId) ? 'In Live' : 'Add to Live'}
                     </button>
                     <button
                       onClick={() => handlePresent(pitch)}

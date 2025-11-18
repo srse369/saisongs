@@ -42,6 +42,34 @@ export interface SongSingerPitch {
   updatedAt: Date;
 }
 
+export interface NamedSession {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SessionItem {
+  id: string;
+  sessionId: string;
+  songId: string;
+  singerId?: string;
+  pitch?: string;
+  sequenceOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SessionItemWithDetails extends SessionItem {
+  songName: string;
+  singerName?: string;
+}
+
+export interface NamedSessionWithItems extends NamedSession {
+  items: SessionItemWithDetails[];
+}
+
 // Presentation interfaces
 
 export interface Slide {
@@ -114,6 +142,30 @@ export interface CreatePitchInput {
 
 export interface UpdatePitchInput {
   pitch?: string;
+}
+
+export interface CreateNamedSessionInput {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateNamedSessionInput {
+  name?: string;
+  description?: string;
+}
+
+export interface CreateSessionItemInput {
+  sessionId: string;
+  songId: string;
+  singerId?: string;
+  pitch?: string;
+  sequenceOrder: number;
+}
+
+export interface UpdateSessionItemInput {
+  singerId?: string;
+  pitch?: string;
+  sequenceOrder?: number;
 }
 
 // Service method return types

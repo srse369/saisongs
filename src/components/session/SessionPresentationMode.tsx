@@ -22,6 +22,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showOverlay, setShowOverlay] = useState(true);
 
   // Build a flattened slide deck for the entire session
   useEffect(() => {
@@ -36,7 +37,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
     try {
       const allSlides: Slide[] = [];
 
-      entries.forEach((entry) => {
+      entries.forEach((entry, songIndex) => {
         const song = songs.find((s) => s.id === entry.songId);
         if (!song) return;
 
@@ -45,6 +46,8 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
           ...slide,
           singerName: singer?.name,
           pitch: entry.pitch,
+          sessionSongIndex: songIndex + 1, // Track which song in the session (1-based)
+          totalSongs: entries.length, // Total number of songs in session
         }));
 
         songSlides.forEach((slide) => {
@@ -86,9 +89,22 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
     }
   }, [entries, songs, singers]);
 
+  // Auto-hide overlay after 2 seconds
+  useEffect(() => {
+    if (showOverlay) {
+      const timer = setTimeout(() => {
+        setShowOverlay(false);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [showOverlay]);
+
   // Handle keyboard navigation across slides
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Show overlay on any key press
+      setShowOverlay(true);
+      
       switch (e.key) {
         case 'ArrowLeft':
         case 'ArrowUp':
@@ -192,16 +208,14 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         <SlideView slide={currentSlide} showTranslation={true} />
       </div>
 
-      {/* Navigation controls - hidden in fullscreen mode */}
-      {!isFullScreen && (
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
-          <SlideNavigation
-            currentSlide={currentSlideIndex}
-            totalSlides={slides.length}
-            onNavigate={handleNavigate}
-          />
-        </div>
-      )}
+      {/* Navigation controls at bottom center */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
+        <SlideNavigation
+          currentSlide={currentSlideIndex}
+          totalSlides={slides.length}
+          onNavigate={handleNavigate}
+        />
+      </div>
 
       {/* Control buttons - top right */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
@@ -236,15 +250,6 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         </button>
       </div>
 
-      {/* Keyboard shortcuts hint - bottom left, hidden in fullscreen */}
-      {!isFullScreen && (
-        <div className="absolute bottom-8 left-8 z-10 text-white/70 text-sm bg-gray-800/70 backdrop-blur-sm px-4 py-2 rounded-lg">
-          <p className="font-medium mb-1">Keyboard Shortcuts:</p>
-          <p>← → : Navigate slides</p>
-          <p>F : Toggle fullscreen</p>
-          <p>Esc : Exit session</p>
-        </div>
-      )}
     </div>
   );
 };

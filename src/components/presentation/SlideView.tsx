@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Slide } from '../../types';
+import { formatPitch } from '../../utils/pitchUtils';
 
 interface SlideViewProps {
   slide: Slide;
@@ -7,12 +8,20 @@ interface SlideViewProps {
 }
 
 export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = true }) => {
+  const sessionSongIndex = (slide as any).sessionSongIndex;
+  const totalSongs = (slide as any).totalSongs;
+  
   return (
     <div className="presentation-slide">
-      {/* Per-song slide position (when applicable) at top-left */}
-      {slide.songSlideCount && slide.songSlideCount > 1 && slide.songSlideNumber && (
-        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 text-[0.7rem] sm:text-xs text-blue-100/80">
-          {slide.songSlideNumber} / {slide.songSlideCount}
+      {/* Song number and slide position at top-left */}
+      {(sessionSongIndex || (slide.songSlideCount && slide.songSlideCount > 1 && slide.songSlideNumber)) && (
+        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 text-[1.05rem] sm:text-[1.125rem] text-blue-100/80 bg-gray-800/25 rounded-lg px-3 py-2">
+          {sessionSongIndex && totalSongs && (
+            <div>Song {sessionSongIndex}/{totalSongs}</div>
+          )}
+          {slide.songSlideCount && slide.songSlideCount > 1 && slide.songSlideNumber && (
+            <div>Slide {slide.songSlideNumber}/{slide.songSlideCount}</div>
+          )}
         </div>
       )}
 
@@ -44,7 +53,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
 
       {/* Singer / pitch (when available) at bottom-left */}
       {(slide.singerName || slide.pitch) && (
-        <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 text-[0.7rem] sm:text-xs text-blue-100/70">
+        <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 text-[1.05rem] sm:text-[1.125rem] text-blue-100/70">
           {slide.singerName && (
             <span>
               Singer: {slide.singerName}
@@ -53,16 +62,16 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
           {slide.singerName && slide.pitch && <span className="mx-1">•</span>}
           {slide.pitch && (
             <span>
-              Pitch: {slide.pitch}
+              Pitch: <span className="font-bold">{formatPitch(slide.pitch)}</span> ({slide.pitch.replace('#', '♯')})
             </span>
           )}
         </div>
       )}
 
-      {/* Slide indicator and next-song hint at bottom-right */}
-      <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 text-right space-y-1">
-        {slide.nextSongName && (
-          <div className="text-[0.7rem] sm:text-xs text-blue-100/80">
+      {/* Next-song hint at bottom-right */}
+      {slide.nextSongName && (
+        <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 text-right">
+          <div className="text-[1.05rem] sm:text-[1.125rem] text-blue-100/80">
             {slide.nextIsContinuation ? (
               <>Next: {slide.nextSongName} (contd.)</>
             ) : (
@@ -73,11 +82,8 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
               </>
             )}
           </div>
-        )}
-        <div className="text-blue-200/60 text-sm sm:text-base">
-          Slide {slide.index + 1}
         </div>
-      </div>
+      )}
     </div>
   );
 };
