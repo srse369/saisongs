@@ -57,3 +57,6 @@ deploy.tar.gz
 *.pem
 *.key
 *.crt
+
+# Wallet / secrets
+wallet/
