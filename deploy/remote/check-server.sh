@@ -1,6 +1,18 @@
 #!/bin/bash
 # Script to check and restart the Song Studio backend server
 # Usage: ssh ubuntu@129.153.85.24 'bash -s' < check-server.sh
+# Or with SSH key: SSH_KEY=~/.ssh/my-key ./check-server.sh
+
+# SSH Configuration
+SSH_OPTS=""
+if [ -n "$SSH_KEY" ]; then
+    # Expand tilde and resolve full path
+    SSH_KEY_PATH=$(eval echo "$SSH_KEY")
+    
+    if [ -f "$SSH_KEY_PATH" ]; then
+        SSH_OPTS="-i \"$SSH_KEY_PATH\""
+    fi
+fi
 
 echo "=========================================="
 echo "Song Studio Server Health Check"
@@ -39,7 +51,7 @@ if pm2 list | grep -q "songstudio"; then
 else
     echo "❌ songstudio process not found. Starting it..."
     cd /var/www/songstudio
-    pm2 start ecosystem.config.js --env production
+    pm2 start ecosystem.config.cjs --env production
 fi
 echo ""
 

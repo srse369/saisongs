@@ -1,8 +1,12 @@
 import express from 'express';
 import oracledb from 'oracledb';
 import { databaseService } from '../services/DatabaseService.js';
+import { cacheService } from '../services/CacheService.js';
 
 const router = express.Router();
+
+// Cache TTL: 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 
 // Helper function to safely extract Oracle values (handles CLOBs and circular refs)
 function extractValue(value: any): any {
@@ -25,6 +29,14 @@ function extractValue(value: any): any {
 // Get all songs
 router.get('/', async (req, res) => {
   try {
+    // Check cache first
+    const cacheKey = 'songs:all';
+    const cached = cacheService.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    // Cache miss - fetch from database
     const songs = await databaseService.query(`
       SELECT 
         RAWTOHEX(id) as id,
@@ -74,6 +86,10 @@ router.get('/', async (req, res) => {
       createdAt: extractValue(song.CREATED_AT),
       updatedAt: extractValue(song.UPDATED_AT)
     }));
+
+    // Cache the results
+    cacheService.set(cacheKey, mappedSongs, CACHE_TTL);
+
     res.json(mappedSongs);
   } catch (error) {
     console.error('Error fetching songs:', error);
@@ -221,6 +237,9 @@ router.post('/', async (req, res) => {
       )
     `, params);
 
+    // Invalidate songs cache
+    cacheService.invalidatePattern('songs:');
+
     res.status(201).json({ message: 'Song created successfully' });
   } catch (error) {
     console.error('Error creating song:', error);
@@ -297,6 +316,9 @@ router.put('/:id', async (req, res) => {
       WHERE RAWTOHEX(id) = :18
     `, params);
 
+    // Invalidate songs cache
+    cacheService.invalidatePattern('songs:');
+
     res.json({ message: 'Song updated successfully' });
   } catch (error) {
     console.error('Error updating song:', error);
@@ -311,6 +333,9 @@ router.delete('/:id', async (req, res) => {
     await databaseService.query(`
       DELETE FROM songs WHERE RAWTOHEX(id) = :1
     `, [id]);
+    
+    // Invalidate songs cache
+    cacheService.invalidatePattern('songs:');
     
     res.json({ message: 'Song deleted successfully' });
   } catch (error) {

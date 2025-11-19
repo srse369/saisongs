@@ -50,7 +50,7 @@ module.exports = {
       repo: 'git@github.com:srse369/songstudio.git',
       path: '/var/www/songstudio',
       'pre-deploy-local': '',
-      'post-deploy': 'npm install && npm run build && npm run build:server && pm2 reload ecosystem.config.js --env production',
+      'post-deploy': 'npm install && npm run build && npm run build:server && pm2 reload ecosystem.config.cjs --env production',
       'pre-setup': ''
     }
   }

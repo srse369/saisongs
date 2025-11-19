@@ -1,119 +1,199 @@
 #!/bin/bash
+# Complete Deployment Script for Song Studio
+# Handles frontend, backend, and all configurations
 
-# Deploy Song Studio to Remote Server
-# Usage: ./deploy.sh [environment]
-# Example: ./deploy.sh production
+set -e
 
-set -e  # Exit on error
+echo "🚀 Song Studio Deployment"
+echo "========================="
+echo ""
 
-# Configuration
-REMOTE_HOST="129.153.85.24"
-REMOTE_USER="ubuntu"
-REMOTE_PATH="/var/www/songstudio"
-ENVIRONMENT="${1:-production}"
-SSH_KEY="${HOME}/Downloads/SSH Key Nov 12 2025.key"
+# SSH Configuration
+# Use SSH_KEY environment variable if set, otherwise use default SSH behavior
+SSH_OPTS=""
+if [ -n "$SSH_KEY" ]; then
+    # Expand tilde and resolve full path
+    SSH_KEY_PATH=$(eval echo "$SSH_KEY")
+    
+    if [ -f "$SSH_KEY_PATH" ]; then
+        SSH_OPTS="-i \"$SSH_KEY_PATH\""
+        echo "🔑 Using SSH key: $SSH_KEY_PATH"
+    else
+        echo "⚠️  Warning: SSH_KEY set but file not found: $SSH_KEY_PATH"
+        echo "    Falling back to default SSH authentication"
+    fi
+fi
+echo ""
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Parse arguments
+SKIP_FRONTEND=false
+SKIP_BACKEND=false
 
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  Song Studio Deployment Script${NC}"
-echo -e "${GREEN}  Target: ${REMOTE_HOST}${NC}"
-echo -e "${GREEN}  Environment: ${ENVIRONMENT}${NC}"
-echo -e "${GREEN}========================================${NC}"
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --skip-frontend)
+      SKIP_FRONTEND=true
+      shift
+      ;;
+    --skip-backend)
+      SKIP_BACKEND=true
+      shift
+      ;;
+    --backend-only)
+      SKIP_FRONTEND=true
+      shift
+      ;;
+    --frontend-only)
+      SKIP_BACKEND=true
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Usage: $0 [--backend-only|--frontend-only|--skip-frontend|--skip-backend]"
+      exit 1
+      ;;
+  esac
+done
 
-# Check if SSH key exists
-if [ ! -f "$SSH_KEY" ]; then
-    echo -e "${RED}Error: SSH key not found at: $SSH_KEY${NC}"
-    echo -e "${YELLOW}Please ensure the SSH key exists at this location.${NC}"
+# Check if we're in the right directory
+if [ ! -f "package.json" ]; then
+    echo "❌ Error: Must run from project root directory"
     exit 1
 fi
 
-# Set proper permissions on SSH key
-chmod 600 "$SSH_KEY"
-
-# Step 1: Build the application locally
-echo -e "\n${GREEN}Step 1: Building application...${NC}"
-npm run build:vps
-npm run build:server
-
-# Step 2: Create deployment package
-echo -e "\n${GREEN}Step 2: Creating deployment package...${NC}"
-TEMP_DIR=$(mktemp -d)
-mkdir -p "$TEMP_DIR/songstudio"
-
-# Copy necessary files
-cp -r dist "$TEMP_DIR/songstudio/"
-cp package.json "$TEMP_DIR/songstudio/"
-cp package-lock.json "$TEMP_DIR/songstudio/"
-cp deploy/remote/ecosystem.config.cjs "$TEMP_DIR/songstudio/" 2>/dev/null || echo "No ecosystem.config.cjs found"
-cp .env.production "$TEMP_DIR/songstudio/.env" 2>/dev/null || echo "No .env.production found"
-
-# Create tarball
-cd "$TEMP_DIR"
-tar -czf songstudio.tar.gz songstudio/
-cd - > /dev/null
-
-# Step 3: Transfer to remote server
-echo -e "\n${GREEN}Step 3: Transferring files to remote server...${NC}"
-scp -i "$SSH_KEY" "$TEMP_DIR/songstudio.tar.gz" "${REMOTE_USER}@${REMOTE_HOST}:/tmp/"
-
-# Step 4: Deploy on remote server
-echo -e "\n${GREEN}Step 4: Deploying on remote server...${NC}"
-ssh -i "$SSH_KEY" "${REMOTE_USER}@${REMOTE_HOST}" << 'ENDSSH'
-set -e
-
-echo "Extracting deployment package..."
-cd /tmp
-tar -xzf songstudio.tar.gz
-
-echo "Creating backup of current deployment..."
-if [ -d "/var/www/songstudio" ]; then
-    sudo cp -r /var/www/songstudio "/var/www/songstudio.backup.$(date +%Y%m%d_%H%M%S)"
+# Frontend Deployment
+if [ "$SKIP_FRONTEND" = false ]; then
+    echo "📦 Building Frontend..."
+    echo "----------------------"
+    
+    # Ensure .env.production exists
+    if [ ! -f ".env.production" ]; then
+        echo "Creating .env.production..."
+        echo "VITE_API_URL=/api" > .env.production
+    fi
+    
+    # Clean and build
+    rm -rf dist/
+    npm run build:vps
+    echo "✅ Frontend built"
+    echo ""
 fi
 
-echo "Installing application..."
-sudo mkdir -p /var/www/songstudio
-sudo cp -r /tmp/songstudio/* /var/www/songstudio/
-sudo chown -R $USER:$USER /var/www/songstudio
-
-echo "Installing dependencies..."
-cd /var/www/songstudio
-npm ci --only=production
-
-echo "Restarting application..."
-if command -v pm2 &> /dev/null; then
-    pm2 restart ecosystem.config.cjs --env production || pm2 start ecosystem.config.cjs --env production
-else
-    echo "PM2 not found. Starting with node..."
-    nohup node dist/server/index.js > /var/www/songstudio/logs/app.log 2>&1 &
+# Backend Deployment
+if [ "$SKIP_BACKEND" = false ]; then
+    echo "🔧 Building Backend..."
+    echo "---------------------"
+    npm run build:server
+    echo "✅ Backend built"
+    echo ""
 fi
 
-echo "Cleaning up..."
-rm -rf /tmp/songstudio /tmp/songstudio.tar.gz
+# Deploy to Server
+echo "🚢 Deploying to saisongs.org..."
+echo "--------------------------------"
 
-echo "Deployment complete!"
+if [ "$SKIP_FRONTEND" = false ]; then
+    echo "  → Uploading frontend files..."
+    eval scp $SSH_OPTS -r dist/* ubuntu@saisongs.org:/var/www/songstudio/dist/
+fi
+
+if [ "$SKIP_BACKEND" = false ]; then
+    echo "  → Uploading backend files..."
+    eval scp $SSH_OPTS -r dist/server ubuntu@saisongs.org:/var/www/songstudio/dist/
+    
+    # Deploy PM2 ecosystem config
+    echo "  → Uploading PM2 config..."
+    eval scp $SSH_OPTS deploy/remote/ecosystem.config.cjs ubuntu@saisongs.org:/var/www/songstudio/
+    
+    # Remove old .js config if it exists
+    eval ssh $SSH_OPTS ubuntu@saisongs.org 'rm -f /var/www/songstudio/ecosystem.config.js' 2>/dev/null || true
+fi
+
+echo "✅ Files deployed"
+echo ""
+
+# Restart Backend (if backend was updated)
+if [ "$SKIP_BACKEND" = false ]; then
+    echo "🔄 Restarting Backend..."
+    echo "-----------------------"
+    
+    eval ssh $SSH_OPTS ubuntu@saisongs.org << 'ENDSSH'
+        cd /var/www/songstudio
+        
+        # Stop gracefully
+        pm2 stop songstudio 2>/dev/null || true
+        
+        # Wait for cleanup (important for Oracle connection pool)
+        sleep 3
+        
+        # Start fresh
+        pm2 start ecosystem.config.cjs --env production
+        
+        # Save configuration
+        pm2 save
 ENDSSH
-
-# Cleanup local temp files
-rm -rf "$TEMP_DIR"
-
-echo -e "\n${GREEN}========================================${NC}"
-echo -e "${GREEN}  Deployment Complete!${NC}"
-echo -e "${GREEN}  Application URL: http://${REMOTE_HOST}${NC}"
-echo -e "${GREEN}========================================${NC}"
-
-# Step 5: Health check
-echo -e "\n${GREEN}Step 5: Performing health check...${NC}"
-sleep 5
-if curl -f "http://${REMOTE_HOST}/api/health" > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ Health check passed!${NC}"
-else
-    echo -e "${RED}✗ Health check failed. Please check the logs.${NC}"
-    echo -e "${YELLOW}SSH into server: ssh ${REMOTE_USER}@${REMOTE_HOST}${NC}"
-    echo -e "${YELLOW}Check logs: pm2 logs songstudio${NC}"
+    
+    echo "✅ Backend restarted"
+    echo ""
+    
+    # Wait for app to initialize
+    echo "⏳ Waiting for app to initialize..."
+    sleep 10
+    echo ""
 fi
 
+# Verify Deployment
+echo "🧪 Verifying Deployment..."
+echo "-------------------------"
+
+# Test API health
+echo "  → Testing API health..."
+if curl -f -s https://saisongs.org/api/health > /dev/null 2>&1; then
+    echo "  ✅ API health check passed"
+else
+    echo "  ❌ API health check failed"
+fi
+
+# Test frontend
+echo "  → Testing frontend..."
+if curl -f -s https://saisongs.org/ > /dev/null 2>&1; then
+    echo "  ✅ Frontend loading"
+else
+    echo "  ❌ Frontend not responding"
+fi
+
+echo ""
+
+# Show Status
+echo "📊 Server Status"
+echo "---------------"
+eval ssh $SSH_OPTS ubuntu@saisongs.org 'pm2 list'
+echo ""
+
+# Show Recent Logs
+echo "📝 Recent Logs (last 15 lines)"
+echo "------------------------------"
+eval ssh $SSH_OPTS ubuntu@saisongs.org 'pm2 logs songstudio --nostream --lines 15'
+echo ""
+
+# Summary
+echo "========================="
+echo "✅ Deployment Complete!"
+echo "========================="
+echo ""
+echo "🌐 URLs:"
+echo "  Frontend: https://saisongs.org"
+echo "  API:      https://saisongs.org/api/health"
+echo ""
+echo "📊 Monitor:"
+echo "  Logs:     ssh ubuntu@saisongs.org 'pm2 logs songstudio'"
+echo "  Status:   ssh ubuntu@saisongs.org 'pm2 status'"
+echo "  Restart:  ssh ubuntu@saisongs.org 'pm2 restart songstudio'"
+echo ""
+echo "🔍 Check caching:"
+echo "  ssh ubuntu@saisongs.org 'pm2 logs songstudio | grep -i cache'"
+echo ""
+echo "Expected cache messages:"
+echo "  ✅ Cache hit for key: songs:all (age: 15s)"
+echo "  💾 Cached data for key: songs:all (TTL: 300s)"
+echo ""

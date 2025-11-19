@@ -1,11 +1,23 @@
 import express from 'express';
 import { databaseService } from '../services/DatabaseService.js';
+import { cacheService } from '../services/CacheService.js';
 
 const router = express.Router();
+
+// Cache TTL: 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 
 // Get all singers
 router.get('/', async (req, res) => {
   try {
+    // Check cache first
+    const cacheKey = 'singers:all';
+    const cached = cacheService.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    // Cache miss - fetch from database
     const singers = await databaseService.query(`
       SELECT 
         RAWTOHEX(id) as id,
@@ -15,6 +27,10 @@ router.get('/', async (req, res) => {
       FROM singers
       ORDER BY name
     `);
+
+    // Cache the results
+    cacheService.set(cacheKey, singers, CACHE_TTL);
+
     res.json(singers);
   } catch (error) {
     console.error('Error fetching singers:', error);
@@ -66,6 +82,9 @@ router.post('/', async (req, res) => {
       INSERT INTO singers (name) VALUES (:1)
     `, [name]);
 
+    // Invalidate singers cache
+    cacheService.invalidatePattern('singers:');
+
     res.status(201).json({ message: 'Singer created successfully' });
   } catch (error) {
     console.error('Error creating singer:', error);
@@ -86,6 +105,9 @@ router.put('/:id', async (req, res) => {
       WHERE RAWTOHEX(id) = :2
     `, [name, id]);
 
+    // Invalidate singers cache
+    cacheService.invalidatePattern('singers:');
+
     res.json({ message: 'Singer updated successfully' });
   } catch (error) {
     console.error('Error updating singer:', error);
@@ -100,6 +122,9 @@ router.delete('/:id', async (req, res) => {
     await databaseService.query(`
       DELETE FROM singers WHERE RAWTOHEX(id) = :1
     `, [id]);
+    
+    // Invalidate singers cache
+    cacheService.invalidatePattern('singers:');
     
     res.json({ message: 'Singer deleted successfully' });
   } catch (error) {

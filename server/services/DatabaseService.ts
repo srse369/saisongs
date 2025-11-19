@@ -19,6 +19,7 @@ dotenv.config({ path: process.env.NODE_ENV === 'production' ? '.env' : '.env.loc
 class DatabaseService {
   private pool: oracledb.Pool | null = null;
   private connectionConfig: oracledb.PoolAttributes;
+  private initializingPool: Promise<void> | null = null;
 
   constructor() {
     // Determine wallet path - use absolute path in production, relative in development
@@ -73,44 +74,70 @@ class DatabaseService {
 
   /**
    * Initializes the Oracle connection pool
+   * Uses a singleton pattern with promise locking to prevent race conditions
    * @throws Error if connection configuration is missing or pool creation fails
    */
   private async initPool(): Promise<void> {
-    if (!this.connectionConfig.user || !this.connectionConfig.password || !this.connectionConfig.connectString) {
-      throw new Error('Oracle database credentials are not configured. Please set VITE_ORACLE_USER, VITE_ORACLE_PASSWORD, and VITE_ORACLE_CONNECT_STRING in your .env.local file.');
+    // If pool already exists, return immediately
+    if (this.pool) {
+      return;
     }
 
-    if (!this.pool) {
+    // If pool is currently being initialized, wait for that to complete
+    if (this.initializingPool) {
+      await this.initializingPool;
+      return;
+    }
+
+    // Start pool initialization with promise lock
+    this.initializingPool = (async () => {
       try {
-        // Check if pool with this alias already exists and reuse it
+        if (!this.connectionConfig.user || !this.connectionConfig.password || !this.connectionConfig.connectString) {
+          throw new Error('Oracle database credentials are not configured. Please set VITE_ORACLE_USER, VITE_ORACLE_PASSWORD, and VITE_ORACLE_CONNECT_STRING in your .env.local file.');
+        }
+
+        // Double-check pool doesn't exist (could have been created by another call)
+        if (this.pool) {
+          return;
+        }
+
+        // Try to get existing pool first
         try {
           this.pool = oracledb.getPool('songstudio_pool');
           console.log('♻️  Reusing existing Oracle database connection pool');
           return;
         } catch (e) {
-          // Pool doesn't exist, continue to create it
+          // Pool doesn't exist, will create it below
         }
 
-        // If we get here, pool doesn't exist - create new pool
-        this.pool = await oracledb.createPool(this.connectionConfig);
-        console.log('✅ Oracle database connection pool established');
-      } catch (error: any) {
-        // If pool alias already exists (race condition), try to reuse it
-        if (error.code === 'NJS-046') {
-          console.log('⚠️  Pool alias already exists, attempting to reuse...');
-          try {
-            this.pool = oracledb.getPool('songstudio_pool');
-            console.log('♻️  Successfully reused existing pool after collision');
-            return;
-          } catch (reuseError) {
-            console.error('Failed to reuse existing pool:', reuseError);
+        // Create new pool
+        try {
+          this.pool = await oracledb.createPool(this.connectionConfig);
+          console.log('✅ Oracle database connection pool established');
+        } catch (error: any) {
+          // Handle race condition where another process created the pool
+          if (error.code === 'NJS-046') {
+            console.log('⚠️  Pool created by another process, reusing...');
+            try {
+              this.pool = oracledb.getPool('songstudio_pool');
+              console.log('♻️  Successfully reused pool after collision');
+              return;
+            } catch (reuseError) {
+              console.error('Failed to reuse pool after collision:', reuseError);
+              throw reuseError;
+            }
           }
+          throw error;
         }
-        
-        console.error('Failed to create Oracle connection pool:', error);
+      } catch (error) {
+        console.error('Failed to initialize Oracle connection pool:', error);
         throw new Error(`Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        this.initializingPool = null;
       }
-    }
+    })();
+
+    await this.initializingPool;
   }
 
   /**

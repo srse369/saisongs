@@ -1,13 +1,25 @@
 import express from 'express';
 import { databaseService } from '../services/DatabaseService.js';
+import { cacheService } from '../services/CacheService.js';
 
 const router = express.Router();
+
+// Cache TTL: 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 
 // ============ Named Sessions ============
 
 // Get all sessions
 router.get('/', async (req, res) => {
   try {
+    // Check cache first
+    const cacheKey = 'sessions:all';
+    const cached = cacheService.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    // Cache miss - fetch from database
     const sessions = await databaseService.query(`
       SELECT 
         RAWTOHEX(id) as id,
@@ -26,6 +38,9 @@ router.get('/', async (req, res) => {
       createdAt: row.CREATED_AT,
       updatedAt: row.UPDATED_AT,
     }));
+
+    // Cache the results
+    cacheService.set(cacheKey, mappedSessions, CACHE_TTL);
 
     res.json(mappedSessions);
   } catch (error) {
@@ -137,6 +152,10 @@ router.post('/', async (req, res) => {
     }
 
     const session = sessions[0];
+
+    // Invalidate sessions cache
+    cacheService.invalidatePattern('sessions:');
+
     res.status(201).json({
       id: session.ID,
       name: session.NAME,
@@ -306,6 +325,9 @@ router.post('/:sessionId/items', async (req, res) => {
       : [sessionId, songId, String(pitch || ''), sequenceOrder]
     );
 
+    // Invalidate sessions cache
+    cacheService.invalidatePattern('sessions:');
+
     res.status(201).json({ message: 'Session item added successfully' });
   } catch (error: any) {
     console.error('Error adding session item:', error);
@@ -356,6 +378,9 @@ router.put('/items/:id', async (req, res) => {
       WHERE RAWTOHEX(id) = :${paramIndex}
     `, params);
 
+    // Invalidate sessions cache
+    cacheService.invalidatePattern('sessions:');
+
     res.json({ message: 'Session item updated successfully' });
   } catch (error: any) {
     console.error('Error updating session item:', error);
@@ -375,6 +400,9 @@ router.delete('/items/:id', async (req, res) => {
       DELETE FROM session_items 
       WHERE RAWTOHEX(id) = :1
     `, [id]);
+
+    // Invalidate sessions cache
+    cacheService.invalidatePattern('sessions:');
 
     res.status(204).send();
   } catch (error) {
@@ -401,6 +429,9 @@ router.put('/:sessionId/reorder', async (req, res) => {
         WHERE RAWTOHEX(id) = :2 AND RAWTOHEX(session_id) = :3
       `, [i + 1, itemIds[i], sessionId]);
     }
+
+    // Invalidate sessions cache
+    cacheService.invalidatePattern('sessions:');
 
     res.status(204).send();
   } catch (error) {

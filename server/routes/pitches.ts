@@ -1,11 +1,23 @@
 import express from 'express';
 import { databaseService } from '../services/DatabaseService.js';
+import { cacheService } from '../services/CacheService.js';
 
 const router = express.Router();
+
+// Cache TTL: 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 
 // Get all pitch associations
 router.get('/', async (req, res) => {
   try {
+    // Check cache first
+    const cacheKey = 'pitches:all';
+    const cached = cacheService.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    // Cache miss - fetch from database
     const pitches = await databaseService.query(`
       SELECT 
         RAWTOHEX(ssp.id) as id,
@@ -21,6 +33,10 @@ router.get('/', async (req, res) => {
       JOIN singers si ON ssp.singer_id = si.id
       ORDER BY s.name, si.name
     `);
+
+    // Cache the results
+    cacheService.set(cacheKey, pitches, CACHE_TTL);
+
     res.json(pitches);
   } catch (error) {
     console.error('Error fetching pitches:', error);
@@ -115,6 +131,9 @@ router.post('/', async (req, res) => {
       VALUES (HEXTORAW(:1), HEXTORAW(:2), :3)
     `, [song_id, singer_id, pitch]);
 
+    // Invalidate pitches cache
+    cacheService.invalidatePattern('pitches:');
+
     res.status(201).json({ message: 'Pitch association created successfully' });
   } catch (error) {
     console.error('Error creating pitch:', error);
@@ -135,6 +154,9 @@ router.put('/:id', async (req, res) => {
       WHERE RAWTOHEX(id) = :2
     `, [pitch, id]);
 
+    // Invalidate pitches cache
+    cacheService.invalidatePattern('pitches:');
+
     res.json({ message: 'Pitch association updated successfully' });
   } catch (error) {
     console.error('Error updating pitch:', error);
@@ -149,6 +171,9 @@ router.delete('/:id', async (req, res) => {
     await databaseService.query(`
       DELETE FROM song_singer_pitches WHERE RAWTOHEX(id) = :1
     `, [id]);
+    
+    // Invalidate pitches cache
+    cacheService.invalidatePattern('pitches:');
     
     res.json({ message: 'Pitch association deleted successfully' });
   } catch (error) {
