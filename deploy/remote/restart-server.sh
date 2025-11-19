@@ -1,23 +1,23 @@
 #!/bin/bash
 # Quick restart script for Song Studio backend
-# Usage: ssh ubuntu@129.153.85.24 'bash -s' < restart-server.sh
+# Usage: ./restart-server.sh
 # Or with SSH key: SSH_KEY=~/.ssh/my-key ./restart-server.sh
 
-# SSH Configuration
-SSH_OPTS=""
-if [ -n "$SSH_KEY" ]; then
-    # Expand tilde and resolve full path
-    SSH_KEY_PATH=$(eval echo "$SSH_KEY")
-    
-    if [ -f "$SSH_KEY_PATH" ]; then
-        SSH_OPTS="-i \"$SSH_KEY_PATH\""
-    fi
+# Source shared configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/config.sh"
+
+# Check required configuration
+if [ -z "$REMOTE_USER" ] || [ -z "$REMOTE_HOST" ]; then
+    echo "❌ Error: REMOTE_USER and REMOTE_HOST must be set"
+    echo "   Set them as environment variables or in config.sh"
+    exit 1
 fi
 
 echo "🔄 Restarting Song Studio backend..."
 
-eval ssh $SSH_OPTS ubuntu@saisongs.org << 'ENDSSH'
-cd /var/www/songstudio
+ssh_exec << ENDSSH
+cd ${REMOTE_PATH}
 
 # Check if PM2 process exists
 if pm2 list | grep -q "songstudio"; then

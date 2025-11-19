@@ -1,17 +1,17 @@
 #!/bin/bash
 # Script to check and restart the Song Studio backend server
-# Usage: ssh ubuntu@129.153.85.24 'bash -s' < check-server.sh
+# Usage: ./check-server.sh
 # Or with SSH key: SSH_KEY=~/.ssh/my-key ./check-server.sh
 
-# SSH Configuration
-SSH_OPTS=""
-if [ -n "$SSH_KEY" ]; then
-    # Expand tilde and resolve full path
-    SSH_KEY_PATH=$(eval echo "$SSH_KEY")
-    
-    if [ -f "$SSH_KEY_PATH" ]; then
-        SSH_OPTS="-i \"$SSH_KEY_PATH\""
-    fi
+# Source shared configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/config.sh"
+
+# Check required configuration
+if [ -z "$REMOTE_USER" ] || [ -z "$REMOTE_HOST" ]; then
+    echo "❌ Error: REMOTE_USER and REMOTE_HOST must be set"
+    echo "   Set them as environment variables or in config.sh"
+    exit 1
 fi
 
 echo "=========================================="
@@ -19,6 +19,7 @@ echo "Song Studio Server Health Check"
 echo "=========================================="
 echo ""
 
+ssh_exec << 'ENDSSH'
 # Check if PM2 is installed
 echo "1. Checking PM2 installation..."
 if ! command -v pm2 &> /dev/null; then
@@ -100,4 +101,5 @@ echo ""
 echo "If issues persist, run:"
 echo "  pm2 logs songstudio --lines 50"
 echo "  sudo tail -f /var/log/nginx/songstudio_error.log"
+ENDSSH
 

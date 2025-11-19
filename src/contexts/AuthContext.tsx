@@ -18,8 +18,8 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'Sairam999';
-const EDITOR_PASSWORD = import.meta.env.VITE_EDITOR_PASSWORD || 'Editor999';
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '';
+const EDITOR_PASSWORD = import.meta.env.VITE_EDITOR_PASSWORD || '';
 const AUTH_ROLE_KEY = 'songstudio_auth_role';
 const AUTH_EXPIRY_KEY = 'songstudio_auth_expiry';
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours

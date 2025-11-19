@@ -151,20 +151,30 @@ NODE_ENV=production
 PORT=3001
 HOST=0.0.0.0
 
-# Update these with your actual values
-DB_USER=your_db_username
-DB_PASSWORD=your_db_password
-DB_CONNECTION_STRING=your_connection_string
+# Oracle Database - Update these with your actual values
+VITE_ORACLE_USER=your_db_username
+VITE_ORACLE_PASSWORD=your_db_password
+VITE_ORACLE_CONNECT_STRING=your_connection_string
+VITE_ORACLE_WALLET_PASSWORD=your_wallet_password
+
+# Admin Access
 ADMIN_PASSWORD=change_this_password
 
-DB_POOL_MIN=2
-DB_POOL_MAX=10
-DB_POOL_INCREMENT=1
+# Database Pool Settings (optimized for Oracle Free Tier)
+DB_POOL_MIN=1
+DB_POOL_MAX=1
+DB_POOL_INCREMENT=0
 
+# URLs - Update with your domain/IP
 APP_URL=http://141.148.149.54
 API_URL=http://141.148.149.54/api
 CORS_ORIGIN=http://141.148.149.54
+
+# Logging
 LOG_LEVEL=info
+
+# Oracle Instant Client
+LD_LIBRARY_PATH=/usr/lib/oracle/21/client64/lib
 EOF
     echo -e "${GREEN}✓ Created .env template at /var/www/songstudio/.env${NC}"
     echo -e "${YELLOW}⚠ Please edit /var/www/songstudio/.env with your actual values${NC}"

@@ -4,24 +4,23 @@
 
 set -e
 
+# Source shared configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/config.sh"
+
 echo "🚀 Song Studio Deployment"
 echo "========================="
 echo ""
 
-# SSH Configuration
-# Use SSH_KEY environment variable if set, otherwise use default SSH behavior
-SSH_OPTS=""
-if [ -n "$SSH_KEY" ]; then
-    # Expand tilde and resolve full path
-    SSH_KEY_PATH=$(eval echo "$SSH_KEY")
-    
-    if [ -f "$SSH_KEY_PATH" ]; then
-        SSH_OPTS="-i \"$SSH_KEY_PATH\""
-        echo "🔑 Using SSH key: $SSH_KEY_PATH"
-    else
-        echo "⚠️  Warning: SSH_KEY set but file not found: $SSH_KEY_PATH"
-        echo "    Falling back to default SSH authentication"
-    fi
+# Check required configuration
+if [ -z "$REMOTE_USER" ] || [ -z "$REMOTE_HOST" ]; then
+    echo "❌ Error: REMOTE_USER and REMOTE_HOST must be set"
+    echo "   Set them as environment variables or in config.sh"
+    exit 1
+fi
+
+if [ -n "$SSH_OPTS" ]; then
+    echo "🔑 Using SSH key authentication"
 fi
 echo ""
 
@@ -89,24 +88,24 @@ if [ "$SKIP_BACKEND" = false ]; then
 fi
 
 # Deploy to Server
-echo "🚢 Deploying to saisongs.org..."
+echo "🚢 Deploying to ${REMOTE_HOST}..."
 echo "--------------------------------"
 
 if [ "$SKIP_FRONTEND" = false ]; then
     echo "  → Uploading frontend files..."
-    eval scp $SSH_OPTS -r dist/* ubuntu@saisongs.org:/var/www/songstudio/dist/
+    eval scp $SSH_OPTS -r dist/* "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}/dist/"
 fi
 
 if [ "$SKIP_BACKEND" = false ]; then
     echo "  → Uploading backend files..."
-    eval scp $SSH_OPTS -r dist/server ubuntu@saisongs.org:/var/www/songstudio/dist/
+    eval scp $SSH_OPTS -r dist/server "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}/dist/"
     
     # Deploy PM2 ecosystem config
     echo "  → Uploading PM2 config..."
-    eval scp $SSH_OPTS deploy/remote/ecosystem.config.cjs ubuntu@saisongs.org:/var/www/songstudio/
+    eval scp $SSH_OPTS deploy/remote/ecosystem.config.cjs "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}/"
     
     # Remove old .js config if it exists
-    eval ssh $SSH_OPTS ubuntu@saisongs.org 'rm -f /var/www/songstudio/ecosystem.config.js' 2>/dev/null || true
+    ssh_exec 'rm -f '"${REMOTE_PATH}"'/ecosystem.config.js' 2>/dev/null || true
 fi
 
 echo "✅ Files deployed"
@@ -117,8 +116,8 @@ if [ "$SKIP_BACKEND" = false ]; then
     echo "🔄 Restarting Backend..."
     echo "-----------------------"
     
-    eval ssh $SSH_OPTS ubuntu@saisongs.org << 'ENDSSH'
-        cd /var/www/songstudio
+    ssh_exec << ENDSSH
+        cd ${REMOTE_PATH}
         
         # Stop gracefully
         pm2 stop songstudio 2>/dev/null || true
@@ -148,7 +147,7 @@ echo "-------------------------"
 
 # Test API health
 echo "  → Testing API health..."
-if curl -f -s https://saisongs.org/api/health > /dev/null 2>&1; then
+if curl -f -s https://${REMOTE_HOST}/api/health > /dev/null 2>&1; then
     echo "  ✅ API health check passed"
 else
     echo "  ❌ API health check failed"
@@ -156,7 +155,7 @@ fi
 
 # Test frontend
 echo "  → Testing frontend..."
-if curl -f -s https://saisongs.org/ > /dev/null 2>&1; then
+if curl -f -s https://${REMOTE_HOST}/ > /dev/null 2>&1; then
     echo "  ✅ Frontend loading"
 else
     echo "  ❌ Frontend not responding"
@@ -167,13 +166,13 @@ echo ""
 # Show Status
 echo "📊 Server Status"
 echo "---------------"
-eval ssh $SSH_OPTS ubuntu@saisongs.org 'pm2 list'
+ssh_exec 'pm2 list'
 echo ""
 
 # Show Recent Logs
 echo "📝 Recent Logs (last 15 lines)"
 echo "------------------------------"
-eval ssh $SSH_OPTS ubuntu@saisongs.org 'pm2 logs songstudio --nostream --lines 15'
+ssh_exec 'pm2 logs songstudio --nostream --lines 15'
 echo ""
 
 # Summary
@@ -182,16 +181,16 @@ echo "✅ Deployment Complete!"
 echo "========================="
 echo ""
 echo "🌐 URLs:"
-echo "  Frontend: https://saisongs.org"
-echo "  API:      https://saisongs.org/api/health"
+echo "  Frontend: https://${REMOTE_HOST}"
+echo "  API:      https://${REMOTE_HOST}/api/health"
 echo ""
 echo "📊 Monitor:"
-echo "  Logs:     ssh ubuntu@saisongs.org 'pm2 logs songstudio'"
-echo "  Status:   ssh ubuntu@saisongs.org 'pm2 status'"
-echo "  Restart:  ssh ubuntu@saisongs.org 'pm2 restart songstudio'"
+echo "  Logs:     ssh ${REMOTE_USER}@${REMOTE_HOST} 'pm2 logs songstudio'"
+echo "  Status:   ssh ${REMOTE_USER}@${REMOTE_HOST} 'pm2 status'"
+echo "  Restart:  ssh ${REMOTE_USER}@${REMOTE_HOST} 'pm2 restart songstudio'"
 echo ""
 echo "🔍 Check caching:"
-echo "  ssh ubuntu@saisongs.org 'pm2 logs songstudio | grep -i cache'"
+echo "  ssh ${REMOTE_USER}@${REMOTE_HOST} 'pm2 logs songstudio | grep -i cache'"
 echo ""
 echo "Expected cache messages:"
 echo "  ✅ Cache hit for key: songs:all (age: 15s)"

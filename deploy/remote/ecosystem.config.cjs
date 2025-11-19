@@ -49,7 +49,7 @@ module.exports = {
   deploy: {
     production: {
       user: 'ubuntu',
-      host: '129.153.85.24',
+      host: 'your-server-ip',
       ref: 'origin/main',
       repo: 'git@github.com:srse369/songstudio.git',
       path: '/var/www/songstudio',
