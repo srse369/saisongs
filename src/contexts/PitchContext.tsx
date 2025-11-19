@@ -33,7 +33,13 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
     setError(null);
   }, []);
 
-  const fetchAllPitches = useCallback(async () => {
+  const fetchAllPitches = useCallback(async (forceRefresh: boolean = false) => {
+    // Reset backoff for explicit user-triggered refreshes
+    if (forceRefresh) {
+      const { apiClient } = await import('../services/ApiClient');
+      apiClient.resetBackoff('/pitches');
+    }
+    
     setLoading(true);
     setError(null);
     try {

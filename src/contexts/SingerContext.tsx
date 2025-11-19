@@ -32,7 +32,13 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
     setError(null);
   }, []);
 
-  const fetchSingers = useCallback(async () => {
+  const fetchSingers = useCallback(async (forceRefresh: boolean = false) => {
+    // Reset backoff for explicit user-triggered refreshes
+    if (forceRefresh) {
+      const { apiClient } = await import('../services/ApiClient');
+      apiClient.resetBackoff('/singers');
+    }
+    
     setLoading(true);
     setError(null);
     try {

@@ -12,7 +12,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { isConnected, connectionError, resetConnection } = useDatabase();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, userRole, logout } = useAuth();
 
   // Initialize dark mode from localStorage or system preference
   useEffect(() => {
@@ -58,40 +58,47 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo/Brand */}
-            <Link to="/" className="flex items-center space-x-2 group">
-              <svg
-                className="w-8 h-8 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
-                />
-              </svg>
-              <span className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white hidden sm:block">
-                Song Studio
-              </span>
+            <Link to="/" className="flex items-center group">
+              <img 
+                src="/logo.png" 
+                alt="Song Studio" 
+                className="h-10 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform"
+              />
             </Link>
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
               <Link to="/" className={getLinkClasses('/')}>
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
                 Home
               </Link>
               <Link to="/admin/songs" className={getLinkClasses('/admin/songs')}>
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                </svg>
                 Songs
               </Link>
               <Link to="/admin/singers" className={getLinkClasses('/admin/singers')}>
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
                 Singers
               </Link>
               <Link to="/admin/pitches" className={getLinkClasses('/admin/pitches')}>
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                  <circle cx="15" cy="15" r="1" fill="currentColor" />
+                  <circle cx="15" cy="12" r="1" fill="currentColor" />
+                </svg>
                 Pitches
               </Link>
               <Link to="/session" className={getLinkClasses('/session')}>
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
                 Live
               </Link>
               
@@ -133,15 +140,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </button>
                 )}
 
-                {/* Admin mode indicator */}
+                {/* Role indicator */}
                 <button
                   type="button"
                   onClick={() => {
                     if (isAuthenticated) {
-                      // Switch from admin mode back to view mode
+                      // Switch back to view mode
                       logout();
                     } else {
-                      // In view mode: attempt to enter admin mode by opening the password dialog
+                      // In view mode: attempt to login by opening the password dialog
                       const event = new KeyboardEvent('keydown', {
                         key: 'i',
                         code: 'KeyI',
@@ -153,38 +160,64 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     }
                   }}
                   className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-medium border ${
-                    isAuthenticated
-                      ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                      : 'bg-gray-50 border-gray-300 text-gray-600'
+                    userRole === 'admin'
+                      ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
+                      : userRole === 'editor'
+                      ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                      : 'bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300'
                   }`}
                   title={
-                    isAuthenticated
-                      ? 'Admin mode is active (edit/delete/pitch actions enabled)'
-                      : 'View-only mode (admin actions disabled)'
+                    userRole === 'admin'
+                      ? 'Admin mode (full access)'
+                      : userRole === 'editor'
+                      ? 'Editor mode (can edit, cannot delete)'
+                      : 'Viewer mode (read-only)'
                   }
                 >
                   <svg
                     className={`w-3 h-3 mr-1 ${
-                      isAuthenticated ? 'text-emerald-600' : 'text-gray-500'
+                      userRole === 'admin' ? 'text-emerald-600 dark:text-emerald-400' : userRole === 'editor' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
                     }`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 11c.828 0 1.5-.672 1.5-1.5S12.828 8 12 8s-1.5.672-1.5 1.5S11.172 11 12 11z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 11V7a5 5 0 10-10 0v4M7 11h10v8H7z"
-                    />
+                    {userRole === 'admin' ? (
+                      <>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                        />
+                      </>
+                    ) : userRole === 'editor' ? (
+                      <>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </>
+                    )}
                   </svg>
-                  {isAuthenticated ? 'Admin mode' : 'View mode'}
+                  {userRole === 'admin' ? 'Admin' : userRole === 'editor' ? 'Editor' : 'Viewer'}
                 </button>
               </div>
             </nav>
@@ -232,6 +265,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className={`block ${getLinkClasses('/')}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
+                <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
                 Home
               </Link>
               <Link
@@ -239,6 +275,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className={`block ${getLinkClasses('/admin/songs')}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
+                <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                </svg>
                 Manage Songs
               </Link>
               <Link
@@ -246,6 +285,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className={`block ${getLinkClasses('/admin/singers')}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
+                <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
                 Manage Singers
               </Link>
               <Link
@@ -253,6 +295,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className={`block ${getLinkClasses('/admin/pitches')}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
+                <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                  <circle cx="15" cy="15" r="1" fill="currentColor" />
+                  <circle cx="15" cy="12" r="1" fill="currentColor" />
+                </svg>
                 Manage Pitches
               </Link>
               <Link
@@ -260,6 +307,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className={`block ${getLinkClasses('/session')}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
+                <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
                 Live Session
               </Link>
               

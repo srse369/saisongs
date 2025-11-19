@@ -7,12 +7,92 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 class ApiClient {
   private baseUrl: string;
+  private failureCount: Map<string, number> = new Map();
+  private lastFailureTime: Map<string, number> = new Map();
+  private readonly MAX_RETRIES = 2; // Maximum 2 retry attempts
+  private readonly MIN_BACKOFF_MS = 3000; // 3 seconds
+  private readonly MAX_BACKOFF_MS = 10000; // 10 seconds max
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
   }
 
+  private getBackoffDelay(endpoint: string): number {
+    const failures = this.failureCount.get(endpoint) || 0;
+    
+    // After MAX_RETRIES, stop retrying completely
+    if (failures > this.MAX_RETRIES) {
+      return -1; // Signal to stop retrying
+    }
+    
+    // First failure: retry immediately
+    // Second failure: wait 3 seconds
+    // Third+ failure: wait 10 seconds
+    if (failures === 0) return 0;
+    if (failures === 1) return this.MIN_BACKOFF_MS;
+    return this.MAX_BACKOFF_MS;
+  }
+
+  private shouldAllowRequest(endpoint: string): boolean {
+    const lastFailure = this.lastFailureTime.get(endpoint);
+    const failures = this.failureCount.get(endpoint) || 0;
+    
+    // If no previous failure, allow request
+    if (!lastFailure) {
+      return true;
+    }
+
+    const backoffDelay = this.getBackoffDelay(endpoint);
+    
+    // If we've exceeded max retries, permanently block until manual reset
+    if (backoffDelay === -1) {
+      throw new Error(
+        `Connection failed after ${this.MAX_RETRIES} attempts. Please check your internet connection or try again later.`
+      );
+    }
+    
+    const timeSinceFailure = Date.now() - lastFailure;
+    
+    // If still in backoff period, block the request
+    if (timeSinceFailure < backoffDelay) {
+      const remainingSeconds = Math.ceil((backoffDelay - timeSinceFailure) / 1000);
+      throw new Error(
+        `Retrying in ${remainingSeconds}s... (Attempt ${failures + 1}/${this.MAX_RETRIES + 1})`
+      );
+    }
+
+    return true;
+  }
+
+  private recordSuccess(endpoint: string): void {
+    this.failureCount.delete(endpoint);
+    this.lastFailureTime.delete(endpoint);
+  }
+
+  private recordFailure(endpoint: string): void {
+    const currentFailures = this.failureCount.get(endpoint) || 0;
+    this.failureCount.set(endpoint, currentFailures + 1);
+    this.lastFailureTime.set(endpoint, Date.now());
+  }
+
+  /**
+   * Reset backoff state - useful when user explicitly clicks "Refresh" or "Retry"
+   */
+  public resetBackoff(endpoint?: string): void {
+    if (endpoint) {
+      this.failureCount.delete(endpoint);
+      this.lastFailureTime.delete(endpoint);
+    } else {
+      // Reset all endpoints
+      this.failureCount.clear();
+      this.lastFailureTime.clear();
+    }
+  }
+
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    // Check if we should back off
+    this.shouldAllowRequest(endpoint);
+
     const url = `${this.baseUrl}${endpoint}`;
     
     try {
@@ -26,16 +106,21 @@ class ApiClient {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Request failed' }));
+        this.recordFailure(endpoint);
         throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       // Handle 204 No Content responses
       if (response.status === 204) {
+        this.recordSuccess(endpoint);
         return undefined as T;
       }
 
-      return await response.json();
+      const data = await response.json();
+      this.recordSuccess(endpoint);
+      return data;
     } catch (error) {
+      this.recordFailure(endpoint);
       console.error(`API request failed: ${endpoint}`, error);
       throw error;
     }

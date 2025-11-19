@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { SongManager, SingerManager, PitchManager, PasswordDialog, BulkImportUI } from './components/admin';
+import { SongManager, SingerManager, PitchManager, PasswordDialog, BulkImportUI, BeavertonImportManager } from './components/admin';
 import { SongList, PresentationMode } from './components/presentation';
 import { SessionManager } from './components/session/SessionManager';
 import { SessionPresentationMode } from './components/session/SessionPresentationMode';
@@ -13,7 +13,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SessionProvider } from './contexts/SessionContext';
 import { NamedSessionProvider } from './contexts/NamedSessionContext';
 import { useAdminShortcut } from './hooks';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './App.css';
 
 function AppContent() {
@@ -22,13 +22,19 @@ function AppContent() {
   const { fetchSongs } = useSongs();
   const { fetchSingers } = useSingers();
   const { fetchAllPitches } = usePitches();
+  const initialLoadDone = useRef(false);
 
   // Warm up caches for songs, singers, and pitches in the background as soon as UI mounts
+  // Only run ONCE on mount, not on every re-render (prevents infinite retry loop)
   useEffect(() => {
-    fetchSongs();
-    fetchSingers();
-    fetchAllPitches();
-  }, [fetchSongs, fetchSingers, fetchAllPitches]);
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true;
+      fetchSongs();
+      fetchSingers();
+      fetchAllPitches();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run once on mount
 
   return (
     <>
@@ -50,9 +56,19 @@ function AppContent() {
                   <Route
                     path="/admin/import"
                     element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requireAdmin={true}>
                         <Layout>
                           <BulkImportPage />
+                        </Layout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/import-beaverton"
+                    element={
+                      <ProtectedRoute>
+                        <Layout>
+                          <BeavertonImportPage />
                         </Layout>
                       </ProtectedRoute>
                     }
@@ -108,6 +124,24 @@ function BulkImportPage() {
   );
 }
 
+// CSV Import Page - wraps BeavertonImportManager
+function BeavertonImportPage() {
+  return (
+    <div className="px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
+      <div className="max-w-3xl">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          Import from CSV
+        </h1>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+          Import singers and their pitch data from CSV format.
+          This tool will help match songs, normalize pitch formats, and create new singer entries as needed.
+        </p>
+      </div>
+      <BeavertonImportManager />
+    </div>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -134,7 +168,7 @@ function App() {
 
 // Home Page Component
 function HomePage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isAdmin } = useAuth();
 
   return (
     <div className="px-4 py-8 sm:py-12 animate-fade-in">
@@ -185,22 +219,42 @@ function HomePage() {
         </Link>
 
         {isAuthenticated && (
-          <Link
-            to="/admin/import"
-            className="group block p-6 sm:p-8 card hover:scale-105 transition-all duration-200"
-          >
-            <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-amber-100 dark:bg-amber-900 rounded-full mb-4 group-hover:bg-amber-200 dark:group-hover:bg-amber-800 transition-colors">
-              <svg className="w-6 h-6 sm:w-8 sm:h-8 text-amber-600 dark:text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582M20 4v5h-.581M4 12h16M10 16l2 2 2-2M12 14v4" />
-              </svg>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-              Bulk Import from Sairhythms
-            </h2>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-              Import or update songs in bulk from Sairhythms.org using the admin tools.
-            </p>
-          </Link>
+          <>
+            {isAdmin && (
+              <Link
+                to="/admin/import"
+                className="group block p-6 sm:p-8 card hover:scale-105 transition-all duration-200"
+              >
+                <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-amber-100 dark:bg-amber-900 rounded-full mb-4 group-hover:bg-amber-200 dark:group-hover:bg-amber-800 transition-colors">
+                  <svg className="w-6 h-6 sm:w-8 sm:h-8 text-amber-600 dark:text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582M20 4v5h-.581M4 12h16M10 16l2 2 2-2M12 14v4" />
+                  </svg>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                  Import from Sairhythms
+                </h2>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                  Import or update songs in bulk from Sairhythms.org
+                </p>
+              </Link>
+            )}
+            <Link
+              to="/admin/import-beaverton"
+              className="group block p-6 sm:p-8 card hover:scale-105 transition-all duration-200"
+            >
+              <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-green-100 dark:bg-green-900 rounded-full mb-4 group-hover:bg-green-200 dark:group-hover:bg-green-800 transition-colors">
+                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-green-600 dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                Import from CSV
+              </h2>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                Import singers and pitches from CSV data
+              </p>
+            </Link>
+          </>
         )}
       </div>
 

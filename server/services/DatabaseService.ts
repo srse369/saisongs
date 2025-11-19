@@ -9,7 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables
-dotenv.config({ path: '.env.local' });
+// In production, load from .env, in development from .env.local
+dotenv.config({ path: process.env.NODE_ENV === 'production' ? '.env' : '.env.local' });
 
 /**
  * DatabaseService handles all database connections and queries to Oracle Autonomous Database.
@@ -20,7 +21,17 @@ class DatabaseService {
   private connectionConfig: oracledb.PoolAttributes;
 
   constructor() {
-    const walletPath = path.join(__dirname, '../../wallet');
+    // Determine wallet path - use absolute path in production, relative in development
+    let walletPath: string;
+    
+    if (process.env.NODE_ENV === 'production') {
+      // In production, wallet is in the app directory
+      walletPath = '/var/www/songstudio/wallet';
+    } else {
+      // In development, use relative path from current file
+      walletPath = path.join(path.dirname(__filename), '../../wallet');
+    }
+    
     console.log('📁 Oracle Wallet location:', walletPath);
     console.log('ℹ️  Using Oracle thin client mode (oracledb 6.x)');
     
@@ -29,21 +40,29 @@ class DatabaseService {
     const walletPassword = process.env.VITE_ORACLE_WALLET_PASSWORD || ''; // Wallet password set during download
     
     // Get connection configuration from environment variables
+    // Use VERY conservative pool settings for Oracle Autonomous Database Free Tier
+    // Free Tier limits: 20 concurrent connections, limited OCPU
     this.connectionConfig = {
       user: process.env.VITE_ORACLE_USER,
       password: process.env.VITE_ORACLE_PASSWORD,
       connectString: process.env.VITE_ORACLE_CONNECT_STRING,
       walletLocation: walletLocation,
       walletPassword: walletPassword,
-      poolMin: 1,
-      poolMax: 10,
-      poolIncrement: 1,
-      queueTimeout: 5000, // Fail fast after 5 seconds instead of 60
-      connectTimeout: 5000, // Connection timeout of 5 seconds
+      poolMin: 0,                   // Start with 0 connections
+      poolMax: 2,                   // Only 2 concurrent connections (reduced from 4)
+      poolIncrement: 1,             // Add 1 connection at a time
+      poolTimeout: 120,             // Wait up to 2 minutes for connection from pool
+      queueTimeout: 10000,          // Wait 10 seconds in queue before failing
+      connectTimeout: 15000,        // Connection timeout of 15 seconds
+      enableStatistics: true,       // Enable pool statistics
+      _enableStats: true,           // Internal stats
+      poolAlias: 'songstudio_pool', // Named pool for monitoring
+      stmtCacheSize: 0,             // Disable statement caching to reduce memory
     };
 
     if (!this.connectionConfig.user || !this.connectionConfig.password || !this.connectionConfig.connectString) {
-      console.error('Oracle database credentials are not defined in environment variables');
+      console.error('⚠️  Oracle database credentials are not defined in environment variables');
+      console.error('⚠️  Database operations will fail until credentials are configured');
     }
 
     // Configure Oracle client for optimal performance
@@ -62,6 +81,16 @@ class DatabaseService {
 
     if (!this.pool) {
       try {
+        // Check if pool with this alias already exists
+        try {
+          this.pool = oracledb.getPool('songstudio_pool');
+          console.log('♻️  Reusing existing Oracle database connection pool');
+          return;
+        } catch (e) {
+          // Pool doesn't exist, create it
+        }
+
+        // Create new pool
         this.pool = await oracledb.createPool(this.connectionConfig);
         console.log('✅ Oracle database connection pool established');
       } catch (error) {
@@ -95,10 +124,21 @@ class DatabaseService {
       
       return (result.rows || []) as T[];
     } catch (error) {
-      console.error('Database query error:', error);
-      console.error('SQL:', sql);
-      console.error('Params:', params);
-      throw new Error(`Query execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Database query error:', errorMessage);
+      
+      // Check for quota/connection limit errors
+      if (errorMessage.includes('quota') || 
+          errorMessage.includes('QUOTA') ||
+          errorMessage.includes('exceeded') ||
+          errorMessage.includes('limit') ||
+          errorMessage.includes('ORA-')) {
+        console.error('⚠️  Oracle Database limit reached. Consider upgrading or optimizing queries.');
+        console.error('Free Tier limits: 20 concurrent connections, 1 OCPU, 20GB storage');
+      }
+      
+      console.error('SQL:', sql.substring(0, 200)); // Log first 200 chars only
+      throw new Error(`Query execution failed: ${errorMessage}`);
     } finally {
       if (connection) {
         try {

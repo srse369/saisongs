@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { usePitches } from '../../contexts/PitchContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { PitchForm } from './PitchForm';
 import { PitchList } from './PitchList';
 import type { SongSingerPitch, CreatePitchInput, Song } from '../../types';
@@ -10,6 +11,7 @@ import { Modal } from '../common/Modal';
 import { SongDetails } from './SongDetails';
 
 export const PitchManager: React.FC = () => {
+  const { isEditor } = useAuth();
   const { 
     pitches, 
     loading: pitchLoading, 
@@ -243,7 +245,7 @@ export const PitchManager: React.FC = () => {
                 </svg>
                 Refresh
               </button>
-              {!showForm && (
+              {!showForm && isEditor && (
                 <button
                   onClick={handleCreateClick}
                   disabled={loading || songs.length === 0 || singers.length === 0}

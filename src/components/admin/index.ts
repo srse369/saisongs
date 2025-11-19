@@ -10,6 +10,7 @@ export { PitchList } from './PitchList';
 export { PitchManager } from './PitchManager';
 export { PasswordDialog } from './PasswordDialog';
 export { BulkImportUI } from './BulkImportUI';
+export { BeavertonImportManager } from './BeavertonImportManager';
 export { NamedSessionManager } from './NamedSessionManager';
 export { NamedSessionList } from './NamedSessionList';
 export { NamedSessionForm } from './NamedSessionForm';

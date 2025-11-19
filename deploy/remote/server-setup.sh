@@ -134,9 +134,9 @@ DB_POOL_MIN=2
 DB_POOL_MAX=10
 DB_POOL_INCREMENT=1
 
-APP_URL=http://141.148.149.54
-API_URL=http://141.148.149.54/api
-CORS_ORIGIN=http://141.148.149.54
+APP_URL=http://129.153.85.24
+API_URL=http://129.153.85.24/api
+CORS_ORIGIN=http://129.153.85.24
 LOG_LEVEL=info
 EOF
     echo -e "${GREEN}✓ Created .env template at /var/www/songstudio/.env${NC}"

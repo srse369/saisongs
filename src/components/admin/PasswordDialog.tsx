@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { validatePassword, RateLimiter, RateLimitError, MissingPasswordError } from '../../utils/passwordUtils';
+import { RateLimiter, RateLimitError } from '../../utils/passwordUtils';
 import { useAuth } from '../../contexts/AuthContext';
 
 /**
@@ -110,10 +110,7 @@ export const PasswordDialog: React.FC<PasswordDialogProps> = ({
     }
 
     try {
-      // Validate password
-      validatePassword(password);
-      
-      // Login through auth context
+      // Login through auth context (checks both admin and editor passwords)
       const success = login(password);
       
       if (success) {
@@ -127,9 +124,7 @@ export const PasswordDialog: React.FC<PasswordDialogProps> = ({
         throw new Error('Invalid password');
       }
     } catch (err) {
-      if (err instanceof MissingPasswordError) {
-        setError('Admin password is not configured. Please contact your administrator.');
-      } else if (err instanceof RateLimitError) {
+      if (err instanceof RateLimitError) {
         setIsLocked(true);
         setError(err.message);
       } else {
@@ -169,7 +164,7 @@ export const PasswordDialog: React.FC<PasswordDialogProps> = ({
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full overflow-hidden animate-fade-in">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Admin Authentication
+            Login
           </h2>
           <button
             onClick={handleCancel}
@@ -198,7 +193,7 @@ export const PasswordDialog: React.FC<PasswordDialogProps> = ({
               htmlFor="admin-password"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
-              Enter Admin Password
+              Enter Password
             </label>
             <input
               ref={passwordInputRef}

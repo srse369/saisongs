@@ -22,7 +22,11 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: 3001,
+        LD_LIBRARY_PATH: '/opt/oracle/instantclient_21_13:/usr/lib',
       },
+      
+      // Load environment variables from .env file
+      env_file: '/var/www/songstudio/.env',
       
       // Logging
       error_file: '/var/www/songstudio/logs/error.log',
@@ -50,7 +54,7 @@ module.exports = {
       repo: 'git@github.com:srse369/songstudio.git',
       path: '/var/www/songstudio',
       'pre-deploy-local': '',
-      'post-deploy': 'npm install && npm run build && npm run build:server && pm2 reload ecosystem.config.js --env production',
+      'post-deploy': 'npm install && npm run build && npm run build:server && pm2 reload ecosystem.config.cjs --env production',
       'pre-setup': ''
     }
   }

@@ -39,6 +39,12 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
   }, []);
 
   const fetchSongs = useCallback(async (forceRefresh: boolean = false) => {
+    // Reset backoff for explicit user-triggered refreshes
+    if (forceRefresh && typeof window !== 'undefined') {
+      const { apiClient } = await import('../services/ApiClient');
+      apiClient.resetBackoff('/songs');
+    }
+    
     setLoading(true);
     setError(null);
     try {

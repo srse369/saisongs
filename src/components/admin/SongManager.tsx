@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSongs } from '../../contexts/SongContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { SongForm } from './SongForm';
 import { SongList } from './SongList';
 import { SongDetails } from './SongDetails';
@@ -17,6 +18,7 @@ export const SongManager: React.FC = () => {
     deleteSong,
     clearError,
   } = useSongs();
+  const { isEditor } = useAuth();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
@@ -206,15 +208,17 @@ export const SongManager: React.FC = () => {
                 </svg>
                 Refresh
               </button>
-              <button
-                onClick={handleCreateClick}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Create New Song
-              </button>
+              {isEditor && (
+                <button
+                  onClick={handleCreateClick}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Create New Song
+                </button>
+              )}
             </div>
           </div>
         </div>

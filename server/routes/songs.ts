@@ -1,6 +1,6 @@
 import express from 'express';
 import oracledb from 'oracledb';
-import { databaseService } from '../services/DatabaseService';
+import { databaseService } from '../services/DatabaseService.js';
 
 const router = express.Router();
 

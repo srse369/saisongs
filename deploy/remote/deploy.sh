@@ -7,10 +7,11 @@
 set -e  # Exit on error
 
 # Configuration
-REMOTE_HOST="141.148.149.54"
-REMOTE_USER="ubuntu"  # Change this to your remote username
+REMOTE_HOST="129.153.85.24"
+REMOTE_USER="ubuntu"
 REMOTE_PATH="/var/www/songstudio"
 ENVIRONMENT="${1:-production}"
+SSH_KEY="${HOME}/Downloads/SSH Key Nov 12 2025.key"
 
 # Colors for output
 RED='\033[0;31m'
@@ -25,9 +26,14 @@ echo -e "${GREEN}  Environment: ${ENVIRONMENT}${NC}"
 echo -e "${GREEN}========================================${NC}"
 
 # Check if SSH key exists
-if [ ! -f ~/.ssh/id_rsa ] && [ ! -f ~/.ssh/id_ed25519 ]; then
-    echo -e "${YELLOW}Warning: No SSH key found. You may be prompted for password.${NC}"
+if [ ! -f "$SSH_KEY" ]; then
+    echo -e "${RED}Error: SSH key not found at: $SSH_KEY${NC}"
+    echo -e "${YELLOW}Please ensure the SSH key exists at this location.${NC}"
+    exit 1
 fi
+
+# Set proper permissions on SSH key
+chmod 600 "$SSH_KEY"
 
 # Step 1: Build the application locally
 echo -e "\n${GREEN}Step 1: Building application...${NC}"
@@ -43,7 +49,7 @@ mkdir -p "$TEMP_DIR/songstudio"
 cp -r dist "$TEMP_DIR/songstudio/"
 cp package.json "$TEMP_DIR/songstudio/"
 cp package-lock.json "$TEMP_DIR/songstudio/"
-cp deploy/remote/ecosystem.config.js "$TEMP_DIR/songstudio/" 2>/dev/null || echo "No ecosystem.config.js found"
+cp deploy/remote/ecosystem.config.cjs "$TEMP_DIR/songstudio/" 2>/dev/null || echo "No ecosystem.config.cjs found"
 cp .env.production "$TEMP_DIR/songstudio/.env" 2>/dev/null || echo "No .env.production found"
 
 # Create tarball
@@ -53,11 +59,11 @@ cd - > /dev/null
 
 # Step 3: Transfer to remote server
 echo -e "\n${GREEN}Step 3: Transferring files to remote server...${NC}"
-scp "$TEMP_DIR/songstudio.tar.gz" "${REMOTE_USER}@${REMOTE_HOST}:/tmp/"
+scp -i "$SSH_KEY" "$TEMP_DIR/songstudio.tar.gz" "${REMOTE_USER}@${REMOTE_HOST}:/tmp/"
 
 # Step 4: Deploy on remote server
 echo -e "\n${GREEN}Step 4: Deploying on remote server...${NC}"
-ssh "${REMOTE_USER}@${REMOTE_HOST}" << 'ENDSSH'
+ssh -i "$SSH_KEY" "${REMOTE_USER}@${REMOTE_HOST}" << 'ENDSSH'
 set -e
 
 echo "Extracting deployment package..."
@@ -80,7 +86,7 @@ npm ci --only=production
 
 echo "Restarting application..."
 if command -v pm2 &> /dev/null; then
-    pm2 restart ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+    pm2 restart ecosystem.config.cjs --env production || pm2 start ecosystem.config.cjs --env production
 else
     echo "PM2 not found. Starting with node..."
     nohup node dist/server/index.js > /var/www/songstudio/logs/app.log 2>&1 &
