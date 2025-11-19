@@ -49,15 +49,16 @@ class DatabaseService {
       walletLocation: walletLocation,
       walletPassword: walletPassword,
       poolMin: 0,                   // Start with 0 connections
-      poolMax: 2,                   // Only 2 concurrent connections (reduced from 4)
+      poolMax: 1,                   // ONLY 1 connection to stay well under limit
       poolIncrement: 1,             // Add 1 connection at a time
-      poolTimeout: 120,             // Wait up to 2 minutes for connection from pool
+      poolTimeout: 60,              // Wait 1 minute for connection from pool
       queueTimeout: 10000,          // Wait 10 seconds in queue before failing
       connectTimeout: 15000,        // Connection timeout of 15 seconds
       enableStatistics: true,       // Enable pool statistics
       _enableStats: true,           // Internal stats
       poolAlias: 'songstudio_pool', // Named pool for monitoring
       stmtCacheSize: 0,             // Disable statement caching to reduce memory
+      poolPingInterval: 60,         // Check connection health every 60 seconds
     };
 
     if (!this.connectionConfig.user || !this.connectionConfig.password || !this.connectionConfig.connectString) {
@@ -81,19 +82,31 @@ class DatabaseService {
 
     if (!this.pool) {
       try {
-        // Check if pool with this alias already exists
+        // Check if pool with this alias already exists and reuse it
         try {
           this.pool = oracledb.getPool('songstudio_pool');
           console.log('♻️  Reusing existing Oracle database connection pool');
           return;
         } catch (e) {
-          // Pool doesn't exist, create it
+          // Pool doesn't exist, continue to create it
         }
 
-        // Create new pool
+        // If we get here, pool doesn't exist - create new pool
         this.pool = await oracledb.createPool(this.connectionConfig);
         console.log('✅ Oracle database connection pool established');
-      } catch (error) {
+      } catch (error: any) {
+        // If pool alias already exists (race condition), try to reuse it
+        if (error.code === 'NJS-046') {
+          console.log('⚠️  Pool alias already exists, attempting to reuse...');
+          try {
+            this.pool = oracledb.getPool('songstudio_pool');
+            console.log('♻️  Successfully reused existing pool after collision');
+            return;
+          } catch (reuseError) {
+            console.error('Failed to reuse existing pool:', reuseError);
+          }
+        }
+        
         console.error('Failed to create Oracle connection pool:', error);
         throw new Error(`Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }

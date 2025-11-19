@@ -47,18 +47,31 @@ const server = app.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\n🛑 Shutting down gracefully...');
-  server.close(() => {
-    console.log('✅ Server closed');
+const shutdown = async (signal: string) => {
+  console.log(`\n🛑 ${signal} received, shutting down gracefully...`);
+  
+  // Close HTTP server
+  server.close(async () => {
+    console.log('✅ HTTP server closed');
+    
+    // Close database connection pool
+    try {
+      const { databaseService } = await import('./services/DatabaseService.js');
+      await databaseService.disconnect();
+      console.log('✅ Database connection pool closed');
+    } catch (error) {
+      console.error('Error closing database pool:', error);
+    }
+    
     process.exit(0);
   });
-});
+  
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error('⚠️  Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
 
-process.on('SIGTERM', () => {
-  console.log('\n🛑 SIGTERM received, shutting down gracefully...');
-  server.close(() => {
-    console.log('✅ Server closed');
-    process.exit(0);
-  });
-});
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
