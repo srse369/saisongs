@@ -41,25 +41,26 @@ class DatabaseService {
     const walletPassword = process.env.VITE_ORACLE_WALLET_PASSWORD || ''; // Wallet password set during download
     
     // Get connection configuration from environment variables
-    // Use VERY conservative pool settings for Oracle Autonomous Database Free Tier
+    // Use conservative pool settings for Oracle Autonomous Database Free Tier
     // Free Tier limits: 20 concurrent connections, limited OCPU
+    // Using 5 max connections keeps us well under the limit while avoiding timeouts
     this.connectionConfig = {
       user: process.env.VITE_ORACLE_USER,
       password: process.env.VITE_ORACLE_PASSWORD,
       connectString: process.env.VITE_ORACLE_CONNECT_STRING,
       walletLocation: walletLocation,
       walletPassword: walletPassword,
-      poolMin: 0,                   // Start with 0 connections
-      poolMax: 1,                   // ONLY 1 connection to stay well under limit
+      poolMin: 0,                   // Start with 0 connections (create on-demand)
+      poolMax: 3,                   // Reduced to 3 connections to be more conservative
       poolIncrement: 1,             // Add 1 connection at a time
-      poolTimeout: 60,              // Wait 1 minute for connection from pool
-      queueTimeout: 10000,          // Wait 10 seconds in queue before failing
-      connectTimeout: 15000,        // Connection timeout of 15 seconds
+      poolTimeout: 120,             // Wait 2 minutes for connection from pool
+      queueTimeout: 120000,         // Wait 120 seconds in queue
+      connectTimeout: 60000,        // Connection timeout of 60 seconds
       enableStatistics: true,       // Enable pool statistics
       _enableStats: true,           // Internal stats
       poolAlias: 'songstudio_pool', // Named pool for monitoring
       stmtCacheSize: 0,             // Disable statement caching to reduce memory
-      poolPingInterval: 60,         // Check connection health every 60 seconds
+      poolPingInterval: 30,         // Check connection health every 30 seconds
     };
 
     if (!this.connectionConfig.user || !this.connectionConfig.password || !this.connectionConfig.connectString) {
@@ -101,19 +102,21 @@ class DatabaseService {
           return;
         }
 
-        // Try to get existing pool first
+        // Try to close any existing pool first (cleanup from previous crashes)
         try {
-          this.pool = oracledb.getPool('songstudio_pool');
-          console.log('♻️  Reusing existing Oracle database connection pool');
-          return;
+          const existingPool = oracledb.getPool('songstudio_pool');
+          console.log('🧹 Cleaning up existing pool from previous run...');
+          await existingPool.close(0); // Force close immediately
+          console.log('✅ Cleaned up stale pool');
         } catch (e) {
-          // Pool doesn't exist, will create it below
+          // Pool doesn't exist, which is good
         }
 
         // Create new pool
         try {
           this.pool = await oracledb.createPool(this.connectionConfig);
           console.log('✅ Oracle database connection pool established');
+          console.log(`📊 Pool config: min=${this.connectionConfig.poolMin}, max=${this.connectionConfig.poolMax}`);
         } catch (error: any) {
           // Handle race condition where another process created the pool
           if (error.code === 'NJS-046') {
@@ -187,6 +190,31 @@ class DatabaseService {
           console.error('Error closing connection:', err);
         }
       }
+    }
+  }
+
+  /**
+   * Initialize the database pool explicitly
+   * Useful for warming up the connection before handling requests
+   */
+  async initialize(): Promise<void> {
+    await this.initPool();
+  }
+
+  /**
+   * Test database connection with a simple query
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      console.log('🔍 Testing database connection...');
+      const startTime = Date.now();
+      await this.query('SELECT 1 FROM DUAL');
+      const duration = Date.now() - startTime;
+      console.log(`✅ Database connection test successful (${duration}ms)`);
+      return true;
+    } catch (error) {
+      console.error('❌ Database connection test failed:', error instanceof Error ? error.message : error);
+      return false;
     }
   }
 

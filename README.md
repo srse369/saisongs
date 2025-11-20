@@ -1,6 +1,6 @@
 # Song Studio
 
-A web-based song presentation system that displays devotional songs (bhajans) in a PowerPoint-style slideshow format. Built with React, TypeScript, and Neon PostgreSQL.
+A web-based song presentation system that displays devotional songs (bhajans) in a PowerPoint-style slideshow format. Built with React, TypeScript, and Oracle Autonomous Database.
 
 ## Features
 

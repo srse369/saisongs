@@ -3,7 +3,11 @@
  * Replaces direct database calls with HTTP requests
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// In development, use /api (proxied by Vite)
+// In production, use full URL from env var or default to deployed backend
+const API_BASE_URL = import.meta.env.VITE_API_URL || (
+  import.meta.env.DEV ? '/api' : 'http://localhost:3001/api'
+);
 
 class ApiClient {
   private baseUrl: string;

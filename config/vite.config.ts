@@ -16,6 +16,15 @@ export default defineConfig(({ command, mode }) => ({
     sourcemap: false,
     minify: 'terser'
   },
+  // Proxy API requests to backend server in development
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      }
+    }
+  },
   test: {
     globals: true,
     environment: 'jsdom',
