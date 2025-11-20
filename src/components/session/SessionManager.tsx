@@ -13,7 +13,7 @@ export const SessionManager: React.FC = () => {
   const { entries, removeSong, clearSession, reorderSession, addSong } = useSession();
   const { songs } = useSongs();
   const { singers } = useSingers();
-  const { sessions, createSession, setSessionItems, loadSession, currentSession } = useNamedSessions();
+  const { sessions, createSession, setSessionItems, loadSession, currentSession, loadSessions, loading } = useNamedSessions();
   const navigate = useNavigate();
 
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
@@ -131,6 +131,14 @@ export const SessionManager: React.FC = () => {
     }
   };
 
+  const handleRefreshSessions = async () => {
+    try {
+      await loadSessions();
+    } catch (error) {
+      console.error('Error refreshing sessions:', error);
+    }
+  };
+
   // Effect to handle loading session items into live session
   useEffect(() => {
     if (sessionToLoad && currentSession && currentSession.id === sessionToLoad && currentSession.items) {
@@ -151,8 +159,8 @@ export const SessionManager: React.FC = () => {
   }, [sessionToLoad, currentSession]);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Session</h1>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
@@ -206,7 +214,7 @@ export const SessionManager: React.FC = () => {
         </div>
       ) : (
         <div className="overflow-x-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <table className="responsive-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900/50">
               <tr>
                 <th className="px-3 py-3 w-10 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -239,10 +247,10 @@ export const SessionManager: React.FC = () => {
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => handleDrop(e, index)}
                 >
-                  <td className="px-3 py-4 w-10 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
+                  <td data-label="#" className="px-3 py-4 w-10 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
                     {index + 1}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td data-label="Song" className="px-6 py-4 whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => setViewingSong(song)}
@@ -256,12 +264,12 @@ export const SessionManager: React.FC = () => {
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td data-label="Singer" className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-gray-100">
                       {singer ? singer.name : '—'}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td data-label="Pitch" className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-gray-100">
                       {entry.pitch ? (
                         <>
@@ -273,14 +281,14 @@ export const SessionManager: React.FC = () => {
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 align-top">
+                  <td data-label="Details" className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 align-top">
                     <div className="space-y-1">
                       <div>Deity: {song.deity || '—'}</div>
                       <div>Raga: {song.raga || '—'}</div>
                       <div>Tempo: {song.tempo || '—'}</div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td data-label="Actions" className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-2">
                       <button
                         className="inline-flex items-center p-2 rounded-md text-gray-500 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-move transition-colors"
@@ -403,6 +411,29 @@ export const SessionManager: React.FC = () => {
         isOpen={showLoadModal}
         onClose={() => setShowLoadModal(false)}
         title="Load Session"
+        titleActions={
+          <button
+            onClick={handleRefreshSessions}
+            disabled={loading}
+            className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
+            title="Refresh sessions"
+            aria-label="Refresh sessions"
+          >
+            <svg
+              className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
+        }
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">

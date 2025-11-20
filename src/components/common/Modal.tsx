@@ -7,6 +7,7 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   size?: 'default' | 'large';
+  titleActions?: ReactNode;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -15,6 +16,7 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   children,
   size = 'default',
+  titleActions,
 }) => {
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -51,7 +53,10 @@ export const Modal: React.FC<ModalProps> = ({
     >
       <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl ${maxWidthClass} w-full max-h-[90vh] overflow-hidden flex flex-col animate-fade-in`}>
         <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">{title}</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">{title}</h2>
+            {titleActions && <div className="flex items-center gap-2">{titleActions}</div>}
+          </div>
           <button
             onClick={onClose}
             className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1 transition-colors"

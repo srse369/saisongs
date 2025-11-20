@@ -79,12 +79,12 @@ export const SingerManager: React.FC = () => {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="mb-4 sm:mb-6">
         <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Singer Management</h1>
-            <p className="mt-2 text-sm text-gray-600">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Singer Management</h1>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               Manage singers and their profiles
             </p>
           </div>
@@ -95,7 +95,7 @@ export const SingerManager: React.FC = () => {
                 value={searchTerm}
                 onChange={handleSearchChange}
                 placeholder="Search singers by name..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <svg
                 className="w-4 h-4 text-gray-400 absolute left-3 top-2.5"

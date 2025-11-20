@@ -1,85 +1,123 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Song } from '../../types';
+import ApiClient from '../../services/ApiClient';
 
 interface SongDetailsProps {
   song: Song;
 }
 
 export const SongDetails: React.FC<SongDetailsProps> = ({ song }) => {
+  const [fullSong, setFullSong] = useState<Song>(song);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch full song data with CLOBs if not already loaded
+  useEffect(() => {
+    const fetchFullSong = async () => {
+      // If lyrics/meaning/tags are already present, no need to fetch
+      if (song.lyrics !== null || song.meaning !== null || song.songTags !== null) {
+        setFullSong(song);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await ApiClient.get<Song>(`/songs/${song.id}`);
+        setFullSong(response);
+      } catch (error) {
+        console.error('Error fetching full song details:', error);
+        // Fall back to the original song data
+        setFullSong(song);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFullSong();
+  }, [song]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-gray-600 dark:text-gray-400">Loading song details...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 text-sm text-gray-700 dark:text-gray-200">
       <div>
         <div className="font-semibold text-gray-900 dark:text-white">Name</div>
-        <div>{song.name}</div>
+        <div>{fullSong.name}</div>
       </div>
       <div>
         <div className="font-semibold text-gray-900 dark:text-white">Sairhythms URL</div>
-        <div className="break-all">{song.sairhythmsUrl}</div>
+        <div className="break-all">{fullSong.sairhythmsUrl}</div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <div className="font-semibold text-gray-900 dark:text-white">Title</div>
-          <div>{song.title || '—'}</div>
+          <div>{fullSong.title || '—'}</div>
         </div>
         <div>
           <div className="font-semibold text-gray-900 dark:text-white">Title 2</div>
-          <div>{song.title2 || '—'}</div>
+          <div>{fullSong.title2 || '—'}</div>
         </div>
         <div>
           <div className="font-semibold text-gray-900 dark:text-white">Language</div>
-          <div>{song.language || '—'}</div>
+          <div>{fullSong.language || '—'}</div>
         </div>
         <div>
           <div className="font-semibold text-gray-900 dark:text-white">Deity</div>
-          <div>{song.deity || '—'}</div>
+          <div>{fullSong.deity || '—'}</div>
         </div>
         <div>
           <div className="font-semibold text-gray-900 dark:text-white">Tempo</div>
-          <div>{song.tempo || '—'}</div>
+          <div>{fullSong.tempo || '—'}</div>
         </div>
         <div>
           <div className="font-semibold text-gray-900 dark:text-white">Beat</div>
-          <div>{song.beat || '—'}</div>
+          <div>{fullSong.beat || '—'}</div>
         </div>
         <div>
           <div className="font-semibold text-gray-900 dark:text-white">Raga</div>
-          <div>{song.raga || '—'}</div>
+          <div>{fullSong.raga || '—'}</div>
         </div>
         <div>
           <div className="font-semibold text-gray-900 dark:text-white">Level</div>
-          <div>{song.level || '—'}</div>
+          <div>{fullSong.level || '—'}</div>
         </div>
       </div>
       <div>
         <div className="font-semibold text-gray-900 dark:text-white">Tags</div>
-        <div>{song.songTags || '—'}</div>
+        <div>{fullSong.songTags || '—'}</div>
       </div>
       <div>
         <div className="font-semibold text-gray-900 dark:text-white">Audio Link</div>
-        <div className="break-all">{song.audioLink || '—'}</div>
+        <div className="break-all">{fullSong.audioLink || '—'}</div>
       </div>
       <div>
         <div className="font-semibold text-gray-900 dark:text-white">Video Link</div>
-        <div className="break-all">{song.videoLink || '—'}</div>
+        <div className="break-all">{fullSong.videoLink || '—'}</div>
       </div>
       <div>
         <div className="font-semibold text-gray-900 dark:text-white">ULink</div>
-        <div className="break-all">{song.ulink || '—'}</div>
+        <div className="break-all">{fullSong.ulink || '—'}</div>
       </div>
       <div>
         <div className="font-semibold text-gray-900 dark:text-white">Golden Voice</div>
-        <div>{song.goldenVoice ? 'Yes' : 'No'}</div>
+        <div>{fullSong.goldenVoice ? 'Yes' : 'No'}</div>
       </div>
       <div>
         <div className="font-semibold text-gray-900 dark:text-white">Lyrics</div>
         <pre className="mt-1 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900/40 p-2 rounded border border-gray-200 dark:border-gray-700 text-xs">
-          {song.lyrics || '—'}
+          {fullSong.lyrics || '—'}
         </pre>
       </div>
       <div>
         <div className="font-semibold text-gray-900 dark:text-white">Meaning / Translation</div>
         <pre className="mt-1 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900/40 p-2 rounded border border-gray-200 dark:border-gray-700 text-xs">
-          {song.meaning || '—'}
+          {fullSong.meaning || '—'}
         </pre>
       </div>
     </div>

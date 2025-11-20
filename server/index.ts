@@ -63,10 +63,11 @@ const server = app.listen(PORT, async () => {
       
       console.log('✅ Database connection pool ready');
       
-      // Warm up cache with all data
-      console.log('🔥 Warming up cache...');
+      // Selective cache warmup - songs WITHOUT CLOBs + all singers/pitches/sessions
+      // CLOBs fetched on-demand when viewing song details
+      console.log('🔥 Starting selective cache warmup...');
       await warmupCache();
-      console.log('✅ Cache warmup completed');
+      console.log('✅ Selective cache warmup completed');
     } catch (error) {
       console.error('⚠️  Database initialization failed:', error instanceof Error ? error.message : error);
       console.log('⚠️  Application will continue, cache will be populated on first request');

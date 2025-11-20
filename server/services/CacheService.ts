@@ -137,9 +137,13 @@ class CacheService {
 
   // ==================== SONGS ====================
 
+  /**
+   * Get all songs WITHOUT CLOB fields (lyrics, meaning, song_tags)
+   * Use getSong(id) for individual songs with full details including CLOBs
+   */
   async getAllSongs(): Promise<any[]> {
     const cacheKey = 'songs:all';
-    const cached = this.get(cacheKey);
+    const cached = this.get<any[]>(cacheKey);
     if (cached && Array.isArray(cached)) return cached;
 
     const db = await this.getDatabase();
@@ -150,15 +154,12 @@ class CacheService {
         sairhythms_url,
         title,
         title2,
-        DBMS_LOB.SUBSTR(lyrics, 4000, 1) AS lyrics,
-        DBMS_LOB.SUBSTR(meaning, 4000, 1) AS meaning,
         "LANGUAGE" as language,
         deity,
         tempo,
         beat,
         raga,
         "LEVEL" as song_level,
-        DBMS_LOB.SUBSTR(song_tags, 4000, 1) AS song_tags,
         audio_link,
         video_link,
         ulink,
@@ -175,28 +176,38 @@ class CacheService {
       sairhythmsUrl: extractValue(song.SAIRHYTHMS_URL),
       title: extractValue(song.TITLE),
       title2: extractValue(song.TITLE2),
-      lyrics: extractValue(song.LYRICS),
-      meaning: extractValue(song.MEANING),
       language: extractValue(song.LANGUAGE),
       deity: extractValue(song.DEITY),
       tempo: extractValue(song.TEMPO),
       beat: extractValue(song.BEAT),
       raga: extractValue(song.RAGA),
       level: extractValue(song.SONG_LEVEL),
-      songTags: extractValue(song.SONG_TAGS),
       audioLink: extractValue(song.AUDIO_LINK),
       videoLink: extractValue(song.VIDEO_LINK),
       ulink: extractValue(song.ULINK),
       goldenVoice: !!extractValue(song.GOLDEN_VOICE),
       createdAt: extractValue(song.CREATED_AT),
-      updatedAt: extractValue(song.UPDATED_AT)
+      updatedAt: extractValue(song.UPDATED_AT),
+      // CLOB fields set to null - fetch on-demand via getSong(id)
+      lyrics: null,
+      meaning: null,
+      songTags: null
     }));
 
     this.set(cacheKey, mappedSongs, 5 * 60 * 1000);
     return mappedSongs;
   }
 
+  /**
+   * Get individual song WITH CLOB fields (lyrics, meaning, song_tags)
+   * Used when viewing song details - fetches and caches full data
+   */
   async getSong(id: string): Promise<any> {
+    // Check individual song cache first
+    const cacheKey = `song:${id}`;
+    const cached = this.get<any>(cacheKey);
+    if (cached) return cached;
+
     const db = await this.getDatabase();
     const songs = await db.query(`
       SELECT 
@@ -227,7 +238,7 @@ class CacheService {
     if (songs.length === 0) return null;
     
     const song = songs[0];
-    return {
+    const mappedSong = {
       id: extractValue(song.ID),
       name: extractValue(song.NAME),
       sairhythmsUrl: extractValue(song.SAIRHYTHMS_URL),
@@ -249,6 +260,10 @@ class CacheService {
       createdAt: extractValue(song.CREATED_AT),
       updatedAt: extractValue(song.UPDATED_AT)
     };
+    
+    // Cache individual song with CLOBs (5 min TTL)
+    this.set(cacheKey, mappedSong, 5 * 60 * 1000);
+    return mappedSong;
   }
 
   async createSong(songData: any): Promise<void> {
@@ -1216,6 +1231,11 @@ function extractValue(value: any): any {
  * Warm up cache by fetching all data on startup
  * This reduces latency for initial requests
  */
+/**
+ * Selective warmup - fetches all data WITHOUT expensive CLOB fields
+ * CLOBs (lyrics, meaning, song_tags) are fetched on-demand when viewing song details
+ * This reduces recursive SQL from 40k to ~2-3k
+ */
 export async function warmupCache(): Promise<void> {
   const { databaseService } = await import('./DatabaseService.js');
   const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -1224,7 +1244,7 @@ export async function warmupCache(): Promise<void> {
   let successCount = 0;
   let failureCount = 0;
 
-  console.log('  📚 Fetching songs...');
+  console.log('  📚 Fetching songs (without CLOB fields)...');
   try {
     const songs = await databaseService.query(`
       SELECT 
@@ -1233,15 +1253,12 @@ export async function warmupCache(): Promise<void> {
         sairhythms_url,
         title,
         title2,
-        DBMS_LOB.SUBSTR(lyrics, 4000, 1) AS lyrics,
-        DBMS_LOB.SUBSTR(meaning, 4000, 1) AS meaning,
         "LANGUAGE" as language,
         deity,
         tempo,
         beat,
         raga,
         "LEVEL" as song_level,
-        DBMS_LOB.SUBSTR(song_tags, 4000, 1) AS song_tags,
         audio_link,
         video_link,
         ulink,
@@ -1252,32 +1269,33 @@ export async function warmupCache(): Promise<void> {
       ORDER BY name
     `);
 
-    // Map with extractValue helper for consistent data handling
+    // Map WITHOUT CLOB fields (lyrics, meaning, song_tags)
     const mappedSongs = songs.map((song: any) => ({
       id: extractValue(song.ID),
       name: extractValue(song.NAME),
       sairhythmsUrl: extractValue(song.SAIRHYTHMS_URL),
       title: extractValue(song.TITLE),
       title2: extractValue(song.TITLE2),
-      lyrics: extractValue(song.LYRICS),
-      meaning: extractValue(song.MEANING),
       language: extractValue(song.LANGUAGE),
       deity: extractValue(song.DEITY),
       tempo: extractValue(song.TEMPO),
       beat: extractValue(song.BEAT),
       raga: extractValue(song.RAGA),
       level: extractValue(song.SONG_LEVEL),
-      songTags: extractValue(song.SONG_TAGS),
       audioLink: extractValue(song.AUDIO_LINK),
       videoLink: extractValue(song.VIDEO_LINK),
       ulink: extractValue(song.ULINK),
       goldenVoice: !!extractValue(song.GOLDEN_VOICE),
       createdAt: extractValue(song.CREATED_AT),
-      updatedAt: extractValue(song.UPDATED_AT)
+      updatedAt: extractValue(song.UPDATED_AT),
+      // CLOB fields will be fetched on-demand:
+      lyrics: null,
+      meaning: null,
+      songTags: null
     }));
 
     cacheService.set('songs:all', mappedSongs, CACHE_TTL);
-    console.log(`  ✓ Cached ${mappedSongs.length} songs`);
+    console.log(`  ✓ Cached ${mappedSongs.length} songs (without lyrics/meaning/tags)`);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache songs:', error instanceof Error ? error.message : error);

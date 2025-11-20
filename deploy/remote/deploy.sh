@@ -147,7 +147,7 @@ echo "-------------------------"
 
 # Test API health
 echo "  → Testing API health..."
-if curl -f -s https://${REMOTE_HOST}/api/health > /dev/null 2>&1; then
+if curl -f -s https://${REMOTE_IP}/api/health > /dev/null 2>&1; then
     echo "  ✅ API health check passed"
 else
     echo "  ❌ API health check failed"
@@ -155,7 +155,7 @@ fi
 
 # Test frontend
 echo "  → Testing frontend..."
-if curl -f -s https://${REMOTE_HOST}/ > /dev/null 2>&1; then
+if curl -f -s https://${REMOTE_IP}/ > /dev/null 2>&1; then
     echo "  ✅ Frontend loading"
 else
     echo "  ❌ Frontend not responding"

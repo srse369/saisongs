@@ -8,9 +8,106 @@
   border: 1px solid rgb(229 231 235);
 }
 
-.dark .card {
-  background-color: rgb(31 41 55);
-  border-color: rgb(55 65 81);
+@media (prefers-color-scheme: dark) {
+  .card {
+    background-color: rgb(31 41 55);
+    border-color: rgb(55 65 81);
+  }
+}
+
+/* Responsive table utilities */
+@media (max-width: 767px) {
+  /* Hide table header on mobile */
+  .responsive-table thead {
+    display: none;
+  }
+  
+  /* Hide overflow wrapper on mobile to prevent horizontal scroll */
+  .responsive-table {
+    overflow-x: visible !important;
+  }
+  
+  /* Make table rows display as cards */
+  .responsive-table tbody tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .responsive-table tbody tr {
+      border-color: rgb(55 65 81);
+    }
+  }
+  
+  /* Prevent table-wide width constraints on mobile */
+  .responsive-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.5rem 0;
+    border: none !important;
+    text-align: left !important;
+    white-space: normal !important;
+    width: 100% !important;
+  }
+  
+  /* Add labels to cells using data-label attribute */
+  .responsive-table tbody td:before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: rgb(107 114 128);
+    margin-right: 1rem;
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .responsive-table tbody td:before {
+      color: rgb(156 163 175);
+    }
+  }
+  
+  /* Cell content area */
+  .responsive-table tbody td > * {
+    flex: 1;
+    text-align: right;
+  }
+  
+  /* Actions column full width on mobile */
+  .responsive-table tbody td:last-child {
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid rgb(229 231 235);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .responsive-table tbody td:last-child {
+      border-top-color: rgb(55 65 81);
+    }
+  }
+  
+  .responsive-table tbody td:last-child:before {
+    margin-bottom: 0.5rem;
+  }
+  
+  /* Button groups in action cells */
+  .responsive-table tbody td:last-child > div {
+    justify-content: flex-start !important;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  /* Make buttons touch-friendly on mobile (44x44 minimum) */
+  .responsive-table tbody td button {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 /* Custom animations */

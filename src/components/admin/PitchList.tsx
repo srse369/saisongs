@@ -107,60 +107,60 @@ export const PitchList: React.FC<PitchListProps> = ({
             d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
           />
         </svg>
-        <h3 className="mt-2 text-sm font-medium text-gray-900">No pitch associations</h3>
-        <p className="mt-1 text-sm text-gray-500">Get started by creating a new pitch association.</p>
+        <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No pitch associations</h3>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by creating a new pitch association.</p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-x-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+        <table className="responsive-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-900/50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Song
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Singer
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Pitch
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {enrichedPitches.map((pitch) => (
-              <tr key={pitch.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
+              <tr key={pitch.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/70">
+                <td data-label="Song" className="px-6 py-4 whitespace-nowrap">
                   <button
                     type="button"
                     onClick={() => onViewSong(pitch.songId)}
-                    className="text-left text-sm font-medium text-blue-700 hover:underline"
+                    className="text-left text-sm font-medium text-blue-700 dark:text-blue-300 hover:underline"
                   >
                     {pitch.songName}
                   </button>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{pitch.singerName}</div>
+                <td data-label="Singer" className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900 dark:text-white">{pitch.singerName}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
-                    <span className="font-bold text-blue-600">{formatPitch(pitch.pitch)}</span>
-                    <span className="text-gray-500 ml-2">({pitch.pitch.replace('#', '♯')})</span>
+                <td data-label="Pitch" className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    <span className="font-bold text-blue-600 dark:text-blue-400">{formatPitch(pitch.pitch)}</span>
+                    <span className="text-gray-500 dark:text-gray-400 ml-2">({pitch.pitch.replace('#', '♯')})</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td data-label="Actions" className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2">
                     <button
                       onClick={() => addSong(pitch.songId, pitch.singerId, pitch.pitch)}
                       disabled={songIds.includes(pitch.songId)}
                       title={songIds.includes(pitch.songId) ? 'In Live' : 'Add to Live'}
-                      className="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         {songIds.includes(pitch.songId) ? (
@@ -173,7 +173,7 @@ export const PitchList: React.FC<PitchListProps> = ({
                     <button
                       onClick={() => handlePresent(pitch)}
                       title="Present"
-                      className="p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                      className="p-2 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -184,7 +184,7 @@ export const PitchList: React.FC<PitchListProps> = ({
                       <button
                         onClick={() => onEdit(pitch)}
                         title="Edit"
-                        className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        className="p-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -195,7 +195,7 @@ export const PitchList: React.FC<PitchListProps> = ({
                       <button
                         onClick={() => handleDeleteClick(pitch)}
                         title="Delete"
-                        className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                        className="p-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -216,7 +216,7 @@ export const PitchList: React.FC<PitchListProps> = ({
         title="Delete Pitch Association"
       >
         <div className="space-y-4">
-          <p className="text-gray-700">
+          <p className="text-gray-700 dark:text-gray-300">
             Are you sure you want to delete the pitch association for{' '}
             <span className="font-semibold">{pitchToDelete?.singerName}</span> singing{' '}
             <span className="font-semibold">{pitchToDelete?.songName}</span> in pitch{' '}
@@ -227,7 +227,7 @@ export const PitchList: React.FC<PitchListProps> = ({
             <button
               onClick={handleDeleteCancel}
               disabled={isDeleting}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>

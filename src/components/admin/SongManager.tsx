@@ -100,6 +100,8 @@ export const SongManager: React.FC = () => {
     if (!query) return songs;
 
     return songs.filter((song) => {
+      // Note: lyrics, meaning, and songTags are not included in search
+      // because they're not loaded in the list view (only in detail view)
       const fields = [
         song.name,
         song.title,
@@ -111,8 +113,6 @@ export const SongManager: React.FC = () => {
         song.raga,
         song.level,
         song.sairhythmsUrl,
-        song.lyrics,
-        song.meaning,
       ];
 
       return fields.some((field) =>
@@ -157,8 +157,8 @@ export const SongManager: React.FC = () => {
   }, [filteredSongs.length]);
 
   return (
-    <div className="container mx-auto px-4 py-6 sm:py-8 animate-fade-in">
-      <div className="mb-6 sm:mb-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 animate-fade-in">
+      <div className="mb-4 sm:mb-8">
         <div className="flex flex-col gap-4 mb-4 sm:mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-1">

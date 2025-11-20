@@ -165,18 +165,18 @@ export const PitchManager: React.FC = () => {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="mb-4 sm:mb-8">
         <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Pitch Management</h1>
-            <p className="mt-2 text-sm text-gray-600">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Pitch Management</h1>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               Associate singers with songs and their pitch information
             </p>
             {(songFilterId || singerFilterId) && (
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                 {songFilterId && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
                     <span className="font-medium mr-1">Song:</span>
                     <span>
                       {songs.find((s) => s.id === songFilterId)?.name || 'Unknown song'}
@@ -184,7 +184,7 @@ export const PitchManager: React.FC = () => {
                   </span>
                 )}
                 {singerFilterId && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-100">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800">
                     <span className="font-medium mr-1">Singer:</span>
                     <span>
                       {singers.find((s) => s.id === singerFilterId)?.name || 'Unknown singer'}
@@ -194,7 +194,7 @@ export const PitchManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleClearFilters}
-                  className="inline-flex items-center px-3 py-1 rounded-full border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                  className="inline-flex items-center px-3 py-1 rounded-full border border-gray-300 dark:border-gray-600 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   Clear filters
                 </button>
@@ -208,7 +208,7 @@ export const PitchManager: React.FC = () => {
                 value={searchTerm}
                 onChange={handleSearchChange}
                 placeholder="Search by song, singer, or pitch..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <svg
                 className="w-4 h-4 text-gray-400 absolute left-3 top-2.5"
@@ -264,7 +264,7 @@ export const PitchManager: React.FC = () => {
 
       {/* Error Message */}
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md flex justify-between items-center">
+        <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 px-4 py-3 rounded-md flex justify-between items-center">
           <span>{error.message}</span>
           <button
             onClick={() => {
@@ -272,7 +272,7 @@ export const PitchManager: React.FC = () => {
               clearSongsError();
               clearSingersError();
             }}
-            className="text-red-600 hover:text-red-800 font-medium"
+            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
           >
             Dismiss
           </button>
@@ -281,8 +281,8 @@ export const PitchManager: React.FC = () => {
 
       {/* Form */}
       {showForm && (
-        <div className="mb-8 bg-white border border-gray-200 rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="mb-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
             {editingPitch ? 'Edit Pitch Association' : 'Create New Pitch Association'}
           </h2>
           <PitchForm
@@ -296,25 +296,18 @@ export const PitchManager: React.FC = () => {
       )}
 
       {/* List */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Pitch Associations</h2>
-        </div>
-        <div className="p-6">
-          <PitchList
-            pitches={filteredPitches}
-            songs={songs}
-            singers={singers}
-            onEdit={handleEditClick}
-            onDelete={handleDelete}
-            onViewSong={(songId) => {
-              const song = songs.find((s) => s.id === songId) || null;
-              setViewingSong(song);
-            }}
-            loading={loading}
-          />
-        </div>
-      </div>
+      <PitchList
+        pitches={filteredPitches}
+        songs={songs}
+        singers={singers}
+        onEdit={handleEditClick}
+        onDelete={handleDelete}
+        onViewSong={(songId) => {
+          const song = songs.find((s) => s.id === songId) || null;
+          setViewingSong(song);
+        }}
+        loading={loading}
+      />
 
       {viewingSong && (
         <Modal

@@ -51,16 +51,16 @@ class DatabaseService {
       walletLocation: walletLocation,
       walletPassword: walletPassword,
       poolMin: 0,                   // Start with 0 connections (create on-demand)
-      poolMax: 3,                   // Reduced to 3 connections to be more conservative
+      poolMax: 2,                   // Reduced to 2 to minimize recursive SQL
       poolIncrement: 1,             // Add 1 connection at a time
-      poolTimeout: 120,             // Wait 2 minutes for connection from pool
-      queueTimeout: 120000,         // Wait 120 seconds in queue
-      connectTimeout: 60000,        // Connection timeout of 60 seconds
+      poolTimeout: 60,              // Wait 60 seconds for connection from pool
+      queueTimeout: 5000,           // Reduced to 5 seconds (FAIL FAST to prevent queue buildup)
+      connectTimeout: 10000,        // Reduced to 10 seconds (FAIL FAST)
       enableStatistics: true,       // Enable pool statistics
       _enableStats: true,           // Internal stats
       poolAlias: 'songstudio_pool', // Named pool for monitoring
       stmtCacheSize: 0,             // Disable statement caching to reduce memory
-      poolPingInterval: 30,         // Check connection health every 30 seconds
+      poolPingInterval: 0,          // DISABLED - reduces recursive SQL from health checks
     };
 
     if (!this.connectionConfig.user || !this.connectionConfig.password || !this.connectionConfig.connectString) {

@@ -6,6 +6,7 @@ import { SlideView } from '../presentation/SlideView';
 import { SlideNavigation } from '../presentation/SlideNavigation';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { generateSlides } from '../../utils/slideUtils';
+import ApiClient from '../../services/ApiClient';
 import type { Slide, Song } from '../../types';
 
 interface SessionPresentationModeProps {
@@ -25,6 +26,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const [showOverlay, setShowOverlay] = useState(true);
 
   // Build a flattened slide deck for the entire session
+  // Fetches full song details with CLOBs (lyrics) for presentation
   useEffect(() => {
     if (entries.length === 0) {
       setError('No songs in session');
@@ -32,62 +34,76 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    try {
-      const allSlides: Slide[] = [];
+    const fetchAndBuildSlides = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // Fetch full song details with CLOBs for all songs in session
+        console.log('📥 Fetching full song details for presentation...');
+        const songPromises = entries.map(entry => 
+          ApiClient.get<Song>(`/songs/${entry.songId}`)
+        );
+        
+        const fullSongs = await Promise.all(songPromises);
+        console.log(`✅ Fetched ${fullSongs.length} songs with lyrics for presentation`);
 
-      entries.forEach((entry, songIndex) => {
-        const song = songs.find((s) => s.id === entry.songId);
-        if (!song) return;
+        const allSlides: Slide[] = [];
 
-        const singer = entry.singerId ? singers.find((si) => si.id === entry.singerId) : undefined;
-        const songSlides = generateSlides(song).map((slide) => ({
-          ...slide,
-          singerName: singer?.name,
-          pitch: entry.pitch,
-          sessionSongIndex: songIndex + 1, // Track which song in the session (1-based)
-          totalSongs: entries.length, // Total number of songs in session
-        }));
+        entries.forEach((entry, songIndex) => {
+          const song = fullSongs[songIndex];
+          if (!song) return;
 
-        songSlides.forEach((slide) => {
-          allSlides.push({
+          const singer = entry.singerId ? singers.find((si) => si.id === entry.singerId) : undefined;
+          const songSlides = generateSlides(song).map((slide) => ({
             ...slide,
-            index: allSlides.length,
+            singerName: singer?.name,
+            pitch: entry.pitch,
+            sessionSongIndex: songIndex + 1, // Track which song in the session (1-based)
+            totalSongs: entries.length, // Total number of songs in session
+          }));
+
+          songSlides.forEach((slide) => {
+            allSlides.push({
+              ...slide,
+              index: allSlides.length,
+            });
           });
         });
-      });
 
-      // Attach "next" metadata across the flattened session slides
-      const annotatedSlides: Slide[] = allSlides.map((slide, index) => {
-        const next = allSlides[index + 1];
-        if (!next) return slide;
+        // Attach "next" metadata across the flattened session slides
+        const annotatedSlides: Slide[] = allSlides.map((slide, index) => {
+          const next = allSlides[index + 1];
+          if (!next) return slide;
 
-        if (next.songName === slide.songName) {
+          if (next.songName === slide.songName) {
+            return {
+              ...slide,
+              nextSongName: slide.songName,
+              nextIsContinuation: true,
+            };
+          }
+
           return {
             ...slide,
-            nextSongName: slide.songName,
-            nextIsContinuation: true,
+            nextSongName: next.songName,
+            nextSingerName: next.singerName,
+            nextPitch: next.pitch,
+            nextIsContinuation: false,
           };
-        }
+        });
 
-        return {
-          ...slide,
-          nextSongName: next.songName,
-          nextSingerName: next.singerName,
-          nextPitch: next.pitch,
-          nextIsContinuation: false,
-        };
-      });
+        setSlides(annotatedSlides);
+        setCurrentSlideIndex(0);
+      } catch (err) {
+        console.error('Error fetching songs for presentation:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load songs for presentation');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      setSlides(annotatedSlides);
-      setCurrentSlideIndex(0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate slides');
-    } finally {
-      setLoading(false);
-    }
-  }, [entries, songs, singers]);
+    fetchAndBuildSlides();
+  }, [entries, singers]);
 
   // Auto-hide overlay after 2 seconds
   useEffect(() => {

@@ -99,16 +99,18 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                 >
                   {song.name}
                 </h3>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
-                  {song.lyrics ? (
-                    <>
-                      {song.lyrics.substring(0, 200)}
-                      {song.lyrics.length > 200 ? '...' : ''}
-                    </>
-                  ) : (
-                    <span className="italic text-gray-400">No lyrics available</span>
-                  )}
-                </p>
+                {song.title2 && song.title2.trim().toLowerCase() !== song.name.trim().toLowerCase() && (
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 italic">
+                    {song.title2}
+                  </p>
+                )}
+                {(song.raga || song.beat) && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    {song.raga && <span>Raga: {song.raga}</span>}
+                    {song.raga && song.beat && <span className="mx-2">•</span>}
+                    {song.beat && <span>Beat: {song.beat}</span>}
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2 text-xs">
                   {song.language && (
                     <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
@@ -125,12 +127,9 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                       {song.tempo}
                     </span>
                   )}
-                  {song.meaning && (
-                    <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded flex items-center">
-                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                      </svg>
-                      Translation
+                  {song.raga && (
+                    <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded">
+                      {song.raga}
                     </span>
                   )}
                 </div>
@@ -139,7 +138,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                     <audio
                       controls
                       preload="none"
-                      className="w-full max-w-xs"
+                      className="w-full max-w-xs dark:invert dark:brightness-90 dark:contrast-90 dark:hue-rotate-180"
                     >
                       <source src={song.audioLink} />
                       Your browser does not support the audio element.
