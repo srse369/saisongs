@@ -28,8 +28,27 @@ const generatePitchVariations = (basePitch: string) => [
   `${basePitch} minor`,
 ];
 
-// All pitch options with variations
-export const ALL_PITCH_OPTIONS = BASE_PITCHES.flatMap(generatePitchVariations);
+// Madhyam pitches
+const MADHYAM_PITCHES = [
+  '1 Madhyam',
+  '1.5 Madhyam',
+  '2 Madhyam',
+  '2.5 Madhyam',
+  '3 Madhyam',
+  '4 Madhyam',
+  '4.5 Madhyam',
+  '5 Madhyam',
+  '5.5 Madhyam',
+  '6 Madhyam',
+  '6.5 Madhyam',
+  '7 Madhyam',
+] as const;
+
+// All pitch options with variations (western pitches + Madhyam pitches)
+export const ALL_PITCH_OPTIONS = [
+  ...BASE_PITCHES.flatMap(generatePitchVariations),
+  ...MADHYAM_PITCHES,
+];
 
 export type Pitch = typeof ALL_PITCH_OPTIONS[number];
 
@@ -46,8 +65,14 @@ export function isValidPitch(pitch: string): boolean {
  * - "C" -> "1"
  * - "C major" -> "1M"
  * - "D# minor" -> "2.5m"
+ * - "1 Madhyam" -> "1 Madhyam"
  */
 export function formatPitch(pitch: string): string {
+  // If it's a Madhyam pitch, return as-is
+  if (pitch.includes('Madhyam')) {
+    return pitch;
+  }
+  
   // Check if it's a major or minor variation
   if (pitch.endsWith(' major')) {
     const basePitch = pitch.replace(' major', '');

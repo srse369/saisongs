@@ -279,22 +279,6 @@ export const PitchManager: React.FC = () => {
         </div>
       )}
 
-      {/* Form */}
-      {showForm && (
-        <div className="mb-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            {editingPitch ? 'Edit Pitch Association' : 'Create New Pitch Association'}
-          </h2>
-          <PitchForm
-            pitch={editingPitch}
-            songs={songs}
-            singers={singers}
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-          />
-        </div>
-      )}
-
       {/* List */}
       <PitchList
         pitches={filteredPitches}
@@ -309,6 +293,24 @@ export const PitchManager: React.FC = () => {
         loading={loading}
       />
 
+      {/* Pitch Form Modal */}
+      {showForm && (
+        <Modal
+          isOpen={showForm}
+          onClose={handleCancel}
+          title={editingPitch ? 'Edit Pitch Association' : 'Create New Pitch Association'}
+        >
+          <PitchForm
+            pitch={editingPitch}
+            songs={songs}
+            singers={singers}
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+          />
+        </Modal>
+      )}
+
+      {/* Song Details Modal */}
       {viewingSong && (
         <Modal
           isOpen={!!viewingSong}

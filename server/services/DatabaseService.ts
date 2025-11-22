@@ -38,16 +38,16 @@ class DatabaseService {
     
     // For thin mode, we need to specify wallet location in connection parameters
     const walletLocation = walletPath;
-    const walletPassword = process.env.VITE_ORACLE_WALLET_PASSWORD || ''; // Wallet password set during download
+    const walletPassword = process.env.ORACLE_WALLET_PASSWORD || ''; // Wallet password set during download
     
     // Get connection configuration from environment variables
     // Use conservative pool settings for Oracle Autonomous Database Free Tier
     // Free Tier limits: 20 concurrent connections, limited OCPU
     // Using 5 max connections keeps us well under the limit while avoiding timeouts
     this.connectionConfig = {
-      user: process.env.VITE_ORACLE_USER,
-      password: process.env.VITE_ORACLE_PASSWORD,
-      connectString: process.env.VITE_ORACLE_CONNECT_STRING,
+      user: process.env.ORACLE_USER,
+      password: process.env.ORACLE_PASSWORD,
+      connectString: process.env.ORACLE_CONNECT_STRING,
       walletLocation: walletLocation,
       walletPassword: walletPassword,
       poolMin: 0,                   // Start with 0 connections (create on-demand)
@@ -94,7 +94,7 @@ class DatabaseService {
     this.initializingPool = (async () => {
       try {
         if (!this.connectionConfig.user || !this.connectionConfig.password || !this.connectionConfig.connectString) {
-          throw new Error('Oracle database credentials are not configured. Please set VITE_ORACLE_USER, VITE_ORACLE_PASSWORD, and VITE_ORACLE_CONNECT_STRING in your .env.local file.');
+          throw new Error('Oracle database credentials are not configured. Please set ORACLE_USER, ORACLE_PASSWORD, and ORACLE_CONNECT_STRING in your .env or .env.local file.');
         }
 
         // Double-check pool doesn't exist (could have been created by another call)

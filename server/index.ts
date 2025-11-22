@@ -1,16 +1,15 @@
+// MUST BE FIRST: Load environment variables before any other local imports
+import './config/env.js';
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import songsRouter from './routes/songs.js';
 import singersRouter from './routes/singers.js';
 import pitchesRouter from './routes/pitches.js';
 import sessionsRouter from './routes/sessions.js';
 import importMappingsRouter from './routes/importMappings.js';
+import authRouter from './routes/auth.js';
 import { warmupCache } from './services/CacheService.js';
-
-// Load environment variables
-// In production, load from .env, in development from .env.local
-dotenv.config({ path: process.env.NODE_ENV === 'production' ? '.env' : '.env.local' });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,6 +25,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // API Routes
+app.use('/api/auth', authRouter);
 app.use('/api/songs', songsRouter);
 app.use('/api/singers', singersRouter);
 app.use('/api/pitches', pitchesRouter);

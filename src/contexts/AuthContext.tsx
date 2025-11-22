@@ -8,7 +8,7 @@ interface AuthContextState {
   userRole: UserRole;
   isEditor: boolean;
   isAdmin: boolean;
-  login: (password: string) => boolean;
+  login: (password: string) => Promise<boolean>;
   logout: () => void;
 }
 
@@ -18,11 +18,14 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || '';
-const EDITOR_PASSWORD = import.meta.env.VITE_EDITOR_PASSWORD || '';
 const AUTH_ROLE_KEY = 'songstudio_auth_role';
 const AUTH_EXPIRY_KEY = 'songstudio_auth_expiry';
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// Use Vite proxy in development (/api), full URL in production
+const API_BASE_URL = import.meta.env.VITE_API_URL || (
+  import.meta.env.DEV ? '/api' : 'http://localhost:3001/api'
+);
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [userRole, setUserRole] = useState<UserRole>('viewer');
@@ -49,22 +52,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = useCallback((password: string): boolean => {
-    let role: UserRole = 'viewer';
-    
-    if (password === ADMIN_PASSWORD) {
-      role = 'admin';
-    } else if (password === EDITOR_PASSWORD) {
-      role = 'editor';
-    } else {
+  const login = useCallback(async (password: string): Promise<boolean> => {
+    try {
+      // Call backend authentication endpoint
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const role = data.role as UserRole;
+
+        // Store role and expiry in sessionStorage
+        const expiryTime = Date.now() + SESSION_DURATION;
+        sessionStorage.setItem(AUTH_ROLE_KEY, role);
+        sessionStorage.setItem(AUTH_EXPIRY_KEY, expiryTime.toString());
+        setUserRole(role);
+        return true;
+      } else {
+        // Login failed
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Login failed:', error);
+        return false;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
       return false;
     }
-    
-    const expiryTime = Date.now() + SESSION_DURATION;
-    sessionStorage.setItem(AUTH_ROLE_KEY, role);
-    sessionStorage.setItem(AUTH_EXPIRY_KEY, expiryTime.toString());
-    setUserRole(role);
-    return true;
   }, []);
 
   const logout = useCallback(() => {

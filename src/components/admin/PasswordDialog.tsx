@@ -97,7 +97,7 @@ export const PasswordDialog: React.FC<PasswordDialogProps> = ({
    * 
    * @param event - Form submission event
    */
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     // Check if locked
@@ -110,8 +110,8 @@ export const PasswordDialog: React.FC<PasswordDialogProps> = ({
     }
 
     try {
-      // Login through auth context (checks both admin and editor passwords)
-      const success = login(password);
+      // Login through auth context (calls backend API)
+      const success = await login(password);
       
       if (success) {
         // Success - reset rate limiter and trigger success callback

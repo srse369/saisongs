@@ -16,7 +16,7 @@ interface SessionContextState {
   songIds: string[];
   // Optional singerId and pitch are used when adding from the Pitches tab
   addSong: (songId: string, singerId?: string, pitch?: string) => void;
-  removeSong: (songId: string) => void;
+  removeSong: (songId: string, singerId?: string) => void;
   clearSession: () => void;
   reorderSession: (order: string[]) => void;
 }
@@ -74,25 +74,37 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
 
   const addSong = useCallback((songId: string, singerId?: string, pitch?: string) => {
     setEntries((prev) => {
-      const existingIndex = prev.findIndex((entry) => entry.songId === songId);
-      // If song is already in the session, update its singer (if provided) but avoid duplicates
+      // Check if this exact song+singer combination exists
+      const existingIndex = prev.findIndex((entry) => 
+        entry.songId === songId && entry.singerId === singerId
+      );
+      
+      // If the exact song+singer combination exists, update the pitch if provided
       if (existingIndex !== -1) {
         const updated = [...prev];
         const existing = updated[existingIndex];
         updated[existingIndex] = {
           ...existing,
-          // Only overwrite singerId/pitch when explicitly provided so we don't lose data
-          singerId: singerId ?? existing.singerId,
+          // Only overwrite pitch when explicitly provided
           pitch: pitch ?? existing.pitch,
         };
         return updated;
       }
+      
+      // Add new entry (allows same song with different singers)
       return [...prev, { songId, singerId, pitch }];
     });
   }, []);
 
-  const removeSong = useCallback((songId: string) => {
-    setEntries((prev) => prev.filter((entry) => entry.songId !== songId));
+  const removeSong = useCallback((songId: string, singerId?: string) => {
+    setEntries((prev) => {
+      // If singerId is provided, remove only the specific song+singer combination
+      if (singerId) {
+        return prev.filter((entry) => !(entry.songId === songId && entry.singerId === singerId));
+      }
+      // If no singerId, remove all entries with this songId (backwards compatibility)
+      return prev.filter((entry) => entry.songId !== songId);
+    });
   }, []);
 
   const clearSession = useCallback(() => {

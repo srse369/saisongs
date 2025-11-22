@@ -309,7 +309,7 @@ export const SessionManager: React.FC = () => {
                         </svg>
                       </button>
                       <button
-                        onClick={() => removeSong(entry.songId)}
+                        onClick={() => removeSong(entry.songId, entry.singerId)}
                         title="Remove"
                         className="inline-flex items-center p-2 rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
                       >

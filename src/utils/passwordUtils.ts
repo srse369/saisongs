@@ -1,5 +1,8 @@
 /**
- * Password validation utilities for admin authentication
+ * Rate limiting utilities for authentication
+ * 
+ * NOTE: Password validation is now done server-side via /api/auth/login
+ * This file only contains the client-side rate limiter for UI feedback
  */
 
 /**
@@ -10,42 +13,6 @@ export class RateLimitError extends Error {
     super(message);
     this.name = 'RateLimitError';
   }
-}
-
-/**
- * Custom error class for missing environment variable
- */
-export class MissingPasswordError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'MissingPasswordError';
-  }
-}
-
-/**
- * Validates the provided password against the environment variable
- * 
- * @param password - The password to validate
- * @returns true if password is correct
- * @throws {MissingPasswordError} If VITE_ADMIN_PASSWORD is not configured
- * @throws {Error} If password is incorrect
- */
-export function validatePassword(password: string): boolean {
-  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
-  
-  // Handle missing environment variable
-  if (!adminPassword) {
-    throw new MissingPasswordError(
-      'Admin password is not configured. Please set VITE_ADMIN_PASSWORD in .env.local'
-    );
-  }
-  
-  // Validate password
-  if (password !== adminPassword) {
-    throw new Error('Incorrect password');
-  }
-  
-  return true;
 }
 
 /**

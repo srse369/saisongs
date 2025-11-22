@@ -31,11 +31,16 @@ export const PitchList: React.FC<PitchListProps> = ({
   loading = false 
 }) => {
   const navigate = useNavigate();
-  const { addSong, songIds } = useSession();
+  const { addSong, songIds, entries } = useSession();
   const { isEditor, isAdmin } = useAuth();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [pitchToDelete, setPitchToDelete] = useState<PitchWithDetails | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Check if a song+singer combination is already in the live session
+  const isInLiveSession = (songId: string, singerId: string): boolean => {
+    return entries.some(entry => entry.songId === songId && entry.singerId === singerId);
+  };
 
   // Create a map for quick lookups
   const songMap = new Map(songs.map(song => [song.id, song.name]));
@@ -158,12 +163,12 @@ export const PitchList: React.FC<PitchListProps> = ({
                   <div className="flex items-center justify-end gap-2">
                     <button
                       onClick={() => addSong(pitch.songId, pitch.singerId, pitch.pitch)}
-                      disabled={songIds.includes(pitch.songId)}
-                      title={songIds.includes(pitch.songId) ? 'In Live' : 'Add to Live'}
+                      disabled={isInLiveSession(pitch.songId, pitch.singerId)}
+                      title={isInLiveSession(pitch.songId, pitch.singerId) ? 'In Live' : 'Add to Live'}
                       className="p-2 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        {songIds.includes(pitch.songId) ? (
+                        {isInLiveSession(pitch.songId, pitch.singerId) ? (
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         ) : (
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
