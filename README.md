@@ -147,18 +147,18 @@ See **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** for detailed GitHub Pages dep
 
 ## Admin Features
 
-### Bulk Import from Sairhythms.org
+### Bulk Import from external source
 
-The application includes a hidden bulk import feature for administrators to import all songs from sairhythms.org into the database.
+The application includes a hidden bulk import feature for administrators to import all songs from external-source into the database.
 
 **Accessing the Bulk Import:**
 1. Ensure `VITE_ADMIN_PASSWORD` is set in your `.env.local` file
 2. Press **Ctrl+Shift+I** (Windows/Linux) or **Cmd+Shift+I** (Mac) to open the password dialog
 3. Enter the admin password
-4. The bulk import interface will appear, allowing you to import all songs from sairhythms.org
+4. The bulk import interface will appear, allowing you to import all songs from external-source
 
 **Features:**
-- Discovers all available songs on sairhythms.org
+- Discovers all available songs on external-source
 - Preserves existing song IDs to maintain data integrity
 - Updates existing songs and creates new ones
 - Real-time progress tracking

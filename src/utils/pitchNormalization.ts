@@ -1,14 +1,14 @@
 /**
- * Utility for normalizing pitch formats from Beaverton to our database format
+ * Utility for normalizing pitch formats from CSV import to our database format
  */
 
 export interface PitchMapping {
-  beavertonFormat: string;
+  sourceFormat: string;
   normalizedFormat: string;
 }
 
 /**
- * Common pitch mappings from Beaverton format to our format
+ * Common pitch mappings from various formats to our standard format
  */
 const PITCH_MAPPINGS: Record<string, string> = {
   '1': 'C',
@@ -25,6 +25,7 @@ const PITCH_MAPPINGS: Record<string, string> = {
   '5.5': 'G#',
   '6.5': 'A#',
   '7.5': 'C',
+  'C(B#)': 'C',  // Cleaned format (spaces removed)
 
   '1M': 'C major',
   '2M': 'D major',
@@ -33,6 +34,13 @@ const PITCH_MAPPINGS: Record<string, string> = {
   '5M': 'G major',
   '6M': 'A major',
   '7M': 'B major',
+  'CM': 'C major',
+  'DM': 'D major',
+  'EM': 'E major',
+  'FM': 'F major',
+  'GM': 'G major',
+  'AM': 'A major',
+  'BM': 'B major',
   '1.5M': 'C# major',
   '2.5M': 'D# major',
   '3.5M': 'F major',
@@ -40,6 +48,14 @@ const PITCH_MAPPINGS: Record<string, string> = {
   '5.5M': 'G# major',
   '6.5M': 'A# major',
   '7.5M': 'C major',
+  'C#M': 'C# major',
+  'D#M': 'D# major',
+  'E#M': 'F major',
+  'F#M': 'F# major',
+  'G#M': 'G# major',
+  'A#M': 'A# major',
+  'B#M': 'C major',
+  'FM(E#M)': 'F major',  // Cleaned format (spaces removed)
 
   '1m': 'C minor',
   '2m': 'D minor',
@@ -48,6 +64,13 @@ const PITCH_MAPPINGS: Record<string, string> = {
   '5m': 'G minor',
   '6m': 'A minor',
   '7m': 'B minor',
+  'Cm': 'C minor',
+  'Dm': 'D minor',
+  'Em': 'E minor',
+  'Fm': 'F minor',
+  'Gm': 'G minor',
+  'Am': 'A minor',
+  'Bm': 'B minor',
   '1.5m': 'C# minor',
   '2.5m': 'D# minor',
   '3.5m': 'F minor',
@@ -55,7 +78,15 @@ const PITCH_MAPPINGS: Record<string, string> = {
   '5.5m': 'G# minor',
   '6.5m': 'A# minor',
   '7.5m': 'C minor',
+  'C#m': 'C# minor',
+  'D#m': 'D# minor',
+  'E#m': 'F minor',
+  'F#m': 'F# minor',
+  'G#m': 'G# minor',
+  'A#m': 'A# minor',
+  'B#m': 'C minor',
 
+  // Note: Keys use cleaned format (no spaces), values are standardized output format
   '1Madhyam': '1 Madhyam',
   '2Madhyam': '2 Madhyam',
   '3Madhyam': '3 Madhyam',
@@ -72,31 +103,40 @@ const PITCH_MAPPINGS: Record<string, string> = {
 };
 
 /**
- * Normalize a Beaverton pitch format to our database format
+ * Normalize a pitch format from CSV import to our database format
+ * Note: Case is IMPORTANT! M = Major, m = minor
  */
-export function normalizePitch(beavertonPitch: string): string | null {
-  if (!beavertonPitch) return null;
+export function normalizePitch(inputPitch: string): string | null {
+  if (!inputPitch) return null;
   
-  const trimmed = beavertonPitch.trim();
+  // Clean up: remove extra whitespace, non-breaking spaces, and normalize
+  // BUT preserve case since M (major) vs m (minor) matters!
+  let cleaned = inputPitch
+    .trim()
+    .replace(/\s+/g, '') // Remove all whitespace
+    .replace(/\u00A0/g, '') // Remove non-breaking spaces
+    .replace(/\u200B/g, ''); // Remove zero-width spaces
   
-  // Direct mapping
-  if (PITCH_MAPPINGS[trimmed]) {
-    return PITCH_MAPPINGS[trimmed];
+  // Direct mapping (CASE-SENSITIVE by design: M=major, m=minor)
+  if (PITCH_MAPPINGS[cleaned]) {
+    return PITCH_MAPPINGS[cleaned];
   }
   
   // If already in standard format (C, D, E, F, G, A, B, C#, D#, F#, G#, A#)
-  if (/^[A-G](#)?$/.test(trimmed)) {
-    return trimmed;
+  // Only single letters with optional # are case-insensitive
+  if (/^[A-G](#)?$/i.test(cleaned)) {
+    return cleaned.toUpperCase();
   }
   
+  // Unrecognized pitch format
   return null;
 }
 
 /**
  * Check if a pitch format is recognized
  */
-export function isRecognizedPitch(beavertonPitch: string): boolean {
-  return normalizePitch(beavertonPitch) !== null;
+export function isRecognizedPitch(inputPitch: string): boolean {
+  return normalizePitch(inputPitch) !== null;
 }
 
 /**
@@ -115,8 +155,15 @@ export function getUnmappedPitches(pitches: string[]): string[] {
 /**
  * Add a custom pitch mapping
  */
-export function addPitchMapping(beavertonFormat: string, normalizedFormat: string): void {
-  PITCH_MAPPINGS[beavertonFormat] = normalizedFormat;
+export function addPitchMapping(sourceFormat: string, normalizedFormat: string): void {
+  PITCH_MAPPINGS[sourceFormat] = normalizedFormat;
+}
+
+/**
+ * Remove a pitch mapping
+ */
+export function removePitchMapping(sourceFormat: string): void {
+  delete PITCH_MAPPINGS[sourceFormat];
 }
 
 /**

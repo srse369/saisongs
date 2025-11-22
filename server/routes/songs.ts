@@ -47,7 +47,7 @@ router.post('/', async (req, res) => {
     // Debug: Log what we received
     console.log('📝 Creating song with data:', {
       name: req.body.name,
-      sairhythms_url: req.body.sairhythms_url?.substring(0, 50),
+      external_source_url: req.body.external_source_url?.substring(0, 50),
       has_lyrics: !!req.body.lyrics,
       lyrics_length: req.body.lyrics?.length || 0,
       has_meaning: !!req.body.meaning,

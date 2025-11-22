@@ -1,10 +1,10 @@
 /**
- * ImportService orchestrates the bulk import process from sairhythms.org.
+ * ImportService orchestrates the bulk import process from external sources.
  * Handles song discovery, matching, and database operations.
  */
 
 import songService from './SongService';
-import sairhythmsScraperService, { type DiscoveredSong } from './SairhythmsScraperService';
+import externalSongsScraperService, { type DiscoveredSong } from './ExternalSongsScraperService';
 import type { Song } from '../types';
 
 /**
@@ -37,7 +37,7 @@ export interface ImportResult {
 }
 
 /**
- * Service for importing songs from sairhythms.org into the database
+ * Service for importing songs from external sources into the database
  */
 class ImportService {
 
@@ -49,11 +49,11 @@ class ImportService {
 
   /**
    * Processes a single discovered song (create or update) using an in-memory cache
-   * of existing songs keyed by sairhythmsUrl. This avoids fetching all songs
+   * of existing songs keyed by externalSourceUrl. This avoids fetching all songs
    * for every record and lets us perform a true UPSERT behavior.
    *
-   * @param discovered - Song discovered from sairhythms.org
-   * @param existingByUrl - Map of existing songs keyed by sairhythmsUrl
+   * @param discovered - Song discovered from external source
+   * @param existingByUrl - Map of existing songs keyed by externalSourceUrl
    * @returns 'created' or 'updated' to indicate the operation performed
    */
   private async processSong(
@@ -75,7 +75,7 @@ class ImportService {
 
     const payload = {
       name: discovered.name,
-      sairhythmsUrl: discovered.url,
+      externalSourceUrl: discovered.url,
       title: (discovered as any).title,
       title2: (discovered as any).title2,
       lyrics: (discovered as any).lyrics,
@@ -131,12 +131,12 @@ class ImportService {
     const errors: ImportError[] = [];
     
     try {
-      // Build a cache of existing songs keyed by sairhythmsUrl so we can do UPSERTs efficiently
+      // Build a cache of existing songs keyed by externalSourceUrl so we can do UPSERTs efficiently
       const existingSongs = await songService.getAllSongs();
       const existingByUrl = new Map<string, Song>(
         existingSongs
-          .filter(s => !!s.sairhythmsUrl)
-          .map(s => [s.sairhythmsUrl, s])
+          .filter(s => !!s.externalSourceUrl)
+          .map(s => [s.externalSourceUrl, s])
       );
 
       // Process songs in small concurrent batches to speed up imports
@@ -201,7 +201,7 @@ class ImportService {
   }
 
   /**
-   * Imports all songs from sairhythms.org
+   * Imports all songs from external sources
    * @param onProgress - Callback function to report progress updates
    * @returns Import result with statistics and errors
    */
@@ -221,16 +221,16 @@ class ImportService {
     const errors: ImportError[] = [];
     
     try {
-      // Step 1: Discover all songs from sairhythms.org
-      const discoveredSongs = await sairhythmsScraperService.discoverAllSongs();
+      // Step 1: Discover all songs from external sources
+      const discoveredSongs = await externalSongsScraperService.discoverAllSongs();
       stats.total = discoveredSongs.length;
 
-      // Step 2: Build a cache of existing songs keyed by sairhythmsUrl
+      // Step 2: Build a cache of existing songs keyed by externalSourceUrl
       const existingSongs = await songService.getAllSongs();
       const existingByUrl = new Map<string, Song>(
         existingSongs
-          .filter(s => !!s.sairhythmsUrl)
-          .map(s => [s.sairhythmsUrl, s])
+          .filter(s => !!s.externalSourceUrl)
+          .map(s => [s.externalSourceUrl, s])
       );
       
       // Step 3: Process discovered songs in concurrent batches

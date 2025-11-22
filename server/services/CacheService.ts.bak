@@ -31,9 +31,11 @@ class CacheService {
     // Check if cache entry has expired
     if (age > entry.ttl) {
       this.cache.delete(key);
+      console.log(`🗑️  Cache expired for key: ${key} (age: ${Math.round(age / 1000)}s)`);
       return null;
     }
 
+    console.log(`✅ Cache hit for key: ${key} (age: ${Math.round(age / 1000)}s)`);
     return entry.data as T;
   }
 
@@ -51,6 +53,7 @@ class CacheService {
     };
 
     this.cache.set(key, entry);
+    console.log(`💾 Cached data for key: ${key} (TTL: ${Math.round(ttlMs / 1000)}s)`);
   }
 
   /**
@@ -60,6 +63,7 @@ class CacheService {
   invalidate(key: string): void {
     if (this.cache.has(key)) {
       this.cache.delete(key);
+      console.log(`🗑️  Invalidated cache for key: ${key}`);
     }
   }
 
@@ -79,6 +83,7 @@ class CacheService {
     }
 
     if (count > 0) {
+      console.log(`🗑️  Invalidated ${count} cache entries matching pattern: ${pattern}`);
     }
   }
 
@@ -88,6 +93,7 @@ class CacheService {
   clear(): void {
     const size = this.cache.size;
     this.cache.clear();
+    console.log(`🗑️  Cleared ${size} cache entries`);
   }
 
   /**
@@ -116,6 +122,7 @@ class CacheService {
     }
 
     if (count > 0) {
+      console.log(`🧹 Cleaned up ${count} expired cache entries`);
     }
   }
 
@@ -352,6 +359,7 @@ class CacheService {
           (a.name || '').localeCompare(b.name || '')
         );
         this.set('songs:all', updated, 5 * 60 * 1000);
+        console.log('✍️  Write-through: Added new song to cache (selective update)');
       }
     }
   }
@@ -461,6 +469,7 @@ class CacheService {
           .map(song => song.id === id ? mappedSong : song)
           .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         this.set('songs:all', updated, 5 * 60 * 1000);
+        console.log('✍️  Write-through: Updated song in cache (selective update)');
       }
     }
   }
@@ -474,6 +483,7 @@ class CacheService {
     if (cached && Array.isArray(cached)) {
       const updated = cached.filter((song: any) => song.id !== id);
       this.set('songs:all', updated, 5 * 60 * 1000);
+      console.log('✍️  Write-through: Removed song from cache after delete');
     }
   }
 
@@ -525,9 +535,12 @@ class CacheService {
 
   async createSinger(name: string): Promise<any> {
     try {
+      console.log(`🎤 CacheService.createSinger: Creating singer "${name}"...`);
       const db = await this.getDatabase();
+      console.log(`  ✓ Database connection obtained`);
       
       await db.query(`INSERT INTO singers (name) VALUES (:1)`, [name]);
+      console.log(`  ✓ INSERT completed`);
       
       // Write-through cache: Fetch only the newly created singer
       const newSingers = await db.query(`
@@ -541,9 +554,11 @@ class CacheService {
         ORDER BY created_at DESC
         FETCH FIRST 1 ROWS ONLY
       `, [name]);
+      console.log(`  ✓ SELECT completed, found ${newSingers.length} singer(s)`);
       
       if (newSingers.length > 0) {
         const rawSinger = newSingers[0];
+        console.log(`  Raw singer from DB:`, rawSinger);
         
         // Normalize field names to lowercase (Oracle might return uppercase)
         const normalizedSinger = {
@@ -552,6 +567,7 @@ class CacheService {
           created_at: rawSinger.created_at || rawSinger.CREATED_AT,
           updated_at: rawSinger.updated_at || rawSinger.UPDATED_AT,
         };
+        console.log(`  Normalized singer:`, normalizedSinger);
         
         const cached = this.get('singers:all');
         if (cached && Array.isArray(cached)) {
@@ -559,9 +575,11 @@ class CacheService {
             (a.NAME || a.name || '').localeCompare(b.NAME || b.name || '')
           );
           this.set('singers:all', updated, 5 * 60 * 1000);
+          console.log('✍️  Write-through: Added new singer to cache (selective update)');
         }
         
         // Return the normalized singer object
+        console.log(`✅ Created singer with ID: ${normalizedSinger.id}`);
         return normalizedSinger;
       }
       
@@ -600,6 +618,7 @@ class CacheService {
           .map((singer: any) => singer.ID === id ? updatedSingers[0] : singer)
           .sort((a, b) => (a.NAME || '').localeCompare(b.NAME || ''));
         this.set('singers:all', updated, 5 * 60 * 1000);
+        console.log('✍️  Write-through: Updated singer in cache (selective update)');
       }
     }
   }
@@ -613,6 +632,7 @@ class CacheService {
     if (cached && Array.isArray(cached)) {
       const updated = cached.filter((singer: any) => singer.ID !== id);
       this.set('singers:all', updated, 5 * 60 * 1000);
+      console.log('✍️  Write-through: Removed singer from cache after delete');
     }
   }
 
@@ -650,6 +670,7 @@ class CacheService {
       ORDER BY s.name, si.name
     `);
 
+    console.log(`📊 Raw pitch from DB (first):`, pitches[0]);
 
     // Normalize field names (Oracle returns uppercase)
     const normalizedPitches = pitches.map((p: any) => ({
@@ -663,6 +684,7 @@ class CacheService {
       updated_at: p.updated_at || p.UPDATED_AT,
     }));
 
+    console.log(`✅ Normalized pitch (first):`, normalizedPitches[0]);
 
     this.set(cacheKey, normalizedPitches, 5 * 60 * 1000);
     return normalizedPitches;
@@ -756,6 +778,7 @@ class CacheService {
           return (a.singer_name || '').localeCompare(b.singer_name || '');
         });
         this.set('pitches:all', updated, 5 * 60 * 1000);
+        console.log('✍️  Write-through: Added new pitch to cache (selective update)');
       }
     }
   }
@@ -805,6 +828,7 @@ class CacheService {
         // Replace the pitch in cache (use lowercase 'id' to match normalized cache)
         const updated = cached.map((p: any) => p.id === id ? normalizedPitch : p);
         this.set('pitches:all', updated, 5 * 60 * 1000);
+        console.log('✍️  Write-through: Updated pitch in cache (selective update)');
       }
     }
   }
@@ -819,6 +843,7 @@ class CacheService {
       // Use lowercase 'id' to match normalized cache
       const updated = cached.filter((pitch: any) => pitch.id !== id);
       this.set('pitches:all', updated, 5 * 60 * 1000);
+      console.log('✍️  Write-through: Removed pitch from cache after delete');
     }
   }
 
@@ -953,6 +978,7 @@ class CacheService {
         (a.name || '').localeCompare(b.name || '')
       );
       this.set('sessions:all', updated, 5 * 60 * 1000);
+      console.log('✍️  Write-through: Added new session to cache (selective update)');
     }
 
     return mappedSession;
@@ -1015,6 +1041,7 @@ class CacheService {
         .map((s: any) => s.id === id ? mappedSession : s)
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       this.set('sessions:all', updated, 5 * 60 * 1000);
+      console.log('✍️  Write-through: Updated session in cache (selective update)');
     }
 
     return mappedSession;
@@ -1029,6 +1056,7 @@ class CacheService {
     if (cached && Array.isArray(cached)) {
       const updated = cached.filter((session: any) => session.id !== id);
       this.set('sessions:all', updated, 5 * 60 * 1000);
+      console.log('✍️  Write-through: Removed session from cache after delete');
     }
   }
 
@@ -1099,6 +1127,7 @@ class CacheService {
         (a.name || '').localeCompare(b.name || '')
       );
       this.set('sessions:all', updated, 5 * 60 * 1000);
+      console.log('✍️  Write-through: Added duplicated session to cache (selective update)');
     }
 
     return mappedSession;
@@ -1159,6 +1188,7 @@ class CacheService {
 
     // Session items don't have separate cache, just invalidate sessions
     this.invalidatePattern('sessions:');
+    console.log('✍️  Write-through: Invalidated sessions cache after item add');
   }
 
   async updateSessionItem(id: string, updates: any): Promise<void> {
@@ -1199,6 +1229,7 @@ class CacheService {
 
     // Session items don't have separate cache, just invalidate sessions
     this.invalidatePattern('sessions:');
+    console.log('✍️  Write-through: Invalidated sessions cache after item update');
   }
 
   async deleteSessionItem(id: string): Promise<void> {
@@ -1207,6 +1238,7 @@ class CacheService {
     
     // Session items don't have separate cache, just invalidate sessions
     this.invalidatePattern('sessions:');
+    console.log('✍️  Write-through: Invalidated sessions cache after item delete');
   }
 
   async reorderSessionItems(sessionId: string, itemIds: string[]): Promise<void> {
@@ -1222,6 +1254,7 @@ class CacheService {
 
     // Session items don't have separate cache, just invalidate sessions
     this.invalidatePattern('sessions:');
+    console.log('✍️  Write-through: Invalidated sessions cache after reorder');
   }
 
   async setSessionItems(sessionId: string, items: any[]): Promise<any[]> {
@@ -1254,6 +1287,7 @@ class CacheService {
 
     // Session items don't have separate cache, just invalidate sessions
     this.invalidatePattern('sessions:');
+    console.log('✍️  Write-through: Invalidated sessions cache after setting items');
 
     // Fetch all items with details
     return await this.getSessionItems(sessionId);
@@ -1327,12 +1361,14 @@ class CacheService {
             updated_at = CURRENT_TIMESTAMP
         WHERE csv_song_name = :3
       `, [dbSongId, dbSongName, csvSongName]);
+      console.log(`✅ Updated song mapping: "${csvSongName}" → "${dbSongName}"`);
     } else {
       // Insert new mapping
       await db.query(`
         INSERT INTO csv_song_mappings (csv_song_name, db_song_id, db_song_name)
         VALUES (:1, HEXTORAW(:2), :3)
       `, [csvSongName, dbSongId, dbSongName]);
+      console.log(`✅ Created song mapping: "${csvSongName}" → "${dbSongName}"`);
     }
   }
 
@@ -1402,12 +1438,14 @@ class CacheService {
             updated_at = CURRENT_TIMESTAMP
         WHERE original_format = :2
       `, [normalizedFormat, originalFormat]);
+      console.log(`✅ Updated pitch mapping: "${originalFormat}" → "${normalizedFormat}"`);
     } else {
       // Insert new mapping
       await db.query(`
         INSERT INTO csv_pitch_mappings (original_format, normalized_format)
         VALUES (:1, :2)
       `, [originalFormat, normalizedFormat]);
+      console.log(`✅ Created pitch mapping: "${originalFormat}" → "${normalizedFormat}"`);
     }
   }
 
@@ -1460,6 +1498,7 @@ export async function warmupCache(): Promise<void> {
   let successCount = 0;
   let failureCount = 0;
 
+  console.log('  📚 Fetching songs (without CLOB fields)...');
   try {
     const songs = await databaseService.query(`
       SELECT 
@@ -1510,6 +1549,7 @@ export async function warmupCache(): Promise<void> {
     }));
 
     cacheService.set('songs:all', mappedSongs, CACHE_TTL);
+    console.log(`  ✓ Cached ${mappedSongs.length} songs (without lyrics/meaning/tags)`);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache songs:', error instanceof Error ? error.message : error);
@@ -1519,6 +1559,7 @@ export async function warmupCache(): Promise<void> {
   // Small delay between queries to avoid overwhelming the pool
   await new Promise(resolve => setTimeout(resolve, 500));
 
+  console.log('  👥 Fetching singers...');
   try {
     const singers = await databaseService.query(`
       SELECT 
@@ -1531,6 +1572,7 @@ export async function warmupCache(): Promise<void> {
     `);
 
     cacheService.set('singers:all', singers, CACHE_TTL);
+    console.log(`  ✓ Cached ${singers.length} singers`);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache singers:', error instanceof Error ? error.message : error);
@@ -1540,6 +1582,7 @@ export async function warmupCache(): Promise<void> {
   // Small delay between queries to avoid overwhelming the pool
   await new Promise(resolve => setTimeout(resolve, 500));
 
+  console.log('  🎵 Fetching pitches...');
   try {
     const pitches = await databaseService.query(`
       SELECT 
@@ -1558,6 +1601,7 @@ export async function warmupCache(): Promise<void> {
     `);
 
     cacheService.set('pitches:all', pitches, CACHE_TTL);
+    console.log(`  ✓ Cached ${pitches.length} pitches`);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache pitches:', error instanceof Error ? error.message : error);
@@ -1567,6 +1611,7 @@ export async function warmupCache(): Promise<void> {
   // Small delay between queries to avoid overwhelming the pool
   await new Promise(resolve => setTimeout(resolve, 500));
 
+  console.log('  📅 Fetching sessions...');
   try {
     const sessions = await databaseService.query(`
       SELECT 
@@ -1588,6 +1633,7 @@ export async function warmupCache(): Promise<void> {
     }));
 
     cacheService.set('sessions:all', mappedSessions, CACHE_TTL);
+    console.log(`  ✓ Cached ${mappedSessions.length} sessions`);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache sessions:', error instanceof Error ? error.message : error);
@@ -1596,6 +1642,7 @@ export async function warmupCache(): Promise<void> {
 
   // Summary
   const total = successCount + failureCount;
+  console.log(`  📊 Cache warmup summary: ${successCount}/${total} successful, ${failureCount}/${total} failed`);
   
   if (failureCount === total) {
     throw new Error('All cache warmup attempts failed - database may not be configured');

@@ -66,8 +66,57 @@ router.get('/song/:songId', async (req, res) => {
 // Create new pitch association
 router.post('/', async (req, res) => {
   try {
-    await cacheService.createPitch(req.body);
-    res.status(201).json({ message: 'Pitch association created successfully' });
+    // Accept both snake_case (from frontend) and camelCase (for compatibility)
+    const songId = req.body.song_id || req.body.songId;
+    const singerId = req.body.singer_id || req.body.singerId;
+    const pitch = req.body.pitch;
+    
+    if (!songId || !singerId || !pitch) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: song_id, singer_id, pitch',
+        received: req.body 
+      });
+    }
+    
+    // Check for duplicate pitch (same song + singer combination)
+    const allPitches = await cacheService.getAllPitches();
+    const existing = allPitches.find(p => p.song_id === songId && p.singer_id === singerId);
+    
+    if (existing) {
+      // Normalize both for comparison (trim whitespace, case-insensitive)
+      const existingPitchNormalized = String(existing.pitch).trim();
+      const newPitchNormalized = String(pitch).trim();
+      
+      // If pitch is the same, return existing (idempotent)
+      if (existingPitchNormalized === newPitchNormalized) {
+        return res.status(200).json({ 
+          message: 'Pitch association already exists',
+          pitch: existing,
+          created: false,
+          updated: false
+        });
+      }
+      
+      // If pitch is different, update it
+      await cacheService.updatePitch(existing.id, pitch);
+      return res.status(200).json({ 
+        message: 'Pitch association updated',
+        created: false,
+        updated: true
+      });
+    }
+    
+    // Create new pitch association
+    await cacheService.createPitch({
+      song_id: songId,
+      singer_id: singerId,
+      pitch: pitch
+    });
+    res.status(201).json({ 
+      message: 'Pitch association created successfully',
+      created: true,
+      updated: false
+    });
   } catch (error) {
     console.error('Error creating pitch:', error);
     res.status(500).json({ error: 'Failed to create pitch association' });

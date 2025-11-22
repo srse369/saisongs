@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { sairhythmsScraperService, DiscoveredSong } from './SairhythmsScraperService';
+import { externalsongsScraperService, DiscoveredSong } from './ExternalSongsScraperService';
 
-describe('SairhythmsScraperService', () => {
+describe('ExternalSongsScraperService', () => {
   beforeEach(() => {
     // Clear all mocks before each test
     vi.clearAllMocks();
@@ -28,13 +28,13 @@ describe('SairhythmsScraperService', () => {
         text: async () => mockHTML,
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
       expect(songs).toHaveLength(3);
       expect(songs).toEqual([
-        { name: 'Amazing Grace', url: 'https://sairhythms.org/song/amazing-grace' },
-        { name: 'How Great Thou Art', url: 'https://sairhythms.org/song/how-great-thou-art' },
-        { name: 'Blessed Assurance', url: 'https://sairhythms.org/songs/blessed-assurance' },
+        { name: 'Amazing Grace', url: 'https://externalsongs.org/song/amazing-grace' },
+        { name: 'How Great Thou Art', url: 'https://externalsongs.org/song/how-great-thou-art' },
+        { name: 'Blessed Assurance', url: 'https://externalsongs.org/songs/blessed-assurance' },
       ]);
     });
 
@@ -43,8 +43,8 @@ describe('SairhythmsScraperService', () => {
         <!DOCTYPE html>
         <html>
           <body>
-            <a href="https://sairhythms.org/song/joyful-joyful">Joyful Joyful</a>
-            <a href="http://sairhythms.org/song/holy-holy-holy">Holy Holy Holy</a>
+            <a href="https://externalsongs.org/song/joyful-joyful">Joyful Joyful</a>
+            <a href="http://externalsongs.org/song/holy-holy-holy">Holy Holy Holy</a>
           </body>
         </html>
       `;
@@ -54,11 +54,11 @@ describe('SairhythmsScraperService', () => {
         text: async () => mockHTML,
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
       expect(songs).toHaveLength(2);
-      expect(songs[0].url).toBe('https://sairhythms.org/song/joyful-joyful');
-      expect(songs[1].url).toBe('http://sairhythms.org/song/holy-holy-holy');
+      expect(songs[0].url).toBe('https://externalsongs.org/song/joyful-joyful');
+      expect(songs[1].url).toBe('http://externalsongs.org/song/holy-holy-holy');
     });
 
     it('should extract song names from title attribute when text is empty', async () => {
@@ -77,7 +77,7 @@ describe('SairhythmsScraperService', () => {
         text: async () => mockHTML,
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
       expect(songs).toHaveLength(2);
       expect(songs[0].name).toBe('Silent Night');
@@ -101,12 +101,12 @@ describe('SairhythmsScraperService', () => {
         text: async () => mockHTML,
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
       expect(songs).toHaveLength(2);
       expect(songs.map(s => s.url)).toEqual([
-        'https://sairhythms.org/song/amazing-grace',
-        'https://sairhythms.org/song/how-great-thou-art',
+        'https://externalsongs.org/song/amazing-grace',
+        'https://externalsongs.org/song/how-great-thou-art',
       ]);
     });
 
@@ -128,7 +128,7 @@ describe('SairhythmsScraperService', () => {
         text: async () => mockHTML,
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
       expect(songs).toHaveLength(1);
       expect(songs[0].name).toBe('Amazing Grace');
@@ -151,7 +151,7 @@ describe('SairhythmsScraperService', () => {
         text: async () => mockHTML,
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
       expect(songs).toHaveLength(1);
       expect(songs[0].name).toBe('Amazing Grace');
@@ -170,7 +170,7 @@ describe('SairhythmsScraperService', () => {
         text: async () => mockHTML,
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
       expect(songs).toHaveLength(0);
     });
@@ -190,19 +190,19 @@ describe('SairhythmsScraperService', () => {
         text: async () => mockHTML,
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
       // DOMParser is forgiving and should still extract songs
       expect(songs.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('should reject URLs from non-sairhythms domains', async () => {
+    it('should reject URLs from non-externalsongs domains', async () => {
       const mockHTML = `
         <!DOCTYPE html>
         <html>
           <body>
             <a href="https://example.com/song/test">External Song</a>
-            <a href="https://sairhythms.org/song/valid">Valid Song</a>
+            <a href="https://externalsongs.org/song/valid">Valid Song</a>
           </body>
         </html>
       `;
@@ -212,12 +212,12 @@ describe('SairhythmsScraperService', () => {
         text: async () => mockHTML,
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
-      // Only the sairhythms.org song should be included
+      // Only the externalsongs.org song should be included
       expect(songs).toHaveLength(1);
       expect(songs[0].name).toBe('Valid Song');
-      expect(songs[0].url).toBe('https://sairhythms.org/song/valid');
+      expect(songs[0].url).toBe('https://externalsongs.org/song/valid');
     });
   });
 
@@ -237,7 +237,7 @@ describe('SairhythmsScraperService', () => {
         });
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
       expect(fetch).toHaveBeenCalledTimes(2);
       expect(songs).toHaveLength(1);
@@ -262,7 +262,7 @@ describe('SairhythmsScraperService', () => {
         });
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
       expect(fetch).toHaveBeenCalledTimes(3);
       expect(songs).toHaveLength(1);
@@ -271,8 +271,8 @@ describe('SairhythmsScraperService', () => {
     it('should throw error after max retries exceeded', async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
-      await expect(sairhythmsScraperService.discoverAllSongs()).rejects.toThrow(
-        /Failed to discover songs from sairhythms.org/
+      await expect(externalsongsScraperService.discoverAllSongs()).rejects.toThrow(
+        /Failed to discover songs from externalsongs.org/
       );
 
       expect(fetch).toHaveBeenCalledTimes(3); // MAX_RETRIES
@@ -285,8 +285,8 @@ describe('SairhythmsScraperService', () => {
         statusText: 'Not Found',
       });
 
-      await expect(sairhythmsScraperService.discoverAllSongs()).rejects.toThrow(
-        /Failed to discover songs from sairhythms.org/
+      await expect(externalsongsScraperService.discoverAllSongs()).rejects.toThrow(
+        /Failed to discover songs from externalsongs.org/
       );
 
       expect(fetch).toHaveBeenCalledTimes(3);
@@ -297,8 +297,8 @@ describe('SairhythmsScraperService', () => {
     it('should handle fetch errors gracefully', async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error('Connection refused'));
 
-      await expect(sairhythmsScraperService.discoverAllSongs()).rejects.toThrow(
-        /Failed to discover songs from sairhythms.org.*Connection refused/
+      await expect(externalsongsScraperService.discoverAllSongs()).rejects.toThrow(
+        /Failed to discover songs from externalsongs.org.*Connection refused/
       );
     });
 
@@ -310,8 +310,8 @@ describe('SairhythmsScraperService', () => {
         },
       });
 
-      await expect(sairhythmsScraperService.discoverAllSongs()).rejects.toThrow(
-        /Failed to discover songs from sairhythms.org/
+      await expect(externalsongsScraperService.discoverAllSongs()).rejects.toThrow(
+        /Failed to discover songs from externalsongs.org/
       );
     });
 
@@ -332,7 +332,7 @@ describe('SairhythmsScraperService', () => {
         text: async () => mockHTML,
       });
 
-      const songs = await sairhythmsScraperService.discoverAllSongs();
+      const songs = await externalsongsScraperService.discoverAllSongs();
 
       // Should get the valid songs despite one invalid entry
       expect(songs.length).toBeGreaterThanOrEqual(2);

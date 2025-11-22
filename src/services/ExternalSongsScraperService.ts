@@ -1,9 +1,9 @@
 /**
- * SairhythmsScraperService handles discovering and extracting song data from sairhythms.org
+ * ExternalSongsScraperService handles discovering and extracting song data from externalsongs.org
  */
 
 /**
- * Represents a song discovered from sairhythms.org
+ * Represents a song discovered from externalsongs.org
  */
 export interface DiscoveredSong {
   name: string;
@@ -11,13 +11,13 @@ export interface DiscoveredSong {
 }
 
 /**
- * Service for scraping song data from sairhythms.sathyasai.org
+ * Service for scraping song data from externalsongs.sathyasai.org
  */
-class SairhythmsScraperService {
-  private readonly SAIRHYTHMS_BASE_URL = 'https://sairhythms.sathyasai.org';
+class ExternalSongsScraperService {
+  private readonly EXTERNALSONGS_BASE_URL = 'https://externalsongs.sathyasai.org';
 
   /**
-   * Discovers all songs available on sairhythms.sathyasai.org
+   * Discovers all songs available on externalsongs.sathyasai.org
    * 
    * Due to CORS restrictions, we need to open the website in a new window
    * and extract the song data from there.
@@ -27,7 +27,7 @@ class SairhythmsScraperService {
    */
   async discoverAllSongs(): Promise<DiscoveredSong[]> {
     try {
-      console.log('Opening sairhythms.sathyasai.org in a new window...');
+      console.log('Opening externalsongs.sathyasai.org in a new window...');
       console.log('Please wait while we extract song data...');
       
       // Open the website in a new window to bypass CORS
@@ -40,7 +40,7 @@ class SairhythmsScraperService {
       // Remove duplicates
       const uniqueSongs = this.removeDuplicates(songs);
       
-      console.log(`Discovered ${uniqueSongs.length} unique songs from sairhythms.sathyasai.org`);
+      console.log(`Discovered ${uniqueSongs.length} unique songs from externalsongs.sathyasai.org`);
       return uniqueSongs;
     } catch (error) {
       console.error('Error discovering songs:', error);
@@ -50,7 +50,7 @@ class SairhythmsScraperService {
 Unable to automatically import songs due to browser security restrictions.
 
 MANUAL IMPORT INSTRUCTIONS:
-1. Open https://sairhythms.sathyasai.org/songs in a new tab
+1. Open https://externalsongs.sathyasai.org/songs in a new tab
 2. Wait for the page to fully load
 3. Open browser console (F12 or Cmd+Option+I on Mac)
 4. Copy and paste this command:
@@ -74,7 +74,7 @@ Note: Automatic import is currently not possible due to CORS restrictions.
   private async loadSongsViaNewWindow(): Promise<DiscoveredSong[]> {
     return new Promise((resolve, reject) => {
       // Open the website in a new window
-      const newWindow = window.open(`${this.SAIRHYTHMS_BASE_URL}/songs`, '_blank', 'width=800,height=600');
+      const newWindow = window.open(`${this.EXTERNALSONGS_BASE_URL}/songs`, '_blank', 'width=800,height=600');
       
       if (!newWindow) {
         reject(new Error('Failed to open new window. Please allow popups for this site.'));
@@ -104,7 +104,7 @@ Note: Automatic import is currently not possible due to CORS restrictions.
             // Convert to our format
             const songs: DiscoveredSong[] = superSongJson.map((song: any) => ({
               name: song.title || song.title2 || 'Unknown Song',
-              url: `${this.SAIRHYTHMS_BASE_URL}/node/${song.song_id}`
+              url: `${this.EXTERNALSONGS_BASE_URL}/node/${song.song_id}`
             })).filter((song: DiscoveredSong) => song.name !== 'Unknown Song');
             
             clearTimeout(timeoutId);
@@ -147,5 +147,5 @@ Note: Automatic import is currently not possible due to CORS restrictions.
 }
 
 // Export singleton instance
-export const sairhythmsScraperService = new SairhythmsScraperService();
-export default sairhythmsScraperService;
+export const externalsongsScraperService = new ExternalSongsScraperService();
+export default externalsongsScraperService;

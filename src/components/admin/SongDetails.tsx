@@ -51,8 +51,8 @@ export const SongDetails: React.FC<SongDetailsProps> = ({ song }) => {
         <div>{fullSong.name}</div>
       </div>
       <div>
-        <div className="font-semibold text-gray-900 dark:text-white">Sairhythms URL</div>
-        <div className="break-all">{fullSong.sairhythmsUrl}</div>
+        <div className="font-semibold text-gray-900 dark:text-white">External Source URL</div>
+        <div className="break-all">{fullSong.externalSourceUrl}</div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>

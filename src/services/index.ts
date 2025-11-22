@@ -3,5 +3,5 @@
 export { default as songService } from './SongService';
 export { default as singerService } from './SingerService';
 export { default as pitchService } from './PitchService';
-export { default as sairhythmsScraperService } from './SairhythmsScraperService';
+export { default as externalSongsScraperService } from './ExternalSongsScraperService';
 export { default as importService } from './ImportService';

@@ -24,8 +24,8 @@ class SongService {
       if (!createInput.name || createInput.name.trim().length === 0) {
         throw new ValidationError('Song name is required', 'name');
       }
-      if (!createInput.sairhythmsUrl || createInput.sairhythmsUrl.trim().length === 0) {
-        throw new ValidationError('Sairhythms.org URL is required', 'sairhythmsUrl');
+      if (!createInput.externalSourceUrl || createInput.externalSourceUrl.trim().length === 0) {
+        throw new ValidationError('external source URL is required', 'externalSourceUrl');
       }
     }
 
@@ -33,11 +33,11 @@ class SongService {
       throw new ValidationError('Song name must be 255 characters or less', 'name');
     }
 
-    if (input.sairhythmsUrl) {
+    if (input.externalSourceUrl) {
       try {
-        new URL(input.sairhythmsUrl);
+        new URL(input.externalSourceUrl);
       } catch {
-        throw new ValidationError('Invalid URL format', 'sairhythmsUrl');
+        throw new ValidationError('Invalid URL format', 'externalSourceUrl');
       }
     }
   }
@@ -86,7 +86,7 @@ class SongService {
     // Debug: Log what SongService is sending to API
     console.log('🚀 SongService.createSong:', {
       name: input.name,
-      sairhythmsUrl: input.sairhythmsUrl?.substring(0, 50),
+      externalSourceUrl: input.externalSourceUrl?.substring(0, 50),
       has_lyrics: !!input.lyrics,
       lyrics_length: (input.lyrics || '').length,
       has_meaning: !!input.meaning,
@@ -96,7 +96,7 @@ class SongService {
     try {
       return await apiClient.createSong({
         name: input.name.trim(),
-        sairhythms_url: input.sairhythmsUrl.trim(),
+        external_source_url: input.externalSourceUrl.trim(),
         title: input.title || null,
         title2: input.title2 || null,
         lyrics: input.lyrics || null,
@@ -132,7 +132,7 @@ class SongService {
     try {
       await apiClient.updateSong(id, {
         name: input.name?.trim(),
-        sairhythms_url: input.sairhythmsUrl?.trim(),
+        external_source_url: input.externalSourceUrl?.trim(),
         title: input.title,
         title2: input.title2,
         lyrics: input.lyrics,

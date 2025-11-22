@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { importService } from './ImportService';
 import songService from './SongService';
-import sairhythmsScraperService from './SairhythmsScraperService';
+import externalSongsScraperService from './ExternalSongsScraperService';
 import type { Song } from '../types';
 
 // Mock the dependencies
 vi.mock('./SongService');
-vi.mock('./SairhythmsScraperService');
+vi.mock('./ExternalSongsScraperService');
 
 describe('ImportService', () => {
   beforeEach(() => {
@@ -20,7 +20,7 @@ describe('ImportService', () => {
         {
           id: 'song-1',
           name: 'Amazing Grace',
-          sairhythmsUrl: 'https://sairhythms.org/song/amazing-grace',
+          externalSourceUrl: 'https://external-source/song/amazing-grace',
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-01'),
         },
@@ -30,12 +30,12 @@ describe('ImportService', () => {
       const discoveredSongs = [
         {
           name: 'Amazing Grace (Updated)',
-          url: 'https://sairhythms.org/song/amazing-grace',
+          url: 'https://external-source/song/amazing-grace',
         },
       ];
 
       vi.mocked(songService.getAllSongs).mockResolvedValue(existingSongs);
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.updateSong).mockResolvedValue({
         ...existingSongs[0],
         name: 'Amazing Grace (Updated)',
@@ -53,7 +53,7 @@ describe('ImportService', () => {
       expect(result.stats.created).toBe(0);
       expect(songService.updateSong).toHaveBeenCalledWith('song-1', {
         name: 'Amazing Grace (Updated)',
-        sairhythmsUrl: 'https://sairhythms.org/song/amazing-grace',
+        externalSourceUrl: 'https://external-source/song/amazing-grace',
       });
     });
 
@@ -63,7 +63,7 @@ describe('ImportService', () => {
         {
           id: 'song-1',
           name: 'Amazing Grace',
-          sairhythmsUrl: 'https://sairhythms.org/old-url/amazing-grace',
+          externalSourceUrl: 'https://external-source/old-url/amazing-grace',
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-01'),
         },
@@ -73,15 +73,15 @@ describe('ImportService', () => {
       const discoveredSongs = [
         {
           name: 'Amazing Grace',
-          url: 'https://sairhythms.org/song/amazing-grace',
+          url: 'https://external-source/song/amazing-grace',
         },
       ];
 
       vi.mocked(songService.getAllSongs).mockResolvedValue(existingSongs);
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.updateSong).mockResolvedValue({
         ...existingSongs[0],
-        sairhythmsUrl: 'https://sairhythms.org/song/amazing-grace',
+        externalSourceUrl: 'https://external-source/song/amazing-grace',
         updatedAt: new Date(),
       });
 
@@ -96,7 +96,7 @@ describe('ImportService', () => {
       expect(result.stats.created).toBe(0);
       expect(songService.updateSong).toHaveBeenCalledWith('song-1', {
         name: 'Amazing Grace',
-        sairhythmsUrl: 'https://sairhythms.org/song/amazing-grace',
+        externalSourceUrl: 'https://external-source/song/amazing-grace',
       });
     });
 
@@ -106,7 +106,7 @@ describe('ImportService', () => {
         {
           id: 'song-1',
           name: 'amazing grace',
-          sairhythmsUrl: 'https://sairhythms.org/song/old',
+          externalSourceUrl: 'https://external-source/song/old',
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-01'),
         },
@@ -116,16 +116,16 @@ describe('ImportService', () => {
       const discoveredSongs = [
         {
           name: 'Amazing Grace',
-          url: 'https://sairhythms.org/song/amazing-grace',
+          url: 'https://external-source/song/amazing-grace',
         },
       ];
 
       vi.mocked(songService.getAllSongs).mockResolvedValue(existingSongs);
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.updateSong).mockResolvedValue({
         ...existingSongs[0],
         name: 'Amazing Grace',
-        sairhythmsUrl: 'https://sairhythms.org/song/amazing-grace',
+        externalSourceUrl: 'https://external-source/song/amazing-grace',
         updatedAt: new Date(),
       });
 
@@ -146,14 +146,14 @@ describe('ImportService', () => {
         {
           id: 'song-1',
           name: 'Amazing Grace',
-          sairhythmsUrl: 'https://sairhythms.org/song/different',
+          externalSourceUrl: 'https://external-source/song/different',
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-01'),
         },
         {
           id: 'song-2',
           name: 'Different Song',
-          sairhythmsUrl: 'https://sairhythms.org/song/amazing-grace',
+          externalSourceUrl: 'https://external-source/song/amazing-grace',
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-01'),
         },
@@ -163,12 +163,12 @@ describe('ImportService', () => {
       const discoveredSongs = [
         {
           name: 'Amazing Grace',
-          url: 'https://sairhythms.org/song/amazing-grace',
+          url: 'https://external-source/song/amazing-grace',
         },
       ];
 
       vi.mocked(songService.getAllSongs).mockResolvedValue(existingSongs);
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.updateSong).mockResolvedValue({
         ...existingSongs[1],
         name: 'Amazing Grace',
@@ -184,7 +184,7 @@ describe('ImportService', () => {
       expect(result.success).toBe(true);
       expect(songService.updateSong).toHaveBeenCalledWith('song-2', {
         name: 'Amazing Grace',
-        sairhythmsUrl: 'https://sairhythms.org/song/amazing-grace',
+        externalSourceUrl: 'https://external-source/song/amazing-grace',
       });
     });
   });
@@ -196,7 +196,7 @@ describe('ImportService', () => {
         {
           id: 'original-id-123',
           name: 'Test Song',
-          sairhythmsUrl: 'https://sairhythms.org/song/test',
+          externalSourceUrl: 'https://external-source/song/test',
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-01'),
         },
@@ -205,12 +205,12 @@ describe('ImportService', () => {
       const discoveredSongs = [
         {
           name: 'Test Song Updated',
-          url: 'https://sairhythms.org/song/test',
+          url: 'https://external-source/song/test',
         },
       ];
 
       vi.mocked(songService.getAllSongs).mockResolvedValue(existingSongs);
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.updateSong).mockResolvedValue({
         ...existingSongs[0],
         name: 'Test Song Updated',
@@ -225,7 +225,7 @@ describe('ImportService', () => {
       // Assert: updateSong should be called with original ID
       expect(songService.updateSong).toHaveBeenCalledWith('original-id-123', {
         name: 'Test Song Updated',
-        sairhythmsUrl: 'https://sairhythms.org/song/test',
+        externalSourceUrl: 'https://external-source/song/test',
       });
       expect(songService.createSong).not.toHaveBeenCalled();
     });
@@ -236,26 +236,26 @@ describe('ImportService', () => {
         {
           id: 'id-1',
           name: 'Song One',
-          sairhythmsUrl: 'https://sairhythms.org/song/one',
+          externalSourceUrl: 'https://external-source/song/one',
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-01'),
         },
         {
           id: 'id-2',
           name: 'Song Two',
-          sairhythmsUrl: 'https://sairhythms.org/song/two',
+          externalSourceUrl: 'https://external-source/song/two',
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-01'),
         },
       ];
 
       const discoveredSongs = [
-        { name: 'Song One Updated', url: 'https://sairhythms.org/song/one' },
-        { name: 'Song Two Updated', url: 'https://sairhythms.org/song/two' },
+        { name: 'Song One Updated', url: 'https://external-source/song/one' },
+        { name: 'Song Two Updated', url: 'https://external-source/song/two' },
       ];
 
       vi.mocked(songService.getAllSongs).mockResolvedValue(existingSongs);
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.updateSong)
         .mockResolvedValueOnce({ ...existingSongs[0], name: 'Song One Updated', updatedAt: new Date() })
         .mockResolvedValueOnce({ ...existingSongs[1], name: 'Song Two Updated', updatedAt: new Date() });
@@ -280,15 +280,15 @@ describe('ImportService', () => {
       const discoveredSongs = [
         {
           name: 'New Song',
-          url: 'https://sairhythms.org/song/new-song',
+          url: 'https://external-source/song/new-song',
         },
       ];
 
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.createSong).mockResolvedValue({
         id: 'new-id',
         name: 'New Song',
-        sairhythmsUrl: 'https://sairhythms.org/song/new-song',
+        externalSourceUrl: 'https://external-source/song/new-song',
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -304,7 +304,7 @@ describe('ImportService', () => {
       expect(result.stats.updated).toBe(0);
       expect(songService.createSong).toHaveBeenCalledWith({
         name: 'New Song',
-        sairhythmsUrl: 'https://sairhythms.org/song/new-song',
+        externalSourceUrl: 'https://external-source/song/new-song',
       });
     });
 
@@ -313,16 +313,16 @@ describe('ImportService', () => {
       vi.mocked(songService.getAllSongs).mockResolvedValue([]);
       
       const discoveredSongs = [
-        { name: 'Song A', url: 'https://sairhythms.org/song/a' },
-        { name: 'Song B', url: 'https://sairhythms.org/song/b' },
-        { name: 'Song C', url: 'https://sairhythms.org/song/c' },
+        { name: 'Song A', url: 'https://external-source/song/a' },
+        { name: 'Song B', url: 'https://external-source/song/b' },
+        { name: 'Song C', url: 'https://external-source/song/c' },
       ];
 
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.createSong)
-        .mockResolvedValueOnce({ id: 'id-a', name: 'Song A', sairhythmsUrl: 'https://sairhythms.org/song/a', createdAt: new Date(), updatedAt: new Date() })
-        .mockResolvedValueOnce({ id: 'id-b', name: 'Song B', sairhythmsUrl: 'https://sairhythms.org/song/b', createdAt: new Date(), updatedAt: new Date() })
-        .mockResolvedValueOnce({ id: 'id-c', name: 'Song C', sairhythmsUrl: 'https://sairhythms.org/song/c', createdAt: new Date(), updatedAt: new Date() });
+        .mockResolvedValueOnce({ id: 'id-a', name: 'Song A', externalSourceUrl: 'https://external-source/song/a', createdAt: new Date(), updatedAt: new Date() })
+        .mockResolvedValueOnce({ id: 'id-b', name: 'Song B', externalSourceUrl: 'https://external-source/song/b', createdAt: new Date(), updatedAt: new Date() })
+        .mockResolvedValueOnce({ id: 'id-c', name: 'Song C', externalSourceUrl: 'https://external-source/song/c', createdAt: new Date(), updatedAt: new Date() });
 
       const progressCallback = vi.fn();
 
@@ -342,19 +342,19 @@ describe('ImportService', () => {
         {
           id: 'existing-1',
           name: 'Existing Song',
-          sairhythmsUrl: 'https://sairhythms.org/song/existing',
+          externalSourceUrl: 'https://external-source/song/existing',
           createdAt: new Date('2024-01-01'),
           updatedAt: new Date('2024-01-01'),
         },
       ];
 
       const discoveredSongs = [
-        { name: 'Existing Song', url: 'https://sairhythms.org/song/existing' },
-        { name: 'New Song', url: 'https://sairhythms.org/song/new' },
+        { name: 'Existing Song', url: 'https://external-source/song/existing' },
+        { name: 'New Song', url: 'https://external-source/song/new' },
       ];
 
       vi.mocked(songService.getAllSongs).mockResolvedValue(existingSongs);
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.updateSong).mockResolvedValue({
         ...existingSongs[0],
         updatedAt: new Date(),
@@ -362,7 +362,7 @@ describe('ImportService', () => {
       vi.mocked(songService.createSong).mockResolvedValue({
         id: 'new-id',
         name: 'New Song',
-        sairhythmsUrl: 'https://sairhythms.org/song/new',
+        externalSourceUrl: 'https://external-source/song/new',
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -386,18 +386,18 @@ describe('ImportService', () => {
       vi.mocked(songService.getAllSongs).mockResolvedValue([]);
       
       const discoveredSongs = [
-        { name: 'Song 1', url: 'https://sairhythms.org/song/1' },
-        { name: 'Song 2', url: 'https://sairhythms.org/song/2' },
-        { name: 'Song 3', url: 'https://sairhythms.org/song/3' },
+        { name: 'Song 1', url: 'https://external-source/song/1' },
+        { name: 'Song 2', url: 'https://external-source/song/2' },
+        { name: 'Song 3', url: 'https://external-source/song/3' },
       ];
 
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       
       // Song 2 will fail
       vi.mocked(songService.createSong)
-        .mockResolvedValueOnce({ id: 'id-1', name: 'Song 1', sairhythmsUrl: 'https://sairhythms.org/song/1', createdAt: new Date(), updatedAt: new Date() })
+        .mockResolvedValueOnce({ id: 'id-1', name: 'Song 1', externalSourceUrl: 'https://external-source/song/1', createdAt: new Date(), updatedAt: new Date() })
         .mockRejectedValueOnce(new Error('Database connection failed'))
-        .mockResolvedValueOnce({ id: 'id-3', name: 'Song 3', sairhythmsUrl: 'https://sairhythms.org/song/3', createdAt: new Date(), updatedAt: new Date() });
+        .mockResolvedValueOnce({ id: 'id-3', name: 'Song 3', externalSourceUrl: 'https://external-source/song/3', createdAt: new Date(), updatedAt: new Date() });
 
       const progressCallback = vi.fn();
 
@@ -420,17 +420,17 @@ describe('ImportService', () => {
       vi.mocked(songService.getAllSongs).mockResolvedValue([]);
       
       const discoveredSongs = [
-        { name: 'Song 1', url: 'https://sairhythms.org/song/1' },
-        { name: 'Song 2', url: 'https://sairhythms.org/song/2' },
-        { name: 'Song 3', url: 'https://sairhythms.org/song/3' },
+        { name: 'Song 1', url: 'https://external-source/song/1' },
+        { name: 'Song 2', url: 'https://external-source/song/2' },
+        { name: 'Song 3', url: 'https://external-source/song/3' },
       ];
 
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       
       // Songs 1 and 3 will fail
       vi.mocked(songService.createSong)
         .mockRejectedValueOnce(new Error('Validation error'))
-        .mockResolvedValueOnce({ id: 'id-2', name: 'Song 2', sairhythmsUrl: 'https://sairhythms.org/song/2', createdAt: new Date(), updatedAt: new Date() })
+        .mockResolvedValueOnce({ id: 'id-2', name: 'Song 2', externalSourceUrl: 'https://external-source/song/2', createdAt: new Date(), updatedAt: new Date() })
         .mockRejectedValueOnce(new Error('Network timeout'));
 
       const progressCallback = vi.fn();
@@ -454,10 +454,10 @@ describe('ImportService', () => {
       vi.mocked(songService.getAllSongs).mockResolvedValue([]);
       
       const discoveredSongs = [
-        { name: 'Song 1', url: 'https://sairhythms.org/song/1' },
+        { name: 'Song 1', url: 'https://external-source/song/1' },
       ];
 
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.createSong).mockRejectedValueOnce('String error');
 
       const progressCallback = vi.fn();
@@ -474,11 +474,11 @@ describe('ImportService', () => {
       vi.mocked(songService.getAllSongs).mockResolvedValue([]);
       
       const discoveredSongs = [
-        { name: 'Song 1', url: 'https://sairhythms.org/song/1' },
-        { name: 'Song 2', url: 'https://sairhythms.org/song/2' },
+        { name: 'Song 1', url: 'https://external-source/song/1' },
+        { name: 'Song 2', url: 'https://external-source/song/2' },
       ];
 
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.createSong)
         .mockRejectedValueOnce(new Error('Error 1'))
         .mockRejectedValueOnce(new Error('Error 2'));
@@ -507,16 +507,16 @@ describe('ImportService', () => {
       vi.mocked(songService.getAllSongs).mockResolvedValue([]);
       
       const discoveredSongs = [
-        { name: 'Song 1', url: 'https://sairhythms.org/song/1' },
-        { name: 'Song 2', url: 'https://sairhythms.org/song/2' },
-        { name: 'Song 3', url: 'https://sairhythms.org/song/3' },
+        { name: 'Song 1', url: 'https://external-source/song/1' },
+        { name: 'Song 2', url: 'https://external-source/song/2' },
+        { name: 'Song 3', url: 'https://external-source/song/3' },
       ];
 
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.createSong)
-        .mockResolvedValueOnce({ id: 'id-1', name: 'Song 1', sairhythmsUrl: 'https://sairhythms.org/song/1', createdAt: new Date(), updatedAt: new Date() })
-        .mockResolvedValueOnce({ id: 'id-2', name: 'Song 2', sairhythmsUrl: 'https://sairhythms.org/song/2', createdAt: new Date(), updatedAt: new Date() })
-        .mockResolvedValueOnce({ id: 'id-3', name: 'Song 3', sairhythmsUrl: 'https://sairhythms.org/song/3', createdAt: new Date(), updatedAt: new Date() });
+        .mockResolvedValueOnce({ id: 'id-1', name: 'Song 1', externalSourceUrl: 'https://external-source/song/1', createdAt: new Date(), updatedAt: new Date() })
+        .mockResolvedValueOnce({ id: 'id-2', name: 'Song 2', externalSourceUrl: 'https://external-source/song/2', createdAt: new Date(), updatedAt: new Date() })
+        .mockResolvedValueOnce({ id: 'id-3', name: 'Song 3', externalSourceUrl: 'https://external-source/song/3', createdAt: new Date(), updatedAt: new Date() });
 
       const progressCallback = vi.fn();
 
@@ -559,14 +559,14 @@ describe('ImportService', () => {
       vi.mocked(songService.getAllSongs).mockResolvedValue([]);
       
       const discoveredSongs = [
-        { name: 'Amazing Grace', url: 'https://sairhythms.org/song/amazing-grace' },
+        { name: 'Amazing Grace', url: 'https://external-source/song/amazing-grace' },
       ];
 
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue(discoveredSongs);
       vi.mocked(songService.createSong).mockResolvedValue({
         id: 'id-1',
         name: 'Amazing Grace',
-        sairhythmsUrl: 'https://sairhythms.org/song/amazing-grace',
+        externalSourceUrl: 'https://external-source/song/amazing-grace',
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -587,13 +587,13 @@ describe('ImportService', () => {
     it('should clear current song after completion', async () => {
       // Arrange
       vi.mocked(songService.getAllSongs).mockResolvedValue([]);
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue([
-        { name: 'Song 1', url: 'https://sairhythms.org/song/1' },
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue([
+        { name: 'Song 1', url: 'https://external-source/song/1' },
       ]);
       vi.mocked(songService.createSong).mockResolvedValue({
         id: 'id-1',
         name: 'Song 1',
-        sairhythmsUrl: 'https://sairhythms.org/song/1',
+        externalSourceUrl: 'https://external-source/song/1',
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -611,8 +611,8 @@ describe('ImportService', () => {
   describe('critical errors', () => {
     it('should handle scraper failure gracefully', async () => {
       // Arrange
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockRejectedValue(
-        new Error('Failed to fetch sairhythms.org')
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockRejectedValue(
+        new Error('Failed to fetch external-source')
       );
 
       const progressCallback = vi.fn();
@@ -624,13 +624,13 @@ describe('ImportService', () => {
       expect(result.success).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].songName).toBe('System');
-      expect(result.errors[0].error).toBe('Failed to fetch sairhythms.org');
+      expect(result.errors[0].error).toBe('Failed to fetch external-source');
     });
 
     it('should handle database fetch failure', async () => {
       // Arrange
-      vi.mocked(sairhythmsScraperService.discoverAllSongs).mockResolvedValue([
-        { name: 'Song 1', url: 'https://sairhythms.org/song/1' },
+      vi.mocked(externalSongsScraperService.discoverAllSongs).mockResolvedValue([
+        { name: 'Song 1', url: 'https://external-source/song/1' },
       ]);
       vi.mocked(songService.getAllSongs).mockRejectedValue(
         new Error('Database connection failed')

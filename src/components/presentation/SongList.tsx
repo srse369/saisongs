@@ -56,7 +56,7 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
         song.beat,
         song.raga,
         song.level,
-        song.sairhythmsUrl,
+        song.externalSourceUrl,
       ];
 
       return fields.some(field =>
@@ -145,7 +145,7 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
                     {song.name}
                   </h3>
                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">
-                    {song.sairhythmsUrl}
+                    {song.externalSourceUrl}
                   </p>
                 </div>
                 <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 dark:text-gray-500 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

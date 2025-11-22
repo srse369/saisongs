@@ -26,7 +26,7 @@ This reduces recursive SQL from **~40k to ~2-3k** (93% reduction).
 SELECT 
   RAWTOHEX(id) as id,
   name,
-  sairhythms_url,
+  externalsongs_url,
   title,
   title2,
   "LANGUAGE" as language,

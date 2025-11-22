@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react';
-import type { SairhythmsData } from '../types';
-import { sairhythmsService } from '../services/SairhythmsService';
+import type { ExternalSongsData } from '../types';
+import { externalsongsService } from '../services/ExternalSongsService';
 
 /**
- * Hook to fetch and cache all song data from Sairhythms.org
- * @param sairhythmsUrl - The Sairhythms.org URL to fetch data from
+ * Hook to fetch and cache all song data from ExternalSongs.org
+ * @param externalsongsUrl - The ExternalSongs.org URL to fetch data from
  * @returns Object containing song data, loading state, and error
  */
-export function useSairhythmsData(sairhythmsUrl?: string) {
-  const [data, setData] = useState<SairhythmsData | null>(null);
+export function useExternalSongsData(externalsongsUrl?: string) {
+  const [data, setData] = useState<ExternalSongsData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!sairhythmsUrl) {
+    if (!externalsongsUrl) {
       setData(null);
       setError(null);
       return;
@@ -26,12 +26,12 @@ export function useSairhythmsData(sairhythmsUrl?: string) {
       setError(null);
 
       try {
-        const songData = await sairhythmsService.fetchSongData(sairhythmsUrl);
+        const songData = await externalsongsService.fetchSongData(externalsongsUrl);
         
         if (isMounted) {
           setData(songData);
           if (!songData) {
-            setError('Unable to fetch song data from Sairhythms.org');
+            setError('Unable to fetch song data from ExternalSongs.org');
           }
         }
       } catch (err) {
@@ -51,10 +51,10 @@ export function useSairhythmsData(sairhythmsUrl?: string) {
     return () => {
       isMounted = false;
     };
-  }, [sairhythmsUrl]);
+  }, [externalsongsUrl]);
 
   return { data, isLoading, error };
 }
 
 // Keep the old name for backwards compatibility
-export const useSairhythmsMetadata = useSairhythmsData;
+export const useExternalSongsMetadata = useExternalSongsData;

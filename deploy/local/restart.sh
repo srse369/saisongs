@@ -21,8 +21,8 @@ echo -e "${YELLOW}Stopping services...${NC}"
 "$SCRIPT_DIR/stop.sh"
 
 echo ""
-echo -e "${YELLOW}Waiting 2 seconds...${NC}"
-sleep 2
+echo -e "${YELLOW}Waiting 5 seconds...${NC}"
+sleep 5
 
 # Start services
 echo ""

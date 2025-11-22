@@ -5,7 +5,7 @@ Comprehensive guide to Song Studio's features and functionality.
 ## Table of Contents
 - [User Roles & Permissions](#user-roles--permissions)
 - [Named Sessions](#named-sessions)
-- [Beaverton Import](#beaverton-import-utility)
+- [CSV Import](#csv-import-utility)
 - [Presentation Mode](#presentation-mode)
 - [Song Management](#song-management)
 
@@ -54,7 +54,7 @@ Song Studio supports three user roles with different access levels.
 **Permissions:**
 - All Editor permissions, plus:
 - ✅ Delete songs, singers, pitch associations
-- ✅ Import from Beaverton database
+- ✅ Import from external sources via CSV
 - ✅ Access all administrative features
 
 ### How to Login
@@ -96,7 +96,6 @@ VITE_EDITOR_PASSWORD=your_editor_password
 | Edit songs/singers/pitches | ❌ | ✅ | ✅ |
 | Delete songs/singers/pitches | ❌ | ❌ | ✅ |
 | Import from CSV | ❌ | ✅ | ✅ |
-| Import from Beaverton | ❌ | ❌ | ✅ |
 | Named session management | ❌ | ✅ | ✅ |
 
 ---
@@ -199,17 +198,17 @@ Named Sessions allow you to:
 
 ---
 
-## Beaverton Import Utility
+## CSV Import Utility
 
-Import singer and pitch data from the Beaverton Sai Bhajans database.
+Import singer and pitch data from CSV files.
 
 **⚠️ Admin only feature**
 
 ### Overview
 
-The Beaverton Import tool allows you to:
+The CSV Import tool allows you to:
 - Import singer records automatically
-- Map pitch formats from Beaverton notation to standard notation
+- Map pitch formats from various notations to standard notation
 - Fuzzy match songs (90% similarity threshold)
 - Manually override song matches when needed
 - Define custom pitch mappings
@@ -219,37 +218,35 @@ The Beaverton Import tool allows you to:
 
 1. Log in as admin (`Ctrl+Shift+I`)
 2. Navigate to Home page
-3. Click **"Import from Beaverton"** card (green card)
-4. Or go directly to: `/admin/import-beaverton`
+3. Click **"Import from CSV"** card (green card)
+4. Or go directly to: `/admin/import-csv`
 
 ### Import Process
 
 #### Step 1: Preparation
-- Click **"Start Scraping"** button
+- Click **"Start Import"** button
 - Read the instructions carefully
 
 #### Step 2: Data Collection
 
-Since automated scraping requires manual interaction:
+Prepare your CSV data with 3 columns:
 
-1. Open https://sycois.wixsite.com/beavertonsaibhajans in another tab
-2. Enable the **"IGNORE UPPER TABLE FILTERS"** checkbox on the website
-3. In the **"Search Singer Here"** box:
-   - Enter 'A' and note down all singers and their data
-   - Enter 'B' and note down all singers and their data
-   - Continue through Z
-4. Copy the table data (tab-separated format)
-5. Paste into the textarea in Song Studio
-
-**Data format:**
+**CSV Format:**
 ```
-Singer Name[TAB]Pitch[TAB]Song Name[TAB]Deity[TAB]Language
+Song Title,Singer,Pitch
 ```
 
 **Example:**
 ```
-Ameya	4m	Raghu Pathey Raaghava Raja Rama	Ram	Sanskrit
+Om Namah Shivaya,Shambhavi,G
+Raghu Pathey,Ameya,4m
+Why fear when I am here,Ameya,5m
 ```
+
+You can:
+- Create the CSV in Excel/Google Sheets and copy-paste
+- Import data from any external source
+- Format manually with commas separating columns
 
 #### Step 3: Preview
 
@@ -296,7 +293,7 @@ Click **"Import More Data"** to start another import session
 
 The utility automatically recognizes and converts:
 
-| Beaverton Format | Normalized | Notes |
+| Input Format | Normalized | Notes |
 |-----------------|------------|-------|
 | 1, 1M, 1Madhyam, 1m | C | Basic C |
 | 2, 2M, 2Madhyam, 2m | D | Basic D |
@@ -333,11 +330,11 @@ The utility automatically recognizes and converts:
 
 **New singer records:**
 - Created automatically for singers not in database
-- Uses exact name from Beaverton
+- Uses exact name from CSV
 
 **New pitch records:**
 - Links: Singer ID + Song ID + Pitch value
-- Includes note: "Imported from Beaverton (Original Song Name)"
+- Includes note: "Imported from CSV (Original Song Name)"
 
 **Updated pitch records:**
 - If singer already has pitch for a song, it gets updated
@@ -345,11 +342,11 @@ The utility automatically recognizes and converts:
 
 ### Tips & Best Practices
 
-1. **Start small**: Test with a few letters (A-C) first
+1. **Start small**: Test with a few rows first to verify the process
 2. **Check song names**: Have your Songs list open for reference
-3. **Batch processing**: Process one letter at a time for large datasets
+3. **Batch processing**: Process data in smaller batches for large datasets
 4. **Review before import**: Always check the preview table
-5. **Note original names**: Original Beaverton song name stored in pitch notes
+5. **Note original names**: Original CSV song name stored in pitch notes
 6. **Incremental updates**: Run import multiple times; existing pitches update
 
 ---

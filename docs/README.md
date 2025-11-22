@@ -44,7 +44,7 @@ Deep dive into:
 Complete guide to:
 - User roles & permissions (Viewer, Editor, Admin)
 - Named sessions (save and reuse session configurations)
-- Beaverton import utility (import singer and pitch data)
+- CSV import utility (import singer and pitch data)
 - Presentation mode
 - Song, singer, and pitch management
 - Search & filter
@@ -211,12 +211,12 @@ See: [ARCHITECTURE.md § Frontend Architecture](./ARCHITECTURE.md#frontend-archi
 
 ---
 
-### Import Data from Beaverton
+### Import Data from CSV
 1. Login as admin (`Ctrl+Shift+I`)
-2. Navigate to Home → "Import from Beaverton"
+2. Navigate to Home → "Import from CSV"
 3. Follow import wizard
 
-See: [FEATURES.md § Beaverton Import Utility](./FEATURES.md#beaverton-import-utility)
+See: [FEATURES.md § CSV Import Utility](./FEATURES.md#csv-import-utility)
 
 ---
 

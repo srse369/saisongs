@@ -45,8 +45,40 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { name } = req.body;
-    await cacheService.createSinger(name);
-    res.status(201).json({ message: 'Singer created successfully' });
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Singer name is required' });
+    }
+    
+    // Check for duplicate singer (case-insensitive)
+    const allSingers = await cacheService.getAllSingers();
+    
+    // Log any singers with null/undefined names
+    const invalidSingers = allSingers.filter(s => !s.name);
+    if (invalidSingers.length > 0) {
+      console.warn(`⚠️  Found ${invalidSingers.length} singer(s) with null/undefined names:`, invalidSingers);
+    }
+    
+    const duplicate = allSingers.find(
+      s => s.name && s.name.toLowerCase().trim() === name.toLowerCase().trim()
+    );
+    
+    if (duplicate) {
+      // Normalize field names (Oracle might return uppercase or lowercase)
+      const normalizedDuplicate = {
+        id: duplicate.id || duplicate.ID,
+        name: duplicate.name || duplicate.NAME,
+        created_at: duplicate.created_at || duplicate.CREATED_AT,
+        updated_at: duplicate.updated_at || duplicate.UPDATED_AT,
+      };
+      
+      console.log(`⚠️  Singer "${name}" already exists with ID: ${normalizedDuplicate.id}`);
+      // Return the existing singer instead of creating a duplicate
+      return res.status(200).json(normalizedDuplicate);
+    }
+    
+    const newSinger = await cacheService.createSinger(name);
+    res.status(201).json(newSinger);
   } catch (error) {
     console.error('Error creating singer:', error);
     res.status(500).json({ error: 'Failed to create singer' });

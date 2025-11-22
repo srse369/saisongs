@@ -25,16 +25,16 @@ class SongService {
       if (!createInput.name || createInput.name.trim().length === 0) {
         throw new ValidationError('Song name is required', 'name');
       }
-      if (!createInput.sairhythmsUrl || createInput.sairhythmsUrl.trim().length === 0) {
-        throw new ValidationError('Sairhythms.org URL is required', 'sairhythmsUrl');
+      if (!createInput.externalSourceUrl || createInput.externalSourceUrl.trim().length === 0) {
+        throw new ValidationError('external source URL is required', 'externalSourceUrl');
       }
     } else {
       const updateInput = input as UpdateSongInput;
       if (updateInput.name !== undefined && updateInput.name.trim().length === 0) {
         throw new ValidationError('Song name cannot be empty', 'name');
       }
-      if (updateInput.sairhythmsUrl !== undefined && updateInput.sairhythmsUrl.trim().length === 0) {
-        throw new ValidationError('Sairhythms.org URL cannot be empty', 'sairhythmsUrl');
+      if (updateInput.externalSourceUrl !== undefined && updateInput.externalSourceUrl.trim().length === 0) {
+        throw new ValidationError('external source URL cannot be empty', 'externalSourceUrl');
       }
     }
 
@@ -44,11 +44,11 @@ class SongService {
     }
 
     // Validate URL format
-    if (input.sairhythmsUrl) {
+    if (input.externalSourceUrl) {
       try {
-        new URL(input.sairhythmsUrl);
+        new URL(input.externalSourceUrl);
       } catch {
-        throw new ValidationError('Invalid URL format', 'sairhythmsUrl');
+        throw new ValidationError('Invalid URL format', 'externalSourceUrl');
       }
     }
   }
@@ -60,7 +60,7 @@ class SongService {
     return {
       id: row.id,
       name: row.name,
-      sairhythmsUrl: row.sairhythms_url,
+      externalSourceUrl: row.external_source_url,
       title: row.title,
       title2: row.title2,
       lyrics: row.lyrics,
@@ -88,7 +88,7 @@ class SongService {
   async getAllSongs(): Promise<Song[]> {
     try {
       const sql = `
-        SELECT id, name, sairhythms_url, title, title2, lyrics, meaning,
+        SELECT id, name, external_source_url, title, title2, lyrics, meaning,
                "LANGUAGE", deity, tempo, beat, raga, "LEVEL", song_tags,
                audio_link, video_link, ulink, golden_voice,
                created_at, updated_at
@@ -115,7 +115,7 @@ class SongService {
   async getSongById(id: string): Promise<Song | null> {
     try {
       const sql = `
-        SELECT id, name, sairhythms_url, title, title2, lyrics, meaning,
+        SELECT id, name, external_source_url, title, title2, lyrics, meaning,
                "LANGUAGE", deity, tempo, beat, raga, "LEVEL", song_tags,
                audio_link, video_link, ulink, golden_voice,
                created_at, updated_at
@@ -151,12 +151,12 @@ class SongService {
       // Oracle doesn't support ON CONFLICT, use MERGE instead
       const sql = `
         MERGE INTO songs s
-        USING (SELECT :1 as name, :2 as sairhythms_url, :3 as title, :4 as title2, 
+        USING (SELECT :1 as name, :2 as external_source_url, :3 as title, :4 as title2, 
                       :5 as lyrics, :6 as meaning, :7 as language, :8 as deity,
                       :9 as tempo, :10 as beat, :11 as raga, :12 as level,
                       :13 as song_tags, :14 as audio_link, :15 as video_link,
                       :16 as ulink, :17 as golden_voice FROM DUAL) src
-        ON (s.sairhythms_url = src.sairhythms_url)
+        ON (s.external_source_url = src.external_source_url)
         WHEN MATCHED THEN
           UPDATE SET
             s.name = src.name,
@@ -177,10 +177,10 @@ class SongService {
             s.golden_voice = src.golden_voice,
             s.updated_at = CURRENT_TIMESTAMP
         WHEN NOT MATCHED THEN
-          INSERT (name, sairhythms_url, title, title2, lyrics, meaning,
+          INSERT (name, external_source_url, title, title2, lyrics, meaning,
                   "LANGUAGE", deity, tempo, beat, raga, "LEVEL", song_tags,
                   audio_link, video_link, ulink, golden_voice)
-          VALUES (src.name, src.sairhythms_url, src.title, src.title2,
+          VALUES (src.name, src.external_source_url, src.title, src.title2,
                   src.lyrics, src.meaning, src.language, src.deity,
                   src.tempo, src.beat, src.raga, src.level,
                   src.song_tags, src.audio_link, src.video_link,
@@ -188,7 +188,7 @@ class SongService {
       `;
       const rows = await databaseService.query(sql, [
         input.name.trim(),
-        input.sairhythmsUrl.trim(),
+        input.externalSourceUrl.trim(),
         input.title || null,
         input.title2 || null,
         input.lyrics || null,
@@ -235,9 +235,9 @@ class SongService {
       updates.push(`name = $${paramIndex++}`);
       values.push(input.name.trim());
     }
-    if (input.sairhythmsUrl !== undefined) {
-      updates.push(`sairhythms_url = $${paramIndex++}`);
-      values.push(input.sairhythmsUrl.trim());
+    if (input.externalSourceUrl !== undefined) {
+      updates.push(`external_source_url = $${paramIndex++}`);
+      values.push(input.externalSourceUrl.trim());
     }
 
     if (updates.length === 0) {
@@ -253,7 +253,7 @@ class SongService {
         UPDATE songs
         SET ${updates.join(', ')}
         WHERE id = $${paramIndex}
-        RETURNING id, name, sairhythms_url, created_at, updated_at
+        RETURNING id, name, external_source_url, created_at, updated_at
       `;
       const rows = await databaseService.query(sql, values);
 
@@ -304,7 +304,7 @@ class SongService {
   async searchSongs(query: string): Promise<Song[]> {
     try {
       const sql = `
-        SELECT id, name, sairhythms_url, created_at, updated_at
+        SELECT id, name, external_source_url, created_at, updated_at
         FROM songs
         WHERE LOWER(name) LIKE LOWER($1)
         ORDER BY name ASC
@@ -330,7 +330,7 @@ class SongService {
   async getSongsBySinger(singerId: string): Promise<Song[]> {
     try {
       const sql = `
-        SELECT DISTINCT s.id, s.name, s.sairhythms_url, s.created_at, s.updated_at
+        SELECT DISTINCT s.id, s.name, s.external_source_url, s.created_at, s.updated_at
         FROM songs s
         INNER JOIN song_singer_pitches ssp ON s.id = ssp.song_id
         WHERE ssp.singer_id = $1
@@ -362,7 +362,7 @@ class SongService {
       if (singerId) {
         // Search with singer filter
         sql = `
-          SELECT DISTINCT s.id, s.name, s.sairhythms_url, s.created_at, s.updated_at
+          SELECT DISTINCT s.id, s.name, s.external_source_url, s.created_at, s.updated_at
           FROM songs s
           INNER JOIN song_singer_pitches ssp ON s.id = ssp.song_id
           WHERE ssp.singer_id = $1 AND LOWER(s.name) LIKE LOWER($2)
@@ -373,7 +373,7 @@ class SongService {
       } else {
         // Search without singer filter
         sql = `
-          SELECT id, name, sairhythms_url, created_at, updated_at
+          SELECT id, name, external_source_url, created_at, updated_at
           FROM songs
           WHERE LOWER(name) LIKE LOWER($1)
           ORDER BY name ASC

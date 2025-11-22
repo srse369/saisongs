@@ -9,7 +9,7 @@ interface SongFormProps {
 
 export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) => {
   const [name, setName] = useState('');
-  const [sairhythmsUrl, setSairhythmsUrl] = useState('');
+  const [externalSourceUrl, setExternalSourceUrl] = useState('');
   const [title, setTitle] = useState('');
   const [title2, setTitle2] = useState('');
   const [lyrics, setLyrics] = useState('');
@@ -33,7 +33,7 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
   useEffect(() => {
     if (song) {
       setName(song.name);
-      setSairhythmsUrl(song.sairhythmsUrl);
+      setExternalSourceUrl(song.externalSourceUrl);
       setTitle(song.title || '');
       setTitle2(song.title2 || '');
       setLyrics(song.lyrics || '');
@@ -51,7 +51,7 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
       setGoldenVoice(song.goldenVoice || false);
     } else {
       setName('');
-      setSairhythmsUrl('');
+      setExternalSourceUrl('');
       setTitle('');
       setTitle2('');
       setLyrics('');
@@ -80,10 +80,10 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
       newErrors.name = 'Song name must be 255 characters or less';
     }
 
-    if (!sairhythmsUrl.trim()) {
-      newErrors.sairhythmsUrl = 'Sairhythms.org URL is required';
-    } else if (!isValidUrl(sairhythmsUrl.trim())) {
-      newErrors.sairhythmsUrl = 'Please enter a valid URL';
+    if (!externalSourceUrl.trim()) {
+      newErrors.externalSourceUrl = 'external source URL is required';
+    } else if (!isValidUrl(externalSourceUrl.trim())) {
+      newErrors.externalSourceUrl = 'Please enter a valid URL';
     }
 
     setErrors(newErrors);
@@ -110,7 +110,7 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
     try {
       await onSubmit({
         name: name.trim(),
-        sairhythmsUrl: sairhythmsUrl.trim(),
+        externalSourceUrl: externalSourceUrl.trim(),
         title: title.trim() || undefined,
         title2: title2.trim() || undefined,
         lyrics: lyrics.trim() || undefined,
@@ -155,24 +155,24 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
         )}
       </div>
 
-      {/* Sairhythms URL */}
+      {/* External Source URL */}
       <div>
-        <label htmlFor="sairhythms-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Sairhythms.org URL <span className="text-red-500 dark:text-red-400">*</span>
+        <label htmlFor="external-source-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          external source URL <span className="text-red-500 dark:text-red-400">*</span>
         </label>
         <input
-          id="sairhythms-url"
+          id="external-source-url"
           type="url"
-          value={sairhythmsUrl}
-          onChange={(e) => setSairhythmsUrl(e.target.value)}
+          value={externalSourceUrl}
+          onChange={(e) => setExternalSourceUrl(e.target.value)}
           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ${
-            errors.sairhythmsUrl ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
+            errors.externalSourceUrl ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
           }`}
-          placeholder="https://sairhythms.org/..."
+          placeholder="https://external-source/..."
           disabled={isSubmitting}
         />
-        {errors.sairhythmsUrl && (
-          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.sairhythmsUrl}</p>
+        {errors.externalSourceUrl && (
+          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.externalSourceUrl}</p>
         )}
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           All song data (lyrics, translation, metadata) will be fetched automatically from this URL.

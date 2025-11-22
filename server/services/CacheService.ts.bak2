@@ -79,6 +79,7 @@ class CacheService {
     }
 
     if (count > 0) {
+      console.log(`🗑️  Invalidated ${count} cache entries matching pattern: ${pattern}`);
     }
   }
 
@@ -1327,12 +1328,14 @@ class CacheService {
             updated_at = CURRENT_TIMESTAMP
         WHERE csv_song_name = :3
       `, [dbSongId, dbSongName, csvSongName]);
+      console.log(`✅ Updated song mapping: "${csvSongName}" → "${dbSongName}"`);
     } else {
       // Insert new mapping
       await db.query(`
         INSERT INTO csv_song_mappings (csv_song_name, db_song_id, db_song_name)
         VALUES (:1, HEXTORAW(:2), :3)
       `, [csvSongName, dbSongId, dbSongName]);
+      console.log(`✅ Created song mapping: "${csvSongName}" → "${dbSongName}"`);
     }
   }
 
@@ -1402,12 +1405,14 @@ class CacheService {
             updated_at = CURRENT_TIMESTAMP
         WHERE original_format = :2
       `, [normalizedFormat, originalFormat]);
+      console.log(`✅ Updated pitch mapping: "${originalFormat}" → "${normalizedFormat}"`);
     } else {
       // Insert new mapping
       await db.query(`
         INSERT INTO csv_pitch_mappings (original_format, normalized_format)
         VALUES (:1, :2)
       `, [originalFormat, normalizedFormat]);
+      console.log(`✅ Created pitch mapping: "${originalFormat}" → "${normalizedFormat}"`);
     }
   }
 
@@ -1460,6 +1465,7 @@ export async function warmupCache(): Promise<void> {
   let successCount = 0;
   let failureCount = 0;
 
+  console.log('  📚 Fetching songs (without CLOB fields)...');
   try {
     const songs = await databaseService.query(`
       SELECT 
@@ -1510,6 +1516,7 @@ export async function warmupCache(): Promise<void> {
     }));
 
     cacheService.set('songs:all', mappedSongs, CACHE_TTL);
+    console.log(`  ✓ Cached ${mappedSongs.length} songs (without lyrics/meaning/tags)`);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache songs:', error instanceof Error ? error.message : error);
@@ -1519,6 +1526,7 @@ export async function warmupCache(): Promise<void> {
   // Small delay between queries to avoid overwhelming the pool
   await new Promise(resolve => setTimeout(resolve, 500));
 
+  console.log('  👥 Fetching singers...');
   try {
     const singers = await databaseService.query(`
       SELECT 
@@ -1531,6 +1539,7 @@ export async function warmupCache(): Promise<void> {
     `);
 
     cacheService.set('singers:all', singers, CACHE_TTL);
+    console.log(`  ✓ Cached ${singers.length} singers`);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache singers:', error instanceof Error ? error.message : error);
@@ -1540,6 +1549,7 @@ export async function warmupCache(): Promise<void> {
   // Small delay between queries to avoid overwhelming the pool
   await new Promise(resolve => setTimeout(resolve, 500));
 
+  console.log('  🎵 Fetching pitches...');
   try {
     const pitches = await databaseService.query(`
       SELECT 
@@ -1558,6 +1568,7 @@ export async function warmupCache(): Promise<void> {
     `);
 
     cacheService.set('pitches:all', pitches, CACHE_TTL);
+    console.log(`  ✓ Cached ${pitches.length} pitches`);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache pitches:', error instanceof Error ? error.message : error);
@@ -1567,6 +1578,7 @@ export async function warmupCache(): Promise<void> {
   // Small delay between queries to avoid overwhelming the pool
   await new Promise(resolve => setTimeout(resolve, 500));
 
+  console.log('  📅 Fetching sessions...');
   try {
     const sessions = await databaseService.query(`
       SELECT 
@@ -1588,6 +1600,7 @@ export async function warmupCache(): Promise<void> {
     }));
 
     cacheService.set('sessions:all', mappedSessions, CACHE_TTL);
+    console.log(`  ✓ Cached ${mappedSessions.length} sessions`);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache sessions:', error instanceof Error ? error.message : error);
@@ -1596,6 +1609,7 @@ export async function warmupCache(): Promise<void> {
 
   // Summary
   const total = successCount + failureCount;
+  console.log(`  📊 Cache warmup summary: ${successCount}/${total} successful, ${failureCount}/${total} failed`);
   
   if (failureCount === total) {
     throw new Error('All cache warmup attempts failed - database may not be configured');

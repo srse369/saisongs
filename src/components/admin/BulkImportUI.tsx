@@ -33,7 +33,7 @@ interface ImportState {
 }
 
 /**
- * Bulk Import UI component for importing songs from sairhythms.org
+ * Bulk Import UI component for importing songs from external sources
  * 
  * Provides a modal interface for the bulk import process with:
  * - Start Import button (idle state)
@@ -135,7 +135,7 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
       // Each song in superSongJson has: song_id, title, title2, lyrics, meaning, language, deity, tempo, beat, raga, level, songtags, audio_link, video_link, ulink, golden_voice, url
       const songs = rawSongs.map((s: any) => ({
         name: s.title2 || s.title || 'Unknown',
-        url: s.url ? `https://sairhythms.sathyasai.org${s.url}` : `https://sairhythms.sathyasai.org/node/${s.song_id}`,
+        url: s.url ? `https://external-source${s.url}` : `https://external-source/node/${s.song_id}`,
         title: s.title,
         title2: s.title2,
         lyrics: s.lyrics,
@@ -340,13 +340,13 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
   const hasErrors = importState.errors.length > 0;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Bulk Import from Sairhythms">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Bulk Import from External Source">
       <div className="space-y-4">
         {/* Idle State - Start Import Button */}
         {importState.status === 'idle' && !showManualImport && (
           <div className="text-center py-8">
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Import all songs from sairhythms.sathyasai.org into the database.
+              Import all songs from external sources into the database.
             </p>
             <div className="space-y-3">
               <button
@@ -374,7 +374,7 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
                 Manual Import Instructions
               </h3>
               <ol className="text-sm text-blue-800 dark:text-blue-400 space-y-2 list-decimal list-inside">
-                <li>Open <a href="https://sairhythms.sathyasai.org/songs" target="_blank" rel="noopener noreferrer" className="underline">sairhythms.sathyasai.org/songs</a> in a new tab</li>
+                <li>Open <a href="https://external-source/songs" target="_blank" rel="noopener noreferrer" className="underline">external-source/songs</a> in a new tab</li>
                 <li>Wait for the page to fully load (you should see the song list)</li>
                 <li>Open browser console (F12 or Cmd+Option+I on Mac)</li>
                 <li>Copy and paste this command in the console and press Enter:
@@ -396,7 +396,7 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
                 id="json-paste"
                 value={pastedJson}
                 onChange={(e) => setPastedJson(e.target.value)}
-                placeholder='[{"name":"Song Name","url":"https://sairhythms.sathyasai.org/node/12345"},...]'
+                placeholder='[{"name":"Song Name","url":"https://external-source/node/12345"},...]'
                 className="w-full h-40 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-mono text-sm"
               />
             </div>

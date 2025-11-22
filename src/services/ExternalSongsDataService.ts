@@ -1,19 +1,19 @@
 /**
- * SairhythmsDataService fetches song data (lyrics, translation, metadata) from sairhythms.org
+ * ExternalSongsDataService fetches song data (lyrics, translation, metadata) from externalsongs.org
  */
 
-import type { SairhythmsData } from '../types';
+import type { ExternalSongsData } from '../types';
 
 /**
- * Service for fetching song data from sairhythms.org URLs
+ * Service for fetching song data from externalsongs.org URLs
  */
-class SairhythmsDataService {
+class ExternalSongsDataService {
   /**
-   * Fetches song data from a sairhythms.org URL
-   * @param url - The sairhythms.org song URL
+   * Fetches song data from a externalsongs.org URL
+   * @param url - The externalsongs.org song URL
    * @returns Song data including lyrics, translation, and metadata
    */
-  async fetchSongData(url: string): Promise<SairhythmsData> {
+  async fetchSongData(url: string): Promise<ExternalSongsData> {
     try {
       console.log(`Fetching song data from: ${url}`);
       
@@ -56,7 +56,7 @@ class SairhythmsDataService {
     const lyrics: Record<string, string> = {};
     const languages: string[] = [];
     
-    // TODO: Adjust selectors based on actual sairhythms.org HTML structure
+    // TODO: Adjust selectors based on actual externalsongs.org HTML structure
     // For now, return a placeholder
     // Look for elements with class 'song-lyrics' or similar
     const lyricsElement = doc.querySelector('.song-lyrics, .lyrics, [class*="lyrics"]');
@@ -76,7 +76,7 @@ class SairhythmsDataService {
    * @returns Translation text or undefined
    */
   private extractTranslation(doc: Document): string | undefined {
-    // TODO: Adjust selectors based on actual sairhythms.org HTML structure
+    // TODO: Adjust selectors based on actual externalsongs.org HTML structure
     const translationElement = doc.querySelector('.translation, [class*="translation"]');
     return translationElement?.textContent?.trim();
   }
@@ -92,7 +92,7 @@ class SairhythmsDataService {
     raga?: string;
     deity?: string;
   } {
-    // TODO: Adjust selectors based on actual sairhythms.org HTML structure
+    // TODO: Adjust selectors based on actual externalsongs.org HTML structure
     return {
       tempo: doc.querySelector('[data-tempo], .tempo')?.textContent?.trim(),
       beat: doc.querySelector('[data-beat], .beat')?.textContent?.trim(),
@@ -103,5 +103,5 @@ class SairhythmsDataService {
 }
 
 // Export singleton instance
-export const sairhythmsDataService = new SairhythmsDataService();
-export default sairhythmsDataService;
+export const externalsongsDataService = new ExternalSongsDataService();
+export default externalsongsDataService;

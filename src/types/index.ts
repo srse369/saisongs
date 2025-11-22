@@ -3,9 +3,9 @@
 export interface Song {
   id: string;
   name: string;
-  sairhythmsUrl: string;
+  externalSourceUrl: string;
   
-  // Cached data from Sairhythms.org
+  // Cached data from external source
   title?: string;
   title2?: string;
   lyrics?: string;
@@ -103,7 +103,7 @@ export interface SongWithPitches extends Song {
 
 export interface CreateSongInput {
   name: string;
-  sairhythmsUrl: string;
+  externalSourceUrl: string;
   title?: string;
   title2?: string;
   lyrics?: string;
@@ -123,7 +123,7 @@ export interface CreateSongInput {
 
 export interface UpdateSongInput {
   name?: string;
-  sairhythmsUrl?: string;
+  externalSourceUrl?: string;
 }
 
 export interface CreateSingerInput {

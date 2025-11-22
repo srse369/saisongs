@@ -5,6 +5,7 @@ import songsRouter from './routes/songs.js';
 import singersRouter from './routes/singers.js';
 import pitchesRouter from './routes/pitches.js';
 import sessionsRouter from './routes/sessions.js';
+import importMappingsRouter from './routes/importMappings.js';
 import { warmupCache } from './services/CacheService.js';
 
 // Load environment variables
@@ -29,6 +30,7 @@ app.use('/api/songs', songsRouter);
 app.use('/api/singers', singersRouter);
 app.use('/api/pitches', pitchesRouter);
 app.use('/api/sessions', sessionsRouter);
+app.use('/api/import-mappings', importMappingsRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

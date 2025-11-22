@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { SongManager, SingerManager, PitchManager, PasswordDialog, BulkImportUI, BeavertonImportManager } from './components/admin';
+import { SongManager, SingerManager, PitchManager, PasswordDialog, BulkImportUI, CsvImportManager } from './components/admin';
 import { SongList, PresentationMode } from './components/presentation';
 import { SessionManager } from './components/session/SessionManager';
 import { SessionPresentationMode } from './components/session/SessionPresentationMode';
@@ -64,11 +64,11 @@ function AppContent() {
                     }
                   />
                   <Route
-                    path="/admin/import-beaverton"
+                    path="/admin/import-csv"
                     element={
                       <ProtectedRoute>
                         <Layout>
-                          <BeavertonImportPage />
+                          <CsvImportPage />
                         </Layout>
                       </ProtectedRoute>
                     }
@@ -98,10 +98,10 @@ function BulkImportPage() {
     <div className="px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
       <div className="max-w-3xl">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Bulk Import from Sairhythms
+          Bulk Import from External Source
         </h1>
         <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-          Use this tool to import or update songs in bulk from Sairhythms.org. You can paste JSON manually
+          Use this tool to import or update songs in bulk from external sources. You can paste JSON manually
           or run a full discovery and import process. Admin authentication is required.
         </p>
       </div>
@@ -124,8 +124,8 @@ function BulkImportPage() {
   );
 }
 
-// CSV Import Page - wraps BeavertonImportManager
-function BeavertonImportPage() {
+// CSV Import Page
+function CsvImportPage() {
   return (
     <div className="px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
       <div className="max-w-3xl">
@@ -137,7 +137,7 @@ function BeavertonImportPage() {
           This tool will help match songs, normalize pitch formats, and create new singer entries as needed.
         </p>
       </div>
-      <BeavertonImportManager />
+      <CsvImportManager />
     </div>
   );
 }
@@ -231,15 +231,15 @@ function HomePage() {
                   </svg>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                  Import from Sairhythms
+                  Import from External Source
                 </h2>
                 <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                  Import or update songs in bulk from Sairhythms.org
+                  Import or update songs in bulk from external sources
                 </p>
               </Link>
             )}
             <Link
-              to="/admin/import-beaverton"
+              to="/admin/import-csv"
               className="group block p-6 sm:p-8 card hover:scale-105 transition-all duration-200"
             >
               <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-green-100 dark:bg-green-900 rounded-full mb-4 group-hover:bg-green-200 dark:group-hover:bg-green-800 transition-colors">

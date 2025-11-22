@@ -112,7 +112,7 @@ export const SongManager: React.FC = () => {
         song.beat,
         song.raga,
         song.level,
-        song.sairhythmsUrl,
+        song.externalSourceUrl,
       ];
 
       return fields.some((field) =>
