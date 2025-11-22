@@ -11,7 +11,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { isConnected, connectionError, resetConnection } = useDatabase();
-  const { isAuthenticated, userRole, logout } = useAuth();
+  const { isAuthenticated, userRole, logout, downgradeRole } = useAuth();
 
   // Check if current path matches the link
   const isActive = (path: string) => {
@@ -56,20 +56,26 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </svg>
                 Songs
               </Link>
-              <Link to="/admin/singers" className={getLinkClasses('/admin/singers')}>
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-                Singers
-              </Link>
-              <Link to="/admin/pitches" className={getLinkClasses('/admin/pitches')}>
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                  <circle cx="15" cy="15" r="1" fill="currentColor" />
-                  <circle cx="15" cy="12" r="1" fill="currentColor" />
-                </svg>
-                Pitches
-              </Link>
+              
+              {/* Singers and Pitches tabs only visible when authenticated */}
+              {isAuthenticated && (
+                <>
+                  <Link to="/admin/singers" className={getLinkClasses('/admin/singers')}>
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                    Singers
+                  </Link>
+                  <Link to="/admin/pitches" className={getLinkClasses('/admin/pitches')}>
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                      <circle cx="15" cy="15" r="1" fill="currentColor" />
+                      <circle cx="15" cy="12" r="1" fill="currentColor" />
+                    </svg>
+                    Pitches
+                  </Link>
+                </>
+              )}
               <Link to="/session" className={getLinkClasses('/session')}>
                 <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -103,10 +109,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   type="button"
                   onClick={() => {
                     if (isAuthenticated) {
-                      // Switch back to view mode
-                      logout();
+                      // Cycle down one role: admin → editor → viewer → public
+                      downgradeRole();
                     } else {
-                      // In view mode: attempt to login by opening the password dialog
+                      // In public mode: open password dialog to login
                       const event = new KeyboardEvent('keydown', {
                         key: 'i',
                         code: 'KeyI',
@@ -122,19 +128,23 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                       ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
                       : userRole === 'editor'
                       ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                      : userRole === 'viewer'
+                      ? 'bg-purple-50 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300'
                       : 'bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300'
                   }`}
                   title={
                     userRole === 'admin'
-                      ? 'Admin mode (full access)'
+                      ? 'Click to downgrade to Editor mode'
                       : userRole === 'editor'
-                      ? 'Editor mode (can edit, cannot delete)'
-                      : 'Viewer mode (read-only)'
+                      ? 'Click to downgrade to Viewer mode'
+                      : userRole === 'viewer'
+                      ? 'Click to downgrade to Public mode'
+                      : 'Click to login'
                   }
                 >
                   <svg
                     className={`w-3 h-3 mr-1 ${
-                      userRole === 'admin' ? 'text-emerald-600 dark:text-emerald-400' : userRole === 'editor' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
+                      userRole === 'admin' ? 'text-emerald-600 dark:text-emerald-400' : userRole === 'editor' ? 'text-blue-600 dark:text-blue-400' : userRole === 'viewer' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'
                     }`}
                     fill="none"
                     stroke="currentColor"
@@ -175,7 +185,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                       </>
                     )}
                   </svg>
-                  {userRole === 'admin' ? 'Admin' : userRole === 'editor' ? 'Editor' : 'Viewer'}
+                  {userRole === 'admin' ? 'Admin' : userRole === 'editor' ? 'Editor' : userRole === 'viewer' ? 'Viewer' : 'Public'}
                 </button>
               </div>
             </nav>
@@ -223,28 +233,34 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </svg>
                 Manage Songs
               </Link>
-              <Link
-                to="/admin/singers"
-                className={`block ${getLinkClasses('/admin/singers')}`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-                Manage Singers
-              </Link>
-              <Link
-                to="/admin/pitches"
-                className={`block ${getLinkClasses('/admin/pitches')}`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                  <circle cx="15" cy="15" r="1" fill="currentColor" />
-                  <circle cx="15" cy="12" r="1" fill="currentColor" />
-                </svg>
-                Manage Pitches
-              </Link>
+              
+              {/* Singers and Pitches tabs only visible when authenticated */}
+              {isAuthenticated && (
+                <>
+                  <Link
+                    to="/admin/singers"
+                    className={`block ${getLinkClasses('/admin/singers')}`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                    Manage Singers
+                  </Link>
+                  <Link
+                    to="/admin/pitches"
+                    className={`block ${getLinkClasses('/admin/pitches')}`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                      <circle cx="15" cy="15" r="1" fill="currentColor" />
+                      <circle cx="15" cy="12" r="1" fill="currentColor" />
+                    </svg>
+                    Manage Pitches
+                  </Link>
+                </>
+              )}
               <Link
                 to="/session"
                 className={`block ${getLinkClasses('/session')}`}

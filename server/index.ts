@@ -9,6 +9,7 @@ import pitchesRouter from './routes/pitches.js';
 import sessionsRouter from './routes/sessions.js';
 import importMappingsRouter from './routes/importMappings.js';
 import authRouter from './routes/auth.js';
+import { requireAuth, requireAdmin } from './middleware/simpleAuth.js';
 import { warmupCache } from './services/CacheService.js';
 
 const app = express();
@@ -25,12 +26,15 @@ app.get('/api/health', (req, res) => {
 });
 
 // API Routes
+// Public routes
 app.use('/api/auth', authRouter);
-app.use('/api/songs', songsRouter);
-app.use('/api/singers', singersRouter);
-app.use('/api/pitches', pitchesRouter);
-app.use('/api/sessions', sessionsRouter);
-app.use('/api/import-mappings', importMappingsRouter);
+app.use('/api/songs', songsRouter);  // Songs remain public
+app.use('/api/sessions', sessionsRouter);  // Sessions public for presentation mode
+
+// Protected routes - require authentication
+app.use('/api/singers', requireAuth, singersRouter);  // Singer data is private
+app.use('/api/pitches', requireAuth, pitchesRouter);  // Pitch data is private
+app.use('/api/import-mappings', requireAdmin, importMappingsRouter);  // Admin only
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

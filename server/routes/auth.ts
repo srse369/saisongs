@@ -5,6 +5,7 @@ const router = express.Router();
 // Get passwords from backend env (NOT prefixed with VITE_)
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const EDITOR_PASSWORD = process.env.EDITOR_PASSWORD || '';
+const VIEWER_PASSWORD = process.env.VIEWER_PASSWORD || '';
 
 // Rate limiting state (in production, consider using Redis)
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -50,6 +51,10 @@ router.post('/login', async (req, res) => {
     // Check against editor password
     else if (EDITOR_PASSWORD && password === EDITOR_PASSWORD) {
       role = 'editor';
+    }
+    // Check against viewer password
+    else if (VIEWER_PASSWORD && password === VIEWER_PASSWORD) {
+      role = 'viewer';
     }
 
     if (role) {

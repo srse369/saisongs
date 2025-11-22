@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
-export type UserRole = 'viewer' | 'editor' | 'admin';
+export type UserRole = 'public' | 'viewer' | 'editor' | 'admin';
 
 interface AuthContextState {
   isAuthenticated: boolean;
@@ -10,6 +10,7 @@ interface AuthContextState {
   isAdmin: boolean;
   login: (password: string) => Promise<boolean>;
   logout: () => void;
+  downgradeRole: () => void;
 }
 
 const AuthContext = createContext<AuthContextState | undefined>(undefined);
@@ -28,7 +29,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || (
 );
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [userRole, setUserRole] = useState<UserRole>('viewer');
+  const [userRole, setUserRole] = useState<UserRole>('public');
 
   // Check authentication status on mount
   useEffect(() => {
@@ -44,7 +45,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Session expired
           sessionStorage.removeItem(AUTH_ROLE_KEY);
           sessionStorage.removeItem(AUTH_EXPIRY_KEY);
-          setUserRole('viewer');
+          setUserRole('public');
         }
       }
     };
@@ -88,16 +89,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = useCallback(() => {
     sessionStorage.removeItem(AUTH_ROLE_KEY);
     sessionStorage.removeItem(AUTH_EXPIRY_KEY);
-    setUserRole('viewer');
+    setUserRole('public');
   }, []);
 
+  const downgradeRole = useCallback(() => {
+    let newRole: UserRole = 'public';
+    
+    // Cycle down one level: admin → editor → viewer → public
+    if (userRole === 'admin') {
+      newRole = 'editor';
+    } else if (userRole === 'editor') {
+      newRole = 'viewer';
+    } else if (userRole === 'viewer') {
+      newRole = 'public';
+    } else {
+      // Already public, do nothing
+      return;
+    }
+
+    // Update storage immediately (fast operation)
+    if (newRole === 'public') {
+      sessionStorage.removeItem(AUTH_ROLE_KEY);
+      sessionStorage.removeItem(AUTH_EXPIRY_KEY);
+    } else {
+      sessionStorage.setItem(AUTH_ROLE_KEY, newRole);
+      // Keep the same expiry time
+    }
+    
+    // Defer state update to avoid blocking the click handler
+    requestAnimationFrame(() => {
+      setUserRole(newRole);
+    });
+  }, [userRole]);
+
   const value: AuthContextState = {
-    isAuthenticated: userRole !== 'viewer',
+    isAuthenticated: userRole !== 'public', // Authenticated = viewer, editor, or admin
     userRole,
     isEditor: userRole === 'editor' || userRole === 'admin',
     isAdmin: userRole === 'admin',
     login,
     logout,
+    downgradeRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -15,7 +15,7 @@ interface SongListProps {
 
 export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onView, loading = false }) => {
   const navigate = useNavigate();
-  const { isEditor, isAdmin } = useAuth();
+  const { isEditor, isAdmin, isAuthenticated } = useAuth();
   const { addSong, songIds } = useSession();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [songToDelete, setSongToDelete] = useState<Song | null>(null);
@@ -171,15 +171,18 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </button>
-                <button
-                  onClick={() => handleViewPitches(song)}
-                  title="View Pitches"
-                  className="p-2 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                  </svg>
-                </button>
+                {/* Only show View Pitches button when authenticated (pitches contain private singer info) */}
+                {isAuthenticated && (
+                  <button
+                    onClick={() => handleViewPitches(song)}
+                    title="View Pitches"
+                    className="p-2 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                    </svg>
+                  </button>
+                )}
                 {isEditor && (
                   <button
                     onClick={() => onEdit(song)}

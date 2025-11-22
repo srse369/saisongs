@@ -99,11 +99,15 @@ class ApiClient {
 
     const url = `${this.baseUrl}${endpoint}`;
     
+    // Get user role from session storage for backend validation
+    const userRole = sessionStorage.getItem('songstudio_auth_role');
+    
     try {
       const response = await fetch(url, {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          ...(userRole && { 'X-User-Role': userRole }),
           ...options?.headers,
         },
       });

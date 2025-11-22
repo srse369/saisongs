@@ -121,19 +121,19 @@ export const PitchList: React.FC<PitchListProps> = ({
   return (
     <>
       <div className="overflow-x-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-        <table className="responsive-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <table className="responsive-table w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-900/50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[25%]">
                 Song
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[20%]">
                 Singer
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[20%]">
                 Pitch
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[35%]">
                 Actions
               </th>
             </tr>
@@ -141,25 +141,26 @@ export const PitchList: React.FC<PitchListProps> = ({
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {enrichedPitches.map((pitch) => (
               <tr key={pitch.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/70">
-                <td data-label="Song" className="px-6 py-4 whitespace-nowrap">
+                <td data-label="Song" className="px-3 py-3">
                   <button
                     type="button"
                     onClick={() => onViewSong(pitch.songId)}
-                    className="text-left text-sm font-medium text-blue-700 dark:text-blue-300 hover:underline"
+                    className="text-left text-sm font-medium text-blue-700 dark:text-blue-300 hover:underline truncate max-w-full block"
+                    title={pitch.songName}
                   >
                     {pitch.songName}
                   </button>
                 </td>
-                <td data-label="Singer" className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900 dark:text-white">{pitch.singerName}</div>
+                <td data-label="Singer" className="px-3 py-3">
+                  <div className="text-sm text-gray-900 dark:text-white truncate" title={pitch.singerName}>{pitch.singerName}</div>
                 </td>
-                <td data-label="Pitch" className="px-6 py-4 whitespace-nowrap">
+                <td data-label="Pitch" className="px-3 py-3 whitespace-nowrap">
                   <div className="text-sm text-gray-900 dark:text-white">
                     <span className="font-bold text-blue-600 dark:text-blue-400">{formatPitch(pitch.pitch)}</span>
                     <span className="text-gray-500 dark:text-gray-400 ml-2">({pitch.pitch.replace('#', '♯')})</span>
                   </div>
                 </td>
-                <td data-label="Actions" className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td data-label="Actions" className="px-3 py-3 text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2">
                     <button
                       onClick={() => addSong(pitch.songId, pitch.singerId, pitch.pitch)}

@@ -19,22 +19,29 @@ import './App.css';
 function AppContent() {
   // Initialize admin keyboard shortcut (Ctrl+Shift+I or Cmd+Shift+I)
   const { isPasswordDialogOpen, closePasswordDialog } = useAdminShortcut();
+  const { isAuthenticated } = useAuth();
   const { fetchSongs } = useSongs();
   const { fetchSingers } = useSingers();
   const { fetchAllPitches } = usePitches();
   const initialLoadDone = useRef(false);
 
-  // Warm up caches for songs, singers, and pitches in the background as soon as UI mounts
-  // Only run ONCE on mount, not on every re-render (prevents infinite retry loop)
+  // Warm up cache for public data (songs) on mount
   useEffect(() => {
     if (!initialLoadDone.current) {
       initialLoadDone.current = true;
-      fetchSongs();
+      fetchSongs(); // Always fetch public data
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run once on mount
+
+  // Warm up cache for protected data (singers, pitches) when user authenticates
+  useEffect(() => {
+    if (isAuthenticated) {
       fetchSingers();
       fetchAllPitches();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty deps - only run once on mount
+  }, [isAuthenticated]); // Fetch when authentication status changes
 
   return (
     <>
@@ -66,7 +73,7 @@ function AppContent() {
                   <Route
                     path="/admin/import-csv"
                     element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requireAdmin={true}>
                         <Layout>
                           <CsvImportPage />
                         </Layout>
@@ -74,10 +81,26 @@ function AppContent() {
                     }
                   />
                   
-                  {/* Admin Routes with Layout (temporarily unprotected for testing) */}
+                  {/* Public route - Song list (no singer/pitch info) */}
                   <Route path="/admin/songs" element={<Layout><SongManager /></Layout>} />
-                  <Route path="/admin/singers" element={<Layout><SingerManager /></Layout>} />
-                  <Route path="/admin/pitches" element={<Layout><PitchManager /></Layout>} />
+                  
+                  {/* Protected routes - Singer and pitch data requires authentication */}
+                  <Route 
+                    path="/admin/singers" 
+                    element={
+                      <ProtectedRoute>
+                        <Layout><SingerManager /></Layout>
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/admin/pitches" 
+                    element={
+                      <ProtectedRoute>
+                        <Layout><PitchManager /></Layout>
+                      </ProtectedRoute>
+                    } 
+                  />
                   
                   {/* Presentation Mode without Layout (full-screen) */}
                   <Route path="/presentation/:songId" element={<PresentationModePage />} />
@@ -124,7 +147,7 @@ function BulkImportPage() {
   );
 }
 
-// CSV Import Page
+// CSV Import Page (Admin only)
 function CsvImportPage() {
   return (
     <div className="px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
@@ -134,7 +157,7 @@ function CsvImportPage() {
         </h1>
         <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
           Import singers and their pitch data from CSV format.
-          This tool will help match songs, normalize pitch formats, and create new singer entries as needed.
+          This tool will help match songs, normalize pitch formats, and create new singer entries as needed. Admin authentication is required.
         </p>
       </div>
       <CsvImportManager />
@@ -221,39 +244,41 @@ function HomePage() {
         {isAuthenticated && (
           <>
             {isAdmin && (
-              <Link
-                to="/admin/import"
-                className="group block p-6 sm:p-8 card hover:scale-105 transition-all duration-200"
-              >
-                <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-amber-100 dark:bg-amber-900 rounded-full mb-4 group-hover:bg-amber-200 dark:group-hover:bg-amber-800 transition-colors">
-                  <svg className="w-6 h-6 sm:w-8 sm:h-8 text-amber-600 dark:text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582M20 4v5h-.581M4 12h16M10 16l2 2 2-2M12 14v4" />
-                  </svg>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                  Import from External Source
-                </h2>
-                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                  Import or update songs in bulk from external sources
-                </p>
-              </Link>
+              <>
+                <Link
+                  to="/admin/import"
+                  className="group block p-6 sm:p-8 card hover:scale-105 transition-all duration-200"
+                >
+                  <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-amber-100 dark:bg-amber-900 rounded-full mb-4 group-hover:bg-amber-200 dark:group-hover:bg-amber-800 transition-colors">
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-amber-600 dark:text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582M20 4v5h-.581M4 12h16M10 16l2 2 2-2M12 14v4" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    Import from External Source
+                  </h2>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                    Import or update songs in bulk from external sources
+                  </p>
+                </Link>
+                <Link
+                  to="/admin/import-csv"
+                  className="group block p-6 sm:p-8 card hover:scale-105 transition-all duration-200"
+                >
+                  <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-green-100 dark:bg-green-900 rounded-full mb-4 group-hover:bg-green-200 dark:group-hover:bg-green-800 transition-colors">
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-green-600 dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    Import from CSV
+                  </h2>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                    Import singers and pitches from CSV data
+                  </p>
+                </Link>
+              </>
             )}
-            <Link
-              to="/admin/import-csv"
-              className="group block p-6 sm:p-8 card hover:scale-105 transition-all duration-200"
-            >
-              <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-green-100 dark:bg-green-900 rounded-full mb-4 group-hover:bg-green-200 dark:group-hover:bg-green-800 transition-colors">
-                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-green-600 dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                Import from CSV
-              </h2>
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                Import singers and pitches from CSV data
-              </p>
-            </Link>
           </>
         )}
       </div>
