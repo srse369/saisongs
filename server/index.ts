@@ -9,6 +9,7 @@ import pitchesRouter from './routes/pitches.js';
 import sessionsRouter from './routes/sessions.js';
 import importMappingsRouter from './routes/importMappings.js';
 import authRouter from './routes/auth.js';
+import analyticsRouter from './routes/analytics.js';
 import { requireAuth, requireEditor, requireAdmin } from './middleware/simpleAuth.js';
 import { warmupCache } from './services/CacheService.js';
 
@@ -19,6 +20,7 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Note: Analytics tracking is done client-side via /api/analytics/track endpoint
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -30,6 +32,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/songs', songsRouter);  // Songs remain public
 app.use('/api/sessions', sessionsRouter);  // Sessions public for presentation mode
+app.use('/api/analytics', analyticsRouter);  // Analytics (routes handle their own auth)
 
 // Protected routes - require authentication
 app.use('/api/singers', requireAuth, singersRouter);  // Singer data is private

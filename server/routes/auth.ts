@@ -24,7 +24,15 @@ setInterval(() => {
 
 router.post('/login', async (req, res) => {
   const { password } = req.body;
-  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  
+  // Get real client IP (handle proxies like nginx)
+  const ip = (
+    req.headers['x-forwarded-for']?.toString().split(',')[0].trim() ||
+    req.headers['x-real-ip']?.toString() ||
+    req.socket.remoteAddress ||
+    req.ip ||
+    'unknown'
+  );
 
   // Rate limiting
   const attempts = loginAttempts.get(ip);
@@ -45,8 +53,8 @@ router.post('/login', async (req, res) => {
     let role: string | null = null;
 
     // Debug: Log password length (NOT the actual password for security)
-    console.log(`[AUTH] Login attempt: password_length=${password.length}, ip=${ip}`);
-    console.log(`[AUTH] Expected lengths: admin=${ADMIN_PASSWORD.length}, editor=${EDITOR_PASSWORD.length}, viewer=${VIEWER_PASSWORD.length}`);
+    console.log(`[AUTH] 🔐 Login attempt from ${ip} (password_length=${password.length})`);
+    console.log(`[AUTH]    Expected lengths: admin=${ADMIN_PASSWORD.length}, editor=${EDITOR_PASSWORD.length}, viewer=${VIEWER_PASSWORD.length}`);
 
     // Check against admin password
     if (ADMIN_PASSWORD && password === ADMIN_PASSWORD) {
@@ -66,7 +74,17 @@ router.post('/login', async (req, res) => {
       loginAttempts.delete(ip);
 
       // Log successful login
-      console.log(`[AUTH] ✅ Successful login: role=${role}, ip=${ip}, time=${new Date().toISOString()}`);
+      const timestamp = new Date().toLocaleString('en-US', { 
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+      console.log(`[AUTH] ✅ SUCCESS: ${role.toUpperCase()} login from ${ip} at ${timestamp}`);
 
       return res.json({ success: true, role });
     } else {
@@ -78,7 +96,17 @@ router.post('/login', async (req, res) => {
       });
 
       // Log failed attempt
-      console.warn(`[AUTH] Failed login attempt: ip=${ip}, attempts=${current.count + 1}, time=${new Date().toISOString()}`);
+      const timestamp = new Date().toLocaleString('en-US', { 
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+      console.warn(`[AUTH] ❌ FAILED: Invalid password from ${ip} at ${timestamp} (attempt ${current.count + 1}/${MAX_ATTEMPTS})`);
 
       return res.status(401).json({ 
         error: 'Invalid credentials',

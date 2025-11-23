@@ -14,3 +14,5 @@ export { CsvImportManager } from './CsvImportManager';
 export { NamedSessionManager } from './NamedSessionManager';
 export { NamedSessionList } from './NamedSessionList';
 export { NamedSessionForm } from './NamedSessionForm';
+export { Analytics } from './Analytics';
+export { WorldMap } from './WorldMap';

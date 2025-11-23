@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { SongManager, SingerManager, PitchManager, PasswordDialog, BulkImportUI, CsvImportManager } from './components/admin';
+import { SongManager, SingerManager, PitchManager, PasswordDialog, BulkImportUI, CsvImportManager, Analytics } from './components/admin';
 import { SongList, PresentationMode } from './components/presentation';
 import { SessionManager } from './components/session/SessionManager';
 import { SessionPresentationMode } from './components/session/SessionPresentationMode';
@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SessionProvider } from './contexts/SessionContext';
 import { NamedSessionProvider } from './contexts/NamedSessionContext';
 import { useAdminShortcut } from './hooks';
+import { usePageTracking } from './hooks/usePageTracking';
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
 
@@ -24,6 +25,9 @@ function AppContent() {
   const { fetchSingers } = useSingers();
   const { fetchAllPitches } = usePitches();
   const initialLoadDone = useRef(false);
+  
+  // Track page views for analytics
+  usePageTracking();
 
   // Warm up cache for public data (songs) on mount
   useEffect(() => {
@@ -98,6 +102,14 @@ function AppContent() {
                     element={
                       <ProtectedRoute>
                         <Layout><PitchManager /></Layout>
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/admin/analytics" 
+                    element={
+                      <ProtectedRoute requireAdmin={true}>
+                        <Layout><Analytics /></Layout>
                       </ProtectedRoute>
                     } 
                   />

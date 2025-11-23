@@ -1557,7 +1557,19 @@ export async function warmupCache(): Promise<void> {
       ORDER BY s.name, si.name
     `);
 
-    cacheService.set('pitches:all', pitches, CACHE_TTL);
+    // Normalize field names (Oracle returns uppercase) for cache consistency
+    const normalizedPitches = pitches.map((p: any) => ({
+      id: p.id || p.ID,
+      song_id: p.song_id || p.SONG_ID,
+      singer_id: p.singer_id || p.SINGER_ID,
+      pitch: p.pitch || p.PITCH,
+      song_name: p.song_name || p.SONG_NAME,
+      singer_name: p.singer_name || p.SINGER_NAME,
+      created_at: p.created_at || p.CREATED_AT,
+      updated_at: p.updated_at || p.UPDATED_AT,
+    }));
+
+    cacheService.set('pitches:all', normalizedPitches, CACHE_TTL);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache pitches:', error instanceof Error ? error.message : error);
