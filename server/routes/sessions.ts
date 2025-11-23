@@ -1,5 +1,6 @@
 import express from 'express';
 import { cacheService } from '../services/CacheService.js';
+import { requireEditor } from '../middleware/simpleAuth.js';
 
 const router = express.Router();
 
@@ -44,7 +45,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create session
-router.post('/', async (req, res) => {
+router.post('/', requireEditor, async (req, res) => {
   try {
     const { name, description } = req.body;
 
@@ -64,7 +65,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update session
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireEditor, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description } = req.body;
@@ -90,7 +91,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete session
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireEditor, async (req, res) => {
   try {
     const { id } = req.params;
     await cacheService.deleteSession(id);
@@ -126,7 +127,7 @@ router.get('/:sessionId/items', async (req, res) => {
 });
 
 // Add session item
-router.post('/:sessionId/items', async (req, res) => {
+router.post('/:sessionId/items', requireEditor, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { songId, singerId, pitch, sequenceOrder } = req.body;
@@ -147,7 +148,7 @@ router.post('/:sessionId/items', async (req, res) => {
 });
 
 // Update session item
-router.put('/items/:id', async (req, res) => {
+router.put('/items/:id', requireEditor, async (req, res) => {
   try {
     const { id } = req.params;
     const { singerId, pitch, sequenceOrder } = req.body;
@@ -168,7 +169,7 @@ router.put('/items/:id', async (req, res) => {
 });
 
 // Delete session item
-router.delete('/items/:id', async (req, res) => {
+router.delete('/items/:id', requireEditor, async (req, res) => {
   try {
     const { id } = req.params;
     await cacheService.deleteSessionItem(id);
@@ -180,7 +181,7 @@ router.delete('/items/:id', async (req, res) => {
 });
 
 // Reorder session items
-router.put('/:sessionId/reorder', async (req, res) => {
+router.put('/:sessionId/reorder', requireEditor, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { itemIds } = req.body;
@@ -198,7 +199,7 @@ router.put('/:sessionId/reorder', async (req, res) => {
 });
 
 // Set all session items (replace existing)
-router.put('/:sessionId/items', async (req, res) => {
+router.put('/:sessionId/items', requireEditor, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { items } = req.body;
@@ -216,7 +217,7 @@ router.put('/:sessionId/items', async (req, res) => {
 });
 
 // Duplicate session
-router.post('/:id/duplicate', async (req, res) => {
+router.post('/:id/duplicate', requireEditor, async (req, res) => {
   try {
     const { id } = req.params;
     const { newName } = req.body;

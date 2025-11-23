@@ -231,7 +231,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                 </svg>
-                Manage Songs
+                Songs
               </Link>
               
               {/* Singers and Pitches tabs only visible when authenticated */}
@@ -245,7 +245,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                     </svg>
-                    Manage Singers
+                    Singers
                   </Link>
                   <Link
                     to="/admin/pitches"
@@ -257,7 +257,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                       <circle cx="15" cy="15" r="1" fill="currentColor" />
                       <circle cx="15" cy="12" r="1" fill="currentColor" />
                     </svg>
-                    Manage Pitches
+                    Pitches
                   </Link>
                 </>
               )}
@@ -273,28 +273,106 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Live Session
               </Link>
               
-              {/* Database status in mobile menu */}
-              <div className="px-3 py-2 flex items-center space-x-2">
-                {isConnected ? (
-                  <>
-                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Database Connected</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                    <button
-                      onClick={resetConnection}
-                      className="text-sm text-red-600 dark:text-red-400 hover:underline"
-                    >
-                      Reconnect Database
-                    </button>
-                  </>
-                )}
+              {/* Database status and Role indicator in mobile menu */}
+              <div className="px-3 py-2 space-y-3 border-t border-gray-200 dark:border-gray-700 mt-2 pt-3">
+                {/* Database status */}
+                <div className="flex items-center space-x-2">
+                  {isConnected ? (
+                    <>
+                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Database Connected</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                      <button
+                        onClick={resetConnection}
+                        className="text-sm text-red-600 dark:text-red-400 hover:underline"
+                      >
+                        Reconnect Database
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Role indicator */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isAuthenticated) {
+                      downgradeRole();
+                    } else {
+                      const event = new KeyboardEvent('keydown', {
+                        key: 'i',
+                        code: 'KeyI',
+                        ctrlKey: true,
+                        shiftKey: true,
+                        bubbles: true,
+                      });
+                      window.dispatchEvent(event);
+                    }
+                  }}
+                  className={`w-full flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium border ${
+                    userRole === 'admin'
+                      ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
+                      : userRole === 'editor'
+                      ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+                      : userRole === 'viewer'
+                      ? 'bg-purple-50 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300'
+                      : 'bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300'
+                  }`}
+                >
+                  <svg
+                    className={`w-4 h-4 mr-2 ${
+                      userRole === 'admin' ? 'text-emerald-600 dark:text-emerald-400' : userRole === 'editor' ? 'text-blue-600 dark:text-blue-400' : userRole === 'viewer' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    {userRole === 'admin' ? (
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                      />
+                    ) : userRole === 'editor' ? (
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                      />
+                    ) : (
+                      <>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </>
+                    )}
+                  </svg>
+                  {userRole === 'admin' 
+                    ? 'Admin Mode - Tap to downgrade' 
+                    : userRole === 'editor' 
+                    ? 'Editor Mode - Tap to downgrade' 
+                    : userRole === 'viewer'
+                    ? 'Viewer Mode - Tap to downgrade'
+                    : 'Public Mode - Tap to login'}
+                </button>
               </div>
             </nav>
           )}

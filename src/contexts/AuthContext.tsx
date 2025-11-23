@@ -68,11 +68,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const data = await response.json();
         const role = data.role as UserRole;
 
+        // Debug logging
+        console.log('[AuthContext] Login successful:', { 
+          receivedRole: role, 
+          backendResponse: data 
+        });
+
         // Store role and expiry in sessionStorage
         const expiryTime = Date.now() + SESSION_DURATION;
         sessionStorage.setItem(AUTH_ROLE_KEY, role);
         sessionStorage.setItem(AUTH_EXPIRY_KEY, expiryTime.toString());
+        
+        console.log('[AuthContext] Stored in sessionStorage:', {
+          role,
+          stored: sessionStorage.getItem(AUTH_ROLE_KEY)
+        });
+        
         setUserRole(role);
+        
+        console.log('[AuthContext] State updated to:', role);
         return true;
       } else {
         // Login failed

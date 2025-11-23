@@ -36,6 +36,29 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
   next();
 };
 
+export const requireEditor = (req: Request, res: Response, next: NextFunction) => {
+  const userRole = req.headers['x-user-role'] as string;
+
+  // First check if authenticated at all
+  if (!userRole || (userRole !== 'admin' && userRole !== 'editor' && userRole !== 'viewer')) {
+    return res.status(401).json({ 
+      error: 'Authentication required',
+      message: 'Please log in to access this resource'
+    });
+  }
+
+  // Check if editor or admin (viewer cannot modify)
+  if (userRole !== 'editor' && userRole !== 'admin') {
+    return res.status(403).json({ 
+      error: 'Editor access required',
+      message: 'This action requires editor or administrator privileges'
+    });
+  }
+
+  (req as any).userRole = userRole;
+  next();
+};
+
 export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   const userRole = req.headers['x-user-role'] as string;
 

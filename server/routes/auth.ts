@@ -44,6 +44,10 @@ router.post('/login', async (req, res) => {
   try {
     let role: string | null = null;
 
+    // Debug: Log password length (NOT the actual password for security)
+    console.log(`[AUTH] Login attempt: password_length=${password.length}, ip=${ip}`);
+    console.log(`[AUTH] Expected lengths: admin=${ADMIN_PASSWORD.length}, editor=${EDITOR_PASSWORD.length}, viewer=${VIEWER_PASSWORD.length}`);
+
     // Check against admin password
     if (ADMIN_PASSWORD && password === ADMIN_PASSWORD) {
       role = 'admin';
@@ -62,7 +66,7 @@ router.post('/login', async (req, res) => {
       loginAttempts.delete(ip);
 
       // Log successful login
-      console.log(`[AUTH] Successful login: role=${role}, ip=${ip}, time=${new Date().toISOString()}`);
+      console.log(`[AUTH] ✅ Successful login: role=${role}, ip=${ip}, time=${new Date().toISOString()}`);
 
       return res.json({ success: true, role });
     } else {

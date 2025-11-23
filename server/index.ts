@@ -9,7 +9,7 @@ import pitchesRouter from './routes/pitches.js';
 import sessionsRouter from './routes/sessions.js';
 import importMappingsRouter from './routes/importMappings.js';
 import authRouter from './routes/auth.js';
-import { requireAuth, requireAdmin } from './middleware/simpleAuth.js';
+import { requireAuth, requireEditor, requireAdmin } from './middleware/simpleAuth.js';
 import { warmupCache } from './services/CacheService.js';
 
 const app = express();

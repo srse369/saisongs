@@ -3,6 +3,7 @@ import { useNamedSessions } from '../../contexts/NamedSessionContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
 import { useSession } from '../../contexts/SessionContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { NamedSessionForm } from './NamedSessionForm';
 import { NamedSessionList } from './NamedSessionList';
 import { Modal } from '../common/Modal';
@@ -34,12 +35,16 @@ export const NamedSessionManager: React.FC = () => {
   const { songs } = useSongs();
   const { singers } = useSingers();
   const { setSessionSongs } = useSession();
+  const { userRole } = useAuth();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingSession, setEditingSession] = useState<NamedSession | null>(null);
   const [managingSession, setManagingSession] = useState<NamedSession | null>(null);
   const [sessionItems, setLocalSessionItems] = useState<SessionItemEdit[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Editor and admin can create/modify sessions
+  const canEdit = userRole === 'editor' || userRole === 'admin';
 
   // Filter sessions by search query
   const filteredSessions = sessions.filter(session =>
@@ -149,15 +154,17 @@ export const NamedSessionManager: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Named Sessions</h2>
-          <p className="text-gray-600 mt-1">Manage saved session configurations</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Named Sessions</h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Manage saved session configurations</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          Create Session
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Create Session
+          </button>
+        )}
       </div>
 
       {/* Search */}
