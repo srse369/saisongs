@@ -8,11 +8,10 @@
   border: 1px solid rgb(229 231 235);
 }
 
-@media (prefers-color-scheme: dark) {
-  .card {
-    background-color: rgb(31 41 55);
-    border-color: rgb(55 65 81);
-  }
+/* Dark mode for card */
+.dark .card {
+  background-color: rgb(31 41 55);
+  border-color: rgb(55 65 81);
 }
 
 /* Responsive table utilities */
@@ -22,25 +21,60 @@
     display: none;
   }
   
-  /* Hide overflow wrapper on mobile to prevent horizontal scroll */
+  /* Hide table wrapper container - show only cards */
+  .overflow-x-auto:has(.responsive-table) {
+    overflow-x: visible !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  
+  /* Make table display as card container */
   .responsive-table {
     overflow-x: visible !important;
+    display: block !important;
+    width: 100% !important;
+    border: none !important;
+    background: transparent !important;
   }
   
-  /* Make table rows display as cards */
+  .responsive-table tbody {
+    display: block !important;
+    width: 100% !important;
+    border: none !important;
+    background-color: transparent !important;
+  }
+  
+  /* Force tbody to be transparent in dark mode too */
+  .dark .responsive-table tbody {
+    background-color: transparent !important;
+  }
+  
+  /* Make table rows display as cards - SAME STYLING AS SONGS TAB */
   .responsive-table tbody tr {
-    display: block;
-    margin-bottom: 1rem;
-    border: 1px solid rgb(229 231 235);
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0.75rem;
+    background-color: rgb(255 255 255) !important;
+    border: 1px solid rgb(229 231 235) !important;
     border-radius: 0.5rem;
-    padding: 1rem;
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+    padding: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    box-sizing: border-box;
+    transition: all 0.2s ease-in-out;
   }
   
-  @media (prefers-color-scheme: dark) {
-    .responsive-table tbody tr {
-      border-color: rgb(55 65 81);
-    }
+  /* Dark mode for table cards - SAME STYLING AS SONGS TAB */
+  .dark .responsive-table tbody tr {
+    background-color: rgb(31 41 55) !important;
+    border-color: rgb(55 65 81) !important;
+  }
+  
+  /* Hover effect - SAME AS SONGS TAB */
+  .responsive-table tbody tr:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
   }
   
   /* Prevent table-wide width constraints on mobile */
@@ -65,10 +99,9 @@
     flex-shrink: 0;
   }
   
-  @media (prefers-color-scheme: dark) {
-    .responsive-table tbody td:before {
-      color: rgb(156 163 175);
-    }
+  /* Dark mode for labels */
+  .dark .responsive-table tbody td:before {
+    color: rgb(156 163 175);
   }
   
   /* Cell content area */
@@ -86,10 +119,9 @@
     border-top: 1px solid rgb(229 231 235);
   }
   
-  @media (prefers-color-scheme: dark) {
-    .responsive-table tbody td:last-child {
-      border-top-color: rgb(55 65 81);
-    }
+  /* Dark mode for actions border */
+  .dark .responsive-table tbody td:last-child {
+    border-top-color: rgb(55 65 81);
   }
   
   .responsive-table tbody td:last-child:before {
@@ -103,10 +135,135 @@
     gap: 0.5rem;
   }
   
-  /* Make buttons touch-friendly on mobile (44x44 minimum) */
+  /* Make buttons touch-friendly on mobile (40x40 for compact layout) */
   .responsive-table tbody td button {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0.5rem;
+  }
+
+  /* Pitch table specific mobile ordering */
+  .responsive-table tbody tr td:nth-child(1) {
+    order: 1; /* Song - first */
+  }
+  
+  .responsive-table tbody tr td:nth-child(2) {
+    order: 2; /* Singer - after song */
+  }
+  
+  .responsive-table tbody tr td:nth-child(3) {
+    order: 3; /* Pitch - after singer */
+  }
+  
+  .responsive-table tbody tr td:nth-child(4) {
+    order: 4; /* Actions - last */
+    border-top: 1px solid rgb(229 231 235);
+    border-bottom: none;
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+    padding-top: 0.75rem;
+    padding-bottom: 0;
+  }
+
+  .dark .responsive-table tbody tr td:nth-child(4) {
+    border-top-color: rgb(55 65 81);
+  }
+  
+  /* Hide "Actions" label on mobile */
+  .responsive-table tbody tr td:nth-child(4):before {
+    display: none;
+  }
+  
+  /* Stack all labels and values vertically for compact layout */
+  .responsive-table tbody tr td:nth-child(1),
+  .responsive-table tbody tr td:nth-child(2),
+  .responsive-table tbody tr td:nth-child(3) {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0;
+    margin-bottom: 0.5rem;
+  }
+  
+  .responsive-table tbody tr td:nth-child(1):before,
+  .responsive-table tbody tr td:nth-child(2):before,
+  .responsive-table tbody tr td:nth-child(3):before {
+    display: block;
+    margin-right: 0;
+    margin-bottom: 0;
+    width: 100%;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    line-height: 1.2;
+  }
+  
+  /* Hide Song label - show song name directly */
+  .responsive-table tbody tr td:nth-child(1):before {
+    display: none;
+  }
+  
+  .responsive-table tbody tr td:nth-child(1) > *,
+  .responsive-table tbody tr td:nth-child(2) > *,
+  .responsive-table tbody tr td:nth-child(3) > * {
+    text-align: left;
+    width: 100%;
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+  
+  /* Style song name like songs tab - large, bold heading */
+  .responsive-table tbody tr td:nth-child(1) {
+    margin-bottom: 0.5rem;
+  }
+  
+  .responsive-table tbody tr td:nth-child(1) > * {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  /* Singers table specific styles (2 columns: Name and Actions) */
+  .responsive-table tbody tr:has(td[data-label="Name"]):has(td[data-label="Actions"]) {
+    /* Reverse the order: Actions first, then Name */
+    display: flex;
+    flex-direction: column-reverse;
+  }
+  
+  /* Singer Actions (shown first on mobile) - only for 2-column Singers table */
+  .responsive-table tbody tr:has(td[data-label="Name"]) td[data-label="Actions"] {
+    order: 1;
+    display: block;
+    margin-bottom: 0.75rem;
+    padding: 0 0 0.75rem 0;
+    border-bottom: 1px solid rgb(229 231 235);
+  }
+
+  .dark .responsive-table tbody tr:has(td[data-label="Name"]) td[data-label="Actions"] {
+    border-bottom-color: rgb(55 65 81);
+  }
+  
+  /* Hide "Actions" label on singers mobile view */
+  .responsive-table tbody tr:has(td[data-label="Name"]) td[data-label="Actions"]:before {
+    display: none;
+  }
+  
+  /* Singer Name (shown second on mobile) */
+  .responsive-table tbody tr:has(td[data-label="Actions"]) td[data-label="Name"] {
+    order: 2;
+    padding: 0;
+    margin-bottom: 0;
+  }
+  
+  /* Hide "Name" label - just show the name directly */
+  .responsive-table tbody tr:has(td[data-label="Actions"]) td[data-label="Name"]:before {
+    display: none;
+  }
+  
+  /* Style the singer name text */
+  .responsive-table tbody tr:has(td[data-label="Actions"]) td[data-label="Name"] > div {
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.4;
   }
 }
 

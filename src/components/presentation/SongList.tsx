@@ -137,7 +137,7 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
             <button
               key={song.id}
               onClick={() => handleSongClick(song.id)}
-              className="w-full text-left p-4 sm:p-5 card hover:scale-[1.02] hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full text-left p-4 sm:p-5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md hover:scale-[1.02] hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">

@@ -168,8 +168,8 @@ export const SongManager: React.FC = () => {
               Create and manage your song library
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <div className="relative flex-1 sm:min-w-[260px]">
+          <div className="flex flex-col lg:flex-row gap-3 w-full">
+            <div className="relative flex-1 lg:min-w-[300px]">
               <input
                 type="text"
                 value={searchTerm}
@@ -191,12 +191,12 @@ export const SongManager: React.FC = () => {
                 />
               </svg>
             </div>
-            <div className="flex flex-row gap-2 justify-end">
+            <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
               <button
                 type="button"
                 onClick={() => fetchSongs(true)}
                 disabled={loading}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -211,7 +211,7 @@ export const SongManager: React.FC = () => {
               {isEditor && (
                 <button
                   onClick={handleCreateClick}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                  className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

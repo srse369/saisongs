@@ -487,8 +487,8 @@ export const CsvImportManager: React.FC = () => {
   
   return (
     <div className="space-y-6">
-      <div className="card p-6">
-        <h2 className="text-2xl font-bold mb-4">Singers and Pitches Import</h2>
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md p-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Singers and Pitches Import</h2>
         
         {/* Instructions Step */}
         {currentStep === 'instructions' && (

@@ -89,21 +89,28 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
         {songs.map((song) => (
           <div
             key={song.id}
-            className="card p-4 hover:shadow-lg transition-all duration-200"
+            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-200"
           >
-            <div className="flex items-start justify-between gap-4">
+            {/* Unified layout for all screen sizes */}
+            <div className="flex flex-col gap-3">
+              {/* Content Section - First */}
               <div className="flex-1 min-w-0">
+                {/* Song Name */}
                 <h3
                   className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-2 cursor-pointer hover:underline"
                   onClick={() => onView(song)}
                 >
                   {song.name}
                 </h3>
+
+                {/* Title 2 */}
                 {song.title2 && song.title2.trim().toLowerCase() !== song.name.trim().toLowerCase() && (
                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 italic">
                     {song.title2}
                   </p>
                 )}
+
+                {/* Raga and Beat (without tempo) */}
                 {(song.raga || song.beat) && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                     {song.raga && <span>Raga: {song.raga}</span>}
@@ -111,28 +118,27 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                     {song.beat && <span>Beat: {song.beat}</span>}
                   </p>
                 )}
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {song.language && (
-                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
-                      {song.language}
-                    </span>
-                  )}
+
+                {/* Deity, Language, and Tempo badges */}
+                <div className="flex flex-wrap gap-2 text-xs mb-2">
                   {song.deity && (
-                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 rounded font-medium">
                       {song.deity}
                     </span>
                   )}
+                  {song.language && (
+                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded font-medium">
+                      {song.language}
+                    </span>
+                  )}
                   {song.tempo && (
-                    <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
+                    <span className="px-2 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded font-medium">
                       {song.tempo}
                     </span>
                   )}
-                  {song.raga && (
-                    <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded">
-                      {song.raga}
-                    </span>
-                  )}
                 </div>
+
+                {/* Audio Player */}
                 {song.audioLink && (
                   <div className="mt-3">
                     <audio
@@ -146,12 +152,14 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                   </div>
                 )}
               </div>
-              <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
+
+              {/* Action Icons - Last with labels always visible */}
+              <div className="flex flex-wrap items-center justify-start gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => addSong(song.id)}
                   disabled={songIds.includes(song.id)}
                   title={songIds.includes(song.id) ? 'In Live' : 'Add to Live'}
-                  className="p-2 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 p-2 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {songIds.includes(song.id) ? (
@@ -160,49 +168,54 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     )}
                   </svg>
+                  <span className="text-sm font-medium whitespace-nowrap">Add to Session</span>
                 </button>
                 <button
                   onClick={() => handlePresent(song)}
                   title="Present"
-                  className="p-2 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+                  className="flex items-center gap-2 p-2 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
+                  <span className="text-sm font-medium whitespace-nowrap">Preview</span>
                 </button>
                 {/* Only show View Pitches button when authenticated (pitches contain private singer info) */}
                 {isAuthenticated && (
                   <button
                     onClick={() => handleViewPitches(song)}
                     title="View Pitches"
-                    className="p-2 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
+                    className="flex items-center gap-2 p-2 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                     </svg>
+                    <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
                   </button>
                 )}
                 {isEditor && (
                   <button
                     onClick={() => onEdit(song)}
                     title="Edit"
-                    className="p-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    className="flex items-center gap-2 p-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
+                    <span className="text-sm font-medium whitespace-nowrap">Edit</span>
                   </button>
                 )}
                 {isAdmin && (
                   <button
                     onClick={() => handleDeleteClick(song)}
                     title="Delete"
-                    className="p-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                    className="flex items-center gap-2 p-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
+                    <span className="text-sm font-medium whitespace-nowrap">Delete</span>
                   </button>
                 )}
               </div>

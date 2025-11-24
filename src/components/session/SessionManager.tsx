@@ -3,6 +3,7 @@ import { useSession } from '../../contexts/SessionContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
 import { useNamedSessions } from '../../contexts/NamedSessionContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import type { Song } from '../../types';
 import { Modal } from '../common/Modal';
@@ -13,7 +14,8 @@ export const SessionManager: React.FC = () => {
   const { entries, removeSong, clearSession, reorderSession, addSong } = useSession();
   const { songs } = useSongs();
   const { singers } = useSingers();
-  const { sessions, createSession, setSessionItems, loadSession, currentSession, loadSessions, loading } = useNamedSessions();
+  const { sessions, createSession, setSessionItems, loadSession, currentSession, loadSessions, loading, deleteSession } = useNamedSessions();
+  const { isEditor } = useAuth();
   const navigate = useNavigate();
 
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
@@ -24,6 +26,7 @@ export const SessionManager: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [loadingSession, setLoadingSession] = useState(false);
   const [sessionToLoad, setSessionToLoad] = useState<string | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
 
   const sessionItems = entries
     .map((entry) => {
@@ -60,12 +63,12 @@ export const SessionManager: React.FC = () => {
     navigate(`/presentation/${songId}${query ? `?${query}` : ''}`);
   };
 
-  const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, fromIndex: number) => {
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, fromIndex: number) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', String(fromIndex));
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLTableRowElement>, toIndex: number) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, toIndex: number) => {
     e.preventDefault();
     const fromIndexRaw = e.dataTransfer.getData('text/plain');
     const fromIndex = parseInt(fromIndexRaw, 10);
@@ -136,6 +139,28 @@ export const SessionManager: React.FC = () => {
       await loadSessions();
     } catch (error) {
       console.error('Error refreshing sessions:', error);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string, sessionName: string) => {
+    if (!window.confirm(`Are you sure you want to delete the session "${sessionName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingSessionId(sessionId);
+    try {
+      const success = await deleteSession(sessionId);
+      if (success) {
+        // Session was deleted successfully
+        await loadSessions(); // Refresh the list
+      } else {
+        alert('Failed to delete session. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      alert('Failed to delete session. Please try again.');
+    } finally {
+      setDeletingSessionId(null);
     }
   };
 
@@ -213,116 +238,115 @@ export const SessionManager: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-          <table className="responsive-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900/50">
-              <tr>
-                <th className="px-3 py-3 w-10 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  #
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Song
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Singer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Pitch
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Details
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {sessionItems.map(({ entry, song, singer }, index) => (
-                <tr
-                  key={`${entry.songId}-${entry.singerId ?? 'none'}`}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-800/70"
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => handleDrop(e, index)}
-                >
-                  <td data-label="#" className="px-3 py-4 w-10 whitespace-nowrap text-sm text-right text-gray-500 dark:text-gray-400">
+        <div className="space-y-3">
+          {sessionItems.map(({ entry, song, singer }, index) => (
+            <div
+              key={`${entry.songId}-${entry.singerId ?? 'none'}`}
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-200 cursor-move"
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => handleDrop(e, index)}
+            >
+              <div className="flex flex-col gap-3">
+                {/* Header with song number */}
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full font-bold text-sm">
                     {index + 1}
-                  </td>
-                  <td data-label="Song" className="px-6 py-4 whitespace-nowrap">
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {/* Song Name */}
                     <button
                       type="button"
                       onClick={() => setViewingSong(song)}
-                      className="text-left text-sm font-medium text-blue-700 dark:text-blue-300 hover:underline"
+                      className="text-left text-base sm:text-lg font-semibold text-blue-700 dark:text-blue-300 hover:underline mb-1"
                     >
                       {song.name}
                     </button>
-                    {song.language && (
-                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        {song.language}
-                      </div>
-                    )}
-                  </td>
-                  <td data-label="Singer" className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-gray-100">
-                      {singer ? singer.name : '—'}
-                    </div>
-                  </td>
-                  <td data-label="Pitch" className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-gray-100">
-                      {entry.pitch ? (
-                        <>
+                    
+                    {/* Singer and Pitch Info */}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+                      {singer && (
+                        <div className="flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{singer.name}</span>
+                        </div>
+                      )}
+                      {entry.pitch && (
+                        <div className="flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                          </svg>
                           <span className="font-bold text-blue-600 dark:text-blue-400">{formatPitch(entry.pitch)}</span>
-                          <span className="text-gray-500 dark:text-gray-400 ml-2">({entry.pitch.replace('#', '♯')})</span>
-                        </>
-                      ) : (
-                        '—'
+                          <span className="text-gray-500 dark:text-gray-400">({entry.pitch.replace('#', '♯')})</span>
+                        </div>
                       )}
                     </div>
-                  </td>
-                  <td data-label="Details" className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300 align-top">
-                    <div className="space-y-1">
-                      <div>Deity: {song.deity || '—'}</div>
-                      <div>Raga: {song.raga || '—'}</div>
-                      <div>Tempo: {song.tempo || '—'}</div>
+
+                    {/* Song Details */}
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {song.language && (
+                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded font-medium">
+                          {song.language}
+                        </span>
+                      )}
+                      {song.deity && (
+                        <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 rounded font-medium">
+                          {song.deity}
+                        </span>
+                      )}
+                      {song.raga && (
+                        <span className="px-2 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded font-medium">
+                          {song.raga}
+                        </span>
+                      )}
+                      {song.tempo && (
+                        <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 rounded font-medium">
+                          {song.tempo}
+                        </span>
+                      )}
                     </div>
-                  </td>
-                  <td data-label="Actions" className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        className="inline-flex items-center p-2 rounded-md text-gray-500 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 cursor-move transition-colors"
-                        title="Drag to reorder"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handlePresentSingle(song.id)}
-                        title="Present"
-                        className="inline-flex items-center p-2 rounded-md text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => removeSong(entry.songId, entry.singerId)}
-                        title="Remove"
-                        className="inline-flex items-center p-2 rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    className="flex items-center gap-2 p-2 rounded-md text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    title="Drag to reorder"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                    </svg>
+                    <span className="text-sm font-medium whitespace-nowrap">Reorder</span>
+                  </button>
+                  <button
+                    onClick={() => handlePresentSingle(song.id)}
+                    title="Present"
+                    className="flex items-center gap-2 p-2 rounded-md text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm font-medium whitespace-nowrap">Present</span>
+                  </button>
+                  <button
+                    onClick={() => removeSong(entry.songId, entry.singerId)}
+                    title="Remove"
+                    className="flex items-center gap-2 p-2 rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span className="text-sm font-medium whitespace-nowrap">Remove</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
       {viewingSong && (
@@ -447,24 +471,52 @@ export const SessionManager: React.FC = () => {
           ) : (
             <div className="max-h-96 overflow-y-auto space-y-2">
               {sessions.map((session) => (
-                <button
+                <div
                   key={session.id}
-                  onClick={() => handleLoadSession(session.id)}
-                  disabled={loadingSession}
-                  className="w-full text-left p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
                 >
-                  <div className="font-semibold text-gray-900 dark:text-white">
-                    {session.name}
-                  </div>
-                  {session.description && (
-                    <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      {session.description}
+                  <button
+                    onClick={() => handleLoadSession(session.id)}
+                    disabled={loadingSession || deletingSessionId === session.id}
+                    className="flex-1 text-left disabled:opacity-50"
+                  >
+                    <div className="font-semibold text-gray-900 dark:text-white">
+                      {session.name}
                     </div>
+                    {session.description && (
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {session.description}
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                      Last saved: {new Date(session.updatedAt).toLocaleString()}
+                    </div>
+                  </button>
+                  
+                  {isEditor && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSession(session.id, session.name);
+                      }}
+                      disabled={deletingSessionId === session.id || loadingSession}
+                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      title="Delete session"
+                      aria-label={`Delete ${session.name}`}
+                    >
+                      {deletingSessionId === session.id ? (
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      )}
+                    </button>
                   )}
-                  <div className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                    Last saved: {new Date(session.updatedAt).toLocaleString()}
-                  </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
