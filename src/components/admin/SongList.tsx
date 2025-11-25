@@ -4,6 +4,7 @@ import { Modal } from '../common/Modal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
+import { MusicIcon } from '../common';
 
 interface SongListProps {
   songs: Song[];
@@ -188,9 +189,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                     title="View Pitches"
                     className="flex items-center gap-2 p-2 text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                    </svg>
+                    <MusicIcon className="w-5 h-5" />
                     <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
                   </button>
                 )}

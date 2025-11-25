@@ -5,6 +5,10 @@ import { SongForm } from './SongForm';
 import { SongList } from './SongList';
 import { SongDetails } from './SongDetails';
 import { Modal } from '../common/Modal';
+import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
+import { AdvancedSongSearch, type SongSearchFilters } from '../common/AdvancedSongSearch';
+import { RefreshIcon } from '../common';
+import { createSongFuzzySearch, parseNaturalQuery } from '../../utils/smartSearch';
 import type { Song, CreateSongInput } from '../../types';
 
 export const SongManager: React.FC = () => {
@@ -24,8 +28,12 @@ export const SongManager: React.FC = () => {
   const [editingSong, setEditingSong] = useState<Song | null>(null);
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [advancedFilters, setAdvancedFilters] = useState<SongSearchFilters>({});
   const [visibleCount, setVisibleCount] = useState(50);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  // Create fuzzy search instance for fallback
+  const fuzzySearch = useMemo(() => createSongFuzzySearch(songs), [songs]);
 
   useEffect(() => {
     // Only fetch songs if we don't already have them loaded.
@@ -79,8 +87,8 @@ export const SongManager: React.FC = () => {
     await deleteSong(id);
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
   };
 
   // Clear search when Escape key is pressed while on this tab
@@ -88,6 +96,7 @@ export const SongManager: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSearchTerm('');
+        setAdvancedFilters({});
       }
     };
 
@@ -96,35 +105,94 @@ export const SongManager: React.FC = () => {
   }, []);
 
   const filteredSongs = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return songs;
+    let results = songs;
 
-    return songs.filter((song) => {
-      // Note: lyrics, meaning, and songTags are not included in search
-      // because they're not loaded in the list view (only in detail view)
-      const fields = [
-        song.name,
-        song.title,
-        song.title2,
-        song.language,
-        song.deity,
-        song.tempo,
-        song.beat,
-        song.raga,
-        song.level,
-        song.externalSourceUrl,
-      ];
-
-      return fields.some((field) =>
-        field ? field.toString().toLowerCase().includes(query) : false
+    // Apply advanced filters first (field-specific)
+    if (advancedFilters.name) {
+      results = results.filter(song => 
+        song.name.toLowerCase().includes(advancedFilters.name!.toLowerCase())
       );
-    });
-  }, [songs, searchTerm]);
+    }
+    if (advancedFilters.title) {
+      results = results.filter(song => 
+        song.title?.toLowerCase().includes(advancedFilters.title!.toLowerCase())
+      );
+    }
+    if (advancedFilters.deity) {
+      results = results.filter(song => 
+        song.deity?.toLowerCase().includes(advancedFilters.deity!.toLowerCase())
+      );
+    }
+    if (advancedFilters.language) {
+      results = results.filter(song => 
+        song.language?.toLowerCase().includes(advancedFilters.language!.toLowerCase())
+      );
+    }
+    if (advancedFilters.raga) {
+      results = results.filter(song => 
+        song.raga?.toLowerCase().includes(advancedFilters.raga!.toLowerCase())
+      );
+    }
+    if (advancedFilters.tempo) {
+      results = results.filter(song => 
+        song.tempo?.toLowerCase().includes(advancedFilters.tempo!.toLowerCase())
+      );
+    }
+    if (advancedFilters.beat) {
+      results = results.filter(song => 
+        song.beat?.toLowerCase().includes(advancedFilters.beat!.toLowerCase())
+      );
+    }
+    if (advancedFilters.level) {
+      results = results.filter(song => 
+        song.level?.toLowerCase().includes(advancedFilters.level!.toLowerCase())
+      );
+    }
+    if (advancedFilters.songTags) {
+      results = results.filter(song => 
+        song.songTags?.toLowerCase().includes(advancedFilters.songTags!.toLowerCase())
+      );
+    }
+
+    // Apply smart search with natural language parsing and fuzzy matching
+    const query = searchTerm.trim();
+    if (!query) return results;
+
+    // Parse natural language query
+    const parsed = parseNaturalQuery(query);
+
+    // Apply parsed filters
+    if (parsed.deity) {
+      results = results.filter(s => s.deity?.toLowerCase().includes(parsed.deity!));
+    }
+    if (parsed.language) {
+      results = results.filter(s => s.language?.toLowerCase().includes(parsed.language!));
+    }
+    if (parsed.raga) {
+      results = results.filter(s => s.raga?.toLowerCase().includes(parsed.raga!));
+    }
+    if (parsed.tempo) {
+      results = results.filter(s => s.tempo?.toLowerCase().includes(parsed.tempo!));
+    }
+    if (parsed.level) {
+      results = results.filter(s => s.level?.toLowerCase().includes(parsed.level!));
+    }
+
+    // Use fuzzy search for remaining general terms
+    if (parsed.general || (!parsed.deity && !parsed.language && !parsed.raga && !parsed.tempo && !parsed.level)) {
+      const searchQuery = parsed.general || query;
+      const fuzzyResults = fuzzySearch.search(searchQuery);
+      const fuzzyIds = new Set(fuzzyResults.map(r => r.item.id));
+      results = results.filter(s => fuzzyIds.has(s.id));
+    }
+
+    return results;
+  }, [songs, searchTerm, advancedFilters, fuzzySearch]);
 
   // Reset visible songs when search or underlying list changes
   useEffect(() => {
     setVisibleCount(50);
-  }, [searchTerm, songs.length]);
+  }, [searchTerm, advancedFilters, songs.length]);
 
   const displayedSongs = useMemo(
     () => filteredSongs.slice(0, visibleCount),
@@ -169,28 +237,16 @@ export const SongManager: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-col lg:flex-row gap-3 w-full">
-            <div className="relative flex-1 lg:min-w-[300px]">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={handleSearchChange}
-                placeholder="Search by name, title, lyrics, language, deity..."
-                className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
-              />
-              <svg
-                className="w-4 h-4 text-gray-400 absolute left-3 top-2.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-4.35-4.35M9.5 17a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
-                />
-              </svg>
-            </div>
+            <WebLLMSearchInput
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onFiltersExtracted={(filters) => {
+                // Merge AI-extracted filters with existing advanced filters
+                setAdvancedFilters(prev => ({ ...prev, ...filters }));
+              }}
+              searchType="song"
+              placeholder='Ask AI: "Show me sai songs in sanskrit with fast tempo"...'
+            />
             <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
               <button
                 type="button"
@@ -198,14 +254,7 @@ export const SongManager: React.FC = () => {
                 disabled={loading}
                 className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h5M20 20v-5h-5M5.455 19.545A8 8 0 0115 5.34M18.545 4.455A8 8 0 019 18.66"
-                  />
-                </svg>
+                <RefreshIcon className="w-4 h-4" />
                 Refresh
               </button>
               {isEditor && (
@@ -221,6 +270,13 @@ export const SongManager: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Advanced Search */}
+          <AdvancedSongSearch
+            filters={advancedFilters}
+            onFiltersChange={setAdvancedFilters}
+            onClear={() => setAdvancedFilters({})}
+          />
         </div>
 
         {error && (

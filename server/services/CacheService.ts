@@ -622,47 +622,37 @@ class CacheService {
     const cacheKey = 'pitches:all';
     const cached = this.get(cacheKey);
     
-    // Check if cached data has proper field normalization (migration safety)
-    if (cached && Array.isArray(cached) && cached.length > 0) {
-      // Verify cache has normalized fields
-      if (cached[0].song_id !== undefined && cached[0].singer_id !== undefined) {
-        return cached;
-      } else {
-        console.log('⚠️  Cache has old format, invalidating...');
-        this.invalidate(cacheKey);
-      }
+    // Return cached data if available
+    if (cached && Array.isArray(cached)) {
+      return cached;
     }
 
+    // OPTIMIZED: No JOIN - fetch IDs only, names looked up client-side
     const db = await this.getDatabase();
     const pitches = await db.query(`
       SELECT 
-        RAWTOHEX(ssp.id) as id,
-        RAWTOHEX(ssp.song_id) as song_id,
-        RAWTOHEX(ssp.singer_id) as singer_id,
-        ssp.pitch,
-        s.name as song_name,
-        si.name as singer_name,
-        ssp.created_at,
-        ssp.updated_at
-      FROM song_singer_pitches ssp
-      JOIN songs s ON ssp.song_id = s.id
-      JOIN singers si ON ssp.singer_id = si.id
-      ORDER BY s.name, si.name
+        RAWTOHEX(id) as id,
+        RAWTOHEX(song_id) as song_id,
+        RAWTOHEX(singer_id) as singer_id,
+        pitch,
+        created_at,
+        updated_at
+      FROM song_singer_pitches
+      ORDER BY created_at DESC
     `);
 
-
     // Normalize field names (Oracle returns uppercase)
+    // Client will lookup song_name and singer_name from cached songs/singers
     const normalizedPitches = pitches.map((p: any) => ({
       id: p.id || p.ID,
       song_id: p.song_id || p.SONG_ID,
       singer_id: p.singer_id || p.SINGER_ID,
       pitch: p.pitch || p.PITCH,
-      song_name: p.song_name || p.SONG_NAME,
-      singer_name: p.singer_name || p.SINGER_NAME,
+      song_name: null,  // Client-side lookup
+      singer_name: null,  // Client-side lookup
       created_at: p.created_at || p.CREATED_AT,
       updated_at: p.updated_at || p.UPDATED_AT,
     }));
-
 
     this.set(cacheKey, normalizedPitches, 5 * 60 * 1000);
     return normalizedPitches;
@@ -1541,30 +1531,29 @@ export async function warmupCache(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, 500));
 
   try {
+    // OPTIMIZED: Fetch pitches WITHOUT JOINS to reduce recursive SQL
+    // We already have songs and singers cached, so we can lookup names client-side
     const pitches = await databaseService.query(`
       SELECT 
-        RAWTOHEX(ssp.id) as id,
-        RAWTOHEX(ssp.song_id) as song_id,
-        RAWTOHEX(ssp.singer_id) as singer_id,
-        ssp.pitch,
-        s.name as song_name,
-        si.name as singer_name,
-        ssp.created_at,
-        ssp.updated_at
-      FROM song_singer_pitches ssp
-      JOIN songs s ON ssp.song_id = s.id
-      JOIN singers si ON ssp.singer_id = si.id
-      ORDER BY s.name, si.name
+        RAWTOHEX(id) as id,
+        RAWTOHEX(song_id) as song_id,
+        RAWTOHEX(singer_id) as singer_id,
+        pitch,
+        created_at,
+        updated_at
+      FROM song_singer_pitches
+      ORDER BY created_at DESC
     `);
 
     // Normalize field names (Oracle returns uppercase) for cache consistency
+    // NOTE: song_name and singer_name will be null - client should lookup from cached songs/singers
     const normalizedPitches = pitches.map((p: any) => ({
       id: p.id || p.ID,
       song_id: p.song_id || p.SONG_ID,
       singer_id: p.singer_id || p.SINGER_ID,
       pitch: p.pitch || p.PITCH,
-      song_name: p.song_name || p.SONG_NAME,
-      singer_name: p.singer_name || p.SINGER_NAME,
+      song_name: null,  // Lookup client-side from cached songs
+      singer_name: null,  // Lookup client-side from cached singers
       created_at: p.created_at || p.CREATED_AT,
       updated_at: p.updated_at || p.UPDATED_AT,
     }));

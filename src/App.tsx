@@ -294,28 +294,6 @@ function HomePage() {
           </>
         )}
       </div>
-
-      <div className="mt-8 sm:mt-12 lg:mt-16 bg-blue-50 dark:bg-gray-800 rounded-lg p-6 sm:p-8 max-w-4xl mx-auto border border-blue-100 dark:border-gray-700">
-        <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-4 sm:mb-6">Quick Start Guide</h3>
-        <ul className="space-y-3 text-sm sm:text-base text-gray-700 dark:text-gray-300">
-          <li className="flex items-start">
-            <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-blue-600 text-white rounded-full text-xs font-bold mr-3 mt-0.5">1</span>
-            <span>Add songs with lyrics and translations in the Manage Songs section</span>
-          </li>
-          <li className="flex items-start">
-            <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-blue-600 text-white rounded-full text-xs font-bold mr-3 mt-0.5">2</span>
-            <span>Create singer profiles in the Manage Singers section</span>
-          </li>
-          <li className="flex items-start">
-            <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-blue-600 text-white rounded-full text-xs font-bold mr-3 mt-0.5">3</span>
-            <span>Associate pitch information with songs and singers</span>
-          </li>
-          <li className="flex items-start">
-            <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-blue-600 text-white rounded-full text-xs font-bold mr-3 mt-0.5">4</span>
-            <span>Start a session and present songs with keyboard navigation support (← → arrows)</span>
-          </li>
-        </ul>
-      </div>
     </div>
   );
 }

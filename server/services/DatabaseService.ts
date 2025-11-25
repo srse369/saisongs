@@ -20,6 +20,8 @@ class DatabaseService {
   private pool: oracledb.Pool | null = null;
   private connectionConfig: oracledb.PoolAttributes;
   private initializingPool: Promise<void> | null = null;
+  private activeConnections: Set<oracledb.Connection> = new Set();
+  private connectionTimeout: NodeJS.Timeout | null = null;
 
   constructor() {
     // Determine wallet path - use absolute path in production, relative in development
@@ -51,16 +53,17 @@ class DatabaseService {
       walletLocation: walletLocation,
       walletPassword: walletPassword,
       poolMin: 0,                   // Start with 0 connections (create on-demand)
-      poolMax: 2,                   // Reduced to 2 to minimize recursive SQL
+      poolMax: 1,                   // EMERGENCY: Reduced to 1 until session leak is fixed
       poolIncrement: 1,             // Add 1 connection at a time
-      poolTimeout: 60,              // Wait 60 seconds for connection from pool
-      queueTimeout: 5000,           // Reduced to 5 seconds (FAIL FAST to prevent queue buildup)
+      poolTimeout: 30,              // Reduced to 30 seconds
+      queueTimeout: 3000,           // Reduced to 3 seconds (FAIL FAST to prevent queue buildup)
       connectTimeout: 10000,        // Reduced to 10 seconds (FAIL FAST)
       enableStatistics: true,       // Enable pool statistics
       _enableStats: true,           // Internal stats
       poolAlias: 'songstudio_pool', // Named pool for monitoring
       stmtCacheSize: 0,             // Disable statement caching to reduce memory
-      poolPingInterval: 0,          // DISABLED - reduces recursive SQL from health checks
+      poolPingInterval: -1,         // DISABLED - negative value prevents any pinging
+      sessionCallback: undefined,   // No session callbacks to prevent leaks
     };
 
     if (!this.connectionConfig.user || !this.connectionConfig.password || !this.connectionConfig.connectString) {
@@ -71,6 +74,9 @@ class DatabaseService {
     // Configure Oracle client for optimal performance
     oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
     oracledb.autoCommit = true;
+    
+    // Set up periodic idle connection cleanup (every 2 minutes)
+    setInterval(() => this.cleanupIdleConnections(), 2 * 60 * 1000);
   }
 
   /**
@@ -158,8 +164,14 @@ class DatabaseService {
     }
 
     let connection: oracledb.Connection | undefined;
+    const connectionStartTime = Date.now();
+    
     try {
       connection = await this.pool.getConnection();
+      
+      // Track active connection
+      this.activeConnections.add(connection);
+      
       const result = await connection.execute(sql, params, {
         outFormat: oracledb.OUT_FORMAT_OBJECT,
         autoCommit: true,
@@ -170,8 +182,28 @@ class DatabaseService {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Database query error:', errorMessage);
       
-      // Check for quota/connection limit errors
-      if (errorMessage.includes('quota') || 
+      // Handle specific Oracle error: ORA-00018: maximum number of sessions exceeded
+      if (errorMessage.includes('ORA-00018') || errorMessage.includes('sessions exceeded')) {
+        console.error('🚨 CRITICAL: Maximum Oracle sessions exceeded!');
+        console.error('   This usually means hung sessions are accumulating.');
+        console.error('   ACTION REQUIRED:');
+        console.error('   1. Run: database/kill-hung-sessions.sql in Oracle SQL Developer');
+        console.error('   2. Or contact DB admin to kill idle sessions');
+        console.error('   3. Consider increasing session limit in Oracle');
+        
+        // Try to force pool reconfiguration to clean up
+        if (this.pool) {
+          try {
+            await this.pool.reconfigure({
+              poolMin: 0,
+              poolMax: 1, // Temporarily reduce to 1
+            });
+            console.log('   ↻ Attempted pool cleanup - reducing max connections to 1');
+          } catch (reconfigError) {
+            console.error('   ⚠️  Pool cleanup failed:', reconfigError);
+          }
+        }
+      } else if (errorMessage.includes('quota') || 
           errorMessage.includes('QUOTA') ||
           errorMessage.includes('exceeded') ||
           errorMessage.includes('limit') ||
@@ -185,10 +217,27 @@ class DatabaseService {
     } finally {
       if (connection) {
         try {
+          // Remove from active tracking
+          this.activeConnections.delete(connection);
+          
+          // Always close connection, even if there was an error
           await connection.close();
+          
+          // Log if connection was held for a long time
+          const connectionDuration = Date.now() - connectionStartTime;
+          if (connectionDuration > 5000) {
+            console.warn(`⚠️  Connection held for ${connectionDuration}ms`);
+          }
         } catch (err) {
           console.error('Error closing connection:', err);
+          // Force remove from tracking even if close failed
+          this.activeConnections.delete(connection);
         }
+      }
+      
+      // Log active connection count if it's concerning
+      if (this.activeConnections.size > 0) {
+        console.warn(`⚠️  ${this.activeConnections.size} connections still active`);
       }
     }
   }
@@ -211,10 +260,79 @@ class DatabaseService {
       await this.query('SELECT 1 FROM DUAL');
       const duration = Date.now() - startTime;
       console.log(`✅ Database connection test successful (${duration}ms)`);
+      
+      // Check Oracle session limits (useful for debugging ORA-00018 errors)
+      try {
+        const sessionInfo = await this.query<any>(`
+          SELECT COUNT(*) as current_sessions
+          FROM v$session 
+          WHERE username = USER
+        `);
+        
+        if (sessionInfo.length > 0) {
+          const current = sessionInfo[0].CURRENT_SESSIONS || sessionInfo[0].current_sessions || 0;
+          console.log(`📊 Oracle sessions: ${current} active`);
+          
+          if (current > 10) {
+            console.warn(`⚠️  WARNING: ${current} sessions active - possible leak!`);
+          }
+        }
+      } catch (sessionCheckError) {
+        // Session check is optional - don't fail if we can't check
+        console.log('ℹ️  Unable to check session count');
+      }
+      
       return true;
     } catch (error) {
       console.error('❌ Database connection test failed:', error instanceof Error ? error.message : error);
       return false;
+    }
+  }
+
+  /**
+   * Clean up idle connections and check pool health
+   * This helps prevent "maximum sessions exceeded" errors
+   */
+  private async cleanupIdleConnections(): Promise<void> {
+    if (!this.pool) return;
+    
+    try {
+      // Get pool statistics
+      const poolStats = this.pool.getStatistics();
+      const openConnections = poolStats?.connectionsOpen || 0;
+      const inUse = poolStats?.connectionsInUse || 0;
+      const poolAvailable = poolStats?.connectionsInPool || 0;
+      
+      console.log(`🔍 Pool health: ${openConnections} open, ${inUse} in use, ${poolAvailable} available, ${this.activeConnections.size} tracked`);
+      
+      // Force close any tracked connections that might be stuck
+      if (this.activeConnections.size > 0) {
+        console.warn(`⚠️  Force-closing ${this.activeConnections.size} tracked connections`);
+        for (const conn of this.activeConnections) {
+          try {
+            await conn.close();
+          } catch (err) {
+            console.error('Error force-closing tracked connection:', err);
+          }
+        }
+        this.activeConnections.clear();
+      }
+      
+      // Warning if pool has too many connections
+      if (openConnections > 3) {
+        console.warn(`🚨 WARNING: ${openConnections} connections open - potential leak!`);
+      }
+      
+      // Force pool to reconfigure to ensure clean state
+      // This triggers Oracle to close unused connections
+      await this.pool.reconfigure({
+        poolMin: 0,
+        poolMax: 1, // Keep at 1 until leak is fixed
+      });
+      
+    } catch (error) {
+      // Don't throw - this is a background maintenance task
+      console.error('Pool cleanup warning:', error instanceof Error ? error.message : error);
     }
   }
 

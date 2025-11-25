@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSingers } from '../../contexts/SingerContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { RefreshIcon } from '../common';
 import { SingerForm } from './SingerForm';
 import { SingerList } from './SingerList';
 import { Modal } from '../common/Modal';
@@ -118,14 +119,7 @@ export const SingerManager: React.FC = () => {
                 disabled={loading}
                 className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h5M20 20v-5h-5M5.455 19.545A8 8 0 0115 5.34M18.545 4.455A8 8 0 019 18.66"
-                  />
-                </svg>
+                <RefreshIcon className="w-4 h-4" />
                 Refresh
               </button>
               {isEditor && (

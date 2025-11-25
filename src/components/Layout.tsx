@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../contexts/AuthContext';
+import { MusicIcon, SongIcon } from './common';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -52,9 +53,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Home
               </Link>
               <Link to="/admin/songs" className={getLinkClasses('/admin/songs')}>
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                </svg>
+                <SongIcon className="w-4 h-4 mr-1.5" />
                 Songs
               </Link>
               
@@ -68,11 +67,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     Singers
                   </Link>
                   <Link to="/admin/pitches" className={getLinkClasses('/admin/pitches')}>
-                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                      <circle cx="15" cy="15" r="1" fill="currentColor" />
-                      <circle cx="15" cy="12" r="1" fill="currentColor" />
-                    </svg>
+                    <MusicIcon className="w-4 h-4 mr-1.5" />
                     Pitches
                   </Link>
                 </>
@@ -242,9 +237,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className={`block ${getLinkClasses('/admin/songs')}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                </svg>
+                <SongIcon className="w-5 h-5 mr-2 inline" />
                 Songs
               </Link>
               
@@ -266,11 +259,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     className={`block ${getLinkClasses('/admin/pitches')}`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                      <circle cx="15" cy="15" r="1" fill="currentColor" />
-                      <circle cx="15" cy="12" r="1" fill="currentColor" />
-                    </svg>
+                    <MusicIcon className="w-5 h-5 mr-2 inline" />
                     Pitches
                   </Link>
                 </>
