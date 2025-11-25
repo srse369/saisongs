@@ -26,6 +26,7 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [hasWebGPU, setHasWebGPU] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setHasWebGPU(checkWebGPUSupport());
@@ -75,12 +76,33 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
       const service = getWebLLMService();
       const result: LLMSearchResult = await service.parseNaturalLanguageQuery(value, searchType);
       
-      if (onFiltersExtracted && Object.keys(result.filters).length > 0) {
-        onFiltersExtracted(result.filters);
+      console.log('🤖 AI Search Result:', {
+        query: value,
+        searchType,
+        extractedFilters: result.filters,
+        filterCount: Object.keys(result.filters).length
+      });
+      
+      if (onFiltersExtracted) {
+        if (Object.keys(result.filters).length > 0) {
+          console.log('✅ Applying filters:', result.filters);
+          onFiltersExtracted(result.filters);
+          
+          // Show success message
+          const filterCount = Object.keys(result.filters).length;
+          const filterNames = Object.keys(result.filters).join(', ');
+          setSuccessMessage(`✨ Applied ${filterCount} filter${filterCount > 1 ? 's' : ''}: ${filterNames}`);
+          
+          // Clear success message after 5 seconds
+          setTimeout(() => setSuccessMessage(null), 5000);
+        } else {
+          console.log('⚠️ No filters extracted from query');
+          setError('No filters found. Try being more specific (e.g., "Show C# pitches for Sai songs")');
+        }
       }
     } catch (err) {
       setError('AI search failed. Using regular search instead.');
-      console.error(err);
+      console.error('❌ AI Search Error:', err);
     } finally {
       setIsProcessing(false);
     }
@@ -204,6 +226,16 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
         </div>
       )}
 
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 flex items-start gap-2 animate-fade-in">
+          <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          <span className="text-sm text-green-800 dark:text-green-300">{successMessage}</span>
+        </div>
+      )}
+
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start gap-2">
@@ -214,15 +246,52 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
         </div>
       )}
 
+      {/* Ask AI Button - only show when AI is enabled and there's a query */}
+      {llmEnabled && value.trim() && !isLoading && (
+        <button
+          onClick={handleSearch}
+          disabled={isProcessing}
+          className="w-full sm:w-auto px-4 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-2"
+        >
+          {isProcessing ? (
+            <>
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Processing...
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Ask AI (or press Enter)
+            </>
+          )}
+        </button>
+      )}
+
       {/* AI Hint */}
-      {llmEnabled && !isProcessing && (
+      {llmEnabled && !isProcessing && !value.trim() && (
         <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
           <p className="text-xs text-purple-900 dark:text-purple-100 font-medium mb-1">💡 AI Search Examples:</p>
           <ul className="text-xs text-purple-700 dark:text-purple-300 space-y-1">
-            <li>• "Show me all sai bhajans in sanskrit with slow tempo"</li>
-            <li>• "I want devi songs that are simple level"</li>
-            <li>• "Find hamsadhwani raga songs"</li>
-            <li>• "C# pitch for any singer"</li>
+            {searchType === 'song' ? (
+              <>
+                <li>• "Show me sai bhajans in sanskrit with slow tempo"</li>
+                <li>• "Find hamsadhwani raga songs"</li>
+                <li>• "Devi songs that are simple level"</li>
+                <li>• "Fast tempo krishna songs in mohanam raga"</li>
+              </>
+            ) : (
+              <>
+                <li>• "Show me C# pitches for sai songs"</li>
+                <li>• "Find pitches for devi songs in hamsadhwani raga"</li>
+                <li>• "D# pitch for sanskrit songs"</li>
+                <li>• "Which singers have krishna bhajans"</li>
+              </>
+            )}
           </ul>
         </div>
       )}
