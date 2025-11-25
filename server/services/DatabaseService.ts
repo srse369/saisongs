@@ -56,8 +56,8 @@ class DatabaseService {
       poolMax: 1,                   // EMERGENCY: Reduced to 1 until session leak is fixed
       poolIncrement: 1,             // Add 1 connection at a time
       poolTimeout: 30,              // Reduced to 30 seconds
-      queueTimeout: 3000,           // Reduced to 3 seconds (FAIL FAST to prevent queue buildup)
-      connectTimeout: 10000,        // Reduced to 10 seconds (FAIL FAST)
+      queueTimeout: 10000,           // 5 seconds (increased for local development)
+      connectTimeout: 20000,        // Reduced to 10 seconds (FAIL FAST)
       enableStatistics: true,       // Enable pool statistics
       _enableStats: true,           // Internal stats
       poolAlias: 'songstudio_pool', // Named pool for monitoring

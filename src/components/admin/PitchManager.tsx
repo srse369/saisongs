@@ -55,6 +55,36 @@ export const PitchManager: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(100);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
+  // Sync advanced filters with URL parameters (when navigating from Songs/Singers tab)
+  useEffect(() => {
+    const newFilters: PitchSearchFilters = {};
+    
+    if (songFilterId && songs.length > 0) {
+      const song = songs.find(s => s.id === songFilterId);
+      if (song) {
+        newFilters.songName = song.name;
+      }
+    }
+    
+    if (singerFilterId && singers.length > 0) {
+      const singer = singers.find(s => s.id === singerFilterId);
+      if (singer) {
+        newFilters.singerName = singer.name;
+      }
+    }
+    
+    // Only update if we have filters to set and they're different from current
+    if (Object.keys(newFilters).length > 0) {
+      setAdvancedFilters(prev => {
+        // Only update if the values are actually different
+        const hasChanges = Object.entries(newFilters).some(([key, value]) => 
+          prev[key as keyof PitchSearchFilters] !== value
+        );
+        return hasChanges ? { ...prev, ...newFilters } : prev;
+      });
+    }
+  }, [songFilterId, singerFilterId, songs, singers]);
+
   // Fetch songs, singers, and all existing pitch associations when needed.
   // We avoid refetching on every tab entry by only loading when the in-memory
   // collections are empty (e.g. first load or after a full reload).
@@ -286,6 +316,24 @@ export const PitchManager: React.FC = () => {
               value={searchTerm}
               onChange={(value) => setSearchTerm(value)}
               onFiltersExtracted={(filters) => {
+                // If AI extracts songName/singerName filters, clear URL params to avoid conflicts
+                const next = new URLSearchParams(searchParams);
+                let urlChanged = false;
+                
+                if (filters.songName && songFilterId) {
+                  next.delete('songId');
+                  urlChanged = true;
+                }
+                
+                if (filters.singerName && singerFilterId) {
+                  next.delete('singerId');
+                  urlChanged = true;
+                }
+                
+                if (urlChanged) {
+                  setSearchParams(next);
+                }
+                
                 // Merge AI-extracted filters with existing advanced filters
                 setAdvancedFilters(prev => ({ ...prev, ...filters }));
               }}
@@ -324,8 +372,39 @@ export const PitchManager: React.FC = () => {
           {/* Advanced Search */}
           <AdvancedPitchSearch
             filters={advancedFilters}
-            onFiltersChange={setAdvancedFilters}
-            onClear={() => setAdvancedFilters({})}
+            onFiltersChange={(newFilters) => {
+              // If user manually changes songName/singerName in advanced search,
+              // clear the corresponding URL param to avoid confusion
+              const next = new URLSearchParams(searchParams);
+              let urlChanged = false;
+              
+              // Get current song/singer names from URL filters
+              const currentSongName = songFilterId 
+                ? songs.find(s => s.id === songFilterId)?.name 
+                : undefined;
+              const currentSingerName = singerFilterId 
+                ? singers.find(s => s.id === singerFilterId)?.name 
+                : undefined;
+              
+              // If songName filter changed and doesn't match URL filter, clear URL param
+              if (newFilters.songName !== currentSongName && songFilterId) {
+                next.delete('songId');
+                urlChanged = true;
+              }
+              
+              // If singerName filter changed and doesn't match URL filter, clear URL param
+              if (newFilters.singerName !== currentSingerName && singerFilterId) {
+                next.delete('singerId');
+                urlChanged = true;
+              }
+              
+              if (urlChanged) {
+                setSearchParams(next);
+              }
+              
+              setAdvancedFilters(newFilters);
+            }}
+            onClear={handleClearFilters}
           />
         </div>
       </div>
