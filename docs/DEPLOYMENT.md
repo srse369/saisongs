@@ -63,10 +63,10 @@ PORT=3001
 HOST=0.0.0.0
 
 # Oracle Database
-VITE_ORACLE_USER=your_username
-VITE_ORACLE_PASSWORD=your_password
-VITE_ORACLE_CONNECT_STRING=your_connection_string
-VITE_ORACLE_WALLET_PASSWORD=your_wallet_password
+ORACLE_USER=your_username
+ORACLE_PASSWORD=your_password
+ORACLE_CONNECT_STRING=your_connection_string
+ORACLE_WALLET_PASSWORD=your_wallet_password
 
 # Admin access
 ADMIN_PASSWORD=your_admin_password

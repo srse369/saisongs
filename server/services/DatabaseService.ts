@@ -53,6 +53,8 @@ class DatabaseService {
       walletLocation: walletLocation,
       walletPassword: walletPassword,
       poolMin: 0,                   // Start with 0 connections (create on-demand)
+      // TODO: Increase poolMax once session leak is resolved. See TROUBLESHOOTING.md for details.
+      // Normal production value should be 3-5 for Oracle Free Tier (20 connection limit).
       poolMax: 1,                   // EMERGENCY: Reduced to 1 until session leak is fixed
       poolIncrement: 1,             // Add 1 connection at a time
       poolTimeout: 30,              // Reduced to 30 seconds

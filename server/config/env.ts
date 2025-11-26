@@ -28,14 +28,13 @@ dotenv.config({ path: envLocalPath });
 dotenv.config({ path: envPath });
 
 console.log('🔐 Environment loaded:');
-console.log('   ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD ? `SET (${process.env.ADMIN_PASSWORD.length} chars)` : 'NOT SET');
-console.log('   EDITOR_PASSWORD:', process.env.EDITOR_PASSWORD ? `SET (${process.env.EDITOR_PASSWORD.length} chars)` : 'NOT SET');
-console.log('   VIEWER_PASSWORD:', process.env.VIEWER_PASSWORD ? `SET (${process.env.VIEWER_PASSWORD.length} chars)` : 'NOT SET');
+console.log('   ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD ? 'SET' : 'NOT SET');
+console.log('   EDITOR_PASSWORD:', process.env.EDITOR_PASSWORD ? 'SET' : 'NOT SET');
+console.log('   VIEWER_PASSWORD:', process.env.VIEWER_PASSWORD ? 'SET' : 'NOT SET');
 
 // Validate that at least one password is set
 if (!process.env.ADMIN_PASSWORD && !process.env.EDITOR_PASSWORD && !process.env.VIEWER_PASSWORD) {
   console.warn('⚠️  WARNING: No authentication passwords configured!');
   console.warn('⚠️  Set ADMIN_PASSWORD, EDITOR_PASSWORD, or VIEWER_PASSWORD in your .env file');
-  console.warn('⚠️  Authentication will not work until passwords are configured');
 }
 

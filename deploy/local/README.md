@@ -1,26 +1,54 @@
 # Local Development Scripts
 
-Scripts for managing Song Studio in local development mode.
+Single script for managing Song Studio in local development mode.
 
 ## Quick Start
 
 ```bash
 # Start all services (frontend + backend)
-./deploy/local/start.sh
+./deploy/local/dev.sh start
 
 # Check status
-./deploy/local/status.sh
+./deploy/local/dev.sh status
 
 # View logs
-./deploy/local/logs.sh -f
+./deploy/local/dev.sh logs -f
 
 # Stop all services
-./deploy/local/stop.sh
+./deploy/local/dev.sh stop
 ```
 
-## Scripts
+## Usage
 
-### `start.sh`
+```bash
+./deploy/local/dev.sh <command> [options]
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `start` | Start frontend and backend servers |
+| `stop` | Stop all services |
+| `restart` | Restart all services |
+| `status` | Show service status |
+| `logs` | View logs (with options) |
+
+### Log Options
+
+| Option | Description |
+|--------|-------------|
+| `frontend`, `fe` | Show only frontend logs |
+| `backend`, `be` | Show only backend logs |
+| `-f`, `--follow` | Follow logs in real-time |
+| `-n`, `--lines N` | Show last N lines (default: 50) |
+
+---
+
+## Command Details
+
+### `start`
+
 Starts both frontend and backend servers in the background.
 
 **What it does:**
@@ -31,12 +59,7 @@ Starts both frontend and backend servers in the background.
 - Saves PIDs to `logs/frontend.pid` and `logs/backend.pid`
 - Offers to show live logs
 
-**Usage:**
-```bash
-./deploy/local/start.sh
-```
-
-**Output:**
+**Example output:**
 ```
 🚀 Starting Song Studio (Local Development)
 ==========================================
@@ -60,16 +83,10 @@ Starts both frontend and backend servers in the background.
    API:      http://localhost:3001/api
 ```
 
-**Features:**
-- Detects if services are already running
-- Offers to kill and restart existing services
-- Creates log files automatically
-- Handles errors gracefully
-- Optional live log viewing
-
 ---
 
-### `stop.sh`
+### `stop`
+
 Stops all running services.
 
 **What it does:**
@@ -79,12 +96,7 @@ Stops all running services.
 - Cleans up PID files
 - Also finds processes by port if PID files are missing
 
-**Usage:**
-```bash
-./deploy/local/stop.sh
-```
-
-**Output:**
+**Example output:**
 ```
 🛑 Stopping Song Studio (Local Development)
 ==========================================
@@ -100,7 +112,8 @@ Stops all running services.
 
 ---
 
-### `status.sh`
+### `status`
+
 Shows the current status of all services.
 
 **What it does:**
@@ -111,12 +124,7 @@ Shows the current status of all services.
 - Shows memory usage
 - Shows log file information
 
-**Usage:**
-```bash
-./deploy/local/status.sh
-```
-
-**Output:**
+**Example output:**
 ```
 📊 Song Studio Status (Local Development)
 ==========================================
@@ -149,18 +157,9 @@ Shows the current status of all services.
 
 ---
 
-### `restart.sh`
+### `restart`
+
 Stops and restarts all services.
-
-**What it does:**
-- Calls `stop.sh` to stop services
-- Waits 2 seconds
-- Calls `start.sh` to restart services
-
-**Usage:**
-```bash
-./deploy/local/restart.sh
-```
 
 **When to use:**
 - After making changes to backend code
@@ -169,48 +168,27 @@ Stops and restarts all services.
 
 ---
 
-### `logs.sh`
+### `logs`
+
 View logs from frontend and/or backend.
-
-**Usage:**
-```bash
-# Show last 50 lines from both logs
-./deploy/local/logs.sh
-
-# Follow logs in real-time
-./deploy/local/logs.sh -f
-
-# Follow only frontend logs
-./deploy/local/logs.sh frontend -f
-
-# Show last 100 lines from backend
-./deploy/local/logs.sh backend -n 100
-
-# Aliases work too
-./deploy/local/logs.sh fe -f        # frontend
-./deploy/local/logs.sh be -f        # backend
-./deploy/local/logs.sh server -f    # backend
-```
-
-**Options:**
-- `frontend`, `fe` - Show only frontend logs
-- `backend`, `be`, `server` - Show only backend logs
-- `-f`, `--follow` - Follow logs in real-time (like `tail -f`)
-- `-n`, `--lines N` - Show last N lines (default: 50)
 
 **Examples:**
 ```bash
-# Follow both logs
-./deploy/local/logs.sh -f
+# Show last 50 lines from both logs
+./deploy/local/dev.sh logs
 
-# Last 200 lines from both
-./deploy/local/logs.sh -n 200
+# Follow logs in real-time
+./deploy/local/dev.sh logs -f
 
-# Follow frontend only
-./deploy/local/logs.sh frontend -f
+# Follow only frontend logs
+./deploy/local/dev.sh logs frontend -f
 
-# Last 100 backend lines
-./deploy/local/logs.sh backend -n 100
+# Show last 100 lines from backend
+./deploy/local/dev.sh logs backend -n 100
+
+# Aliases work too
+./deploy/local/dev.sh logs fe -f        # frontend
+./deploy/local/dev.sh logs be -f        # backend
 ```
 
 ---
@@ -221,10 +199,10 @@ View logs from frontend and/or backend.
 
 ```bash
 # Check if anything is running
-./deploy/local/status.sh
+./deploy/local/dev.sh status
 
 # Start services
-./deploy/local/start.sh
+./deploy/local/dev.sh start
 
 # Open browser to http://localhost:5173
 ```
@@ -233,16 +211,16 @@ View logs from frontend and/or backend.
 
 ```bash
 # Check if everything is still running
-./deploy/local/status.sh
+./deploy/local/dev.sh status
 
 # View recent logs
-./deploy/local/logs.sh
+./deploy/local/dev.sh logs
 
 # Follow logs while developing
-./deploy/local/logs.sh -f
+./deploy/local/dev.sh logs -f
 
 # Check backend errors
-./deploy/local/logs.sh backend -n 50
+./deploy/local/dev.sh logs backend -n 50
 ```
 
 ### After Making Changes
@@ -252,17 +230,17 @@ View logs from frontend and/or backend.
 # No action needed!
 
 # Backend changes require restart
-./deploy/local/restart.sh
+./deploy/local/dev.sh restart
 ```
 
 ### Ending Your Day
 
 ```bash
 # Stop everything
-./deploy/local/stop.sh
+./deploy/local/dev.sh stop
 
 # Verify stopped
-./deploy/local/status.sh
+./deploy/local/dev.sh status
 ```
 
 ---
@@ -286,8 +264,8 @@ kill $(lsof -ti:3001)
 
 **Check logs for errors:**
 ```bash
-./deploy/local/logs.sh backend -n 100
-./deploy/local/logs.sh frontend -n 100
+./deploy/local/dev.sh logs backend -n 100
+./deploy/local/dev.sh logs frontend -n 100
 ```
 
 **Common issues:**
@@ -300,32 +278,32 @@ kill $(lsof -ti:3001)
 
 ```bash
 # Check if backend is running
-./deploy/local/status.sh
+./deploy/local/dev.sh status
 
 # Check backend logs
-./deploy/local/logs.sh backend -n 50
+./deploy/local/dev.sh logs backend -n 50
 
 # Test API directly
 curl http://localhost:3001/api/health
 
 # Restart backend
-./deploy/local/restart.sh
+./deploy/local/dev.sh restart
 ```
 
 ### Frontend Not Loading
 
 ```bash
 # Check if frontend is running
-./deploy/local/status.sh
+./deploy/local/dev.sh status
 
 # Check frontend logs
-./deploy/local/logs.sh frontend -n 50
+./deploy/local/dev.sh logs frontend -n 50
 
 # Clear browser cache
 # Hard refresh: Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux)
 
 # Restart frontend
-./deploy/local/restart.sh
+./deploy/local/dev.sh restart
 ```
 
 ### PID Mismatch Note
@@ -343,14 +321,13 @@ If services won't start due to PID file conflicts:
 rm -f logs/frontend.pid logs/backend.pid
 
 # Try starting again
-./deploy/local/start.sh
+./deploy/local/dev.sh start
 ```
 
-### Scripts Not Executable
+### Script Not Executable
 
 ```bash
-# Make all scripts executable
-chmod +x deploy/local/*.sh
+chmod +x deploy/local/dev.sh
 ```
 
 ---
@@ -380,15 +357,15 @@ logs/
 
 ## Environment Variables
 
-The `start.sh` script checks for `.env.local` and creates it from `.env.example` if missing.
+The start command checks for `.env.local` and creates it from `.env.example` if missing.
 
 **Required variables:**
 ```bash
 # Oracle Database
-VITE_ORACLE_USER=your_username
-VITE_ORACLE_PASSWORD=your_password
-VITE_ORACLE_CONNECT_STRING=your_connection_string
-VITE_ORACLE_WALLET_PASSWORD=your_wallet_password
+ORACLE_USER=your_username
+ORACLE_PASSWORD=your_password
+ORACLE_CONNECT_STRING=your_connection_string
+ORACLE_WALLET_PASSWORD=your_wallet_password
 
 # Admin Password
 VITE_ADMIN_PASSWORD=AdminPassword
@@ -439,9 +416,9 @@ PORT=3001  # Backend port
 rm -f logs/*.log
 
 # Or start fresh
-./deploy/local/stop.sh
+./deploy/local/dev.sh stop
 rm -rf logs/
-./deploy/local/start.sh
+./deploy/local/dev.sh start
 ```
 
 ---
@@ -459,19 +436,19 @@ Add to `.vscode/tasks.json`:
     {
       "label": "Start Song Studio",
       "type": "shell",
-      "command": "./deploy/local/start.sh",
+      "command": "./deploy/local/dev.sh start",
       "problemMatcher": []
     },
     {
       "label": "Stop Song Studio",
       "type": "shell",
-      "command": "./deploy/local/stop.sh",
+      "command": "./deploy/local/dev.sh stop",
       "problemMatcher": []
     },
     {
       "label": "Song Studio Status",
       "type": "shell",
-      "command": "./deploy/local/status.sh",
+      "command": "./deploy/local/dev.sh status",
       "problemMatcher": []
     }
   ]
@@ -485,11 +462,11 @@ Add to `package.json`:
 ```json
 {
   "scripts": {
-    "local:start": "./deploy/local/start.sh",
-    "local:stop": "./deploy/local/stop.sh",
-    "local:restart": "./deploy/local/restart.sh",
-    "local:status": "./deploy/local/status.sh",
-    "local:logs": "./deploy/local/logs.sh"
+    "local:start": "./deploy/local/dev.sh start",
+    "local:stop": "./deploy/local/dev.sh stop",
+    "local:restart": "./deploy/local/dev.sh restart",
+    "local:status": "./deploy/local/dev.sh status",
+    "local:logs": "./deploy/local/dev.sh logs"
   }
 }
 ```
@@ -511,7 +488,7 @@ npm run local:logs
 | Backend | tsx watch (auto-reload) | PM2 (process manager) |
 | Port | 5173 (frontend), 3001 (backend) | 443 (HTTPS), 80 (HTTP) |
 | Logs | `logs/` directory | PM2 logs, nginx logs |
-| Process Management | Bash scripts | PM2 |
+| Process Management | Single bash script | PM2 |
 | Database | Same Oracle DB | Same Oracle DB |
 | Hot Reload | ✅ Frontend, ❌ Backend | ❌ Both |
 | Auto Start on Boot | ❌ | ✅ PM2 |
@@ -529,8 +506,7 @@ npm run local:logs
 ## Questions?
 
 If you encounter issues:
-1. Check `./deploy/local/status.sh`
-2. View logs with `./deploy/local/logs.sh -f`
-3. Try `./deploy/local/restart.sh`
+1. Check `./deploy/local/dev.sh status`
+2. View logs with `./deploy/local/dev.sh logs -f`
+3. Try `./deploy/local/dev.sh restart`
 4. Check [TROUBLESHOOTING.md](../../docs/TROUBLESHOOTING.md)
-

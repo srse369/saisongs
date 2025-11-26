@@ -340,7 +340,7 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
   const hasErrors = importState.errors.length > 0;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Bulk Import from External Source">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Import Songs">
       <div className="space-y-4">
         {/* Idle State - Start Import Button */}
         {importState.status === 'idle' && !showManualImport && (

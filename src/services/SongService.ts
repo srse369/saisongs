@@ -83,16 +83,6 @@ class SongService {
   async createSong(input: CreateSongInput): Promise<Song> {
     this.validateSongInput(input);
 
-    // Debug: Log what SongService is sending to API
-    console.log('🚀 SongService.createSong:', {
-      name: input.name,
-      externalSourceUrl: input.externalSourceUrl?.substring(0, 50),
-      has_lyrics: !!input.lyrics,
-      lyrics_length: (input.lyrics || '').length,
-      has_meaning: !!input.meaning,
-      meaning_length: (input.meaning || '').length
-    });
-
     try {
       return await apiClient.createSong({
         name: input.name.trim(),

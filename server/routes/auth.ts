@@ -52,9 +52,7 @@ router.post('/login', async (req, res) => {
   try {
     let role: string | null = null;
 
-    // Debug: Log password length (NOT the actual password for security)
-    console.log(`[AUTH] 🔐 Login attempt from ${ip} (password_length=${password.length})`);
-    console.log(`[AUTH]    Expected lengths: admin=${ADMIN_PASSWORD.length}, editor=${EDITOR_PASSWORD.length}, viewer=${VIEWER_PASSWORD.length}`);
+    // Log login attempt (no sensitive data)
 
     // Check against admin password
     if (ADMIN_PASSWORD && password === ADMIN_PASSWORD) {
@@ -106,7 +104,7 @@ router.post('/login', async (req, res) => {
         second: '2-digit',
         hour12: true
       });
-      console.warn(`[AUTH] ❌ FAILED: Invalid password from ${ip} at ${timestamp} (attempt ${current.count + 1}/${MAX_ATTEMPTS})`);
+      console.warn(`[AUTH] ❌ FAILED: Invalid credentials from ${ip} at ${timestamp} (attempt ${current.count + 1}/${MAX_ATTEMPTS})`);
 
       return res.status(401).json({ 
         error: 'Invalid credentials',

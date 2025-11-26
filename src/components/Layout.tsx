@@ -39,7 +39,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <Link to="/" className="flex items-center group">
               <img 
                 src="/logo.png" 
-                alt="Song Studio" 
+                alt="Sai Devotional Song Studio" 
                 className="h-10 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform"
               />
             </Link>
@@ -408,7 +408,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">
         <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
           <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-            Song Studio © {new Date().getFullYear()}
+            Sai Devotional Song Studio © {new Date().getFullYear()}
           </p>
         </div>
       </footer>

@@ -88,6 +88,25 @@ Song Studio uses **Oracle Autonomous Database** (or Oracle Database 19c+) with t
 
 ## Database Setup
 
+### Consolidated Scripts (recommended)
+
+- Fresh install (drops and recreates all app tables):
+```sql
+@schema_full_install.sql
+```
+
+- Safe upgrade (creates only missing objects; idempotent for production):
+```sql
+@schema_upgrade_safe.sql
+```
+
+- Session maintenance (identify/kill hung sessions, verify cleanup):
+```sql
+@sessions_maintenance.sql
+```
+
+These consolidated scripts replace the legacy scripts that previously lived in this folder.
+
 ### Initial Setup (Fresh Install)
 
 1. **Connect to your Oracle database:**
@@ -95,14 +114,9 @@ Song Studio uses **Oracle Autonomous Database** (or Oracle Database 19c+) with t
    sqlplus admin@your_database
    ```
 
-2. **Run the main schema:**
+2. **Run the full install script:**
    ```sql
-   @schema_oracle.sql
-   ```
-
-3. **Run the analytics schema:**
-   ```sql
-   @analytics_schema.sql
+   @schema_full_install.sql
    ```
 
 4. **Verify tables were created:**
@@ -123,16 +137,10 @@ Song Studio uses **Oracle Autonomous Database** (or Oracle Database 19c+) with t
 
 ### Migration (Existing Database)
 
-If you already have a database and need to add new features:
+If you already have a database and need to add new features safely:
 
-**Adding Import Mappings (if missing):**
 ```sql
-@add_import_mappings.sql
-```
-
-**Adding Analytics (if missing):**
-```sql
-@analytics_schema.sql
+@schema_upgrade_safe.sql
 ```
 
 ---
@@ -263,7 +271,7 @@ ORACLE_PASSWORD=your_password
 ORACLE_CONNECTION_STRING=your_connection_string
 
 # Oracle Wallet (for secure connections)
-TNS_ADMIN=/path/to/wallet
+ORACLE_WALLET_DIR=/path/to/wallet
 ```
 
 ### Oracle Autonomous Database
@@ -384,7 +392,7 @@ Error: ORA-12154: TNS:could not resolve the connect identifier
 ```
 
 **Solution:**
-1. Check `TNS_ADMIN` environment variable points to wallet directory
+1. Check `ORACLE_WALLET_DIR` environment variable points to wallet directory
 2. Verify wallet files exist and are readable
 3. Check `tnsnames.ora` has correct connection string
 

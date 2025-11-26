@@ -133,7 +133,7 @@ function BulkImportPage() {
     <div className="px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
       <div className="max-w-3xl">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Bulk Import from External Source
+          Import Songs
         </h1>
         <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
           Use this tool to import or update songs in bulk from external sources. You can paste JSON manually
@@ -165,10 +165,10 @@ function CsvImportPage() {
     <div className="px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
       <div className="max-w-3xl">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Import from CSV
+          Import Singers and Pitches
         </h1>
         <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-          Import singers and their pitch data from CSV format.
+          Import singers and their pitch data from external sources in CSV format.
           This tool will help match songs, normalize pitch formats, and create new singer entries as needed. Admin authentication is required.
         </p>
       </div>
@@ -208,12 +208,9 @@ function HomePage() {
   return (
     <div className="px-4 py-8 sm:py-12 animate-fade-in">
       <div className="text-center max-w-4xl mx-auto">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-6">
-          Song Studio
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-8 sm:mb-12">
+          Sai Devotional Song Studio
         </h1>
-        <p className="text-lg sm:text-xl md:text-2xl text-gray-600 dark:text-gray-300 mb-8 sm:mb-12">
-          Manage and present devotional songs in a beautiful slideshow format
-        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 mt-8 sm:mt-12 max-w-6xl mx-auto">
@@ -267,7 +264,7 @@ function HomePage() {
                     </svg>
                   </div>
                   <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                    Import from External Source
+                    Import Songs
                   </h2>
                   <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
                     Import or update songs in bulk from external sources
@@ -283,10 +280,10 @@ function HomePage() {
                     </svg>
                   </div>
                   <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                    Import from CSV
+                    Import Singers and Pitches
                   </h2>
                   <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                    Import singers and pitches from CSV data
+                    Import singers and pitches from external source
                   </p>
                 </Link>
               </>

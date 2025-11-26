@@ -22,6 +22,7 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: 3001,
+        TNS_ADMIN: '/var/www/songstudio/wallet',
         LD_LIBRARY_PATH: '/opt/oracle/instantclient_21_13:/usr/lib',
       },
       

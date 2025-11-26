@@ -2,15 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
-export default defineConfig(({ command, mode }) => ({
+export default defineConfig(() => ({
   plugins: [react()],
-  // Use base path based on deployment target
-  // For VPS deployment: use root path '/'
-  // For GitHub Pages: use '/songstudio/'
-  // Set via environment variable: VITE_DEPLOY_TARGET=vps or github
-  base: process.env.VITE_DEPLOY_TARGET === 'vps' || mode === 'vps' 
-    ? '/' 
-    : (command === 'build' ? '/songstudio/' : '/'),
+  // Always deploy to VPS with root path
+  base: '/',
   build: {
     outDir: 'dist',
     sourcemap: false,

@@ -77,9 +77,6 @@ class CacheService {
         count++;
       }
     }
-
-    if (count > 0) {
-    }
   }
 
   /**
@@ -113,9 +110,6 @@ class CacheService {
         this.cache.delete(key);
         count++;
       }
-    }
-
-    if (count > 0) {
     }
   }
 

@@ -1,189 +1,137 @@
-# Song Studio
+# Sai Devotional Song Studio
 
-A web-based song presentation system that displays devotional songs (bhajans) in a PowerPoint-style slideshow format. Built with React, TypeScript, and Oracle Autonomous Database.
+A web-based song presentation system for devotional songs (bhajans) with slideshow presentation, session management, and smart search capabilities.
 
 ## Features
 
-- 📝 Manage songs with lyrics and English translations
-- 👤 Track singers and their pitch information
-- 🎵 Associate musical pitch data with song-singer combinations
-- 📊 Present songs in full-screen slideshow mode
-- 🔍 Search and filter songs
-- ⌨️ Keyboard navigation in presentation mode
+- 🎵 **Song Management** - Manage songs with lyrics and translations
+- 👤 **Singer & Pitch Tracking** - Track singers and their pitch information
+- 📊 **Presentation Mode** - Full-screen slideshow with keyboard navigation
+- 📋 **Session Management** - Create and manage song sessions/playlists
+- 🔍 **Smart Search** - Natural language search ("sai songs in sanskrit", "fast tempo")
+- 🤖 **AI Search** - Optional WebLLM-powered semantic search
+- 📈 **Analytics** - Usage tracking and visitor statistics
+- 🔐 **Role-based Access** - Admin, Editor, and Viewer roles
 
 ## Tech Stack
 
-- **Frontend**: React 19 + TypeScript + Vite
+- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS
 - **Backend**: Express.js + TypeScript
-- **Styling**: Tailwind CSS
-- **Database**: Oracle Database
-- **Routing**: React Router
-- **Deployment**: GitHub Pages or VPS
+- **Database**: Oracle Autonomous Database
+- **Search**: Fuse.js (fuzzy) + WebLLM (AI-powered)
+- **Deployment**: VPS with PM2 + Nginx
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 20+
+- Oracle Database (or Oracle Autonomous Database Free Tier)
+- Oracle Wallet (for cloud database)
+
+### Installation
+
+```bash
+# Clone and install
+git clone <repository-url>
+cd songstudio
+npm install
+
+# Set up environment
+cp .env.example .env.local
+# Edit .env.local with your Oracle credentials and passwords
+```
+
+### Environment Variables
+
+Create `.env.local` with:
+
+```bash
+# Oracle Database
+ORACLE_USER=your_username
+ORACLE_PASSWORD=your_password
+ORACLE_CONNECT_STRING=your_connection_string
+ORACLE_WALLET_PASSWORD=your_wallet_password
+
+# Authentication
+ADMIN_PASSWORD=your_admin_password
+EDITOR_PASSWORD=your_editor_password
+VIEWER_PASSWORD=your_viewer_password
+```
+
+### Development
+
+```bash
+# Start both frontend and backend
+npm run dev:all
+
+# Or use the dev script
+./deploy/local/dev.sh start
+```
+
+Open [http://localhost:5173](http://localhost:5173)
+
+### Production Deployment
+
+```bash
+# Deploy to VPS
+./deploy/remote/deploy.sh code
+
+# Or use npm
+npm run deploy
+```
+
+See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for detailed instructions.
 
 ## Project Structure
 
 ```
-.
-├── src/                    # Frontend source code
-│   ├── components/
-│   │   ├── admin/          # Admin/management components
-│   │   ├── presentation/   # Slideshow components
-│   │   └── common/         # Shared components
-│   ├── contexts/           # React contexts for state
-│   ├── hooks/              # Custom React hooks
-│   ├── services/           # Database service layer
-│   ├── types/              # TypeScript type definitions
-│   └── utils/              # Utility functions
-├── server/                 # Backend source code
-│   ├── routes/             # API routes
-│   └── services/           # Backend services
-├── database/               # Database schemas and migrations
-├── deploy/                 # Deployment configurations
-│   ├── local/              # Local development config
-│   └── remote/             # Remote server deployment
-├── docs/                   # Documentation
-└── public/                 # Static assets
+├── src/                    # Frontend (React)
+│   ├── components/         # UI components
+│   ├── contexts/           # React contexts
+│   ├── services/           # API clients
+│   └── utils/              # Utilities (search, validation)
+├── server/                 # Backend (Express)
+│   ├── routes/             # API endpoints
+│   └── services/           # Database, cache services
+├── database/               # SQL schemas
+├── deploy/
+│   ├── local/              # Local dev scripts
+│   └── remote/             # Production deployment
+└── docs/                   # Documentation
 ```
 
-## Getting Started
+## Scripts
 
-### Prerequisites
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start frontend dev server |
+| `npm run dev:server` | Start backend dev server |
+| `npm run dev:all` | Start both frontend and backend |
+| `npm run build` | Build frontend for production |
+| `npm run build:server` | Build backend for production |
+| `npm run deploy` | Deploy to VPS |
+| `npm run test` | Run tests |
+| `npm run lint` | Run ESLint |
 
-- Node.js 20+ and npm
-- Oracle Database access
-- (Optional) Remote server for production deployment
+## Admin Access
 
-### Installation
+Press **Ctrl+Shift+I** (or **Cmd+Shift+I** on Mac) to open the login dialog.
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+### Roles
 
-3. Set up environment variables:
-   - Copy the template file:
-     ```bash
-     cp deploy/local/.env.local.template .env.local
-     ```
-   - Edit `.env.local` with your Oracle database credentials:
-     ```
-     DB_USER=your_db_username
-     DB_PASSWORD=your_db_password
-     DB_CONNECTION_STRING=your_connection_string
-     ADMIN_PASSWORD=your_secure_admin_password_here
-     ```
+| Role | Access |
+|------|--------|
+| **Admin** | Full access + imports + analytics |
+| **Editor** | Manage songs, singers, pitches, sessions |
+| **Viewer** | Read-only access to protected data |
 
-4. Run the development server:
-   ```bash
-   # Start both frontend and backend
-   npm run dev:all
-   
-   # Or run separately:
-   npm run dev        # Frontend only (port 5173)
-   npm run dev:server # Backend only (port 3001)
-   ```
+## Documentation
 
-5. Open [http://localhost:5173](http://localhost:5173) in your browser
-
-### Building for Production
-
-```bash
-npm run build
-```
-
-The built files will be in the `dist/` directory.
-
-## Database Setup
-
-### Quick Setup
-
-1. **Create the schema** on your Oracle database:
-   - Run the contents of `database/schema_oracle.sql` in your Oracle database
-   - You can use SQL*Plus, SQL Developer, or any Oracle SQL client
-
-2. **Load sample data** (optional):
-   - See the `database/` directory for sample data files
-   - Refer to [`database/README_DATA_LOADING.md`](./database/README_DATA_LOADING.md) for loading instructions
-   - See [`database/ORACLE_MIGRATION.md`](./database/ORACLE_MIGRATION.md) for migration details
-
-### Database Schema
-
-The application uses three main tables:
-- **songs**: Stores song information with lyrics and translations
-- **singers**: Stores singer/vocalist profiles
-- **song_singer_pitches**: Associates songs with singers and pitch information
-
-See the complete schema in `database/schema_oracle.sql`
-
-## Deployment
-
-### Option 1: VPS/Remote Server (Recommended for Full Stack)
-
-Deploy to a remote server (e.g., 141.148.149.54) with full backend support:
-
-```bash
-# One-time setup on server
-ssh ubuntu@141.148.149.54
-bash deploy/remote/server-setup.sh
-
-# Deploy from local machine
-./deploy/remote/deploy.sh production
-# or
-npm run deploy:vps
-```
-
-See **[docs/DEPLOYMENT_VPS.md](./docs/DEPLOYMENT_VPS.md)** for detailed instructions.
-
-### Option 2: GitHub Pages (Frontend Only)
-
-Deploy static frontend to GitHub Pages:
-
-1. Update the `base` path in `vite.config.ts` to match your repository name
-2. Build the project: `npm run build`
-3. Deploy: `npm run deploy`
-
-See **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** for detailed GitHub Pages deployment instructions.
-
-## Admin Features
-
-### Bulk Import from external source
-
-The application includes a hidden bulk import feature for administrators to import all songs from external-source into the database.
-
-**Accessing the Bulk Import:**
-1. Ensure `VITE_ADMIN_PASSWORD` is set in your `.env.local` file
-2. Press **Ctrl+Shift+I** (Windows/Linux) or **Cmd+Shift+I** (Mac) to open the password dialog
-3. Enter the admin password
-4. The bulk import interface will appear, allowing you to import all songs from external-source
-
-**Features:**
-- Discovers all available songs on external-source
-- Preserves existing song IDs to maintain data integrity
-- Updates existing songs and creates new ones
-- Real-time progress tracking
-- Error handling and reporting
-
-**Security:**
-- The feature is hidden from regular users (no visible UI elements)
-- Password-protected access
-- Rate limiting after 5 failed password attempts (5-minute lockout)
-
-## Development
-
-### Available Scripts
-
-- `npm run dev` - Start frontend development server
-- `npm run dev:server` - Start backend development server
-- `npm run dev:all` - Start both frontend and backend
-- `npm run build` - Build frontend for production (GitHub Pages)
-- `npm run build:vps` - Build frontend for VPS deployment
-- `npm run build:server` - Build backend for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-- `npm run test` - Run tests
-- `npm run deploy` - Deploy to GitHub Pages
-- `npm run deploy:vps` - Deploy to VPS server
+- [Architecture](./docs/ARCHITECTURE.md) - System design and performance
+- [Deployment](./docs/DEPLOYMENT.md) - Production deployment guide
+- [Features](./docs/FEATURES.md) - Feature documentation
+- [Troubleshooting](./docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ## License
 

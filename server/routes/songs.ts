@@ -44,16 +44,6 @@ router.get('/:id', async (req, res) => {
 // Create new song
 router.post('/', async (req, res) => {
   try {
-    // Debug: Log what we received
-    console.log('📝 Creating song with data:', {
-      name: req.body.name,
-      external_source_url: req.body.external_source_url?.substring(0, 50),
-      has_lyrics: !!req.body.lyrics,
-      lyrics_length: req.body.lyrics?.length || 0,
-      has_meaning: !!req.body.meaning,
-      meaning_length: req.body.meaning?.length || 0
-    });
-
     await cacheService.createSong(req.body);
     res.status(201).json({ message: 'Song created successfully' });
   } catch (error) {

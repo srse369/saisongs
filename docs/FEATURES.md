@@ -6,6 +6,8 @@ Comprehensive guide to Song Studio's features and functionality.
 - [User Roles & Permissions](#user-roles--permissions)
 - [Named Sessions](#named-sessions)
 - [CSV Import](#csv-import-utility)
+- [Smart Search](#smart-search)
+- [AI Search (WebLLM)](#ai-search-webllm)
 - [Presentation Mode](#presentation-mode)
 - [Song Management](#song-management)
 
@@ -81,10 +83,6 @@ VITE_ADMIN_PASSWORD=your_admin_password
 VITE_EDITOR_PASSWORD=your_editor_password
 ```
 
-**Default passwords** (change in production!):
-- Admin: `AdminPassword`
-- Editor: `EditorPassword`
-
 ### Permission Matrix
 
 | Feature | Viewer | Editor | Admin |
@@ -149,35 +147,6 @@ Named Sessions allow you to:
 2. Enter a new name for the copy
 3. Session and all its items are duplicated
 
-### Managing Sessions
-
-**Edit session:**
-- Click the **"Edit"** icon (✏️)
-- Update name or description
-- Click **"Save"**
-
-**Delete session:**
-- Click the **"Delete"** icon (🗑️)
-- Confirm deletion
-- All session items are also deleted
-
-### Database Schema
-
-**`named_sessions` table:**
-- `id` - UUID primary key
-- `name` - Unique session name
-- `description` - Optional description
-- `created_at`, `updated_at` - Timestamps
-
-**`session_items` table:**
-- `id` - UUID primary key
-- `session_id` - Foreign key to named_sessions
-- `song_id` - Foreign key to songs
-- `singer_id` - Optional foreign key to singers
-- `pitch` - Optional pitch information
-- `sequence_order` - Order in sequence (1-based)
-- `created_at`, `updated_at` - Timestamps
-
 ### API Endpoints
 
 **Sessions:**
@@ -194,7 +163,6 @@ Named Sessions allow you to:
 - `PUT /api/sessions/items/:id` - Update item
 - `DELETE /api/sessions/items/:id` - Delete item
 - `PUT /api/sessions/:sessionId/reorder` - Reorder items
-- `PUT /api/sessions/:sessionId/items` - Replace all items (bulk update)
 
 ---
 
@@ -221,97 +189,35 @@ The CSV Import tool allows you to:
 3. Click **"Import from CSV"** card (green card)
 4. Or go directly to: `/admin/import-csv`
 
-### Import Process
-
-#### Step 1: Preparation
-- Click **"Start Import"** button
-- Read the instructions carefully
-
-#### Step 2: Data Collection
+### CSV Format
 
 Prepare your CSV data with 3 columns:
 
-**CSV Format:**
 ```
 Song Title,Singer,Pitch
-```
-
-**Example:**
-```
 Om Namah Shivaya,Shambhavi,G
 Raghu Pathey,Ameya,4m
 Why fear when I am here,Ameya,5m
 ```
-
-You can:
-- Create the CSV in Excel/Google Sheets and copy-paste
-- Import data from any external source
-- Format manually with commas separating columns
-
-#### Step 3: Preview
-
-After pasting data:
-- Click **"Process Data"** button
-- Review the preview table showing:
-  - ✅ **Ready**: Items ready to import (song matched, pitch recognized)
-  - ⚠️ **Song**: Items needing manual song matching
-  - ⚠️ **Pitch**: Items needing pitch format mapping
-
-#### Step 4: Resolve Issues
-
-**For unmatched songs:**
-1. Click **"Set Song"** button
-2. Enter the EXACT song name from your database
-3. Click ✓ to confirm
-
-**For unrecognized pitches:**
-1. Click **"Map Pitch"** button
-2. Enter the normalized pitch (C, D, E, F, G, A, B, C#, D#, F#, G#, A#)
-3. Click ✓ to confirm
-4. Mapping is saved for future imports
-
-#### Step 5: Import
-
-- Review the counts:
-  - Ready to Import
-  - Need Song Match
-  - Need Pitch Mapping
-- Click **"Import X Items"** button
-- Wait for completion
-
-#### Step 6: Results
-
-View statistics:
-- Singers Created
-- Pitches Created
-- Pitches Updated
-- Any errors encountered
-
-Click **"Import More Data"** to start another import session
 
 ### Pitch Format Mappings
 
 The utility automatically recognizes and converts:
 
 | Input Format | Normalized | Notes |
-|-----------------|------------|-------|
-| 1, 1M, 1Madhyam, 1m | C | Basic C |
-| 2, 2M, 2Madhyam, 2m | D | Basic D |
-| 3, 3M, 3Madhyam, 3m | E | Basic E |
-| 4, 4M, 4Madhyam, 4m | F | Basic F |
-| 5, 5M, 5Madhyam, 5m | G | Basic G |
-| 6, 6M, 6Madhyam, 6m | A | Basic A |
-| 7, 7M, 7Madhyam, 7m | B | Basic B |
-| 1.5m, 1.5M, 1.5Madhyam | C# | C Sharp |
-| 2.5m, 2.5M, 2.5Madhyam | D# | D Sharp |
-| 4.5m, 4.5M, 4.5Madhyam | F# | F Sharp |
-| 5.5m, 5.5M, 5.5Madhyam | G# | G Sharp |
-| 6.5m, 6.5M, 6.5Madhyam | A# | A Sharp |
-
-**Custom mappings:**
-- System prompts for unrecognized formats
-- Enter standard notation
-- Mapping saved for all future imports
+|--------------|------------|-------|
+| 1, 1M, 1m | C | Basic C |
+| 2, 2M, 2m | D | Basic D |
+| 3, 3M, 3m | E | Basic E |
+| 4, 4M, 4m | F | Basic F |
+| 5, 5M, 5m | G | Basic G |
+| 6, 6M, 6m | A | Basic A |
+| 7, 7M, 7m | B | Basic B |
+| 1.5m, 1.5M | C# | C Sharp |
+| 2.5m, 2.5M | D# | D Sharp |
+| 4.5m, 4.5M | F# | F Sharp |
+| 5.5m, 5.5M | G# | G Sharp |
+| 6.5m, 6.5M | A# | A Sharp |
 
 ### Song Matching
 
@@ -323,31 +229,208 @@ The utility automatically recognizes and converts:
 **Match types:**
 - **Exact (100%)**: Perfect match (green indicator)
 - **Fuzzy (90-99%)**: Close match with similarity % (yellow indicator)
-- **Manual**: User-provided match (with "(Manual)" label)
+- **Manual**: User-provided match
 - **None**: No match found, requires manual input
 
-### Database Operations
+---
 
-**New singer records:**
-- Created automatically for singers not in database
-- Uses exact name from CSV
+## Smart Search
 
-**New pitch records:**
-- Links: Singer ID + Song ID + Pitch value
-- Includes note: "Imported from CSV (Original Song Name)"
+Natural language search using **fuzzy matching** and **intelligent query parsing**. Works entirely **client-side** with no server requirements.
 
-**Updated pitch records:**
-- If singer already has pitch for a song, it gets updated
-- Previous pitch value replaced with new one
+### Features
 
-### Tips & Best Practices
+#### Natural Language Queries
+Type queries as you would speak them:
 
-1. **Start small**: Test with a few rows first to verify the process
-2. **Check song names**: Have your Songs list open for reference
-3. **Batch processing**: Process data in smaller batches for large datasets
-4. **Review before import**: Always check the preview table
-5. **Note original names**: Original CSV song name stored in pitch notes
-6. **Incremental updates**: Run import multiple times; existing pitches update
+```
+"sai songs in sanskrit"
+"fast tempo devi songs"
+"C# pitch for singers"
+"simple level hamsadhwani"
+```
+
+#### Fuzzy Matching (Typo-Tolerant)
+Misspell words? No problem!
+
+```
+"hamsa" → finds "Hamsadhwani"
+"devii" → finds "Devi"
+"sanskirt" → finds "Sanskrit"
+```
+
+#### Smart Keyword Detection
+
+Automatically recognizes:
+- **Deities**: sai, devi, krishna, rama, shiva, ganesh, hanuman, durga, lakshmi, saraswati
+- **Languages**: sanskrit, hindi, telugu, tamil, kannada, malayalam, bengali, marathi
+- **Tempos**: slow, medium, fast (with synonyms: quick, rapid, slower)
+- **Levels**: simple, easy, intermediate, advanced, difficult
+- **Pitches**: C, C#, D, D#, E, F, F#, G, G#, A, A#, B
+
+### How It Works
+
+When you type a query, the system:
+
+1. **Extracts keywords** from your query
+2. **Applies filters** based on recognized patterns
+3. **Performs fuzzy search** on remaining terms
+4. **Ranks results** by relevance
+
+**Example: "sai songs fast tempo"**
+1. Detects `sai` → filters by deity
+2. Detects `fast` → filters by tempo
+3. Excludes common words (`songs`)
+4. Returns matching results
+
+### Advanced Usage
+
+**Combining Filters:**
+```
+"C# devi sanskrit"
+→ Pitches in C#, for Devi, in Sanskrit
+
+"simple sai slow"
+→ Simple level, Sai songs, slow tempo
+```
+
+**Synonyms:**
+- **Tempo**: fast = quick = rapid
+- **Level**: simple = easy = basic = beginner
+- **Level**: advanced = difficult = hard = complex
+
+### Search Fields (Songs)
+
+| Field | Weight |
+|-------|--------|
+| Name | 2.0 |
+| Title | 1.5 |
+| Title2 | 1.5 |
+| Deity | 1.0 |
+| Language | 1.0 |
+| Raga | 1.0 |
+| Tempo | 0.8 |
+| Beat | 0.8 |
+| Level | 0.8 |
+
+### Performance
+
+- **Fuse.js**: Only ~14KB gzipped
+- **Client-side**: No API calls
+- **Fast**: Searches 1000+ songs instantly
+- **No backend**: Works on smallest instances
+
+---
+
+## AI Search (WebLLM)
+
+**True natural language search** using a local AI model running entirely in your browser. No server or API keys needed!
+
+### Requirements
+
+**Browser Support (WebGPU required):**
+- ✅ Chrome/Edge 113+
+- ✅ Safari 17+
+- ❌ Firefox (WebGPU experimental)
+
+**System Requirements:**
+- 4GB RAM minimum (8GB+ recommended)
+- ~150MB free disk space
+- Modern GPU (integrated or dedicated)
+- Stable internet (first download only)
+
+### How to Use
+
+#### 1. Enable AI Search
+
+1. Navigate to the **Songs** or **Pitches** tab
+2. Click the **"AI Search OFF"** button
+3. Wait for the model to download (~100-150MB, one-time)
+4. Progress bar shows download status
+5. Button turns to **"AI Search ON"** with green checkmark
+
+#### 2. Natural Language Queries
+
+With AI enabled, type queries naturally:
+
+```
+"Show me all sai bhajans in sanskrit with slow tempo"
+"I want devi songs that are simple level"
+"Find songs in hamsadhwani raga"
+"Which singers have C# pitches?"
+```
+
+#### 3. Ask AI Button
+
+Click **"Ask AI"** or press **Enter** to:
+- Parse your natural language query
+- Extract relevant filters automatically
+- Apply them to your search
+
+### Example Queries
+
+**Song Searches:**
+- `"sai songs in sanskrit"`
+- `"fast tempo devi bhajans"`
+- `"simple level songs with slow tempo"`
+- `"krishna songs in hindi language"`
+
+**Pitch Searches:**
+- `"C# pitch for all singers"`
+- `"devi songs sung in D#"`
+- `"which pitches are available for sai songs"`
+
+### Technical Details
+
+**Model Used:**
+- Qwen2-0.5B - quantized to 4-bit
+- Size: ~100-150MB (ultra-lightweight)
+- Optimized for instruction following and parsing
+- Runs locally via WebGPU
+
+**Performance:**
+- First load: 10-40 seconds (downloading)
+- Subsequent loads: 1-3 seconds (from cache)
+- Query processing: 0.3-1.5 seconds
+
+**Privacy:**
+- ✅ 100% local processing
+- ✅ No data sent to servers
+- ✅ No API keys required
+- ✅ Works offline after initial download
+
+### AI vs Regular Search
+
+| Feature | AI Search | Regular Search |
+|---------|-----------|----------------|
+| Natural language | ✅ Yes | ❌ Keywords only |
+| Query understanding | ✅ Smart | ❌ Literal |
+| Setup required | 100-150MB download | Instant |
+| Performance | 0.3-1.5s per query | Instant |
+| Works offline | ✅ Yes | ✅ Yes |
+| Browser support | Limited | All |
+
+### Troubleshooting
+
+**"WebGPU not available":**
+1. Update to Chrome/Edge 113+ or Safari 17+
+2. Enable hardware acceleration: `chrome://settings/system`
+3. Check WebGPU: https://webgpureport.org/
+
+**"Network error loading model":**
+- Check internet connection
+- Disable VPN/proxy temporarily
+- Try again in a few minutes
+
+**"Insufficient memory":**
+- Close other browser tabs
+- Close other applications
+- Restart browser
+
+**Model loads but doesn't respond:**
+- Wait 5-10 seconds (first query is slower)
+- Try disabling and re-enabling AI search
+- Restart browser
 
 ---
 
@@ -443,63 +526,6 @@ Pitch associations link singers to songs with specific pitch information.
 6. Add notes (optional)
 7. Click **"Save"**
 
-**View pitches:**
-- Filter by singer or song
-- Search by any field
-- Sort by date or alphabetically
-
----
-
-## Search & Filter
-
-### Global Search
-
-Available on Songs, Singers, and Pitches pages:
-- Real-time search as you type
-- Searches across all fields
-- Case-insensitive
-- Instant results
-
-### Filters
-
-**Songs page:**
-- Filter by deity
-- Filter by language
-- Filter by category
-
-**Pitches page:**
-- Filter by singer
-- Filter by song
-- Filter by pitch
-
----
-
-## Import/Export
-
-### CSV Import
-
-1. Log in as Editor or Admin
-2. Navigate to Songs/Singers/Pitches page
-3. Click **"Import CSV"**
-4. Select CSV file
-5. Map columns to fields
-6. Preview import
-7. Confirm import
-
-### Bulk Operations
-
-**Bulk edit:**
-- Select multiple items
-- Click **"Bulk Edit"**
-- Update fields
-- Apply to all selected
-
-**Bulk delete:**
-- Admin only
-- Select multiple items
-- Click **"Bulk Delete"**
-- Confirm deletion
-
 ---
 
 ## Live Session
@@ -531,7 +557,6 @@ The live session is the current working set of songs for presentation.
 
 **Clear all:**
 - Click **"Clear Session"** button
-- Confirm clearing
 
 **Save as named session:**
 1. Click **"Save Session"**
@@ -571,4 +596,3 @@ For technical information:
 - Deployment: [DEPLOYMENT.md](./DEPLOYMENT.md)
 - Architecture: [ARCHITECTURE.md](./ARCHITECTURE.md)
 - Troubleshooting: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
-
