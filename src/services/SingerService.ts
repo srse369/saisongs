@@ -21,12 +21,14 @@ class SingerService {
   private mapApiSinger(row: any): Singer {
     const id = row.id ?? row.ID;
     const name = row.name ?? row.NAME;
+    const gender = row.gender ?? row.GENDER;
     const createdRaw = row.createdAt ?? row.created_at ?? row.CREATED_AT;
     const updatedRaw = row.updatedAt ?? row.updated_at ?? row.UPDATED_AT;
 
     return {
       id,
       name,
+      gender,
       createdAt: createdRaw ? new Date(createdRaw) : new Date(),
       updatedAt: updatedRaw ? new Date(updatedRaw) : new Date(),
     };
@@ -51,6 +53,11 @@ class SingerService {
     // Validate name length
     if (input.name && input.name.length > 255) {
       throw new ValidationError('Singer name must be 255 characters or less', 'name');
+    }
+
+    // Validate gender if provided
+    if (input.gender && !['Male', 'Female', 'Boy', 'Girl', 'Other'].includes(input.gender)) {
+      throw new ValidationError('Gender must be one of: Male, Female, Boy, Girl, Other', 'gender');
     }
   }
 
@@ -107,6 +114,7 @@ class SingerService {
       // Create on the server
       await apiClient.createSinger({
         name: input.name.trim(),
+        gender: input.gender,
       });
 
       // Re-fetch all singers and pick the one that matches by name,
@@ -138,6 +146,7 @@ class SingerService {
     try {
       await apiClient.updateSinger(id, {
         name: input.name?.trim(),
+        gender: input.gender,
       });
       return this.getSingerById(id);
     } catch (error) {

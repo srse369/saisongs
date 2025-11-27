@@ -21,6 +21,8 @@ BEGIN EXECUTE IMMEDIATE 'DROP TABLE csv_song_mappings CASCADE CONSTRAINTS'; EXCE
 /
 BEGIN EXECUTE IMMEDIATE 'DROP TABLE csv_pitch_mappings CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
 /
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE feedback CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
 
 -- =============================================================================
 -- Core schema
@@ -28,7 +30,7 @@ BEGIN EXECUTE IMMEDIATE 'DROP TABLE csv_pitch_mappings CASCADE CONSTRAINTS'; EXC
 CREATE TABLE songs (
     id RAW(16) DEFAULT SYS_GUID() PRIMARY KEY,
     name VARCHAR2(255) NOT NULL,
-    external_source_url VARCHAR2(500) NOT NULL UNIQUE,
+    external_source_url VARCHAR2(500) UNIQUE,
     title VARCHAR2(500),
     title2 VARCHAR2(500),
     lyrics CLOB,
@@ -42,8 +44,9 @@ CREATE TABLE songs (
     song_tags CLOB,
     audio_link VARCHAR2(500),
     video_link VARCHAR2(500),
-    ulink VARCHAR2(500),
     golden_voice NUMBER(1) DEFAULT 0,
+    reference_gents_pitch VARCHAR2(50),
+    reference_ladies_pitch VARCHAR2(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -51,6 +54,7 @@ CREATE TABLE songs (
 CREATE TABLE singers (
     id RAW(16) DEFAULT SYS_GUID() PRIMARY KEY,
     name VARCHAR2(255) NOT NULL,
+    gender VARCHAR2(20) CHECK (gender IN ('Male', 'Female', 'Boy', 'Girl', 'Other')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -160,6 +164,27 @@ CREATE INDEX idx_csv_song_name ON csv_song_mappings(csv_song_name);
 CREATE INDEX idx_original_format ON csv_pitch_mappings(original_format);
 
 -- =============================================================================
+-- Feedback table
+-- =============================================================================
+CREATE TABLE feedback (
+    id RAW(16) DEFAULT SYS_GUID() PRIMARY KEY,
+    category VARCHAR2(50) NOT NULL CHECK (category IN ('bug', 'feature', 'improvement', 'question', 'other')),
+    feedback CLOB NOT NULL,
+    email VARCHAR2(255) NOT NULL,
+    ip_address VARCHAR2(45),
+    user_agent VARCHAR2(500),
+    url VARCHAR2(500),
+    status VARCHAR2(50) DEFAULT 'new' CHECK (status IN ('new', 'in-progress', 'resolved', 'closed')),
+    admin_notes CLOB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_feedback_status ON feedback(status);
+CREATE INDEX idx_feedback_category ON feedback(category);
+CREATE INDEX idx_feedback_created_at ON feedback(created_at DESC);
+
+-- =============================================================================
 -- Comments (subset for brevity)
 -- =============================================================================
 COMMENT ON TABLE songs IS 'Stores song data cached from external sources for fast searching and presentation';
@@ -170,5 +195,6 @@ COMMENT ON TABLE session_items IS 'Ordered sequence of songs within a session';
 COMMENT ON TABLE visitor_analytics IS 'Visitor analytics including geolocation';
 COMMENT ON TABLE csv_song_mappings IS 'CSV song name → DB song mapping';
 COMMENT ON TABLE csv_pitch_mappings IS 'CSV pitch format → normalized pitch mapping';
+COMMENT ON TABLE feedback IS 'User feedback submissions for bug reports, feature requests, etc.';
 
 

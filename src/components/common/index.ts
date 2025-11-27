@@ -10,6 +10,7 @@ export { AdvancedSongSearch } from './AdvancedSongSearch';
 export { AdvancedPitchSearch } from './AdvancedPitchSearch';
 export { SmartSearchInput } from './SmartSearchInput';
 export { WebLLMSearchInput } from './WebLLMSearchInput';
+export { FeedbackDrawer } from './FeedbackDrawer';
 export { RefreshIcon, MusicIcon, PitchIcon, SongIcon } from './Icons';
 export type { SongSearchFilters } from './AdvancedSongSearch';
 export type { PitchSearchFilters } from './AdvancedPitchSearch';

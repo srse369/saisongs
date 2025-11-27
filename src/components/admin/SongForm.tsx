@@ -23,8 +23,9 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
   const [songTags, setSongTags] = useState('');
   const [audioLink, setAudioLink] = useState('');
   const [videoLink, setVideoLink] = useState('');
-  const [ulink, setUlink] = useState('');
   const [goldenVoice, setGoldenVoice] = useState(false);
+  const [referenceGentsPitch, setReferenceGentsPitch] = useState('');
+  const [referenceLadiesPitch, setReferenceLadiesPitch] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -47,8 +48,9 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
       setSongTags(song.songTags || '');
       setAudioLink(song.audioLink || '');
       setVideoLink(song.videoLink || '');
-      setUlink(song.ulink || '');
       setGoldenVoice(song.goldenVoice || false);
+      setReferenceGentsPitch(song.referenceGentsPitch || '');
+      setReferenceLadiesPitch(song.referenceLadiesPitch || '');
     } else {
       setName('');
       setExternalSourceUrl('');
@@ -65,8 +67,9 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
       setSongTags('');
       setAudioLink('');
       setVideoLink('');
-      setUlink('');
       setGoldenVoice(false);
+      setReferenceGentsPitch('');
+      setReferenceLadiesPitch('');
     }
     setErrors({});
   }, [song]);
@@ -80,9 +83,7 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
       newErrors.name = 'Song name must be 255 characters or less';
     }
 
-    if (!externalSourceUrl.trim()) {
-      newErrors.externalSourceUrl = 'external source URL is required';
-    } else if (!isValidUrl(externalSourceUrl.trim())) {
+    if (externalSourceUrl.trim() && !isValidUrl(externalSourceUrl.trim())) {
       newErrors.externalSourceUrl = 'Please enter a valid URL';
     }
 
@@ -124,8 +125,9 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
         songTags: songTags.trim() || undefined,
         audioLink: audioLink.trim() || undefined,
         videoLink: videoLink.trim() || undefined,
-        ulink: ulink.trim() || undefined,
         goldenVoice,
+        referenceGentsPitch: referenceGentsPitch.trim() || undefined,
+        referenceLadiesPitch: referenceLadiesPitch.trim() || undefined,
       });
     } finally {
       setIsSubmitting(false);
@@ -158,7 +160,7 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
       {/* External Source URL */}
       <div>
         <label htmlFor="external-source-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          external source URL <span className="text-red-500 dark:text-red-400">*</span>
+          External Source URL
         </label>
         <input
           id="external-source-url"
@@ -391,21 +393,6 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
               disabled={isSubmitting}
             />
           </div>
-
-          {/* ULink */}
-          <div>
-            <label htmlFor="ulink" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              ULink
-            </label>
-            <input
-              id="ulink"
-              type="text"
-              value={ulink}
-              onChange={(e) => setUlink(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
-              disabled={isSubmitting}
-            />
-          </div>
         </div>
 
         {/* Golden Voice */}
@@ -420,6 +407,47 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
             />
             <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Golden Voice</span>
           </label>
+        </div>
+
+        {/* Reference Pitches */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+          {/* Reference Gents Pitch */}
+          <div>
+            <label htmlFor="referenceGentsPitch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Reference Gents Pitch
+            </label>
+            <input
+              id="referenceGentsPitch"
+              type="text"
+              value={referenceGentsPitch}
+              onChange={(e) => setReferenceGentsPitch(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
+              placeholder="e.g., F, 2 Madhyam, C#"
+              disabled={isSubmitting}
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              For male singers (e.g., C, D, F, 2 Madhyam)
+            </p>
+          </div>
+
+          {/* Reference Ladies Pitch */}
+          <div>
+            <label htmlFor="referenceLadiesPitch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Reference Ladies Pitch
+            </label>
+            <input
+              id="referenceLadiesPitch"
+              type="text"
+              value={referenceLadiesPitch}
+              onChange={(e) => setReferenceLadiesPitch(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
+              placeholder="e.g., C, 1 Madhyam, G#"
+              disabled={isSubmitting}
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              For female singers (e.g., C, G, 1 Madhyam)
+            </p>
+          </div>
         </div>
       </div>
 

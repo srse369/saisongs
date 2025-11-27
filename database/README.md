@@ -260,6 +260,31 @@ Tracks visitor activity with geolocation:
 
 ---
 
+#### feedback
+Collects user feedback with categorization:
+- `id` (RAW(16), PK)
+- `category` (VARCHAR2(50)) - bug, feature, improvement, question, other
+- `feedback` (CLOB) - User feedback message
+- `email` (VARCHAR2(255)) - Contact email
+- `ip_address` (VARCHAR2(45)) - User IP address
+- `user_agent` (VARCHAR2(500)) - Browser info
+- `url` (VARCHAR2(500)) - Page URL where feedback was submitted
+- `status` (VARCHAR2(50)) - new, in-progress, resolved, closed
+- `admin_notes` (CLOB) - Internal admin notes
+- `created_at`, `updated_at` (TIMESTAMP)
+
+**Constraints:**
+- Check: category IN ('bug', 'feature', 'improvement', 'question', 'other')
+- Check: status IN ('new', 'in-progress', 'resolved', 'closed')
+
+**Indexes:**
+- Primary key on `id`
+- Index on `status`
+- Index on `category`
+- Index on `created_at DESC`
+
+---
+
 ## Connection Configuration
 
 The application expects the following environment variables (`.env` file):

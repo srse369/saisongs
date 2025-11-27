@@ -91,7 +91,12 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
           {slide.singerName && slide.pitch && <span className="mx-1">•</span>}
           {slide.pitch && (
             <span>
-              Pitch: <span className="font-bold">{formatPitch(slide.pitch)}</span> ({slide.pitch.replace('#', '♯')})
+              Pitch: <span className="font-bold">
+                {slide.pitch.includes(' / ') 
+                  ? slide.pitch.split(' / ').map(p => formatPitch(p.trim())).join(' / ')
+                  : formatPitch(slide.pitch)
+                }
+              </span> ({slide.pitch.replace('#', '♯')})
             </span>
           )}
         </div>

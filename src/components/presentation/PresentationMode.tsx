@@ -37,11 +37,30 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
           return;
         }
 
+        // Determine which pitch and singer name to use
+        let displayPitch = pitch;
+        let displaySingerName = singerName;
+        
+        // If no singer pitch is provided, use reference pitches from the song
+        if (!pitch) {
+          // If both reference pitches exist, show both
+          if (song.referenceGentsPitch && song.referenceLadiesPitch) {
+            displaySingerName = 'Gents/Ladies';
+            displayPitch = `${song.referenceGentsPitch} / ${song.referenceLadiesPitch}`;
+          } else if (song.referenceGentsPitch) {
+            displaySingerName = 'Gents';
+            displayPitch = song.referenceGentsPitch;
+          } else if (song.referenceLadiesPitch) {
+            displaySingerName = 'Ladies';
+            displayPitch = song.referenceLadiesPitch;
+          }
+        }
+
         // Generate slides from the song data and attach optional singer/pitch (if provided)
         const baseSlides = generateSlides(song).map((slide) => ({
           ...slide,
-          singerName,
-          pitch,
+          singerName: displaySingerName,
+          pitch: displayPitch,
         }));
 
         // Attach "next" metadata for single-song presentation
@@ -222,7 +241,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
         {/* Fullscreen toggle */}
         <button
           onClick={toggleFullScreen}
-          className="p-3 bg-gray-800/90 hover:bg-gray-700 text-white rounded-lg backdrop-blur-sm transition-colors"
+          className="p-3 bg-gray-800/90 hover:bg-gray-700 text-white rounded-lg backdrop-blur-xs transition-colors"
           aria-label={isFullScreen ? 'Exit fullscreen' : 'Enter fullscreen'}
           title={isFullScreen ? 'Exit fullscreen (F)' : 'Enter fullscreen (F)'}
         >
@@ -240,7 +259,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
         {/* Exit button */}
         <button
           onClick={handleExitPresentation}
-          className="p-3 bg-red-600/90 hover:bg-red-700 text-white rounded-lg backdrop-blur-sm transition-colors"
+          className="p-3 bg-red-600/90 hover:bg-red-700 text-white rounded-lg backdrop-blur-xs transition-colors"
           aria-label="Exit presentation"
           title="Exit presentation (Esc)"
         >

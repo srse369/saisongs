@@ -32,6 +32,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<ServiceError | null>(null);
+  const [hasFetched, setHasFetched] = useState<boolean>(false);
   const toast = useToast();
 
   const clearError = useCallback(() => {
@@ -39,10 +40,17 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
   }, []);
 
   const fetchSongs = useCallback(async (forceRefresh: boolean = false) => {
+    // Prevent retry loops: if we've already fetched and failed, don't retry automatically
+    if (!forceRefresh && hasFetched && error) {
+      return;
+    }
+    
     // Reset backoff for explicit user-triggered refreshes
     if (forceRefresh && typeof window !== 'undefined') {
       const { apiClient } = await import('../services/ApiClient');
       apiClient.resetBackoff('/songs');
+      setError(null);
+      setHasFetched(false);
     }
     
     setLoading(true);

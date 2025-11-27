@@ -26,6 +26,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
   const [singers, setSingers] = useState<Singer[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<ServiceError | null>(null);
+  const [hasFetched, setHasFetched] = useState<boolean>(false);
   const toast = useToast();
 
   const clearError = useCallback(() => {
@@ -33,10 +34,17 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
   }, []);
 
   const fetchSingers = useCallback(async (forceRefresh: boolean = false) => {
+    // Prevent retry loops: if we've already fetched and failed, don't retry automatically
+    if (!forceRefresh && hasFetched && error) {
+      return;
+    }
+    
     // Reset backoff for explicit user-triggered refreshes
     if (forceRefresh) {
       const { apiClient } = await import('../services/ApiClient');
       apiClient.resetBackoff('/singers');
+      setError(null);
+      setHasFetched(false);
     }
     
     setLoading(true);
@@ -53,8 +61,9 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       toast.error(errorMessage);
     } finally {
       setLoading(false);
+      setHasFetched(true);
     }
-  }, [toast]);
+  }, [toast, hasFetched, error]);
 
   const getSingerById = useCallback(async (id: string): Promise<Singer | null> => {
     setLoading(true);

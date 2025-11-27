@@ -9,6 +9,9 @@ import { formatPitch, formatPitchWithName } from '../../utils/pitchUtils';
 interface PitchWithDetails extends SongSingerPitch {
   songName?: string;
   singerName?: string;
+  externalSourceUrl?: string;
+  referenceGentsPitch?: string;
+  referenceLadiesPitch?: string;
 }
 
 interface PitchListProps {
@@ -43,14 +46,22 @@ export const PitchList: React.FC<PitchListProps> = ({
   };
 
   // Create a map for quick lookups
-  const songMap = new Map(songs.map(song => [song.id, song.name]));
+  const songMap = new Map(songs.map(song => [song.id, { 
+    name: song.name, 
+    externalSourceUrl: song.externalSourceUrl,
+    referenceGentsPitch: song.referenceGentsPitch,
+    referenceLadiesPitch: song.referenceLadiesPitch
+  }]));
   const singerMap = new Map(singers.map(singer => [singer.id, singer.name]));
 
   // Enrich pitches with song and singer names
   const enrichedPitches: PitchWithDetails[] = pitches.map(pitch => ({
     ...pitch,
-    songName: songMap.get(pitch.songId) || 'Unknown Song',
+    songName: songMap.get(pitch.songId)?.name || 'Unknown Song',
     singerName: singerMap.get(pitch.singerId) || 'Unknown Singer',
+    externalSourceUrl: songMap.get(pitch.songId)?.externalSourceUrl,
+    referenceGentsPitch: songMap.get(pitch.songId)?.referenceGentsPitch,
+    referenceLadiesPitch: songMap.get(pitch.songId)?.referenceLadiesPitch,
   }));
 
   const handleDeleteClick = (pitch: PitchWithDetails) => {
@@ -130,23 +141,53 @@ export const PitchList: React.FC<PitchListProps> = ({
             <div className="flex flex-col gap-3">
               {/* Content Section */}
               <div className="flex-1 min-w-0">
-                {/* Song Name */}
-                <button
-                  type="button"
-                  onClick={() => onViewSong(pitch.songId)}
-                  className="text-left text-base font-semibold text-blue-700 dark:text-blue-300 hover:underline mb-2"
-                  title={pitch.songName}
-                >
-                  {pitch.songName}
-                </button>
+                {/* Song Name with External Link */}
+                <div className="flex items-center gap-1 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => handlePresent(pitch)}
+                    className="text-left text-base font-semibold text-blue-700 dark:text-blue-300 hover:underline"
+                    title={pitch.songName}
+                  >
+                    {pitch.songName}
+                  </button>
+                  {pitch.externalSourceUrl && (
+                    <a
+                      href={pitch.externalSourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-shrink-0 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
+                      title="View on external source"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  )}
+                </div>
                 
                 {/* Singer and Pitch */}
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  <span>Singer: {pitch.singerName}</span>
+                  <span>Singer: </span>
+                  <span className="font-semibold text-purple-600 dark:text-purple-400">{pitch.singerName}</span>
                   <span className="mx-2">•</span>
                   <span>Pitch: </span>
                   <span className="font-bold text-blue-600 dark:text-blue-400">{formatPitch(pitch.pitch)}</span>
                   <span className="ml-1">({pitch.pitch.replace('#', '♯')})</span>
+                  {(pitch.referenceGentsPitch || pitch.referenceLadiesPitch) && (
+                    <>
+                      <span className="mx-2">•</span>
+                      <span className="text-gray-500 dark:text-gray-500">Ref: </span>
+                      {pitch.referenceGentsPitch && (
+                        <span>Gents <span className="font-medium">{formatPitch(pitch.referenceGentsPitch)}</span> (<span className="font-medium">{pitch.referenceGentsPitch.replace('#', '♯')}</span>)</span>
+                      )}
+                      {pitch.referenceGentsPitch && pitch.referenceLadiesPitch && <span className="mx-1">/</span>}
+                      {pitch.referenceLadiesPitch && (
+                        <span>Ladies <span className="font-medium">{formatPitch(pitch.referenceLadiesPitch)}</span> (<span className="font-medium">{pitch.referenceLadiesPitch.replace('#', '♯')}</span>)</span>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
               
@@ -166,17 +207,6 @@ export const PitchList: React.FC<PitchListProps> = ({
                         )}
                       </svg>
                       <span className="text-sm font-medium whitespace-nowrap">Add to Session</span>
-                    </button>
-                    <button
-                      onClick={() => handlePresent(pitch)}
-                      title="Present"
-                      className="flex items-center gap-2 p-2 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span className="text-sm font-medium whitespace-nowrap">Preview</span>
                     </button>
                     {isEditor && (
                       <button

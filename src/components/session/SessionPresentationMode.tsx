@@ -250,7 +250,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         {/* Fullscreen toggle */}
         <button
           onClick={toggleFullScreen}
-          className="p-3 bg-gray-800/90 hover:bg-gray-700 text-white rounded-lg backdrop-blur-sm transition-colors"
+          className="p-3 bg-gray-800/90 hover:bg-gray-700 text-white rounded-lg backdrop-blur-xs transition-colors"
           aria-label={isFullScreen ? 'Exit fullscreen' : 'Enter fullscreen'}
           title={isFullScreen ? 'Exit fullscreen (F)' : 'Enter fullscreen (F)'}
         >
@@ -268,7 +268,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         {/* Exit button */}
         <button
           onClick={handleExitPresentation}
-          className="p-3 bg-red-600/90 hover:bg-red-700 text-white rounded-lg backdrop-blur-sm transition-colors"
+          className="p-3 bg-red-600/90 hover:bg-red-700 text-white rounded-lg backdrop-blur-xs transition-colors"
           aria-label="Exit presentation"
           title="Exit presentation (Esc)"
         >

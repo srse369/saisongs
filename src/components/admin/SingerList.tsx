@@ -86,10 +86,17 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
             className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-200"
           >
             <div className="flex flex-col gap-3">
-              {/* Singer Name */}
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {singer.name}
-              </h3>
+              {/* Singer Name and Gender */}
+              <div className="flex items-center gap-3">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {singer.name}
+                </h3>
+                {singer.gender && (
+                  <span className="text-sm text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                    {singer.gender}
+                  </span>
+                )}
+              </div>
               
               {/* Actions */}
               <div className="flex flex-wrap items-center justify-start gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">

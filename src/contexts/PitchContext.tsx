@@ -27,6 +27,7 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
   const [pitches, setPitches] = useState<SongSingerPitch[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<ServiceError | null>(null);
+  const [hasFetched, setHasFetched] = useState<boolean>(false);
   const toast = useToast();
 
   const clearError = useCallback(() => {
@@ -34,10 +35,17 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
   }, []);
 
   const fetchAllPitches = useCallback(async (forceRefresh: boolean = false) => {
+    // Prevent retry loops: if we've already fetched and failed, don't retry automatically
+    if (!forceRefresh && hasFetched && error) {
+      return;
+    }
+    
     // Reset backoff for explicit user-triggered refreshes
     if (forceRefresh) {
       const { apiClient } = await import('../services/ApiClient');
       apiClient.resetBackoff('/pitches');
+      setError(null);
+      setHasFetched(false);
     }
     
     setLoading(true);
@@ -54,8 +62,9 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
       toast.error(errorMessage);
     } finally {
       setLoading(false);
+      setHasFetched(true);
     }
-  }, [toast]);
+  }, [toast, hasFetched, error]);
 
   const getPitchesForSong = useCallback(async (songId: string) => {
     setLoading(true);

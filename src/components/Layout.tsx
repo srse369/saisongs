@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../contexts/AuthContext';
 import { MusicIcon, SongIcon } from './common';
+import { FeedbackDrawer } from './common/FeedbackDrawer';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,6 +13,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const { isConnected, connectionError, resetConnection } = useDatabase();
   const { isAuthenticated, userRole, logout, downgradeRole } = useAuth();
 
@@ -83,12 +85,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               
               {/* Analytics tab - Admin only */}
               {userRole === 'admin' && (
-                <Link to="/admin/analytics" className={getLinkClasses('/admin/analytics')}>
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Analytics
-                </Link>
+                <>
+                  <Link to="/admin/analytics" className={getLinkClasses('/admin/analytics')}>
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Analytics
+                  </Link>
+                  <Link to="/admin/feedback" className={getLinkClasses('/admin/feedback')}>
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                    </svg>
+                    Feedback
+                  </Link>
+                </>
               )}
               
               {/* Database connection indicator + Admin mode indicator */}
@@ -279,16 +289,28 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               
               {/* Analytics tab - Admin only */}
               {userRole === 'admin' && (
-                <Link
-                  to="/admin/analytics"
-                  className={`block ${getLinkClasses('/admin/analytics')}`}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Analytics
-                </Link>
+                <>
+                  <Link
+                    to="/admin/analytics"
+                    className={`block ${getLinkClasses('/admin/analytics')}`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Analytics
+                  </Link>
+                  <Link
+                    to="/admin/feedback"
+                    className={`block ${getLinkClasses('/admin/feedback')}`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                    </svg>
+                    Feedback
+                  </Link>
+                </>
               )}
               
               {/* Database status and Role indicator in mobile menu */}
@@ -410,8 +432,26 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
             Sai Devotional Song Studio © {new Date().getFullYear()}
           </p>
+          <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-1">
+            Thanks 🙏 to sairhythms for Songs and Metadata.
+          </p>
         </div>
       </footer>
+
+      {/* Feedback Button - Almost Hidden */}
+      <button
+        onClick={() => setIsFeedbackOpen(true)}
+        className="fixed bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+        title="Send feedback"
+        aria-label="Send feedback"
+      >
+        <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+        </svg>
+      </button>
+
+      {/* Feedback Drawer */}
+      <FeedbackDrawer isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
     </div>
   );
 };

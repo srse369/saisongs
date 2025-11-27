@@ -132,7 +132,7 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
       }
       
       // Transform superSongJson format to our format
-      // Each song in superSongJson has: song_id, title, title2, lyrics, meaning, language, deity, tempo, beat, raga, level, songtags, audio_link, video_link, ulink, golden_voice, url
+      // Each song in superSongJson has: song_id, title, title2, lyrics, meaning, language, deity, tempo, beat, raga, level, songtags, audio_link, video_link, golden_voice, url
       const songs = rawSongs.map((s: any) => ({
         name: s.title2 || s.title || 'Unknown',
         url: s.url ? `https://external-source${s.url}` : `https://external-source/node/${s.song_id}`,
@@ -150,7 +150,6 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
         // Handle arrays - convert to comma-separated string or take first element
         audio_link: Array.isArray(s.audio_link) ? s.audio_link[0] : s.audio_link,
         video_link: Array.isArray(s.video_link) ? s.video_link[0] : s.video_link,
-        ulink: s.ulink,
         golden_voice: Array.isArray(s.golden_voice) ? (s.golden_voice.length > 0 ? 'yes' : '') : s.golden_voice,
       }));
       

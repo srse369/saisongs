@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import type { ReactNode } from 'react';
 
 export type UserRole = 'public' | 'viewer' | 'editor' | 'admin';
@@ -84,7 +85,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           stored: sessionStorage.getItem(AUTH_ROLE_KEY)
         });
         
-        setUserRole(role);
+        // Use flushSync to ensure state is updated synchronously
+        // This prevents the "tabs not clickable" issue after login
+        flushSync(() => {
+          setUserRole(role);
+        });
         
         console.log('[AuthContext] State updated to:', role);
         return true;

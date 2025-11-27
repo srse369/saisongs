@@ -11,6 +11,7 @@ A web-based song presentation system for devotional songs (bhajans) with slidesh
 - 🔍 **Smart Search** - Natural language search ("sai songs in sanskrit", "fast tempo")
 - 🤖 **AI Search** - Optional WebLLM-powered semantic search
 - 📈 **Analytics** - Usage tracking and visitor statistics
+- 💬 **Feedback System** - Collect and manage user feedback with categorization
 - 🔐 **Role-based Access** - Admin, Editor, and Viewer roles
 
 ## Tech Stack

@@ -149,8 +149,9 @@ class CacheService {
         "LEVEL" as song_level,
         audio_link,
         video_link,
-        ulink,
         golden_voice,
+        reference_gents_pitch,
+        reference_ladies_pitch,
         created_at,
         updated_at
       FROM songs
@@ -171,8 +172,9 @@ class CacheService {
       level: extractValue(song.SONG_LEVEL),
       audioLink: extractValue(song.AUDIO_LINK),
       videoLink: extractValue(song.VIDEO_LINK),
-      ulink: extractValue(song.ULINK),
       goldenVoice: !!extractValue(song.GOLDEN_VOICE),
+      referenceGentsPitch: extractValue(song.REFERENCE_GENTS_PITCH),
+      referenceLadiesPitch: extractValue(song.REFERENCE_LADIES_PITCH),
       createdAt: extractValue(song.CREATED_AT),
       updatedAt: extractValue(song.UPDATED_AT),
       // CLOB fields set to null - fetch on-demand via getSong(id)
@@ -214,8 +216,9 @@ class CacheService {
         DBMS_LOB.SUBSTR(song_tags, 4000, 1) AS song_tags,
         audio_link,
         video_link,
-        ulink,
         golden_voice,
+        reference_gents_pitch,
+        reference_ladies_pitch,
         created_at,
         updated_at
       FROM songs
@@ -242,8 +245,9 @@ class CacheService {
       songTags: extractValue(song.SONG_TAGS),
       audioLink: extractValue(song.AUDIO_LINK),
       videoLink: extractValue(song.VIDEO_LINK),
-      ulink: extractValue(song.ULINK),
       goldenVoice: !!extractValue(song.GOLDEN_VOICE),
+      referenceGentsPitch: extractValue(song.REFERENCE_GENTS_PITCH),
+      referenceLadiesPitch: extractValue(song.REFERENCE_LADIES_PITCH),
       createdAt: extractValue(song.CREATED_AT),
       updatedAt: extractValue(song.UPDATED_AT)
     };
@@ -271,17 +275,19 @@ class CacheService {
       String(songData.song_tags || ''),
       String(songData.audio_link || ''),
       String(songData.video_link || ''),
-      String(songData.ulink || ''),
-      Number(songData.golden_voice || 0)
+      Number(songData.golden_voice || 0),
+      songData.reference_gents_pitch ? String(songData.reference_gents_pitch) : null,
+      songData.reference_ladies_pitch ? String(songData.reference_ladies_pitch) : null
     ];
 
     await db.query(`
       INSERT INTO songs (
         name, external_source_url, title, title2, lyrics, meaning,
         "LANGUAGE", deity, tempo, beat, raga, "LEVEL",
-        song_tags, audio_link, video_link, ulink, golden_voice
+        song_tags, audio_link, video_link, golden_voice,
+        reference_gents_pitch, reference_ladies_pitch
       ) VALUES (
-        :1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17
+        :1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18
       )
     `, params);
 
@@ -304,8 +310,9 @@ class CacheService {
         DBMS_LOB.SUBSTR(song_tags, 4000, 1) AS song_tags,
         audio_link,
         video_link,
-        ulink,
         golden_voice,
+        reference_gents_pitch,
+        reference_ladies_pitch,
         created_at,
         updated_at
       FROM songs
@@ -333,8 +340,9 @@ class CacheService {
         songTags: extractValue(newSong.SONG_TAGS),
         audioLink: extractValue(newSong.AUDIO_LINK),
         videoLink: extractValue(newSong.VIDEO_LINK),
-        ulink: extractValue(newSong.ULINK),
         goldenVoice: !!extractValue(newSong.GOLDEN_VOICE),
+        referenceGentsPitch: extractValue(newSong.REFERENCE_GENTS_PITCH),
+        referenceLadiesPitch: extractValue(newSong.REFERENCE_LADIES_PITCH),
         createdAt: extractValue(newSong.CREATED_AT),
         updatedAt: extractValue(newSong.UPDATED_AT)
       };
@@ -368,7 +376,6 @@ class CacheService {
       String(songData.song_tags || ''),
       String(songData.audio_link || ''),
       String(songData.video_link || ''),
-      String(songData.ulink || ''),
       Number(songData.golden_voice || 0),
       String(id)
     ];
@@ -390,10 +397,9 @@ class CacheService {
         song_tags = :13,
         audio_link = :14,
         video_link = :15,
-        ulink = :16,
-        golden_voice = :17,
+        golden_voice = :16,
         updated_at = CURRENT_TIMESTAMP
-      WHERE RAWTOHEX(id) = :18
+      WHERE RAWTOHEX(id) = :17
     `, params);
 
     // Write-through cache: Fetch only the updated song
@@ -415,8 +421,9 @@ class CacheService {
         DBMS_LOB.SUBSTR(song_tags, 4000, 1) AS song_tags,
         audio_link,
         video_link,
-        ulink,
         golden_voice,
+        reference_gents_pitch,
+        reference_ladies_pitch,
         created_at,
         updated_at
       FROM songs
@@ -442,8 +449,9 @@ class CacheService {
         songTags: extractValue(updatedSong.SONG_TAGS),
         audioLink: extractValue(updatedSong.AUDIO_LINK),
         videoLink: extractValue(updatedSong.VIDEO_LINK),
-        ulink: extractValue(updatedSong.ULINK),
         goldenVoice: !!extractValue(updatedSong.GOLDEN_VOICE),
+        referenceGentsPitch: extractValue(updatedSong.REFERENCE_GENTS_PITCH),
+        referenceLadiesPitch: extractValue(updatedSong.REFERENCE_LADIES_PITCH),
         createdAt: extractValue(updatedSong.CREATED_AT),
         updatedAt: extractValue(updatedSong.UPDATED_AT)
       };
@@ -483,6 +491,7 @@ class CacheService {
       SELECT 
         RAWTOHEX(id) as id,
         name,
+        gender,
         created_at,
         updated_at
       FROM singers
@@ -490,10 +499,11 @@ class CacheService {
       ORDER BY name
     `);
 
-    // Normalize field names (Oracle returns uppercase: ID, NAME, CREATED_AT, UPDATED_AT)
+    // Normalize field names (Oracle returns uppercase: ID, NAME, GENDER, CREATED_AT, UPDATED_AT)
     const normalizedSingers = singers.map((s: any) => ({
       id: s.id || s.ID,
       name: s.name || s.NAME,
+      gender: s.gender || s.GENDER,
       created_at: s.created_at || s.CREATED_AT,
       updated_at: s.updated_at || s.UPDATED_AT,
     })).filter((s: any) => s.name); // Filter out any singers with no name
@@ -508,6 +518,7 @@ class CacheService {
       SELECT 
         RAWTOHEX(id) as id,
         name,
+        gender,
         created_at,
         updated_at
       FROM singers
@@ -517,17 +528,18 @@ class CacheService {
     return singers.length > 0 ? singers[0] : null;
   }
 
-  async createSinger(name: string): Promise<any> {
+  async createSinger(name: string, gender?: string): Promise<any> {
     try {
       const db = await this.getDatabase();
       
-      await db.query(`INSERT INTO singers (name) VALUES (:1)`, [name]);
+      await db.query(`INSERT INTO singers (name, gender) VALUES (:1, :2)`, [name, gender || null]);
       
       // Write-through cache: Fetch only the newly created singer
       const newSingers = await db.query(`
         SELECT 
           RAWTOHEX(id) as id,
           name,
+          gender,
           created_at,
           updated_at
         FROM singers
@@ -543,6 +555,7 @@ class CacheService {
         const normalizedSinger = {
           id: rawSinger.id || rawSinger.ID,
           name: rawSinger.name || rawSinger.NAME,
+          gender: rawSinger.gender || rawSinger.GENDER,
           created_at: rawSinger.created_at || rawSinger.CREATED_AT,
           updated_at: rawSinger.updated_at || rawSinger.UPDATED_AT,
         };
@@ -567,20 +580,22 @@ class CacheService {
     }
   }
 
-  async updateSinger(id: string, name: string): Promise<void> {
+  async updateSinger(id: string, name: string, gender?: string): Promise<void> {
     const db = await this.getDatabase();
     await db.query(`
       UPDATE singers SET
         name = :1,
+        gender = :2,
         updated_at = CURRENT_TIMESTAMP
-      WHERE RAWTOHEX(id) = :2
-    `, [name, id]);
+      WHERE RAWTOHEX(id) = :3
+    `, [name, gender || null, id]);
     
     // Write-through cache: Fetch only the updated singer
     const updatedSingers = await db.query(`
       SELECT 
         RAWTOHEX(id) as id,
         name,
+        gender,
         created_at,
         updated_at
       FROM singers
@@ -621,29 +636,32 @@ class CacheService {
       return cached;
     }
 
-    // OPTIMIZED: No JOIN - fetch IDs only, names looked up client-side
+    // Fetch pitches with song and singer names for proper sorting
     const db = await this.getDatabase();
     const pitches = await db.query(`
       SELECT 
-        RAWTOHEX(id) as id,
-        RAWTOHEX(song_id) as song_id,
-        RAWTOHEX(singer_id) as singer_id,
-        pitch,
-        created_at,
-        updated_at
-      FROM song_singer_pitches
-      ORDER BY created_at DESC
+        RAWTOHEX(ssp.id) as id,
+        RAWTOHEX(ssp.song_id) as song_id,
+        RAWTOHEX(ssp.singer_id) as singer_id,
+        ssp.pitch,
+        s.name as song_name,
+        si.name as singer_name,
+        ssp.created_at,
+        ssp.updated_at
+      FROM song_singer_pitches ssp
+      JOIN songs s ON ssp.song_id = s.id
+      JOIN singers si ON ssp.singer_id = si.id
+      ORDER BY s.name, si.name
     `);
 
     // Normalize field names (Oracle returns uppercase)
-    // Client will lookup song_name and singer_name from cached songs/singers
     const normalizedPitches = pitches.map((p: any) => ({
       id: p.id || p.ID,
       song_id: p.song_id || p.SONG_ID,
       singer_id: p.singer_id || p.SINGER_ID,
       pitch: p.pitch || p.PITCH,
-      song_name: null,  // Client-side lookup
-      singer_name: null,  // Client-side lookup
+      song_name: p.song_name || p.SONG_NAME,
+      singer_name: p.singer_name || p.SINGER_NAME,
       created_at: p.created_at || p.CREATED_AT,
       updated_at: p.updated_at || p.UPDATED_AT,
     }));
@@ -1460,8 +1478,9 @@ export async function warmupCache(): Promise<void> {
         "LEVEL" as song_level,
         audio_link,
         video_link,
-        ulink,
         golden_voice,
+        reference_gents_pitch,
+        reference_ladies_pitch,
         created_at,
         updated_at
       FROM songs
@@ -1483,8 +1502,9 @@ export async function warmupCache(): Promise<void> {
       level: extractValue(song.SONG_LEVEL),
       audioLink: extractValue(song.AUDIO_LINK),
       videoLink: extractValue(song.VIDEO_LINK),
-      ulink: extractValue(song.ULINK),
       goldenVoice: !!extractValue(song.GOLDEN_VOICE),
+      referenceGentsPitch: extractValue(song.REFERENCE_GENTS_PITCH),
+      referenceLadiesPitch: extractValue(song.REFERENCE_LADIES_PITCH),
       createdAt: extractValue(song.CREATED_AT),
       updatedAt: extractValue(song.UPDATED_AT),
       // CLOB fields will be fetched on-demand:
@@ -1508,6 +1528,7 @@ export async function warmupCache(): Promise<void> {
       SELECT 
         RAWTOHEX(id) as id,
         name,
+        gender,
         created_at,
         updated_at
       FROM singers
@@ -1525,29 +1546,31 @@ export async function warmupCache(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, 500));
 
   try {
-    // OPTIMIZED: Fetch pitches WITHOUT JOINS to reduce recursive SQL
-    // We already have songs and singers cached, so we can lookup names client-side
+    // Fetch pitches with song and singer names for proper sorting
     const pitches = await databaseService.query(`
       SELECT 
-        RAWTOHEX(id) as id,
-        RAWTOHEX(song_id) as song_id,
-        RAWTOHEX(singer_id) as singer_id,
-        pitch,
-        created_at,
-        updated_at
-      FROM song_singer_pitches
-      ORDER BY created_at DESC
+        RAWTOHEX(ssp.id) as id,
+        RAWTOHEX(ssp.song_id) as song_id,
+        RAWTOHEX(ssp.singer_id) as singer_id,
+        ssp.pitch,
+        s.name as song_name,
+        si.name as singer_name,
+        ssp.created_at,
+        ssp.updated_at
+      FROM song_singer_pitches ssp
+      JOIN songs s ON ssp.song_id = s.id
+      JOIN singers si ON ssp.singer_id = si.id
+      ORDER BY s.name, si.name
     `);
 
     // Normalize field names (Oracle returns uppercase) for cache consistency
-    // NOTE: song_name and singer_name will be null - client should lookup from cached songs/singers
     const normalizedPitches = pitches.map((p: any) => ({
       id: p.id || p.ID,
       song_id: p.song_id || p.SONG_ID,
       singer_id: p.singer_id || p.SINGER_ID,
       pitch: p.pitch || p.PITCH,
-      song_name: null,  // Lookup client-side from cached songs
-      singer_name: null,  // Lookup client-side from cached singers
+      song_name: p.song_name || p.SONG_NAME,
+      singer_name: p.singer_name || p.SINGER_NAME,
       created_at: p.created_at || p.CREATED_AT,
       updated_at: p.updated_at || p.UPDATED_AT,
     }));

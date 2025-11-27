@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { SongManager, SingerManager, PitchManager, PasswordDialog, BulkImportUI, CsvImportManager, Analytics } from './components/admin';
+import { SongManager, SingerManager, PitchManager, PasswordDialog, BulkImportUI, CsvImportManager, Analytics, FeedbackManager } from './components/admin';
 import { SongList, PresentationMode } from './components/presentation';
 import { SessionManager } from './components/session/SessionManager';
 import { SessionPresentationMode } from './components/session/SessionPresentationMode';
@@ -110,6 +110,14 @@ function AppContent() {
                     element={
                       <ProtectedRoute requireAdmin={true}>
                         <Layout><Analytics /></Layout>
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/admin/feedback" 
+                    element={
+                      <ProtectedRoute requireAdmin={true}>
+                        <Layout><FeedbackManager /></Layout>
                       </ProtectedRoute>
                     } 
                   />

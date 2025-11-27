@@ -89,7 +89,6 @@ class ImportService {
       songTags: (discovered as any).songtags,
       audioLink: (discovered as any).audio_link,
       videoLink: (discovered as any).video_link,
-      ulink: (discovered as any).ulink,
       goldenVoice: (discovered as any).golden_voice === 'yes',
     };
 

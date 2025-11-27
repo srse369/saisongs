@@ -48,7 +48,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in"
       onClick={handleBackdropClick}
     >
       <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl ${maxWidthClass} w-full max-h-[90vh] overflow-hidden flex flex-col animate-fade-in`}>

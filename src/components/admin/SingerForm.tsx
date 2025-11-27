@@ -9,6 +9,7 @@ interface SingerFormProps {
 
 export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCancel }) => {
   const [name, setName] = useState('');
+  const [gender, setGender] = useState<'Male' | 'Female' | 'Boy' | 'Girl' | 'Other' | ''>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -17,8 +18,10 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
   useEffect(() => {
     if (singer) {
       setName(singer.name);
+      setGender(singer.gender || '');
     } else {
       setName('');
+      setGender('');
     }
     setErrors({});
   }, [singer]);
@@ -30,6 +33,10 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
       newErrors.name = 'Singer name is required';
     } else if (name.length > 255) {
       newErrors.name = 'Singer name must be 255 characters or less';
+    }
+
+    if (!gender) {
+      newErrors.gender = 'Gender is required';
     }
 
     setErrors(newErrors);
@@ -47,6 +54,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
     try {
       await onSubmit({
         name: name.trim(),
+        gender: gender as 'Male' | 'Female' | 'Boy' | 'Girl' | 'Other',
       });
     } finally {
       setIsSubmitting(false);
@@ -72,6 +80,31 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
         />
         {errors.name && (
           <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+        )}
+      </div>
+
+      <div>
+        <label htmlFor="singer-gender" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Gender <span className="text-red-500 dark:text-red-400">*</span>
+        </label>
+        <select
+          id="singer-gender"
+          value={gender}
+          onChange={(e) => setGender(e.target.value as typeof gender)}
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ${
+            errors.gender ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
+          }`}
+          disabled={isSubmitting}
+        >
+          <option value="">Select gender</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Boy">Boy</option>
+          <option value="Girl">Girl</option>
+          <option value="Other">Other</option>
+        </select>
+        {errors.gender && (
+          <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.gender}</p>
         )}
       </div>
 

@@ -76,6 +76,7 @@ class DatabaseService {
     // Configure Oracle client for optimal performance
     oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
     oracledb.autoCommit = true;
+    oracledb.fetchAsString = [oracledb.CLOB]; // Fetch CLOBs as strings
     
     // Set up periodic idle connection cleanup (every 2 minutes)
     setInterval(() => this.cleanupIdleConnections(), 2 * 60 * 1000);

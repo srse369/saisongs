@@ -101,10 +101,6 @@ export const SongDetails: React.FC<SongDetailsProps> = ({ song }) => {
         <div className="break-all">{fullSong.videoLink || '—'}</div>
       </div>
       <div>
-        <div className="font-semibold text-gray-900 dark:text-white">ULink</div>
-        <div className="break-all">{fullSong.ulink || '—'}</div>
-      </div>
-      <div>
         <div className="font-semibold text-gray-900 dark:text-white">Golden Voice</div>
         <div>{fullSong.goldenVoice ? 'Yes' : 'No'}</div>
       </div>

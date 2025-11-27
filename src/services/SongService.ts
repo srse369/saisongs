@@ -100,7 +100,6 @@ class SongService {
         song_tags: input.songTags || null,
         audio_link: input.audioLink || null,
         video_link: input.videoLink || null,
-        ulink: input.ulink || null,
         golden_voice: input.goldenVoice || 0,
       });
     } catch (error) {
@@ -133,11 +132,10 @@ class SongService {
         beat: input.beat,
         raga: input.raga,
         level: input.level,
-        song_tags: input.songTags,
-        audio_link: input.audioLink,
-        video_link: input.videoLink,
-        ulink: input.ulink,
-        golden_voice: input.goldenVoice,
+        songTags: input.songTags,
+        audioLink: input.audioLink,
+        videoLink: input.videoLink,
+        goldenVoice: input.goldenVoice,
       });
       return this.getSongById(id);
     } catch (error) {

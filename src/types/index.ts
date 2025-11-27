@@ -19,8 +19,9 @@ export interface Song {
   songTags?: string;
   audioLink?: string;
   videoLink?: string;
-  ulink?: string;
   goldenVoice?: boolean;
+  referenceGentsPitch?: string;
+  referenceLadiesPitch?: string;
   
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +30,7 @@ export interface Song {
 export interface Singer {
   id: string;
   name: string;
+  gender?: 'Male' | 'Female' | 'Boy' | 'Girl' | 'Other';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -117,8 +119,9 @@ export interface CreateSongInput {
   songTags?: string;
   audioLink?: string;
   videoLink?: string;
-  ulink?: string;
   goldenVoice?: boolean;
+  referenceGentsPitch?: string;
+  referenceLadiesPitch?: string;
 }
 
 export interface UpdateSongInput {
@@ -128,10 +131,12 @@ export interface UpdateSongInput {
 
 export interface CreateSingerInput {
   name: string;
+  gender?: 'Male' | 'Female' | 'Boy' | 'Girl' | 'Other';
 }
 
 export interface UpdateSingerInput {
   name?: string;
+  gender?: 'Male' | 'Female' | 'Boy' | 'Girl' | 'Other';
 }
 
 export interface CreatePitchInput {

@@ -96,13 +96,30 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
             <div className="flex flex-col gap-3">
               {/* Content Section - First */}
               <div className="flex-1 min-w-0">
-                {/* Song Name */}
-                <h3
-                  className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-2 cursor-pointer hover:underline"
-                  onClick={() => onView(song)}
-                >
-                  {song.name}
-                </h3>
+                {/* Song Name - Clickable to preview with external link */}
+                <div className="flex items-center gap-1 mb-2">
+                  <button
+                    onClick={() => handlePresent(song)}
+                    className="text-left text-base sm:text-lg font-semibold text-blue-700 dark:text-blue-300 hover:underline"
+                    title="Click to preview"
+                  >
+                    {song.name}
+                  </button>
+                  {song.externalSourceUrl && (
+                    <a
+                      href={song.externalSourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-shrink-0 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
+                      title="View on external source"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  )}
+                </div>
 
                 {/* Title 2 */}
                 {song.title2 && song.title2.trim().toLowerCase() !== song.name.trim().toLowerCase() && (
@@ -170,17 +187,6 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                     )}
                   </svg>
                   <span className="text-sm font-medium whitespace-nowrap">Add to Session</span>
-                </button>
-                <button
-                  onClick={() => handlePresent(song)}
-                  title="Present"
-                  className="flex items-center gap-2 p-2 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-sm font-medium whitespace-nowrap">Preview</span>
                 </button>
                 {/* Only show View Pitches button when authenticated (pitches contain private singer info) */}
                 {isAuthenticated && (

@@ -44,10 +44,15 @@ router.get('/:id', async (req, res) => {
 // Create new singer
 router.post('/', async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, gender } = req.body;
     
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Singer name is required' });
+    }
+    
+    // Validate gender if provided
+    if (gender && !['Male', 'Female', 'Boy', 'Girl', 'Other'].includes(gender)) {
+      return res.status(400).json({ error: 'Gender must be one of: Male, Female, Boy, Girl, Other' });
     }
     
     // Check for duplicate singer (case-insensitive)
@@ -68,6 +73,7 @@ router.post('/', async (req, res) => {
       const normalizedDuplicate = {
         id: duplicate.id || duplicate.ID,
         name: duplicate.name || duplicate.NAME,
+        gender: duplicate.gender || duplicate.GENDER,
         created_at: duplicate.created_at || duplicate.CREATED_AT,
         updated_at: duplicate.updated_at || duplicate.UPDATED_AT,
       };
@@ -77,7 +83,7 @@ router.post('/', async (req, res) => {
       return res.status(200).json(normalizedDuplicate);
     }
     
-    const newSinger = await cacheService.createSinger(name);
+    const newSinger = await cacheService.createSinger(name, gender);
     res.status(201).json(newSinger);
   } catch (error) {
     console.error('Error creating singer:', error);
@@ -89,8 +95,14 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
-    await cacheService.updateSinger(id, name);
+    const { name, gender } = req.body;
+    
+    // Validate gender if provided
+    if (gender && !['Male', 'Female', 'Boy', 'Girl', 'Other'].includes(gender)) {
+      return res.status(400).json({ error: 'Gender must be one of: Male, Female, Boy, Girl, Other' });
+    }
+    
+    await cacheService.updateSinger(id, name, gender);
     res.json({ message: 'Singer updated successfully' });
   } catch (error) {
     console.error('Error updating singer:', error);
