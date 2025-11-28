@@ -76,6 +76,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
                 value={filters.songName || ''}
                 onChange={(e) => handleFilterChange('songName', e.target.value)}
                 placeholder="Search by song..."
+                autoFocus
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
             </div>

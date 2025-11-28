@@ -135,6 +135,7 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={llmEnabled ? placeholder : 'Search (Enable AI for natural language)...'}
+          autoFocus
           className={`
             w-full pl-10 pr-32 py-2.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
             ${llmEnabled 
