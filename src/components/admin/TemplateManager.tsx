@@ -35,7 +35,9 @@ function templateToYaml(template: PresentationTemplate): string {
     template.images.forEach((img) => {
       lines.push('  - id: ' + escapeYamlString(img.id));
       lines.push(`    url: ${escapeYamlString(img.url)}`);
-      lines.push(`    position: ${img.position}`);
+      if (img.position) lines.push(`    position: ${img.position}`);
+      if (img.x !== undefined) lines.push(`    x: ${escapeYamlString(String(img.x))}`);
+      if (img.y !== undefined) lines.push(`    y: ${escapeYamlString(String(img.y))}`);
       if (img.width) lines.push(`    width: ${escapeYamlString(img.width)}`);
       if (img.height) lines.push(`    height: ${escapeYamlString(img.height)}`);
       if (img.opacity !== undefined) lines.push(`    opacity: ${img.opacity}`);
@@ -51,7 +53,9 @@ function templateToYaml(template: PresentationTemplate): string {
     template.videos.forEach((vid) => {
       lines.push('  - id: ' + escapeYamlString(vid.id));
       lines.push(`    url: ${escapeYamlString(vid.url)}`);
-      lines.push(`    position: ${vid.position}`);
+      if (vid.position) lines.push(`    position: ${vid.position}`);
+      if (vid.x !== undefined) lines.push(`    x: ${escapeYamlString(String(vid.x))}`);
+      if (vid.y !== undefined) lines.push(`    y: ${escapeYamlString(String(vid.y))}`);
       if (vid.width) lines.push(`    width: ${escapeYamlString(vid.width)}`);
       if (vid.height) lines.push(`    height: ${escapeYamlString(vid.height)}`);
       if (vid.opacity !== undefined) lines.push(`    opacity: ${vid.opacity}`);
@@ -70,7 +74,9 @@ function templateToYaml(template: PresentationTemplate): string {
     template.text.forEach((txt) => {
       lines.push('  - id: ' + escapeYamlString(txt.id));
       lines.push(`    content: ${escapeYamlString(txt.content)}`);
-      lines.push(`    position: ${txt.position}`);
+      if (txt.position) lines.push(`    position: ${txt.position}`);
+      if (txt.x !== undefined) lines.push(`    x: ${escapeYamlString(String(txt.x))}`);
+      if (txt.y !== undefined) lines.push(`    y: ${escapeYamlString(String(txt.y))}`);
       if (txt.fontSize) lines.push(`    fontSize: ${escapeYamlString(txt.fontSize)}`);
       if (txt.color) lines.push(`    color: ${escapeYamlString(txt.color)}`);
       if (txt.fontWeight) lines.push(`    fontWeight: ${txt.fontWeight}`);

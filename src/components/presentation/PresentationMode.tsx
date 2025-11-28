@@ -266,9 +266,10 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
       )}
 
       {/* Control buttons - top right */}
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
-        {/* Template selector */}
-        <TemplateSelector 
+      {showOverlay && (
+        <div className="absolute top-4 right-4 z-[1000] flex gap-2 opacity-50 transition-opacity duration-300">
+          {/* Template selector */}
+          <TemplateSelector 
           currentTemplateId={selectedTemplateId}
           onTemplateSelect={(template) => {
             setSelectedTemplateId(template.id);
@@ -305,7 +306,8 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-      </div>
+        </div>
+      )}
 
     </div>
   );

@@ -9,29 +9,29 @@ interface TemplateSelectorProps {
 
 export default function TemplateSelector({ onTemplateSelect, currentTemplateId }: TemplateSelectorProps) {
   const [templates, setTemplates] = useState<PresentationTemplate[]>([]);
-  const [selectedId, setSelectedId] = useState<string>();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Add pulse animation style
+  const pulseStyle = `
+    @keyframes pulse-gentle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .animate-pulse-gentle {
+      animation: pulse-gentle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  `;
 
   useEffect(() => {
     loadTemplates();
   }, []);
-
-  useEffect(() => {
-    setSelectedId(currentTemplateId);
-  }, [currentTemplateId]);
 
   const loadTemplates = async () => {
     try {
       setLoading(true);
       const data = await templateService.getAllTemplates();
       setTemplates(data);
-      
-      // Auto-select default template if available
-      const defaultTemplate = data.find(t => t.isDefault);
-      if (defaultTemplate && !selectedId) {
-        setSelectedId(defaultTemplate.id);
-      }
     } catch (error) {
       console.error('Error loading templates:', error);
     } finally {
@@ -40,35 +40,46 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId }
   };
 
   const handleSelect = (template: PresentationTemplate) => {
-    setSelectedId(template.id);
     if (onTemplateSelect) {
       onTemplateSelect(template);
     }
     setExpanded(false);
   };
 
-  const selectedTemplate = templates.find(t => t.id === selectedId);
+  const selectedTemplate = templates.find(t => t.id === currentTemplateId);
+  const isTemplateSelected = !!selectedTemplate;
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg hover:from-violet-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 shadow-md hover:shadow-lg transition-all duration-200"
-        title="Select presentation template"
-      >
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
-        </svg>
-        <span className="max-w-xs truncate font-medium">{selectedTemplate?.name || 'Select Template'}</span>
-        <svg 
-          className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
+    <>
+      <style>{pulseStyle}</style>
+      <div className="relative">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className={`flex items-center gap-3 px-5 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 shadow-lg hover:shadow-xl transition-all duration-200 font-medium ${
+            isTemplateSelected 
+              ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 focus:ring-purple-500'
+              : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 focus:ring-amber-500 animate-pulse-gentle'
+          }`}
+          title={isTemplateSelected ? 'Select presentation template' : 'Pick a template for presentation'}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-        </svg>
-      </button>
+          <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+          </svg>
+          <div className="flex flex-col items-start gap-0.5">
+            <span className="text-xs font-bold opacity-90 tracking-wider">TEMPLATE</span>
+            <span className="text-sm truncate max-w-xs">
+              {isTemplateSelected ? selectedTemplate?.name : 'Select one'}
+            </span>
+          </div>
+          <svg 
+            className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ml-auto ${expanded ? 'rotate-180' : ''}`}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        </button>
 
       {expanded && (
         <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 min-w-max max-h-96 overflow-y-auto">
@@ -88,7 +99,7 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId }
                   key={template.id}
                   onClick={() => handleSelect(template)}
                   className={`w-full text-left px-4 py-3 transition-colors ${
-                    selectedId === template.id 
+                    currentTemplateId === template.id 
                       ? 'bg-purple-50 dark:bg-purple-900/30 border-l-4 border-purple-600' 
                       : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-l-4 border-transparent'
                   } ${index !== templates.length - 1 ? 'border-b border-gray-100 dark:border-gray-700/50' : ''}`}
@@ -133,7 +144,7 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId }
                         )}
                       </div>
                     </div>
-                    {selectedId === template.id && (
+                    {currentTemplateId === template.id && (
                       <svg className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
@@ -145,6 +156,7 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId }
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

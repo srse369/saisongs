@@ -5,10 +5,14 @@ export interface BackgroundElement {
   opacity?: number;
 }
 
+export type PositionType = 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+
 export interface ImageElement {
   id: string;
   url: string;
-  position: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+  position?: PositionType;
+  x?: number | string; // pixels or percentage (e.g., 10, "10px", "50%")
+  y?: number | string;
   width?: string;
   height?: string;
   opacity?: number;
@@ -18,7 +22,9 @@ export interface ImageElement {
 export interface VideoElement {
   id: string;
   url: string;
-  position: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+  position?: PositionType;
+  x?: number | string;
+  y?: number | string;
   width?: string;
   height?: string;
   opacity?: number;
@@ -31,7 +37,9 @@ export interface VideoElement {
 export interface TextElement {
   id: string;
   content: string;
-  position: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+  position?: PositionType;
+  x?: number | string;
+  y?: number | string;
   fontSize?: string;
   color?: string;
   fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';

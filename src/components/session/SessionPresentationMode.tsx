@@ -5,6 +5,7 @@ import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
 import { SlideView } from '../presentation/SlideView';
 import { SlideNavigation } from '../presentation/SlideNavigation';
+import TemplateSelector from '../presentation/TemplateSelector';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { generateSlides } from '../../utils/slideUtils';
 import ApiClient from '../../services/ApiClient';
@@ -28,6 +29,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const [error, setError] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const [activeTemplate, setActiveTemplate] = useState<PresentationTemplate | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>();
 
   // Load template from query params or default
   useEffect(() => {
@@ -40,9 +42,13 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         if (templateId) {
           // Load specific template from query param
           template = await templateService.getTemplate(templateId);
+          setSelectedTemplateId(templateId);
         } else {
           // Load default template
           template = await templateService.getDefaultTemplate();
+          if (template) {
+            setSelectedTemplateId(template.id);
+          }
         }
         
         if (template) {
@@ -278,7 +284,17 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
       )}
 
       {/* Control buttons - top right */}
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
+      {showOverlay && (
+        <div className="absolute top-4 right-4 z-[1000] flex gap-2 opacity-50 transition-opacity duration-300">
+          {/* Template selector */}
+          <TemplateSelector 
+          currentTemplateId={selectedTemplateId}
+          onTemplateSelect={(template) => {
+            setSelectedTemplateId(template.id);
+            setActiveTemplate(template);
+          }}
+        />
+
         {/* Fullscreen toggle */}
         <button
           onClick={toggleFullScreen}
@@ -308,7 +324,8 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-      </div>
+        </div>
+      )}
 
     </div>
   );

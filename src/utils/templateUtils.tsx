@@ -51,8 +51,13 @@ export const getBackgroundStyles = (template: PresentationTemplate | null): Reac
  * Get position classes for overlay elements
  */
 export const getPositionClasses = (
-  position: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right'
+  position?: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right'
 ): string => {
+  // If no position specified, custom x/y will be used via inline styles
+  if (!position) {
+    return 'absolute';
+  }
+  
   const positionMap: Record<string, string> = {
     'top-left': 'top-0 left-0',
     'top-center': 'top-0 left-1/2 -translate-x-1/2',
@@ -64,19 +69,29 @@ export const getPositionClasses = (
     'bottom-center': 'bottom-0 left-1/2 -translate-x-1/2',
     'bottom-right': 'bottom-0 right-0',
   };
-  return positionMap[position] || '';
+  return `absolute ${positionMap[position] || ''}`;
 };
 
 /**
  * Get inline styles for positioned elements
  */
 export const getElementStyles = (element: any): React.CSSProperties => {
-  return {
+  const styles: React.CSSProperties = {
     width: element.width,
     height: element.height,
     opacity: element.opacity ?? 1,
     zIndex: element.zIndex || 0,
   };
+
+  // Add custom x/y positioning if provided
+  if (element.x !== undefined) {
+    styles.left = typeof element.x === 'number' ? `${element.x}px` : element.x;
+  }
+  if (element.y !== undefined) {
+    styles.top = typeof element.y === 'number' ? `${element.y}px` : element.y;
+  }
+
+  return styles;
 };
 
 /**
