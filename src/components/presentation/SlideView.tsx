@@ -1,13 +1,16 @@
 import React from 'react';
-import type { Slide } from '../../types';
+import type { Slide, PresentationTemplate } from '../../types';
 import { formatPitch } from '../../utils/pitchUtils';
+import { getBackgroundStyles } from '../../utils/templateUtils';
+import { TemplateBackground, TemplateImages, TemplateVideos, TemplateText } from '../../utils/templateUtils';
 
 interface SlideViewProps {
   slide: Slide;
   showTranslation?: boolean;
+  template?: PresentationTemplate | null;
 }
 
-export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = true }) => {
+export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = true, template }) => {
   const sessionSongIndex = (slide as any).sessionSongIndex;
   const totalSongs = (slide as any).totalSongs;
   
@@ -30,9 +33,13 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
   };
   
   const hasTranslation = showTranslation && slide.translation;
+  const backgroundStyles = getBackgroundStyles(template);
   
   return (
-    <div className="presentation-slide">
+    <div className="presentation-slide relative overflow-hidden" style={backgroundStyles}>
+      {/* Template background elements */}
+      <TemplateBackground template={template} />
+      
       {/* Song number and slide position at top-left */}
       {(sessionSongIndex || (slide.songSlideCount && slide.songSlideCount > 1 && slide.songSlideNumber)) && (
         <div className="absolute top-2 left-2 sm:top-3 sm:left-3 text-[0.95rem] sm:text-[1rem] text-blue-100/80 bg-gray-800/25 rounded-lg px-2 py-1 z-10">
@@ -46,7 +53,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
       )}
 
       {/* Song name at top - 15% of screen */}
-      <div className="w-full max-w-6xl border-2 border-blue-400/[0.03] rounded-lg p-2 sm:p-3" style={{ height: '15%' }}>
+      <div className="w-full max-w-6xl border-2 border-blue-400/[0.03] rounded-lg p-2 sm:p-3 relative z-5" style={{ height: '15%' }}>
         <div className="h-full flex items-center justify-center">
           <h1 className="presentation-title">
             {slide.songName}
@@ -56,7 +63,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
 
       {/* Main content area - 60% (with translation) or 80% (without) */}
       <div 
-        className="w-full max-w-6xl px-2 sm:px-4 presentation-main overflow-auto"
+        className="w-full max-w-6xl px-2 sm:px-4 presentation-main overflow-auto relative z-5"
         style={{ height: hasTranslation ? '60%' : '80%' }}
       >
         {/* Original lyrics */}
@@ -69,7 +76,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
 
       {/* Translation (if available and showTranslation is true) - 25% of screen */}
       {hasTranslation && slide.translation && (
-        <div className="w-full max-w-6xl px-2 sm:px-4 overflow-auto" style={{ height: '25%' }}>
+        <div className="w-full max-w-6xl px-2 sm:px-4 overflow-auto relative z-5" style={{ height: '25%' }}>
           <div className="border-2 border-blue-400/[0.03] rounded-lg p-3 sm:p-4 w-full h-full flex items-start justify-center">
             <div 
               className={`text-center leading-relaxed ${getTranslationFontSize()}`}
@@ -118,6 +125,11 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
           </div>
         </div>
       )}
+
+      {/* Template overlays */}
+      <TemplateImages template={template} />
+      <TemplateVideos template={template} />
+      <TemplateText template={template} />
     </div>
   );
 };

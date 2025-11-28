@@ -366,7 +366,7 @@ Optimized to reduce recursive SQL from **40,000 to ~2,000** queries (95% reducti
 ```sql
 SELECT 
   RAWTOHEX(id) as id,
-  name, title, title2, "LANGUAGE", deity, tempo, beat, raga,
+  name, "LANGUAGE", deity, tempo, beat, raga,
   "LEVEL", audio_link, video_link, created_at, updated_at
 FROM songs ORDER BY name
 -- NO DBMS_LOB.SUBSTR calls!
@@ -376,7 +376,7 @@ FROM songs ORDER BY name
 ```sql
 SELECT 
   RAWTOHEX(id) as id,
-  name, title, title2, 
+  name,
   DBMS_LOB.SUBSTR(lyrics, 4000, 1) AS lyrics,
   DBMS_LOB.SUBSTR(meaning, 4000, 1) AS meaning,
   ...
@@ -599,6 +599,138 @@ module.exports = {
   }]
 };
 ```
+
+---
+
+## Presentation Templates System
+
+Comprehensive system for customizing presentation appearances with backgrounds, overlays, and text elements.
+
+### Architecture
+
+**Database:**
+- Table: `presentation_templates`
+- Storage: CLOB for both JSON and YAML formats
+- Default template flagged per system requirement
+
+**Backend:**
+- Service: `TemplateService` in `server/services/TemplateService.ts`
+- Routes: `server/routes/templates.ts`
+- Features: CRUD operations, YAML parsing, JSON validation
+
+**Frontend:**
+- Service: `TemplateService` in `src/services/TemplateService.ts` (API client)
+- Components:
+  - `TemplateManager`: Admin UI for CRUD operations
+  - `TemplateSelector`: Dropdown for template selection in presentations
+  - `SlideView`: Renders templates during presentations
+- Utilities: `src/utils/templateUtils.tsx` for CSS generation
+
+### Data Flow
+
+1. **Admin Creates/Edits Template:**
+   - TemplateManager (React) → TemplateService (API client) → API → TemplateService (backend) → Database
+
+2. **Presentation Loads Template:**
+   - PresentationMode (React) loads default or selected → SlideView applies styles → Browser renders
+
+3. **Template Validation:**
+   - YAML parsed on frontend → Validation API on backend → Error feedback
+
+### Component Hierarchy
+
+```
+PresentationMode
+├── TemplateSelector (template dropdown)
+└── SlideView
+    ├── TemplateBackground (video/image/color)
+    ├── TemplateImages (overlays)
+    ├── TemplateVideos (overlays)
+    └── TemplateText (overlays)
+```
+
+### Template Elements
+
+**Backgrounds:**
+- Color (hex/CSS)
+- Image (URL-based)
+- Video (URL-based with autoplay)
+
+**Overlays:**
+- Images: Positioned with width/height/opacity/z-index
+- Videos: Auto-playing backgrounds with controls hidden
+- Text: Positioned with font styling and opacity
+
+**Positioning:**
+- 9 predefined positions (top-left, top-center, top-right, center-left, center, center-right, bottom-left, bottom-center, bottom-right)
+- CSS-based positioning with Tailwind utilities
+
+### Performance
+
+- **Caching:** Templates loaded on-demand, cached in browser
+- **Rendering:** CSS-based, no heavy calculations
+- **Storage:** JSON format for fast parsing
+- **YAML:** Parsed only when needed (admin operations)
+
+### API Endpoints
+
+```
+GET    /api/templates                 List all templates
+GET    /api/templates/default         Get default template
+GET    /api/templates/:id             Get specific template
+POST   /api/templates                 Create template
+PUT    /api/templates/:id             Update template
+DELETE /api/templates/:id             Delete template
+POST   /api/templates/validate/yaml   Validate YAML syntax
+```
+
+### YAML Format
+
+```yaml
+name: Template Name
+description: Optional description
+background:
+  type: color|image|video
+  value: "#hexcolor" | "https://url"
+  opacity: 0-1
+images: []
+videos: []
+text: []
+```
+
+### State Management
+
+- Templates stored in database
+- Template selection in component state
+- Active template passed via props
+- Automatic default template selection on load
+
+### Extensibility
+
+- Clean component structure for adding new element types
+- YAML format supports future extensions
+- API-driven architecture for easy updates
+
+### Browser Compatibility
+
+- Chrome/Edge: Full support
+- Firefox: Full support
+- Safari: Full support (video autoplay limited)
+- Mobile: Responsive positioning works well
+
+### Known Limitations
+
+1. Video autoplay requires `muted: true` (browser policy)
+2. Videos must have CORS enabled from their source
+3. Template names must be unique in database
+4. No soft delete (deletion is permanent)
+
+### Security
+
+- No authentication required for viewing (presentations are public)
+- Template creation/editing could be restricted to admins (not enforced)
+- YAML parsing uses safe library (js-yaml)
+- No server-side script execution
 
 ---
 

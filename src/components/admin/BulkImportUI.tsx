@@ -132,12 +132,11 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
       }
       
       // Transform superSongJson format to our format
-      // Each song in superSongJson has: song_id, title, title2, lyrics, meaning, language, deity, tempo, beat, raga, level, songtags, audio_link, video_link, golden_voice, url
+      // Each song in superSongJson has: song_id, lyrics, meaning, language, deity, tempo, beat, raga, level, songtags, audio_link, video_link, golden_voice, url
+      const externalSourceUrl = import.meta.env.VITE_EXTERNAL_SOURCE_URL || 'https://localhost:3000';
       const songs = rawSongs.map((s: any) => ({
-        name: s.title2 || s.title || 'Unknown',
-        url: s.url ? `https://external-source${s.url}` : `https://external-source/node/${s.song_id}`,
-        title: s.title,
-        title2: s.title2,
+        name: s.name || 'Unknown',
+        url: s.url ? `${externalSourceUrl}${s.url}` : `${externalSourceUrl}/node/${s.song_id}`,
         lyrics: s.lyrics,
         meaning: s.meaning,
         language: s.language,
@@ -373,7 +372,7 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
                 Manual Import Instructions
               </h3>
               <ol className="text-sm text-blue-800 dark:text-blue-400 space-y-2 list-decimal list-inside">
-                <li>Open <a href="https://external-source/songs" target="_blank" rel="noopener noreferrer" className="underline">external-source/songs</a> in a new tab</li>
+                <li>Open <a href={`${import.meta.env.VITE_EXTERNAL_SOURCE_URL || 'https://sairhythms.sathyasai.org'}/songs`} target="_blank" rel="noopener noreferrer" className="underline">{import.meta.env.VITE_EXTERNAL_SOURCE_URL || 'https://sairhythms.sathyasai.org'}/songs</a> in a new tab</li>
                 <li>Wait for the page to fully load (you should see the song list)</li>
                 <li>Open browser console (F12 or Cmd+Option+I on Mac)</li>
                 <li>Copy and paste this command in the console and press Enter:

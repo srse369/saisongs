@@ -11,6 +11,7 @@ import importMappingsRouter from './routes/importMappings.js';
 import authRouter from './routes/auth.js';
 import analyticsRouter from './routes/analytics.js';
 import feedbackRouter from './routes/feedback.js';
+import templatesRouter from './routes/templates.js';
 import { requireAuth, requireEditor, requireAdmin } from './middleware/simpleAuth.js';
 import { warmupCache } from './services/CacheService.js';
 
@@ -35,6 +36,7 @@ app.use('/api/songs', songsRouter);  // Songs remain public
 app.use('/api/sessions', sessionsRouter);  // Sessions public for presentation mode
 app.use('/api/analytics', analyticsRouter);  // Analytics (routes handle their own auth)
 app.use('/api/feedback', feedbackRouter);  // Feedback is public
+app.use('/api/templates', templatesRouter);  // Templates public for presentation mode
 
 // Protected routes - require authentication
 app.use('/api/singers', requireAuth, singersRouter);  // Singer data is private

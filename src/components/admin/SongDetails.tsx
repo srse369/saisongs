@@ -56,14 +56,6 @@ export const SongDetails: React.FC<SongDetailsProps> = ({ song }) => {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <div className="font-semibold text-gray-900 dark:text-white">Title</div>
-          <div>{fullSong.title || '—'}</div>
-        </div>
-        <div>
-          <div className="font-semibold text-gray-900 dark:text-white">Title 2</div>
-          <div>{fullSong.title2 || '—'}</div>
-        </div>
-        <div>
           <div className="font-semibold text-gray-900 dark:text-white">Language</div>
           <div>{fullSong.language || '—'}</div>
         </div>

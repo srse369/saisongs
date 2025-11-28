@@ -218,10 +218,28 @@ cmd_code() {
         
         echo "  → Uploading PM2 config..."
         eval scp $SSH_OPTS deploy/remote/ecosystem.config.cjs "${REMOTE_USER}@${REMOTE_IP}:${REMOTE_PATH}/"
+        
+        echo "  → Uploading package files..."
+        eval scp $SSH_OPTS package.json "${REMOTE_USER}@${REMOTE_IP}:${REMOTE_PATH}/"
+        eval scp $SSH_OPTS package-lock.json "${REMOTE_USER}@${REMOTE_IP}:${REMOTE_PATH}/"
     fi
 
     echo -e "${GREEN}✅ Files deployed${NC}"
     echo ""
+
+    # Install Dependencies (if backend was updated)
+    if [ "$SKIP_BACKEND" = false ]; then
+        echo "📦 Installing Dependencies..."
+        echo "-----------------------------"
+        
+        ssh_exec << ENDSSH
+            cd ${REMOTE_PATH}
+            npm install --production
+ENDSSH
+        
+        echo -e "${GREEN}✅ Dependencies installed${NC}"
+        echo ""
+    fi
 
     # Restart Backend (if backend was updated)
     if [ "$SKIP_BACKEND" = false ]; then

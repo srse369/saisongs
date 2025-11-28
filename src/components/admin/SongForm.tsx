@@ -10,8 +10,6 @@ interface SongFormProps {
 export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) => {
   const [name, setName] = useState('');
   const [externalSourceUrl, setExternalSourceUrl] = useState('');
-  const [title, setTitle] = useState('');
-  const [title2, setTitle2] = useState('');
   const [lyrics, setLyrics] = useState('');
   const [meaning, setMeaning] = useState('');
   const [language, setLanguage] = useState('');
@@ -35,8 +33,6 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
     if (song) {
       setName(song.name);
       setExternalSourceUrl(song.externalSourceUrl);
-      setTitle(song.title || '');
-      setTitle2(song.title2 || '');
       setLyrics(song.lyrics || '');
       setMeaning(song.meaning || '');
       setLanguage(song.language || '');
@@ -54,8 +50,6 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
     } else {
       setName('');
       setExternalSourceUrl('');
-      setTitle('');
-      setTitle2('');
       setLyrics('');
       setMeaning('');
       setLanguage('');
@@ -112,8 +106,6 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
       await onSubmit({
         name: name.trim(),
         externalSourceUrl: externalSourceUrl.trim(),
-        title: title.trim() || undefined,
-        title2: title2.trim() || undefined,
         lyrics: lyrics.trim() || undefined,
         meaning: meaning.trim() || undefined,
         language: language.trim() || undefined,
@@ -186,36 +178,6 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
         <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Song Details (Optional)</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Title */}
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Title
-            </label>
-            <input
-              id="title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          {/* Title2 */}
-          <div>
-            <label htmlFor="title2" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Title 2 (Full)
-            </label>
-            <input
-              id="title2"
-              type="text"
-              value={title2}
-              onChange={(e) => setTitle2(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
-              disabled={isSubmitting}
-            />
-          </div>
-
           {/* Language */}
           <div>
             <label htmlFor="language" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

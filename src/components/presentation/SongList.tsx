@@ -48,8 +48,6 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
     return base.filter(song => {
       const fields = [
         song.name,
-        song.title,
-        song.title2,
         song.language,
         song.deity,
         song.tempo,

@@ -3,6 +3,7 @@
  * Handles song discovery, matching, and database operations.
  */
 
+import apiClient from './ApiClient';
 import songService from './SongService';
 import externalSongsScraperService, { type DiscoveredSong } from './ExternalSongsScraperService';
 import type { Song } from '../types';
@@ -48,6 +49,30 @@ class ImportService {
   private static readonly BATCH_SIZE = 10;
 
   /**
+   * Extracts reference pitches from a song URL via backend proxy to avoid CORS
+   * @param url - Song URL from external source
+   * @returns Object with reference gents and ladies pitches, or nulls if not found
+   */
+  private async extractReferencePitches(url: string): Promise<{
+    referenceGentsPitch: string | null;
+    referenceLadiesPitch: string | null;
+  }> {
+    try {
+      console.log(`📊 Fetching reference pitches from: ${url}`);
+      const response = await apiClient.post<{
+        referenceGentsPitch: string | null;
+        referenceLadiesPitch: string | null;
+      }>('/songs/extract-pitches', { url });
+      
+      console.log(`✅ Extracted pitches - Gents: ${response.referenceGentsPitch}, Ladies: ${response.referenceLadiesPitch}`);
+      return response;
+    } catch (error) {
+      console.error(`❌ Failed to extract reference pitches from ${url}:`, error);
+      return { referenceGentsPitch: null, referenceLadiesPitch: null };
+    }
+  }
+
+  /**
    * Processes a single discovered song (create or update) using an in-memory cache
    * of existing songs keyed by externalSourceUrl. This avoids fetching all songs
    * for every record and lets us perform a true UPSERT behavior.
@@ -73,11 +98,12 @@ class ImportService {
       operation: existing ? 'update' : 'create',
     });
 
+    // Extract reference pitches from the song URL
+    const { referenceGentsPitch, referenceLadiesPitch } = await this.extractReferencePitches(discovered.url);
+
     const payload = {
       name: discovered.name,
       externalSourceUrl: discovered.url,
-      title: (discovered as any).title,
-      title2: (discovered as any).title2,
       lyrics: (discovered as any).lyrics,
       meaning: (discovered as any).meaning,
       language: (discovered as any).language,
@@ -90,6 +116,8 @@ class ImportService {
       audioLink: (discovered as any).audio_link,
       videoLink: (discovered as any).video_link,
       goldenVoice: (discovered as any).golden_voice === 'yes',
+      referenceGentsPitch: referenceGentsPitch || undefined,
+      referenceLadiesPitch: referenceLadiesPitch || undefined,
     };
 
     if (existing) {

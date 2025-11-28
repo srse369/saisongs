@@ -1,3 +1,67 @@
+// Presentation Template interfaces
+export interface BackgroundElement {
+  type: 'color' | 'image' | 'video';
+  value: string;
+  opacity?: number;
+}
+
+export interface ImageElement {
+  id: string;
+  url: string;
+  position: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+  width?: string;
+  height?: string;
+  opacity?: number;
+  zIndex?: number;
+}
+
+export interface VideoElement {
+  id: string;
+  url: string;
+  position: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+  width?: string;
+  height?: string;
+  opacity?: number;
+  zIndex?: number;
+  autoPlay?: boolean;
+  loop?: boolean;
+  muted?: boolean;
+}
+
+export interface TextElement {
+  id: string;
+  content: string;
+  position: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+  fontSize?: string;
+  color?: string;
+  fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
+  fontFamily?: string;
+  opacity?: number;
+  zIndex?: number;
+  maxWidth?: string;
+}
+
+export interface PresentationTemplate {
+  id?: string;
+  name: string;
+  description?: string;
+  background?: BackgroundElement;
+  images?: ImageElement[];
+  videos?: VideoElement[];
+  text?: TextElement[];
+  isDefault?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+  yaml?: string;
+}
+
+export interface TemplateReference {
+  id: string;
+  name: string;
+  description?: string;
+  isDefault: boolean;
+}
+
 // Core entity interfaces
 
 export interface Song {
@@ -6,8 +70,6 @@ export interface Song {
   externalSourceUrl: string;
   
   // Cached data from external source
-  title?: string;
-  title2?: string;
   lyrics?: string;
   meaning?: string;
   language?: string;
@@ -106,8 +168,6 @@ export interface SongWithPitches extends Song {
 export interface CreateSongInput {
   name: string;
   externalSourceUrl: string;
-  title?: string;
-  title2?: string;
   lyrics?: string;
   meaning?: string;
   language?: string;

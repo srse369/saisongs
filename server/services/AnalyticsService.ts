@@ -87,11 +87,7 @@ class AnalyticsService {
    */
   async trackVisitor(visitorData: VisitorData): Promise<void> {
     try {
-      console.log(`[Analytics] 🔍 Tracking visitor: IP=${visitorData.ipAddress}, Role=${visitorData.userRole}, Path=${visitorData.pagePath}`);
-      
       const geo = await this.getGeolocation(visitorData.ipAddress);
-      
-      console.log(`[Analytics] 📍 Geolocation: ${geo.city || 'unknown'}, ${geo.country || 'unknown'} (${geo.latitude},${geo.longitude})`);
 
       await databaseService.query(`
         INSERT INTO visitor_analytics (
@@ -112,8 +108,6 @@ class AnalyticsService {
         visitorData.referrer || null,
         visitorData.userRole || 'public'
       ]);
-      
-      console.log(`[Analytics] ✅ Visitor tracked successfully`);
     } catch (error) {
       // Don't fail the request if analytics fails
       console.error('[Analytics] ❌ Failed to track visitor:', error);

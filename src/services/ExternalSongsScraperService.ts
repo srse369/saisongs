@@ -103,7 +103,7 @@ Note: Automatic import is currently not possible due to CORS restrictions.
             
             // Convert to our format
             const songs: DiscoveredSong[] = superSongJson.map((song: any) => ({
-              name: song.title || song.title2 || 'Unknown Song',
+              name: song.name || 'Unknown Song',
               url: `${this.EXTERNALSONGS_BASE_URL}/node/${song.song_id}`
             })).filter((song: DiscoveredSong) => song.name !== 'Unknown Song');
             

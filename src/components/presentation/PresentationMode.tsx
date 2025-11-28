@@ -1,28 +1,57 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SlideView } from './SlideView';
 import { SlideNavigation } from './SlideNavigation';
+import TemplateSelector from './TemplateSelector';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { generateSlides } from '../../utils/slideUtils';
-import type { Slide, Song } from '../../types';
+import type { Slide, Song, PresentationTemplate } from '../../types';
 import apiClient from '../../services/ApiClient';
+import templateService from '../../services/TemplateService';
 import { useSearchParams } from 'react-router-dom';
 
 interface PresentationModeProps {
   songId: string;
   onExit?: () => void;
+  templateId?: string;
 }
 
-export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onExit }) => {
+export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onExit, templateId }) => {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
+  const [activeTemplate, setActiveTemplate] = useState<PresentationTemplate | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(templateId);
 
   const [searchParams] = useSearchParams();
   const singerName = searchParams.get('singerName') || undefined;
   const pitch = searchParams.get('pitch') || undefined;
+
+  // Load template on mount or when templateId changes
+  useEffect(() => {
+    const loadTemplate = async () => {
+      try {
+        if (selectedTemplateId) {
+          const template = await templateService.getTemplate(selectedTemplateId);
+          setActiveTemplate(template);
+        } else {
+          // Try to load default template
+          const defaultTemplate = await templateService.getDefaultTemplate();
+          if (defaultTemplate) {
+            setActiveTemplate(defaultTemplate);
+            setSelectedTemplateId(defaultTemplate.id);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading template:', error);
+        // Continue without template if loading fails
+      }
+    };
+
+    loadTemplate();
+  }, [selectedTemplateId]);
 
   // Load song and generate slides
   useEffect(() => {
@@ -222,7 +251,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     <div className="relative h-screen w-screen overflow-hidden bg-gray-900">
       {/* Slide view */}
       <div className="h-full w-full">
-        <SlideView slide={currentSlide} showTranslation={true} />
+        <SlideView slide={currentSlide} showTranslation={true} template={activeTemplate} />
       </div>
 
       {/* Navigation controls at bottom center - auto-hide after 2 seconds */}
@@ -238,6 +267,15 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
 
       {/* Control buttons - top right */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
+        {/* Template selector */}
+        <TemplateSelector 
+          currentTemplateId={selectedTemplateId}
+          onTemplateSelect={(template) => {
+            setSelectedTemplateId(template.id);
+            setActiveTemplate(template);
+          }}
+        />
+
         {/* Fullscreen toggle */}
         <button
           onClick={toggleFullScreen}

@@ -83,20 +83,6 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
               />
             </div>
 
-            {/* Title */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Title
-              </label>
-              <input
-                type="text"
-                value={filters.title || ''}
-                onChange={(e) => handleFilterChange('title', e.target.value)}
-                placeholder="Search by title..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
             {/* Deity */}
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">

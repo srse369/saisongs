@@ -116,8 +116,6 @@ export function createSongFuzzySearch(songs: Song[]) {
   return new Fuse(songs, {
     keys: [
       { name: 'name', weight: 2 },
-      { name: 'title', weight: 1.5 },
-      { name: 'title2', weight: 1.5 },
       { name: 'deity', weight: 1 },
       { name: 'language', weight: 1 },
       { name: 'raga', weight: 1 },

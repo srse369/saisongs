@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { SongManager, SingerManager, PitchManager, PasswordDialog, BulkImportUI, CsvImportManager, Analytics, FeedbackManager } from './components/admin';
+import { SongManager, SingerManager, PitchManager, PasswordDialog, BulkImportUI, CsvImportManager, Analytics, FeedbackManager, TemplateManager } from './components/admin';
 import { SongList, PresentationMode } from './components/presentation';
 import { SessionManager } from './components/session/SessionManager';
 import { SessionPresentationMode } from './components/session/SessionPresentationMode';
@@ -8,6 +8,7 @@ import { Layout } from './components/Layout';
 import { SongProvider, useSongs } from './contexts/SongContext';
 import { SingerProvider, useSingers } from './contexts/SingerContext';
 import { PitchProvider, usePitches } from './contexts/PitchContext';
+import { TemplateProvider, useTemplates } from './contexts/TemplateContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SessionProvider } from './contexts/SessionContext';
@@ -24,6 +25,7 @@ function AppContent() {
   const { fetchSongs } = useSongs();
   const { fetchSingers } = useSingers();
   const { fetchAllPitches } = usePitches();
+  const { fetchTemplates } = useTemplates();
   const initialLoadDone = useRef(false);
   
   // Track page views for analytics
@@ -38,11 +40,12 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only run once on mount
 
-  // Warm up cache for protected data (singers, pitches) when user authenticates
+  // Warm up cache for protected data (singers, pitches, templates) when user authenticates
   useEffect(() => {
     if (isAuthenticated) {
       fetchSingers();
       fetchAllPitches();
+      fetchTemplates();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]); // Fetch when authentication status changes
@@ -121,6 +124,14 @@ function AppContent() {
                       </ProtectedRoute>
                     } 
                   />
+                  <Route 
+                    path="/admin/templates" 
+                    element={
+                      <ProtectedRoute requireAdmin={true}>
+                        <Layout><TemplateManager /></Layout>
+                      </ProtectedRoute>
+                    } 
+                  />
                   
                   {/* Presentation Mode without Layout (full-screen) */}
                   <Route path="/presentation/:songId" element={<PresentationModePage />} />
@@ -193,13 +204,15 @@ function App() {
           <SongProvider>
             <SingerProvider>
               <PitchProvider>
-                <NamedSessionProvider>
-                  <SessionProvider>
-                    <BrowserRouter>
-                      <AppContent />
-                    </BrowserRouter>
-                  </SessionProvider>
-                </NamedSessionProvider>
+                <TemplateProvider>
+                  <NamedSessionProvider>
+                    <SessionProvider>
+                      <BrowserRouter>
+                        <AppContent />
+                      </BrowserRouter>
+                    </SessionProvider>
+                  </NamedSessionProvider>
+                </TemplateProvider>
               </PitchProvider>
             </SingerProvider>
           </SongProvider>

@@ -87,8 +87,6 @@ class SongService {
       return await apiClient.createSong({
         name: input.name.trim(),
         external_source_url: input.externalSourceUrl.trim(),
-        title: input.title || null,
-        title2: input.title2 || null,
         lyrics: input.lyrics || null,
         meaning: input.meaning || null,
         language: input.language || null,
@@ -122,8 +120,6 @@ class SongService {
       await apiClient.updateSong(id, {
         name: input.name?.trim(),
         external_source_url: input.externalSourceUrl?.trim(),
-        title: input.title,
-        title2: input.title2,
         lyrics: input.lyrics,
         meaning: input.meaning,
         language: input.language,
@@ -162,6 +158,30 @@ class SongService {
   }
 
   /**
+   * Syncs a song from its external source URL
+   * Fetches metadata (pitches, etc.) and updates the song
+   */
+  async syncSong(id: string): Promise<{ message: string; updates: Record<string, any> } | null> {
+    try {
+      // First, fetch the song to get its externalSourceUrl
+      const song = await this.getSongById(id);
+      if (!song || !song.externalSourceUrl) {
+        console.error('Song not found or missing externalSourceUrl');
+        return null;
+      }
+
+      const response = await apiClient.post<{ message: string; updates: Record<string, any> }>(
+        `/songs/${id}/sync`,
+        { externalUrl: song.externalSourceUrl }
+      );
+      return response;
+    } catch (error) {
+      console.error('Error syncing song:', error);
+      return null;
+    }
+  }
+
+  /**
    * Searches songs by name
    */
   async searchSongs(query: string): Promise<Song[]> {
@@ -169,9 +189,7 @@ class SongService {
       const allSongs = await this.getAllSongs();
       const lowerQuery = query.toLowerCase();
       return allSongs.filter(song => 
-        song.name.toLowerCase().includes(lowerQuery) ||
-        song.title?.toLowerCase().includes(lowerQuery) ||
-        song.title2?.toLowerCase().includes(lowerQuery)
+        song.name.toLowerCase().includes(lowerQuery)
       );
     } catch (error) {
       console.error('Error searching songs:', error);
@@ -212,3 +230,4 @@ class SongService {
 // Export singleton instance
 export const songService = new SongService();
 export default songService;
+

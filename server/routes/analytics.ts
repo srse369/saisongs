@@ -25,8 +25,6 @@ router.post('/track', async (req, res) => {
 
     const userRole = (req.headers['x-user-role'] as string) || 'public';
 
-    console.log(`[Analytics] 📊 Track: ${userRole} → ${path || '/'} from ${ipAddress || 'unknown IP'}`);
-
     // Track asynchronously (respond immediately)
     setImmediate(() => {
       analyticsService.trackVisitor({

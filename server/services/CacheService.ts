@@ -3,6 +3,8 @@
  * Reduces database load by caching query results with TTL
  */
 
+import * as yaml from 'js-yaml';
+
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
@@ -139,8 +141,6 @@ class CacheService {
         RAWTOHEX(id) as id,
         name,
         external_source_url,
-        title,
-        title2,
         "LANGUAGE" as language,
         deity,
         tempo,
@@ -162,8 +162,6 @@ class CacheService {
       id: extractValue(song.ID),
       name: extractValue(song.NAME),
       externalSourceUrl: extractValue(song.EXTERNAL_SOURCE_URL),
-      title: extractValue(song.TITLE),
-      title2: extractValue(song.TITLE2),
       language: extractValue(song.LANGUAGE),
       deity: extractValue(song.DEITY),
       tempo: extractValue(song.TEMPO),
@@ -203,8 +201,6 @@ class CacheService {
         RAWTOHEX(id) as id,
         name,
         external_source_url,
-        title,
-        title2,
         DBMS_LOB.SUBSTR(lyrics, 4000, 1) AS lyrics,
         DBMS_LOB.SUBSTR(meaning, 4000, 1) AS meaning,
         "LANGUAGE" as language,
@@ -232,8 +228,6 @@ class CacheService {
       id: extractValue(song.ID),
       name: extractValue(song.NAME),
       externalSourceUrl: extractValue(song.EXTERNAL_SOURCE_URL),
-      title: extractValue(song.TITLE),
-      title2: extractValue(song.TITLE2),
       lyrics: extractValue(song.LYRICS),
       meaning: extractValue(song.MEANING),
       language: extractValue(song.LANGUAGE),
@@ -262,8 +256,6 @@ class CacheService {
     const params = [
       String(songData.name || ''),
       String(songData.external_source_url || ''),
-      String(songData.title || ''),
-      String(songData.title2 || ''),
       String(songData.lyrics || ''),
       String(songData.meaning || ''),
       String(songData.language || ''),
@@ -282,12 +274,12 @@ class CacheService {
 
     await db.query(`
       INSERT INTO songs (
-        name, external_source_url, title, title2, lyrics, meaning,
+        name, external_source_url, lyrics, meaning,
         "LANGUAGE", deity, tempo, beat, raga, "LEVEL",
         song_tags, audio_link, video_link, golden_voice,
         reference_gents_pitch, reference_ladies_pitch
       ) VALUES (
-        :1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17, :18
+        :1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16
       )
     `, params);
 
@@ -297,8 +289,6 @@ class CacheService {
         RAWTOHEX(id) as id,
         name,
         external_source_url,
-        title,
-        title2,
         DBMS_LOB.SUBSTR(lyrics, 4000, 1) AS lyrics,
         DBMS_LOB.SUBSTR(meaning, 4000, 1) AS meaning,
         "LANGUAGE" as language,
@@ -327,8 +317,6 @@ class CacheService {
         id: extractValue(newSong.ID),
         name: extractValue(newSong.NAME),
         externalSourceUrl: extractValue(newSong.EXTERNAL_SOURCE_URL),
-        title: extractValue(newSong.TITLE),
-        title2: extractValue(newSong.TITLE2),
         lyrics: extractValue(newSong.LYRICS),
         meaning: extractValue(newSong.MEANING),
         language: extractValue(newSong.LANGUAGE),
@@ -363,8 +351,6 @@ class CacheService {
     const params = [
       String(songData.name || ''),
       String(songData.external_source_url || ''),
-      String(songData.title || ''),
-      String(songData.title2 || ''),
       String(songData.lyrics || ''),
       String(songData.meaning || ''),
       String(songData.language || ''),
@@ -377,6 +363,8 @@ class CacheService {
       String(songData.audio_link || ''),
       String(songData.video_link || ''),
       Number(songData.golden_voice || 0),
+      songData.reference_gents_pitch ? String(songData.reference_gents_pitch) : null,
+      songData.reference_ladies_pitch ? String(songData.reference_ladies_pitch) : null,
       String(id)
     ];
 
@@ -384,20 +372,20 @@ class CacheService {
       UPDATE songs SET
         name = :1,
         external_source_url = :2,
-        title = :3,
-        title2 = :4,
-        lyrics = :5,
-        meaning = :6,
-        "LANGUAGE" = :7,
-        deity = :8,
-        tempo = :9,
-        beat = :10,
-        raga = :11,
-        "LEVEL" = :12,
-        song_tags = :13,
-        audio_link = :14,
-        video_link = :15,
-        golden_voice = :16,
+        lyrics = :3,
+        meaning = :4,
+        "LANGUAGE" = :5,
+        deity = :6,
+        tempo = :7,
+        beat = :8,
+        raga = :9,
+        "LEVEL" = :10,
+        song_tags = :11,
+        audio_link = :12,
+        video_link = :13,
+        golden_voice = :14,
+        reference_gents_pitch = :15,
+        reference_ladies_pitch = :16,
         updated_at = CURRENT_TIMESTAMP
       WHERE RAWTOHEX(id) = :17
     `, params);
@@ -408,8 +396,6 @@ class CacheService {
         RAWTOHEX(id) as id,
         name,
         external_source_url,
-        title,
-        title2,
         DBMS_LOB.SUBSTR(lyrics, 4000, 1) AS lyrics,
         DBMS_LOB.SUBSTR(meaning, 4000, 1) AS meaning,
         "LANGUAGE" as language,
@@ -436,8 +422,6 @@ class CacheService {
         id: extractValue(updatedSong.ID),
         name: extractValue(updatedSong.NAME),
         externalSourceUrl: extractValue(updatedSong.EXTERNAL_SOURCE_URL),
-        title: extractValue(updatedSong.TITLE),
-        title2: extractValue(updatedSong.TITLE2),
         lyrics: extractValue(updatedSong.LYRICS),
         meaning: extractValue(updatedSong.MEANING),
         language: extractValue(updatedSong.LANGUAGE),
@@ -853,6 +837,63 @@ class CacheService {
 
     this.set(cacheKey, mappedSessions, 5 * 60 * 1000);
     return mappedSessions;
+  }
+
+  async getAllTemplates(): Promise<any[]> {
+    const cacheKey = 'templates:all';
+    const cached = this.get(cacheKey);
+    if (cached && Array.isArray(cached)) return cached;
+
+    const db = await this.getDatabase();
+    const templates = await db.query(`
+      SELECT 
+        id,
+        name,
+        description,
+        template_json,
+        is_default,
+        created_at,
+        updated_at
+      FROM presentation_templates 
+      ORDER BY is_default DESC, name ASC
+    `);
+
+    const mappedTemplates = templates.map((row: any) => {
+      let templateJson: any = {};
+      try {
+        templateJson = typeof row.TEMPLATE_JSON === 'string' ? JSON.parse(row.TEMPLATE_JSON) : row.TEMPLATE_JSON || {};
+      } catch (e) {
+        console.error('Error parsing template JSON:', e);
+      }
+
+      const template: any = {
+        id: row.ID,
+        name: row.NAME,
+        description: row.DESCRIPTION,
+        background: templateJson.background,
+        images: templateJson.images || [],
+        videos: templateJson.videos || [],
+        text: templateJson.text || [],
+        isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
+        createdAt: row.CREATED_AT,
+        updatedAt: row.UPDATED_AT,
+      };
+
+      // Reconstruct YAML from template data (same as TemplateService)
+      template.yaml = yaml.dump({
+        name: template.name,
+        description: template.description,
+        background: template.background,
+        images: template.images || [],
+        videos: template.videos || [],
+        text: template.text || [],
+      });
+
+      return template;
+    });
+
+    this.set(cacheKey, mappedTemplates, 5 * 60 * 1000);
+    return mappedTemplates;
   }
 
   async getSession(id: string): Promise<any> {
@@ -1468,8 +1509,6 @@ export async function warmupCache(): Promise<void> {
         RAWTOHEX(id) as id,
         name,
         external_source_url,
-        title,
-        title2,
         "LANGUAGE" as language,
         deity,
         tempo,
@@ -1492,8 +1531,6 @@ export async function warmupCache(): Promise<void> {
       id: extractValue(song.ID),
       name: extractValue(song.NAME),
       externalSourceUrl: extractValue(song.EXTERNAL_SOURCE_URL),
-      title: extractValue(song.TITLE),
-      title2: extractValue(song.TITLE2),
       language: extractValue(song.LANGUAGE),
       deity: extractValue(song.DEITY),
       tempo: extractValue(song.TEMPO),
@@ -1609,6 +1646,64 @@ export async function warmupCache(): Promise<void> {
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache sessions:', error instanceof Error ? error.message : error);
+    failureCount++;
+  }
+
+  // Small delay between queries to avoid overwhelming the pool
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  try {
+    const templates = await databaseService.query(`
+      SELECT 
+        id,
+        name,
+        description,
+        template_json,
+        is_default,
+        created_at,
+        updated_at
+      FROM presentation_templates 
+      ORDER BY is_default DESC, name ASC
+    `);
+
+    const mappedTemplates = templates.map((row: any) => {
+      let templateJson: any = {};
+      try {
+        templateJson = typeof row.TEMPLATE_JSON === 'string' ? JSON.parse(row.TEMPLATE_JSON) : row.TEMPLATE_JSON || {};
+      } catch (e) {
+        console.error('Error parsing template JSON:', e);
+      }
+
+      const template: any = {
+        id: row.ID,
+        name: row.NAME,
+        description: row.DESCRIPTION,
+        background: templateJson.background,
+        images: templateJson.images || [],
+        videos: templateJson.videos || [],
+        text: templateJson.text || [],
+        isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
+        createdAt: row.CREATED_AT,
+        updatedAt: row.UPDATED_AT,
+      };
+
+      // Reconstruct YAML from template data
+      template.yaml = yaml.dump({
+        name: template.name,
+        description: template.description,
+        background: template.background,
+        images: template.images || [],
+        videos: template.videos || [],
+        text: template.text || [],
+      });
+
+      return template;
+    });
+
+    cacheService.set('templates:all', mappedTemplates, CACHE_TTL);
+    successCount++;
+  } catch (error) {
+    console.error('  ✗ Failed to cache templates:', error instanceof Error ? error.message : error);
     failureCount++;
   }
 

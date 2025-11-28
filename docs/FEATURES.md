@@ -304,8 +304,6 @@ When you type a query, the system:
 | Field | Weight |
 |-------|--------|
 | Name | 2.0 |
-| Title | 1.5 |
-| Title2 | 1.5 |
 | Deity | 1.0 |
 | Language | 1.0 |
 | Raga | 1.0 |
@@ -436,7 +434,7 @@ Click **"Ask AI"** or press **Enter** to:
 
 ## Presentation Mode
 
-Display songs and lyrics in a clean, distraction-free presentation view.
+Display songs and lyrics in a clean, distraction-free presentation view with customizable templates.
 
 ### Features
 
@@ -446,6 +444,9 @@ Display songs and lyrics in a clean, distraction-free presentation view.
 - Keyboard shortcuts
 - Mobile-friendly
 - Live session support
+- **Customizable presentation templates**
+- Template selector with live preview
+- Support for backgrounds, images, videos, and text overlays
 
 ### Navigation
 
@@ -460,6 +461,7 @@ Display songs and lyrics in a clean, distraction-free presentation view.
 - Navigation arrows
 - Slide counter
 - Exit button
+- **🎨 Template selector** (top-right) for switching templates during presentation
 
 ### Accessing Presentation Mode
 
@@ -467,6 +469,205 @@ Display songs and lyrics in a clean, distraction-free presentation view.
 2. Click **"Presentation Mode"** button
 3. Navigate through slides
 4. Press `Esc` to exit
+
+---
+
+### Presentation Templates
+
+Customize the appearance of presentations with backgrounds, overlays, images, videos, and text elements.
+
+#### Quick Setup
+
+1. Open Admin panel → **Presentation Templates**
+2. Click **➕ New Template**
+3. Enter template name and description
+4. Configure in YAML format
+5. Click **💾 Save**
+6. Use **⭐ Set Default** to make it default for all presentations
+
+#### Template Configuration
+
+Templates are defined in YAML format:
+
+```yaml
+name: Template Name
+description: Optional description
+background:
+  type: color|image|video
+  value: "#hexcolor" | "https://url" | "https://video-url"
+  opacity: 0-1
+images:
+  - id: unique-id
+    url: https://example.com/image.png
+    position: top-left|top-center|top-right|center-left|center|center-right|bottom-left|bottom-center|bottom-right
+    width: "100px"
+    height: "100px"
+    opacity: 0.8
+    zIndex: 1
+videos:
+  - id: unique-id
+    url: https://example.com/video.mp4
+    position: center
+    width: "80%"
+    height: "400px"
+    opacity: 0.5
+    autoPlay: true
+    loop: true
+    muted: true
+text:
+  - id: unique-id
+    content: "Text to display"
+    position: bottom-center
+    fontSize: "24px"
+    color: "#ffffff"
+    fontWeight: bold
+    opacity: 0.9
+```
+
+#### Position Values
+
+Elements can be positioned using these predefined locations:
+
+```
+top-left        top-center        top-right
+center-left     center            center-right
+bottom-left     bottom-center     bottom-right
+```
+
+#### Using Templates in Presentations
+
+1. Start a presentation
+2. Click **🎨** button in the top-right corner
+3. Select a template from the dropdown
+4. Template applies immediately
+5. Switch templates at any time during presentation
+
+#### Template Examples
+
+**Simple Dark Background:**
+```yaml
+name: Dark Background
+background:
+  type: color
+  value: '#1a1a1a'
+images: []
+videos: []
+text: []
+```
+
+**With Logo:**
+```yaml
+name: Branded
+background:
+  type: color
+  value: '#f5f5f5'
+images:
+  - id: logo
+    url: 'https://example.com/logo.png'
+    position: top-right
+    width: '120px'
+    height: '120px'
+    opacity: 0.9
+videos: []
+text: []
+```
+
+**Spiritual Theme:**
+```yaml
+name: Spiritual
+background:
+  type: color
+  value: '#8b4513'
+images:
+  - id: corner
+    url: 'https://example.com/design.png'
+    position: bottom-right
+    width: '200px'
+    height: '200px'
+    opacity: 0.3
+text:
+  - id: om
+    content: 'ॐ'
+    position: top-center
+    fontSize: '48px'
+    color: '#ffd700'
+    opacity: 0.6
+```
+
+**Video Background:**
+```yaml
+name: Dynamic Background
+background:
+  type: color
+  value: '#000000'
+videos:
+  - id: bg
+    url: 'https://example.com/background.mp4'
+    position: center
+    width: '100%'
+    height: '100%'
+    opacity: 0.3
+    autoPlay: true
+    loop: true
+    muted: true
+images: []
+text: []
+```
+
+#### Best Practices
+
+1. **Opacity Control:** Use opacity to prevent overlays from blocking lyrics
+   - Background overlays: 0.3-0.5 (subtle)
+   - Logo/elements: 0.7-1.0 (visible)
+
+2. **Layering:** Control with z-index
+   - Background video: 0
+   - Background images: 1-5
+   - Text overlays: 10+
+
+3. **Responsive Sizing:** Use flexible units
+   - Percentages for flexibility: `width: "100%"`
+   - Fixed sizes for logos: `width: "120px"`
+
+#### Opacity Reference
+
+- `1` = fully opaque (solid)
+- `0.5` = 50% transparent
+- `0.3` = 70% transparent (subtle)
+- `0` = invisible
+
+#### Common Issues
+
+**Q: Template doesn't appear in presentations?**
+A: Make sure it's set as default or selected in the template dropdown.
+
+**Q: Images/videos not loading?**
+A: Check that the URL is accessible and CORS-enabled.
+
+**Q: Overlays blocking lyrics?**
+A: Reduce opacity (try 0.3-0.5) or move away from center.
+
+#### API Access
+
+```bash
+# Get default template
+curl http://localhost:3001/api/templates/default
+
+# List all templates
+curl http://localhost:3001/api/templates
+
+# Create template
+curl -X POST http://localhost:3001/api/templates \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Template",
+    "description": "My awesome template",
+    "background": {"type": "color", "value": "#ffffff"},
+    "images": [],
+    "videos": [],
+    "text": []
+  }'
+```
 
 ---
 

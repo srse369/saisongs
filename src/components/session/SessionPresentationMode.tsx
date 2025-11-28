@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useSession } from '../../contexts/SessionContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
@@ -7,13 +8,15 @@ import { SlideNavigation } from '../presentation/SlideNavigation';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { generateSlides } from '../../utils/slideUtils';
 import ApiClient from '../../services/ApiClient';
-import type { Slide, Song } from '../../types';
+import templateService from '../../services/TemplateService';
+import type { Slide, Song, PresentationTemplate } from '../../types';
 
 interface SessionPresentationModeProps {
   onExit?: () => void;
 }
 
 export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = ({ onExit }) => {
+  const [searchParams] = useSearchParams();
   const { entries } = useSession();
   const { songs } = useSongs();
   const { singers } = useSingers();
@@ -24,6 +27,35 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
+  const [activeTemplate, setActiveTemplate] = useState<PresentationTemplate | null>(null);
+
+  // Load template from query params or default
+  useEffect(() => {
+    const loadTemplate = async () => {
+      try {
+        const templateId = searchParams.get('templateId');
+        
+        let template: PresentationTemplate | null = null;
+        
+        if (templateId) {
+          // Load specific template from query param
+          template = await templateService.getTemplate(templateId);
+        } else {
+          // Load default template
+          template = await templateService.getDefaultTemplate();
+        }
+        
+        if (template) {
+          setActiveTemplate(template);
+        }
+      } catch (error) {
+        console.error('Error loading template:', error);
+        // Continue without template if loading fails
+      }
+    };
+
+    loadTemplate();
+  }, [searchParams]);
 
   // Build a flattened slide deck for the entire session
   // Fetches full song details with CLOBs (lyrics) for presentation
@@ -231,7 +263,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
     <div className="relative h-screen w-screen overflow-hidden bg-gray-900">
       {/* Slide view */}
       <div className="h-full w-full">
-        <SlideView slide={currentSlide} showTranslation={true} />
+        <SlideView slide={currentSlide} showTranslation={true} template={activeTemplate} />
       </div>
 
       {/* Navigation controls at bottom center - auto-hide after 2 seconds */}

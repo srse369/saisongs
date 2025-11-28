@@ -8,7 +8,8 @@ Welcome to the Song Studio documentation! This guide will help you deploy, confi
 |----------|-------------|
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | Complete deployment guide for all platforms |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Technical architecture and performance optimizations |
-| [FEATURES.md](./FEATURES.md) | User-facing features and functionality |
+| [FEATURES.md](./FEATURES.md) | User-facing features and functionality (includes presentation templates) |
+| [TEMPLATE_VISUAL_EDITOR.md](./TEMPLATE_VISUAL_EDITOR.md) | User-friendly visual editor for creating presentation templates |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | Solutions to common problems |
 
 ---

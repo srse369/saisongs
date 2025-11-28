@@ -10,14 +10,16 @@ interface SongListProps {
   songs: Song[];
   onEdit: (song: Song) => void;
   onDelete: (id: string) => Promise<void>;
+  onSync: (id: string) => Promise<void>;
   onView: (song: Song) => void;
   loading?: boolean;
 }
 
-export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onView, loading = false }) => {
+export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onSync, onView, loading = false }) => {
   const navigate = useNavigate();
   const { isEditor, isAdmin, isAuthenticated } = useAuth();
   const { addSong, songIds } = useSession();
+  const [syncingSongId, setSyncingSongId] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [songToDelete, setSongToDelete] = useState<Song | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -43,6 +45,15 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
   const handleDeleteCancel = () => {
     setDeleteModalOpen(false);
     setSongToDelete(null);
+  };
+
+  const handleSyncClick = async (id: string) => {
+    setSyncingSongId(id);
+    try {
+      await onSync(id);
+    } finally {
+      setSyncingSongId(null);
+    }
   };
 
   const handlePresent = (song: Song) => {
@@ -120,13 +131,6 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                     </a>
                   )}
                 </div>
-
-                {/* Title 2 */}
-                {song.title2 && song.title2.trim().toLowerCase() !== song.name.trim().toLowerCase() && (
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2 italic">
-                    {song.title2}
-                  </p>
-                )}
 
                 {/* Raga and Beat (without tempo) */}
                 {(song.raga || song.beat) && (
@@ -209,6 +213,30 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onV
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                     <span className="text-sm font-medium whitespace-nowrap">Edit</span>
+                  </button>
+                )}
+                {isEditor && song.externalSourceUrl && (
+                  <button
+                    onClick={() => handleSyncClick(song.id)}
+                    disabled={syncingSongId === song.id}
+                    title="Sync from external source"
+                    className="flex items-center gap-2 p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {syncingSongId === song.id ? (
+                      <>
+                        <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span className="text-sm font-medium whitespace-nowrap">Syncing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span className="text-sm font-medium whitespace-nowrap">Sync</span>
+                      </>
+                    )}
                   </button>
                 )}
                 {isAdmin && (

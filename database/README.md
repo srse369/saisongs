@@ -11,6 +11,7 @@ Song Studio uses **Oracle Autonomous Database** (or Oracle Database 19c+) with t
 - **Pitch Assignments**: Links songs to singers with specific pitch keys
 - **Session Management**: Named sessions for live performances
 - **CSV Import Mappings**: User-defined mappings for CSV imports
+- **Presentation Templates**: Customizable templates for presentations
 - **Analytics**: Visitor tracking with geolocation data
 
 ## Database Files
@@ -127,6 +128,7 @@ These consolidated scripts replace the legacy scripts that previously lived in t
    You should see:
    - `IMPORT_MAPPINGS`
    - `NAMED_SESSIONS`
+   - `PRESENTATION_TEMPLATES`
    - `SESSION_ITEMS`
    - `SINGERS`
    - `SONG_SINGER_PITCHES`
@@ -154,7 +156,6 @@ Stores song information cached from external sources:
 - `id` (RAW(16), PK) - Unique identifier
 - `name` (VARCHAR2(255)) - Song name for searching
 - `external_source_url` (VARCHAR2(500)) - Original source URL
-- `title`, `title2` - Cached song titles
 - `lyrics` (CLOB) - Full song lyrics
 - `metadata` (CLOB, JSON) - Additional cached metadata
 - `created_at`, `updated_at` - Timestamps
@@ -260,6 +261,32 @@ Tracks visitor activity with geolocation:
 
 ---
 
+#### presentation_templates
+Stores customizable templates for presentations:
+- `id` (VARCHAR2(36), PK)
+- `name` (VARCHAR2(255), unique) - Template name
+- `description` (VARCHAR2(1000)) - Template description
+- `template_json` (CLOB) - JSON representation of template elements
+- `template_yaml` (CLOB) - Original YAML source
+- `is_default` (NUMBER(1)) - Flag for default template
+- `created_at`, `updated_at` (TIMESTAMP) - Timestamps
+- `created_by`, `updated_by` (VARCHAR2(255)) - Audit fields
+
+**Features:**
+- Support for backgrounds (color, image, video)
+- Image overlays with positioning and opacity
+- Video overlays with autoplay controls
+- Text overlays with font styling
+- 9 predefined positions for elements
+- Opacity and z-index control for layering
+
+**Indexes:**
+- Primary key on `id`
+- Unique index on `name`
+- Index on `is_default`
+
+---
+
 #### feedback
 Collects user feedback with categorization:
 - `id` (RAW(16), PK)
@@ -326,7 +353,7 @@ For Oracle Autonomous Database, you'll need:
 expdp admin/password@database \
   directory=data_pump_dir \
   dumpfile=songstudio_backup.dmp \
-  tables=songs,singers,song_singer_pitches,named_sessions,session_items,import_mappings,visitor_analytics
+  tables=songs,singers,song_singer_pitches,named_sessions,session_items,import_mappings,presentation_templates,visitor_analytics
 ```
 
 **Export specific table:**
@@ -374,6 +401,8 @@ UNION ALL
 SELECT 'session_items', COUNT(*) FROM session_items
 UNION ALL
 SELECT 'import_mappings', COUNT(*) FROM import_mappings
+UNION ALL
+SELECT 'presentation_templates', COUNT(*) FROM presentation_templates
 UNION ALL
 SELECT 'visitor_analytics', COUNT(*) FROM visitor_analytics;
 ```
@@ -505,6 +534,7 @@ For issues or questions:
 
 ## Version History
 
+- **v2.1** - Added presentation_templates table for customizable presentation templates
 - **v2.0** - Added analytics schema with geolocation tracking
 - **v1.5** - Added import_mappings table for CSV import
 - **v1.0** - Initial schema with songs, singers, pitches, sessions

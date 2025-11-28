@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSongs } from '../../contexts/SongContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { SongForm } from './SongForm';
 import { SongList } from './SongList';
 import { SongDetails } from './SongDetails';
@@ -9,6 +10,7 @@ import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedSongSearch, type SongSearchFilters } from '../common/AdvancedSongSearch';
 import { RefreshIcon } from '../common';
 import { createSongFuzzySearch, parseNaturalQuery } from '../../utils/smartSearch';
+import songService from '../../services/SongService';
 import type { Song, CreateSongInput } from '../../types';
 
 export const SongManager: React.FC = () => {
@@ -23,6 +25,7 @@ export const SongManager: React.FC = () => {
     clearError,
   } = useSongs();
   const { isEditor } = useAuth();
+  const toast = useToast();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | null>(null);
@@ -49,8 +52,14 @@ export const SongManager: React.FC = () => {
     setIsFormModalOpen(true);
   };
 
-  const handleEditClick = (song: Song) => {
-    setEditingSong(song);
+  const handleEditClick = async (song: Song) => {
+    // Fetch full song details (including CLOB fields like lyrics, meaning)
+    const fullSong = await songService.getSongById(song.id);
+    if (fullSong) {
+      setEditingSong(fullSong);
+    } else {
+      setEditingSong(song);
+    }
     setIsFormModalOpen(true);
   };
 
@@ -87,6 +96,22 @@ export const SongManager: React.FC = () => {
     await deleteSong(id);
   };
 
+  const handleSync = async (id: string) => {
+    try {
+      const result = await songService.syncSong(id);
+      if (result) {
+        toast.success(`Song synced: ${result.message}`);
+        // Refresh songs to get updated data
+        await fetchSongs();
+      } else {
+        toast.error('Failed to sync song');
+      }
+    } catch (err) {
+      console.error('Error syncing song:', err);
+      toast.error('Error syncing song');
+    }
+  };
+
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
   };
@@ -111,11 +136,6 @@ export const SongManager: React.FC = () => {
     if (advancedFilters.name) {
       results = results.filter(song => 
         song.name.toLowerCase().includes(advancedFilters.name!.toLowerCase())
-      );
-    }
-    if (advancedFilters.title) {
-      results = results.filter(song => 
-        song.title?.toLowerCase().includes(advancedFilters.title!.toLowerCase())
       );
     }
     if (advancedFilters.deity) {
@@ -318,6 +338,7 @@ export const SongManager: React.FC = () => {
         songs={displayedSongs}
         onEdit={handleEditClick}
         onDelete={handleDelete}
+        onSync={handleSync}
         loading={loading}
         onView={handleViewClick}
       />

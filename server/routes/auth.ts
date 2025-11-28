@@ -82,7 +82,6 @@ router.post('/login', async (req, res) => {
         second: '2-digit',
         hour12: true
       });
-      console.log(`[AUTH] ✅ SUCCESS: ${role.toUpperCase()} login from ${ip} at ${timestamp}`);
 
       return res.json({ success: true, role });
     } else {
@@ -92,19 +91,6 @@ router.post('/login', async (req, res) => {
         count: current.count + 1,
         resetAt: Date.now() + LOCKOUT_DURATION,
       });
-
-      // Log failed attempt
-      const timestamp = new Date().toLocaleString('en-US', { 
-        timeZone: 'America/Los_Angeles',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-      });
-      console.warn(`[AUTH] ❌ FAILED: Invalid credentials from ${ip} at ${timestamp} (attempt ${current.count + 1}/${MAX_ATTEMPTS})`);
 
       return res.status(401).json({ 
         error: 'Invalid credentials',

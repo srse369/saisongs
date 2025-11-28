@@ -5,10 +5,12 @@ import { useSingers } from '../../contexts/SingerContext';
 import { useNamedSessions } from '../../contexts/NamedSessionContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import type { Song } from '../../types';
+import type { Song, PresentationTemplate } from '../../types';
 import { Modal } from '../common/Modal';
 import { SongDetails } from '../admin/SongDetails';
 import { formatPitch } from '../../utils/pitchUtils';
+import TemplateSelector from '../presentation/TemplateSelector';
+import templateService from '../../services/TemplateService';
 
 export const SessionManager: React.FC = () => {
   const { entries, removeSong, clearSession, reorderSession, addSong } = useSession();
@@ -21,12 +23,33 @@ export const SessionManager: React.FC = () => {
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<PresentationTemplate | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [sessionDescription, setSessionDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [loadingSession, setLoadingSession] = useState(false);
   const [sessionToLoad, setSessionToLoad] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+
+  // Restore previously selected template from localStorage on mount
+  useEffect(() => {
+    const restoreTemplate = async () => {
+      const savedTemplateId = localStorage.getItem('selectedSessionTemplateId');
+      if (savedTemplateId) {
+        try {
+          const template = await templateService.getTemplate(savedTemplateId);
+          if (template) {
+            setSelectedTemplate(template);
+          }
+        } catch (error) {
+          console.error('Error restoring template:', error);
+          // Clear invalid template ID from storage
+          localStorage.removeItem('selectedSessionTemplateId');
+        }
+      }
+    };
+    restoreTemplate();
+  }, []);
 
   const sessionItems = entries
     .map((entry) => {
@@ -42,7 +65,22 @@ export const SessionManager: React.FC = () => {
 
   const handlePresentSession = () => {
     if (sessionItems.length === 0) return;
-    navigate('/session/present');
+    // Navigate to presentation with selected template ID in query params
+    const templateId = selectedTemplate?.id;
+    if (templateId) {
+      navigate(`/session/present?templateId=${templateId}`);
+    } else {
+      // If no template selected, navigate without template ID (will use default)
+      navigate('/session/present');
+    }
+  };
+
+  const handleTemplateSelect = (template: PresentationTemplate) => {
+    setSelectedTemplate(template);
+    // Save selected template ID to localStorage for persistence
+    if (template.id) {
+      localStorage.setItem('selectedSessionTemplateId', template.id);
+    }
   };
 
   const handlePresentSingle = (songId: string) => {
@@ -172,8 +210,14 @@ export const SessionManager: React.FC = () => {
       
       // Load songs into the active session context
       currentSession.items.forEach(item => {
-        const singer = singers.find(s => s.id === item.singerId);
-        addSong(item.songId, singer?.id, item.pitch);
+        // In editor mode, include singer and pitch; in public mode, load without them
+        if (isEditor) {
+          const singer = singers.find(s => s.id === item.singerId);
+          addSong(item.songId, singer?.id, item.pitch);
+        } else {
+          // Public mode: load songs without singer names or pitches
+          addSong(item.songId, undefined, undefined);
+        }
       });
       
       setShowLoadModal(false);
@@ -194,14 +238,17 @@ export const SessionManager: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-          <button
-            type="button"
-            onClick={handlePresentSession}
-            disabled={sessionItems.length === 0}
-            className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Present Session
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
+            <button
+              type="button"
+              onClick={handlePresentSession}
+              disabled={sessionItems.length === 0}
+              className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Present Session
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => setShowLoadModal(true)}
@@ -536,5 +583,7 @@ export const SessionManager: React.FC = () => {
     </div>
   );
 };
+
+
 
 

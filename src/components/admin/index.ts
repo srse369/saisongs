@@ -17,4 +17,6 @@ export { NamedSessionForm } from './NamedSessionForm';
 export { Analytics } from './Analytics';
 export { WorldMap } from './WorldMap';
 export { FeedbackManager } from './FeedbackManager';
+export { TemplateManager } from './TemplateManager';
+export { TemplateVisualEditor } from './TemplateVisualEditor';
 
