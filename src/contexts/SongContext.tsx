@@ -133,7 +133,22 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
     setError(null);
     try {
       const song = await songService.createSong(input);
-      setSongs(prev => [...prev, song]);
+      
+      // Add the song to local state immediately
+      setSongs(prev => {
+        // Check if song already exists (duplicate prevention)
+        if (prev.some(s => s.id === song.id)) {
+          return prev;
+        }
+        // Insert in sorted order by name
+        return [...prev, song].sort((a, b) => a.name.localeCompare(b.name));
+      });
+      
+      // Clear localStorage cache so it doesn't return stale data
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(SONGS_CACHE_KEY);
+      }
+      
       toast.success('Song created successfully');
       return song;
     } catch (err) {
@@ -156,6 +171,12 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
       const song = await songService.updateSong(id, input);
       if (song) {
         setSongs(prev => prev.map(s => s.id === id ? song : s));
+        
+        // Clear localStorage cache so it doesn't return stale data
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(SONGS_CACHE_KEY);
+        }
+        
         toast.success('Song updated successfully');
       }
       return song;
@@ -179,6 +200,12 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
       const success = await songService.deleteSong(id);
       if (success) {
         setSongs(prev => prev.filter(song => song.id !== id));
+        
+        // Clear localStorage cache so it doesn't return stale data
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(SONGS_CACHE_KEY);
+        }
+        
         toast.success('Song deleted successfully');
       }
       return success;

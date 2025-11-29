@@ -16,7 +16,7 @@ import { requireAuth, requireEditor, requireAdmin } from './middleware/simpleAut
 import { warmupCache } from './services/CacheService.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3111;
 
 // Middleware
 app.use(cors());

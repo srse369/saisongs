@@ -45,7 +45,7 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
       return base;
     }
 
-    return base.filter(song => {
+    const filtered = base.filter(song => {
       const fields = [
         song.name,
         song.language,
@@ -60,6 +60,21 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
       return fields.some(field =>
         field ? field.toString().toLowerCase().includes(query) : false
       );
+    });
+
+    // Sort results: prioritize songs that start with the search term
+    return filtered.sort((a, b) => {
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+      const aStartsWith = aName.startsWith(query);
+      const bStartsWith = bName.startsWith(query);
+      
+      // Prefix matches come first
+      if (aStartsWith && !bStartsWith) return -1;
+      if (!aStartsWith && bStartsWith) return 1;
+      
+      // If both start with query or neither does, sort alphabetically
+      return aName.localeCompare(bName);
     });
   }, [songs, searchQuery, selectedSingerId, pitches]);
 

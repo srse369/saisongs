@@ -146,7 +146,12 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
     setError(null);
     try {
       const created = await templateService.createTemplate(template);
+      // Add to local state immediately for instant UI update
       setTemplates(prev => [...prev, created]);
+      // Clear localStorage cache so fresh data is fetched next time
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(TEMPLATES_CACHE_KEY);
+      }
       toast.success('Template created successfully');
       return created;
     } catch (err) {

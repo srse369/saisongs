@@ -107,7 +107,17 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
     setError(null);
     try {
       const pitch = await pitchService.createPitch(input);
-      setPitches(prev => [...prev, pitch]);
+      
+      // Add the pitch to local state immediately
+      // (PitchManager will sort by song name so it appears in the right place)
+      setPitches(prev => {
+        // Check if pitch already exists (duplicate prevention)
+        if (prev.some(p => p.id === pitch.id)) {
+          return prev;
+        }
+        return [...prev, pitch];
+      });
+      
       toast.success('Pitch association created successfully');
       return pitch;
     } catch (err) {

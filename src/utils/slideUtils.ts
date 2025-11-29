@@ -1,4 +1,5 @@
-import type { Song, Slide } from '../types';
+import type { Song, Slide, PresentationTemplate, TemplateSlide } from '../types';
+import { isMultiSlideTemplate } from './templateUtils';
 
 /**
  * Maximum number of lines per slide before splitting
@@ -186,4 +187,230 @@ export function generateSlides(song: Song): Slide[] {
     songSlideNumber: slide.index + 1,
     songSlideCount: total,
   }));
+}
+
+/**
+ * Generates a complete presentation slide deck from a song and multi-slide template.
+ * The deck includes:
+ * 1. Intro slides (template slides before referenceSlideIndex) - static, no song content
+ * 2. Song content slides (using reference slide as template)
+ * 3. Outro slides (template slides after referenceSlideIndex) - static, no song content
+ * 
+ * @param song - The song object with lyrics
+ * @param template - The multi-slide template
+ * @param singerName - Optional singer name to display
+ * @param pitch - Optional pitch to display
+ * @returns Array of slides for the complete presentation
+ */
+export function generatePresentationSlides(
+  song: Song,
+  template: PresentationTemplate | null,
+  singerName?: string,
+  pitch?: string
+): Slide[] {
+  // Generate base song content slides
+  const songSlides = generateSlides(song).map((slide) => ({
+    ...slide,
+    singerName,
+    pitch,
+    slideType: 'song' as const,
+  }));
+
+  // If no multi-slide template, just return song slides
+  if (!template || !isMultiSlideTemplate(template)) {
+    return songSlides;
+  }
+
+  const slides = template.slides!;
+  const refIndex = template.referenceSlideIndex ?? 0;
+  const result: Slide[] = [];
+
+  // 1. Add intro slides (before reference slide)
+  for (let i = 0; i < refIndex; i++) {
+    result.push({
+      index: result.length,
+      content: '',
+      songName: song.name,
+      slideType: 'static',
+      templateSlide: slides[i],
+    });
+  }
+
+  // 2. Add song content slides (using reference slide)
+  songSlides.forEach((slide) => {
+    result.push({
+      ...slide,
+      index: result.length,
+      slideType: 'song',
+    });
+  });
+
+  // 3. Add outro slides (after reference slide)
+  for (let i = refIndex + 1; i < slides.length; i++) {
+    result.push({
+      index: result.length,
+      content: '',
+      songName: song.name,
+      slideType: 'static',
+      templateSlide: slides[i],
+    });
+  }
+
+  // Re-annotate with next slide info
+  return result.map((slide, index) => {
+    const next = result[index + 1];
+    if (!next) return slide;
+
+    if (next.slideType === 'static') {
+      return {
+        ...slide,
+        nextSongName: undefined,
+        nextIsContinuation: false,
+      };
+    }
+
+    if (next.songName === slide.songName) {
+      return {
+        ...slide,
+        nextSongName: slide.songName,
+        nextIsContinuation: true,
+      };
+    }
+
+    return {
+      ...slide,
+      nextSongName: next.songName,
+      nextSingerName: next.singerName,
+      nextPitch: next.pitch,
+      nextIsContinuation: false,
+    };
+  });
+}
+
+/**
+ * Generates slides for a session with multiple songs using a multi-slide template.
+ * For each song, it creates the full slide sequence (intro, content, outro).
+ * Only shows intro slides for the first song and outro slides for the last song.
+ * 
+ * @param songs - Array of songs with their metadata
+ * @param template - The multi-slide template
+ * @returns Array of slides for the complete session presentation
+ */
+export function generateSessionPresentationSlides(
+  songs: Array<{ song: Song; singerName?: string; pitch?: string }>,
+  template: PresentationTemplate | null
+): Slide[] {
+  const result: Slide[] = [];
+
+  // If no multi-slide template, just concatenate song slides
+  if (!template || !isMultiSlideTemplate(template)) {
+    songs.forEach(({ song, singerName, pitch }, songIndex) => {
+      const songSlides = generateSlides(song).map((slide) => ({
+        ...slide,
+        singerName,
+        pitch,
+        slideType: 'song' as const,
+      }));
+      
+      songSlides.forEach((slide) => {
+        result.push({
+          ...slide,
+          index: result.length,
+          // Add session metadata
+          sessionSongIndex: songIndex + 1,
+          totalSongs: songs.length,
+        } as Slide);
+      });
+    });
+    
+    return addNextSlideMetadata(result);
+  }
+
+  const templateSlides = template.slides!;
+  const refIndex = template.referenceSlideIndex ?? 0;
+
+  songs.forEach(({ song, singerName, pitch }, songIndex) => {
+    const isFirstSong = songIndex === 0;
+    const isLastSong = songIndex === songs.length - 1;
+
+    // 1. Add intro slides (only for first song)
+    if (isFirstSong) {
+      for (let i = 0; i < refIndex; i++) {
+        result.push({
+          index: result.length,
+          content: '',
+          songName: song.name,
+          slideType: 'static',
+          templateSlide: templateSlides[i],
+        });
+      }
+    }
+
+    // 2. Add song content slides
+    const songSlides = generateSlides(song).map((slide) => ({
+      ...slide,
+      singerName,
+      pitch,
+      slideType: 'song' as const,
+      // Add session metadata
+      sessionSongIndex: songIndex + 1,
+      totalSongs: songs.length,
+    }));
+
+    songSlides.forEach((slide) => {
+      result.push({
+        ...slide,
+        index: result.length,
+      } as Slide);
+    });
+
+    // 3. Add outro slides (only for last song)
+    if (isLastSong) {
+      for (let i = refIndex + 1; i < templateSlides.length; i++) {
+        result.push({
+          index: result.length,
+          content: '',
+          songName: song.name,
+          slideType: 'static',
+          templateSlide: templateSlides[i],
+        });
+      }
+    }
+  });
+
+  return addNextSlideMetadata(result);
+}
+
+/**
+ * Helper to add next slide metadata to a slide array
+ */
+function addNextSlideMetadata(slides: Slide[]): Slide[] {
+  return slides.map((slide, index) => {
+    const next = slides[index + 1];
+    if (!next) return slide;
+
+    if (next.slideType === 'static') {
+      return {
+        ...slide,
+        nextSongName: undefined,
+        nextIsContinuation: false,
+      };
+    }
+
+    if (next.songName === slide.songName && slide.slideType !== 'static') {
+      return {
+        ...slide,
+        nextSongName: slide.songName,
+        nextIsContinuation: true,
+      };
+    }
+
+    return {
+      ...slide,
+      nextSongName: next.songName,
+      nextSingerName: next.singerName,
+      nextPitch: next.pitch,
+      nextIsContinuation: false,
+    };
+  });
 }

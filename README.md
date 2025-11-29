@@ -70,7 +70,7 @@ npm run dev:all
 ./deploy/local/dev.sh start
 ```
 
-Open [http://localhost:5173](http://localhost:5173)
+Open [http://localhost:5111](http://localhost:5111)
 
 ### Production Deployment
 

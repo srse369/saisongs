@@ -190,9 +190,13 @@ export const PitchManager: React.FC = () => {
     setAdvancedFilters({});
   };
 
+  // Create lookup maps for O(1) access instead of O(n) .find() calls
+  const songMap = useMemo(() => new Map(songs.map(s => [s.id, s])), [songs]);
+  const singerMap = useMemo(() => new Map(singers.map(s => [s.id, s])), [singers]);
+
   // Memoize filtered pitches with debounced search for performance
   const filteredPitches = useMemo(() => {
-    return pitches.filter((p) => {
+    const filtered = pitches.filter((p) => {
       // If navigated here with a specific songId, only show pitches for that song
       if (songFilterId && p.songId !== songFilterId) {
         return false;
@@ -203,8 +207,8 @@ export const PitchManager: React.FC = () => {
         return false;
       }
 
-      const song = songs.find((s) => s.id === p.songId);
-      const singer = singers.find((s) => s.id === p.singerId);
+      const song = songMap.get(p.songId);
+      const singer = singerMap.get(p.singerId);
 
       // Apply advanced filters (field-specific)
       if (advancedFilters.songName && !song?.name.toLowerCase().includes(advancedFilters.songName.toLowerCase())) {
@@ -236,7 +240,38 @@ export const PitchManager: React.FC = () => {
         singer?.name.toLowerCase().includes(q)
       );
     });
-  }, [pitches, debouncedSearchTerm, advancedFilters, songFilterId, singerFilterId, songs, singers]);
+
+    // Sort results by song name, then singer name (alphabetically)
+    // When searching, prioritize pitches where song name or singer name starts with the search term
+    return filtered.sort((a, b) => {
+      const songA = songMap.get(a.songId);
+      const songB = songMap.get(b.songId);
+      const singerA = singerMap.get(a.singerId);
+      const singerB = singerMap.get(b.singerId);
+      
+      const aSongName = songA?.name.toLowerCase() || '';
+      const bSongName = songB?.name.toLowerCase() || '';
+      const aSingerName = singerA?.name.toLowerCase() || '';
+      const bSingerName = singerB?.name.toLowerCase() || '';
+      
+      if (debouncedSearchTerm.trim()) {
+        const q = debouncedSearchTerm.toLowerCase();
+        
+        // Check if song name or singer name starts with query
+        const aStartsWith = aSongName.startsWith(q) || aSingerName.startsWith(q);
+        const bStartsWith = bSongName.startsWith(q) || bSingerName.startsWith(q);
+        
+        // Prefix matches come first
+        if (aStartsWith && !bStartsWith) return -1;
+        if (!aStartsWith && bStartsWith) return 1;
+      }
+      
+      // Sort by song name first, then by singer name
+      const songCompare = aSongName.localeCompare(bSongName);
+      if (songCompare !== 0) return songCompare;
+      return aSingerName.localeCompare(bSingerName);
+    });
+  }, [pitches, debouncedSearchTerm, advancedFilters, songFilterId, singerFilterId, songMap, singerMap]);
 
   // Reset visible pitches when search or underlying list changes
   useEffect(() => {

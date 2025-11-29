@@ -59,7 +59,7 @@ nano /var/www/songstudio/.env
 Required variables:
 ```bash
 NODE_ENV=production
-PORT=3001
+PORT=3111
 HOST=0.0.0.0
 
 # Oracle Database
@@ -113,7 +113,7 @@ Internet → Nginx (Port 443 HTTPS / 80 HTTP)
               ↓
          Static Files (React Frontend)
               ↓
-         Express Backend (Port 3001) → Oracle Database
+         Express Backend (Port 3111) → Oracle Database
 ```
 
 ### Managing the Application
@@ -270,7 +270,7 @@ GitHub Pages doesn't support client-side routing. Add `public/404.html`:
 
 **Problem:** Mobile devices show "Failed to fetch songs/singers/pitches"
 
-**Root cause:** Frontend trying to connect to `localhost:3001` instead of production server
+**Root cause:** Frontend trying to connect to `localhost:3111` instead of production server
 
 **Fix:**
 
@@ -297,7 +297,7 @@ pm2 logs songstudio --lines 100
 - Missing `.env` file
 - Incorrect Oracle credentials
 - Wallet files not found
-- Port 3001 already in use
+- Port 3111 already in use
 
 **Fix:**
 ```bash
@@ -317,7 +317,7 @@ pm2 restart songstudio
 **Check if backend is running:**
 ```bash
 pm2 status
-curl http://localhost:3001/api/health
+curl http://localhost:3111/api/health
 ```
 
 **Check nginx logs:**

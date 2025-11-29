@@ -49,14 +49,33 @@ export interface TextElement {
   maxWidth?: string;
 }
 
-export interface PresentationTemplate {
-  id?: string;
-  name: string;
-  description?: string;
+// Individual slide within a multi-slide template
+export interface TemplateSlide {
   background?: BackgroundElement;
   images?: ImageElement[];
   videos?: VideoElement[];
   text?: TextElement[];
+}
+
+// Multi-slide presentation template
+// A template contains multiple slides, with one designated as the "reference slide"
+// for overlaying song content (lyrics, pitch, singer name, etc.)
+export interface PresentationTemplate {
+  id?: string;
+  name: string;
+  description?: string;
+  
+  // Multi-slide structure (new format)
+  slides?: TemplateSlide[];           // Array of slides in the template
+  referenceSlideIndex?: number;       // 0-based index of the slide used for song content overlay
+  
+  // Legacy single-slide fields (for backward compatibility)
+  // These are used when slides array is not present
+  background?: BackgroundElement;
+  images?: ImageElement[];
+  videos?: VideoElement[];
+  text?: TextElement[];
+  
   isDefault?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -161,6 +180,10 @@ export interface Slide {
   nextPitch?: string;
   /** True when the next slide is the same song continued */
   nextIsContinuation?: boolean;
+  /** Type of slide: 'song' for song content, 'static' for template-only slides */
+  slideType?: 'song' | 'static';
+  /** For static slides, the template slide configuration to use */
+  templateSlide?: TemplateSlide;
 }
 
 export interface SongWithPitches extends Song {

@@ -26,7 +26,7 @@ Mobile device shows errors like:
 
 ### Root Cause
 
-The frontend is trying to connect to `localhost:3001` instead of the production server. On mobile devices, "localhost" refers to the mobile device itself, not your server.
+The frontend is trying to connect to `localhost:3111` instead of the production server. On mobile devices, "localhost" refers to the mobile device itself, not your server.
 
 ### Solution
 
@@ -55,7 +55,7 @@ npm run build:server
 
 ```bash
 # Check built files don't reference localhost
-grep -r "localhost:3001" dist/
+grep -r "localhost:3111" dist/
 # Should return: (nothing)
 
 # Test API directly
@@ -86,7 +86,7 @@ cat /var/www/songstudio/.env
 **Required variables:**
 ```bash
 NODE_ENV=production
-PORT=3001
+PORT=3111
 ORACLE_USER=your_user
 ORACLE_PASSWORD=your_password
 ORACLE_CONNECT_STRING=your_connection_string
@@ -121,7 +121,7 @@ ls -la /opt/oracle/instantclient_21_13/
 #### 3. Port Already in Use
 
 ```bash
-sudo lsof -i :3001
+sudo lsof -i :3111
 sudo kill -9 <PID>
 pm2 restart songstudio
 ```
@@ -325,7 +325,7 @@ pm2 restart songstudio
 
 2. **Backend not listening:**
 ```bash
-curl http://localhost:3001/api/health
+curl http://localhost:3111/api/health
 ```
 
 3. **Check nginx logs:**
@@ -466,7 +466,7 @@ pm2 restart songstudio
 # Check status
 pm2 status
 sudo systemctl status nginx
-curl http://localhost:3001/api/health
+curl http://localhost:3111/api/health
 ```
 
 ### Reset to Last Known Good State
@@ -525,8 +525,8 @@ ssh ubuntu@saisongs.org 'sudo systemctl status nginx'
 ssh ubuntu@saisongs.org
 
 pm2 status
-curl http://localhost:3001/api/health
-curl http://localhost:3001/api/songs | jq '.[0]'
+curl http://localhost:3111/api/health
+curl http://localhost:3111/api/songs | jq '.[0]'
 sudo systemctl status nginx
 df -h
 free -h
@@ -572,7 +572,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 
 # Check database
-curl http://localhost:3001/api/health
+curl http://localhost:3111/api/health
 
 # Deploy updates
 ./deploy/remote/deploy.sh code

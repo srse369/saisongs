@@ -1,12 +1,91 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTemplates } from '../../contexts/TemplateContext';
-import type { PresentationTemplate, Slide } from '../../types';
+import type { PresentationTemplate, Slide, TemplateSlide } from '../../types';
 import { RefreshIcon, Modal } from '../common';
 import { SlideView } from '../presentation/SlideView';
 import { TemplateVisualEditor } from './TemplateVisualEditor';
+import { isMultiSlideTemplate, getSlideBackgroundStyles, SlideBackground, SlideImages, SlideVideos, SlideText } from '../../utils/templateUtils';
+
+/**
+ * Convert a single slide to YAML format
+ */
+function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; text?: any[] }, indent: string = ''): string[] {
+  const lines: string[] = [];
+
+  // Background
+  lines.push(`${indent}background:`);
+  if (slide.background) {
+    lines.push(`${indent}  type: ${slide.background.type}`);
+    lines.push(`${indent}  value: ${escapeYamlString(slide.background.value || '')}`);
+    if (slide.background.opacity !== undefined) {
+      lines.push(`${indent}  opacity: ${slide.background.opacity}`);
+    }
+  }
+
+  // Images
+  lines.push(`${indent}images:`);
+  if (slide.images && slide.images.length > 0) {
+    slide.images.forEach((img) => {
+      lines.push(`${indent}  - id: ` + escapeYamlString(img.id));
+      lines.push(`${indent}    url: ${escapeYamlString(img.url)}`);
+      if (img.position) lines.push(`${indent}    position: ${img.position}`);
+      if (img.x !== undefined) lines.push(`${indent}    x: ${escapeYamlString(String(img.x))}`);
+      if (img.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(String(img.y))}`);
+      if (img.width) lines.push(`${indent}    width: ${escapeYamlString(img.width)}`);
+      if (img.height) lines.push(`${indent}    height: ${escapeYamlString(img.height)}`);
+      if (img.opacity !== undefined) lines.push(`${indent}    opacity: ${img.opacity}`);
+      if (img.zIndex !== undefined) lines.push(`${indent}    zIndex: ${img.zIndex}`);
+    });
+  } else {
+    lines.push(`${indent}  []`);
+  }
+
+  // Videos
+  lines.push(`${indent}videos:`);
+  if (slide.videos && slide.videos.length > 0) {
+    slide.videos.forEach((vid) => {
+      lines.push(`${indent}  - id: ` + escapeYamlString(vid.id));
+      lines.push(`${indent}    url: ${escapeYamlString(vid.url)}`);
+      if (vid.position) lines.push(`${indent}    position: ${vid.position}`);
+      if (vid.x !== undefined) lines.push(`${indent}    x: ${escapeYamlString(String(vid.x))}`);
+      if (vid.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(String(vid.y))}`);
+      if (vid.width) lines.push(`${indent}    width: ${escapeYamlString(vid.width)}`);
+      if (vid.height) lines.push(`${indent}    height: ${escapeYamlString(vid.height)}`);
+      if (vid.opacity !== undefined) lines.push(`${indent}    opacity: ${vid.opacity}`);
+      if (vid.zIndex !== undefined) lines.push(`${indent}    zIndex: ${vid.zIndex}`);
+      if (vid.autoPlay !== undefined) lines.push(`${indent}    autoPlay: ${vid.autoPlay}`);
+      if (vid.loop !== undefined) lines.push(`${indent}    loop: ${vid.loop}`);
+      if (vid.muted !== undefined) lines.push(`${indent}    muted: ${vid.muted}`);
+    });
+  } else {
+    lines.push(`${indent}  []`);
+  }
+
+  // Text
+  lines.push(`${indent}text:`);
+  if (slide.text && slide.text.length > 0) {
+    slide.text.forEach((txt) => {
+      lines.push(`${indent}  - id: ` + escapeYamlString(txt.id));
+      lines.push(`${indent}    content: ${escapeYamlString(txt.content)}`);
+      if (txt.position) lines.push(`${indent}    position: ${txt.position}`);
+      if (txt.x !== undefined) lines.push(`${indent}    x: ${escapeYamlString(String(txt.x))}`);
+      if (txt.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(String(txt.y))}`);
+      if (txt.fontSize) lines.push(`${indent}    fontSize: ${escapeYamlString(txt.fontSize)}`);
+      if (txt.color) lines.push(`${indent}    color: ${escapeYamlString(txt.color)}`);
+      if (txt.fontWeight) lines.push(`${indent}    fontWeight: ${txt.fontWeight}`);
+      if (txt.opacity !== undefined) lines.push(`${indent}    opacity: ${txt.opacity}`);
+      if (txt.zIndex !== undefined) lines.push(`${indent}    zIndex: ${txt.zIndex}`);
+    });
+  } else {
+    lines.push(`${indent}  []`);
+  }
+
+  return lines;
+}
 
 /**
  * Convert a PresentationTemplate object to YAML string format
+ * Supports both multi-slide and legacy single-slide formats
  */
 function templateToYaml(template: PresentationTemplate): string {
   const lines: string[] = [];
@@ -19,72 +98,24 @@ function templateToYaml(template: PresentationTemplate): string {
     lines.push(`description: ${escapeYamlString(template.description)}`);
   }
 
-  // Background
-  lines.push('background:');
-  if (template.background) {
-    lines.push(`  type: ${template.background.type}`);
-    lines.push(`  value: ${escapeYamlString(template.background.value || '')}`);
-    if (template.background.opacity !== undefined) {
-      lines.push(`  opacity: ${template.background.opacity}`);
-    }
-  }
-
-  // Images
-  lines.push('images:');
-  if (template.images && template.images.length > 0) {
-    template.images.forEach((img) => {
-      lines.push('  - id: ' + escapeYamlString(img.id));
-      lines.push(`    url: ${escapeYamlString(img.url)}`);
-      if (img.position) lines.push(`    position: ${img.position}`);
-      if (img.x !== undefined) lines.push(`    x: ${escapeYamlString(String(img.x))}`);
-      if (img.y !== undefined) lines.push(`    y: ${escapeYamlString(String(img.y))}`);
-      if (img.width) lines.push(`    width: ${escapeYamlString(img.width)}`);
-      if (img.height) lines.push(`    height: ${escapeYamlString(img.height)}`);
-      if (img.opacity !== undefined) lines.push(`    opacity: ${img.opacity}`);
-      if (img.zIndex !== undefined) lines.push(`    zIndex: ${img.zIndex}`);
+  // Check if template has multi-slide format
+  if (template.slides && template.slides.length > 0) {
+    // New multi-slide format
+    lines.push(`referenceSlideIndex: ${template.referenceSlideIndex ?? 0}`);
+    lines.push('slides:');
+    template.slides.forEach((slide, index) => {
+      lines.push(`  - # Slide ${index + 1}${index === template.referenceSlideIndex ? ' (Reference)' : ''}`);
+      const slideLines = slideToYaml(slide, '    ');
+      lines.push(...slideLines);
     });
   } else {
-    lines.push('  []');
-  }
-
-  // Videos
-  lines.push('videos:');
-  if (template.videos && template.videos.length > 0) {
-    template.videos.forEach((vid) => {
-      lines.push('  - id: ' + escapeYamlString(vid.id));
-      lines.push(`    url: ${escapeYamlString(vid.url)}`);
-      if (vid.position) lines.push(`    position: ${vid.position}`);
-      if (vid.x !== undefined) lines.push(`    x: ${escapeYamlString(String(vid.x))}`);
-      if (vid.y !== undefined) lines.push(`    y: ${escapeYamlString(String(vid.y))}`);
-      if (vid.width) lines.push(`    width: ${escapeYamlString(vid.width)}`);
-      if (vid.height) lines.push(`    height: ${escapeYamlString(vid.height)}`);
-      if (vid.opacity !== undefined) lines.push(`    opacity: ${vid.opacity}`);
-      if (vid.zIndex !== undefined) lines.push(`    zIndex: ${vid.zIndex}`);
-      if (vid.autoPlay !== undefined) lines.push(`    autoPlay: ${vid.autoPlay}`);
-      if (vid.loop !== undefined) lines.push(`    loop: ${vid.loop}`);
-      if (vid.muted !== undefined) lines.push(`    muted: ${vid.muted}`);
-    });
-  } else {
-    lines.push('  []');
-  }
-
-  // Text
-  lines.push('text:');
-  if (template.text && template.text.length > 0) {
-    template.text.forEach((txt) => {
-      lines.push('  - id: ' + escapeYamlString(txt.id));
-      lines.push(`    content: ${escapeYamlString(txt.content)}`);
-      if (txt.position) lines.push(`    position: ${txt.position}`);
-      if (txt.x !== undefined) lines.push(`    x: ${escapeYamlString(String(txt.x))}`);
-      if (txt.y !== undefined) lines.push(`    y: ${escapeYamlString(String(txt.y))}`);
-      if (txt.fontSize) lines.push(`    fontSize: ${escapeYamlString(txt.fontSize)}`);
-      if (txt.color) lines.push(`    color: ${escapeYamlString(txt.color)}`);
-      if (txt.fontWeight) lines.push(`    fontWeight: ${txt.fontWeight}`);
-      if (txt.opacity !== undefined) lines.push(`    opacity: ${txt.opacity}`);
-      if (txt.zIndex !== undefined) lines.push(`    zIndex: ${txt.zIndex}`);
-    });
-  } else {
-    lines.push('  []');
+    // Legacy single-slide format (fallback)
+    lines.push(...slideToYaml({
+      background: template.background,
+      images: template.images,
+      videos: template.videos,
+      text: template.text,
+    }, ''));
   }
 
   return lines.join('\n');
@@ -118,6 +149,7 @@ export const TemplateManager: React.FC = () => {
 
   const [showForm, setShowForm] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<PresentationTemplate | null>(null);
+  const [previewSlideIndex, setPreviewSlideIndex] = useState(0);
   const [editingTemplate, setEditingTemplate] = useState<PresentationTemplate | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [yamlContent, setYamlContent] = useState('');
@@ -126,12 +158,29 @@ export const TemplateManager: React.FC = () => {
   const [editorMode, setEditorMode] = useState<'visual' | 'yaml'>('visual');
   const previewContainerRef = React.useRef<HTMLDivElement>(null);
 
+  // Get slides array from preview template (for multi-slide preview)
+  const previewSlides = useMemo(() => {
+    if (!previewTemplate) return [];
+    if (isMultiSlideTemplate(previewTemplate)) {
+      return previewTemplate.slides || [];
+    }
+    // Legacy single-slide template - wrap in array
+    return [{
+      background: previewTemplate.background,
+      images: previewTemplate.images || [],
+      videos: previewTemplate.videos || [],
+      text: previewTemplate.text || [],
+    }];
+  }, [previewTemplate]);
+
+  const previewReferenceIndex = previewTemplate?.referenceSlideIndex ?? 0;
+
   // Load templates on mount
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
 
-  // Handle escape key to close preview modal, and arrow keys to scroll
+  // Handle escape key to close preview modal, and arrow keys to navigate slides
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!previewTemplate) return;
@@ -140,31 +189,29 @@ export const TemplateManager: React.FC = () => {
         event.preventDefault();
         event.stopPropagation();
         setPreviewTemplate(null);
+        setPreviewSlideIndex(0);
         return;
       }
 
-      // Handle arrow keys for scrolling through preview
-      const container = previewContainerRef.current;
-      if (!container) return;
-
-      const scrollAmount = 100; // pixels to scroll per key press
-      
+      // Handle arrow keys for slide navigation in multi-slide templates
       switch (event.key) {
+        case 'ArrowLeft':
         case 'ArrowUp':
           event.preventDefault();
-          container.scrollTop -= scrollAmount;
-          break;
-        case 'ArrowDown':
-          event.preventDefault();
-          container.scrollTop += scrollAmount;
-          break;
-        case 'ArrowLeft':
-          event.preventDefault();
-          container.scrollLeft -= scrollAmount;
+          setPreviewSlideIndex(prev => Math.max(0, prev - 1));
           break;
         case 'ArrowRight':
+        case 'ArrowDown':
           event.preventDefault();
-          container.scrollLeft += scrollAmount;
+          setPreviewSlideIndex(prev => Math.min(previewSlides.length - 1, prev + 1));
+          break;
+        case 'Home':
+          event.preventDefault();
+          setPreviewSlideIndex(0);
+          break;
+        case 'End':
+          event.preventDefault();
+          setPreviewSlideIndex(previewSlides.length - 1);
           break;
         default:
           break;
@@ -173,7 +220,7 @@ export const TemplateManager: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [previewTemplate]);
+  }, [previewTemplate, previewSlides.length]);
 
   // Filter templates based on search
   const filteredTemplates = useMemo(() => {
@@ -298,10 +345,11 @@ export const TemplateManager: React.FC = () => {
     setValidationError('');
   };
 
-  const handlePreview = (template: PresentationTemplate) => {
-    console.log('👁️ Preview clicked - template:', template.name, 'background:', template.background);
+  const handlePreview = useCallback((template: PresentationTemplate) => {
+    console.log('👁️ Preview clicked - template:', template.name, 'slides:', template.slides?.length ?? 1);
+    setPreviewSlideIndex(0);
     setPreviewTemplate(template);
-  };
+  }, []);
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
@@ -397,28 +445,34 @@ export const TemplateManager: React.FC = () => {
                       {template.description}
                     </p>
                   )}
-                  {template.background && (
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
+                    {/* Multi-slide indicator */}
+                    {template.slides && template.slides.length > 0 && (
+                      <span className="inline-flex items-center px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                        📑 {template.slides.length} slide{template.slides.length !== 1 ? 's' : ''} (ref: {(template.referenceSlideIndex ?? 0) + 1})
+                      </span>
+                    )}
+                    {template.background && (
                       <span className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
                         📌 {template.background.type}
                       </span>
-                      {template.images && template.images.length > 0 && (
-                        <span className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                          🖼️ {template.images.length} image{template.images.length !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                      {template.videos && template.videos.length > 0 && (
-                        <span className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                          🎬 {template.videos.length} video{template.videos.length !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                      {template.text && template.text.length > 0 && (
-                        <span className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                          📝 {template.text.length} element{template.text.length !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                    )}
+                    {template.images && template.images.length > 0 && (
+                      <span className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
+                        🖼️ {template.images.length} image{template.images.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {template.videos && template.videos.length > 0 && (
+                      <span className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
+                        🎬 {template.videos.length} video{template.videos.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {template.text && template.text.length > 0 && (
+                      <span className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
+                        📝 {template.text.length} element{template.text.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Actions Row */}
@@ -648,13 +702,16 @@ export const TemplateManager: React.FC = () => {
                   Template Preview: {previewTemplate.name}
                 </h2>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Use arrow keys to scroll • Press Esc to close
+                  {previewSlides.length > 1 
+                    ? `Slide ${previewSlideIndex + 1} of ${previewSlides.length} • Use arrow keys to navigate • Press Esc to close`
+                    : 'Press Esc to close'}
                 </p>
               </div>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setPreviewTemplate(null);
+                  setPreviewSlideIndex(0);
                 }}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none ml-4 flex-shrink-0"
                 aria-label="Close preview"
@@ -663,31 +720,114 @@ export const TemplateManager: React.FC = () => {
               </button>
             </div>
 
-            {/* Preview Content - Takes most of the space and is scrollable */}
+            {/* Preview Content - Shows current slide */}
             <div 
               ref={previewContainerRef}
               className="flex-1 overflow-auto relative"
               style={{ overscrollBehavior: 'contain' }}
             >
-              {/* Full slide preview without constraints */}
-              <SlideView 
-                slide={{
-                  songName: 'Sample Devotional Song',
-                  content: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6',
-                  translation: 'Translation Line 1\nTranslation Line 2\nTranslation Line 3',
-                  singerName: 'Sample Singer',
-                  pitch: 'C',
-                  nextSongName: 'Next Song',
-                  nextSingerName: 'Next Singer',
-                  nextPitch: 'D',
-                  nextIsContinuation: false,
-                  songSlideNumber: 1,
-                  songSlideCount: 5,
-                } as Slide}
-                showTranslation={true}
-                template={previewTemplate}
-              />
+              {/* Render based on whether it's a static slide or reference slide */}
+              {previewSlideIndex === previewReferenceIndex ? (
+                /* Reference slide - show with sample song content */
+                <SlideView 
+                  slide={{
+                    songName: 'Sample Devotional Song',
+                    content: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6',
+                    translation: 'Translation Line 1\nTranslation Line 2\nTranslation Line 3',
+                    singerName: 'Sample Singer',
+                    pitch: 'C',
+                    nextSongName: 'Next Song',
+                    nextSingerName: 'Next Singer',
+                    nextPitch: 'D',
+                    nextIsContinuation: false,
+                    songSlideNumber: 1,
+                    songSlideCount: 5,
+                    index: previewSlideIndex,
+                  } as Slide}
+                  showTranslation={true}
+                  template={previewTemplate}
+                />
+              ) : (
+                /* Static slide - show template content only */
+                <div 
+                  className="presentation-slide relative overflow-hidden"
+                  style={getSlideBackgroundStyles(previewSlides[previewSlideIndex])}
+                >
+                  <SlideBackground templateSlide={previewSlides[previewSlideIndex]} />
+                  <SlideImages templateSlide={previewSlides[previewSlideIndex]} />
+                  <SlideVideos templateSlide={previewSlides[previewSlideIndex]} />
+                  <SlideText templateSlide={previewSlides[previewSlideIndex]} />
+                </div>
+              )}
+              
+              {/* Reference Slide Indicator Overlay */}
+              {previewSlideIndex === previewReferenceIndex && previewSlides.length > 1 && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div className="bg-yellow-500/90 text-black px-6 py-3 rounded-lg text-2xl font-bold shadow-xl transform rotate-[-5deg] border-4 border-yellow-600">
+                    🎯 Reference Slide
+                  </div>
+                </div>
+              )}
+              
+              {/* Static Slide Indicator */}
+              {previewSlideIndex !== previewReferenceIndex && previewSlides.length > 1 && (
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none">
+                  <div className="bg-gray-700/80 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    {previewSlideIndex < previewReferenceIndex ? 'Intro Slide' : 'Outro Slide'} (Static)
+                  </div>
+                </div>
+              )}
             </div>
+            
+            {/* Slide Navigation (shown for multi-slide templates) */}
+            {previewSlides.length > 1 && (
+              <div className="flex items-center justify-center gap-2 p-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+                <button
+                  onClick={() => setPreviewSlideIndex(prev => Math.max(0, prev - 1))}
+                  disabled={previewSlideIndex === 0}
+                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                
+                {/* Slide dots/indicators */}
+                <div className="flex gap-2 mx-4">
+                  {previewSlides.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setPreviewSlideIndex(idx)}
+                      className={`w-3 h-3 rounded-full transition-colors ${
+                        idx === previewSlideIndex
+                          ? 'bg-blue-500'
+                          : idx === previewReferenceIndex
+                            ? 'bg-yellow-400 hover:bg-yellow-500'
+                            : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+                      }`}
+                      title={idx === previewReferenceIndex ? `Slide ${idx + 1} (Reference)` : `Slide ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+                
+                <button
+                  onClick={() => setPreviewSlideIndex(prev => Math.min(previewSlides.length - 1, prev + 1))}
+                  disabled={previewSlideIndex === previewSlides.length - 1}
+                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                
+                <span className="ml-4 text-sm text-gray-600 dark:text-gray-400">
+                  Slide {previewSlideIndex + 1} / {previewSlides.length}
+                  {previewSlideIndex === previewReferenceIndex && (
+                    <span className="ml-2 text-yellow-500 font-medium">⭐ Reference</span>
+                  )}
+                </span>
+              </div>
+            )}
 
             {/* Footer with Details - Collapsible info panel */}
             <div className="bg-white dark:bg-gray-800 p-3 border-t border-gray-200 dark:border-gray-700 overflow-y-auto max-h-32 flex-shrink-0">

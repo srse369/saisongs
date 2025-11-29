@@ -111,19 +111,14 @@ class SingerService {
     this.validateSingerInput(input);
 
     try {
-      // Create on the server
-      await apiClient.createSinger({
+      // Create on the server and use the returned singer directly
+      const raw = await apiClient.createSinger({
         name: input.name.trim(),
         gender: input.gender,
       });
 
-      // Re-fetch all singers and pick the one that matches by name,
-      // or fall back to the last item (names are unique in typical use).
-      const all = await this.getAllSingers();
-      const created =
-        all.find((s) => s.name === input.name.trim()) ?? all[all.length - 1];
-
-      return created;
+      // Map and return the created singer
+      return this.mapApiSinger(raw);
     } catch (error) {
       console.error('Error creating singer:', error);
       throw new DatabaseError(

@@ -251,7 +251,7 @@ class CacheService {
     return mappedSong;
   }
 
-  async createSong(songData: any): Promise<void> {
+  async createSong(songData: any): Promise<any> {
     const db = await this.getDatabase();
     const params = [
       String(songData.name || ''),
@@ -335,18 +335,29 @@ class CacheService {
         updatedAt: extractValue(newSong.UPDATED_AT)
       };
 
-      // Add to cached list and re-sort by name
+      // Update cache directly - add to existing cache or invalidate to force fresh fetch
       const cached = this.get('songs:all');
       if (cached && Array.isArray(cached)) {
         const updated = [...cached, mappedSong].sort((a, b) => 
           (a.name || '').localeCompare(b.name || '')
         );
         this.set('songs:all', updated, 5 * 60 * 1000);
+      } else {
+        // No cache exists - invalidate to force fresh fetch on next request
+        // This ensures all songs (including the new one) will be included
+        this.invalidate('songs:all');
       }
+      
+      // Also cache the individual song
+      this.set(`song:${mappedSong.id}`, mappedSong, 5 * 60 * 1000);
+      
+      return mappedSong;
     }
+    
+    return null;
   }
 
-  async updateSong(id: string, songData: any): Promise<void> {
+  async updateSong(id: string, songData: any): Promise<any> {
     const db = await this.getDatabase();
     const params = [
       String(songData.name || ''),
@@ -440,27 +451,49 @@ class CacheService {
         updatedAt: extractValue(updatedSong.UPDATED_AT)
       };
 
-      // Replace in cached list and re-sort (in case name changed)
+      // Update cache directly - replace in list or add if not exists
       const cached = this.get('songs:all');
       if (cached && Array.isArray(cached)) {
-        const updated = cached
-          .map(song => song.id === id ? mappedSong : song)
-          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        const songExists = cached.some(song => song.id === id);
+        let updated;
+        if (songExists) {
+          updated = cached
+            .map(song => song.id === id ? mappedSong : song)
+            .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        } else {
+          // Song not in cache list, add it
+          updated = [...cached, mappedSong].sort((a, b) => 
+            (a.name || '').localeCompare(b.name || '')
+          );
+        }
         this.set('songs:all', updated, 5 * 60 * 1000);
       }
+      // No else - if cache doesn't exist, don't force a full reload
+      // The next getAllSongs() call will fetch from DB naturally
+      
+      // Update the individual song cache directly
+      this.set(`song:${id}`, mappedSong, 5 * 60 * 1000);
+      
+      return mappedSong;
     }
+    
+    return null;
   }
 
   async deleteSong(id: string): Promise<void> {
     const db = await this.getDatabase();
     await db.query(`DELETE FROM songs WHERE RAWTOHEX(id) = :1`, [id]);
     
-    // Write-through cache: Remove from cached list
+    // Remove from individual song cache
+    this.invalidate(`song:${id}`);
+    
+    // Update cache directly - remove from list
     const cached = this.get('songs:all');
     if (cached && Array.isArray(cached)) {
       const updated = cached.filter((song: any) => song.id !== id);
       this.set('songs:all', updated, 5 * 60 * 1000);
     }
+    // No else - if cache doesn't exist, nothing to update
   }
 
   // ==================== SINGERS ====================
@@ -544,12 +577,17 @@ class CacheService {
           updated_at: rawSinger.updated_at || rawSinger.UPDATED_AT,
         };
         
+        // Write-through cache: Add to cache or create minimal cache with new singer
         const cached = this.get('singers:all');
         if (cached && Array.isArray(cached)) {
           const updated = [...cached, rawSinger].sort((a, b) => 
             (a.NAME || a.name || '').localeCompare(b.NAME || b.name || '')
           );
           this.set('singers:all', updated, 5 * 60 * 1000);
+        } else {
+          // Cache doesn't exist - invalidate to force fresh fetch on next request
+          // This ensures the new singer will be included
+          this.invalidate('singers:all');
         }
         
         // Return the normalized singer object
@@ -693,7 +731,7 @@ class CacheService {
     `, [songId]);
   }
 
-  async createPitch(pitchData: any): Promise<void> {
+  async createPitch(pitchData: any): Promise<any> {
     const db = await this.getDatabase();
     await db.query(`
       INSERT INTO song_singer_pitches (song_id, singer_id, pitch)
@@ -720,30 +758,38 @@ class CacheService {
     `, [pitchData.song_id, pitchData.singer_id]);
     
     if (newPitches.length > 0) {
+      // Normalize the new pitch data
+      const rawPitch = newPitches[0];
+      const normalizedPitch = {
+        id: rawPitch.id || rawPitch.ID,
+        song_id: rawPitch.song_id || rawPitch.SONG_ID,
+        singer_id: rawPitch.singer_id || rawPitch.SINGER_ID,
+        pitch: rawPitch.pitch || rawPitch.PITCH,
+        song_name: rawPitch.song_name || rawPitch.SONG_NAME,
+        singer_name: rawPitch.singer_name || rawPitch.SINGER_NAME,
+        created_at: rawPitch.created_at || rawPitch.CREATED_AT,
+        updated_at: rawPitch.updated_at || rawPitch.UPDATED_AT,
+      };
+      
+      // Write-through cache: Add to existing cache or invalidate
       const cached = this.get('pitches:all');
       if (cached && Array.isArray(cached)) {
-        // Normalize the new pitch data
-        const rawPitch = newPitches[0];
-        const normalizedPitch = {
-          id: rawPitch.id || rawPitch.ID,
-          song_id: rawPitch.song_id || rawPitch.SONG_ID,
-          singer_id: rawPitch.singer_id || rawPitch.SINGER_ID,
-          pitch: rawPitch.pitch || rawPitch.PITCH,
-          song_name: rawPitch.song_name || rawPitch.SONG_NAME,
-          singer_name: rawPitch.singer_name || rawPitch.SINGER_NAME,
-          created_at: rawPitch.created_at || rawPitch.CREATED_AT,
-          updated_at: rawPitch.updated_at || rawPitch.UPDATED_AT,
-        };
-        
-        // Add to cache and sort (use lowercase field names for normalized cache)
+        // Add to cache and sort
         const updated = [...cached, normalizedPitch].sort((a, b) => {
           const songCompare = (a.song_name || '').localeCompare(b.song_name || '');
           if (songCompare !== 0) return songCompare;
           return (a.singer_name || '').localeCompare(b.singer_name || '');
         });
         this.set('pitches:all', updated, 5 * 60 * 1000);
+      } else {
+        // No cache exists - invalidate to force fresh fetch
+        this.invalidate('pitches:all');
       }
+      
+      return normalizedPitch;
     }
+    
+    return null;
   }
 
   async updatePitch(id: string, pitch: string): Promise<void> {
@@ -866,34 +912,144 @@ class CacheService {
         console.error('Error parsing template JSON:', e);
       }
 
+      // Check if this is a multi-slide template
+      const isMultiSlide = Array.isArray(templateJson.slides) && templateJson.slides.length > 0;
+
       const template: any = {
         id: row.ID,
         name: row.NAME,
         description: row.DESCRIPTION,
-        background: templateJson.background,
-        images: templateJson.images || [],
-        videos: templateJson.videos || [],
-        text: templateJson.text || [],
         isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
         createdAt: row.CREATED_AT,
         updatedAt: row.UPDATED_AT,
       };
 
-      // Reconstruct YAML from template data (same as TemplateService)
-      template.yaml = yaml.dump({
-        name: template.name,
-        description: template.description,
-        background: template.background,
-        images: template.images || [],
-        videos: template.videos || [],
-        text: template.text || [],
-      });
+      if (isMultiSlide) {
+        // Multi-slide format
+        template.slides = templateJson.slides;
+        template.referenceSlideIndex = templateJson.referenceSlideIndex ?? 0;
+        // Also populate legacy fields from reference slide for backward compatibility
+        const refSlide = template.slides[template.referenceSlideIndex] || template.slides[0];
+        template.background = refSlide?.background;
+        template.images = refSlide?.images || [];
+        template.videos = refSlide?.videos || [];
+        template.text = refSlide?.text || [];
+      } else {
+        // Legacy single-slide format
+        template.background = templateJson.background;
+        template.images = templateJson.images || [];
+        template.videos = templateJson.videos || [];
+        template.text = templateJson.text || [];
+        // Auto-migrate to multi-slide format
+        template.slides = [{
+          background: template.background,
+          images: template.images,
+          videos: template.videos,
+          text: template.text,
+        }];
+        template.referenceSlideIndex = 0;
+      }
+
+      // Reconstruct YAML from template data (using multi-slide format)
+      if (template.slides && template.slides.length > 0) {
+        template.yaml = yaml.dump({
+          name: template.name,
+          description: template.description,
+          slides: template.slides,
+          referenceSlideIndex: template.referenceSlideIndex ?? 0,
+        });
+      } else {
+        template.yaml = yaml.dump({
+          name: template.name,
+          description: template.description,
+          background: template.background,
+          images: template.images || [],
+          videos: template.videos || [],
+          text: template.text || [],
+        });
+      }
 
       return template;
     });
 
     this.set(cacheKey, mappedTemplates, 5 * 60 * 1000);
     return mappedTemplates;
+  }
+
+  /**
+   * Create a template with write-through cache update
+   */
+  async createTemplate(template: any): Promise<any> {
+    const templateService = (await import('./TemplateService.js')).default;
+    const created = await templateService.createTemplate(template);
+    
+    // Write-through: add to cache directly
+    const cacheKey = 'templates:all';
+    const cached = this.get(cacheKey);
+    if (cached && Array.isArray(cached)) {
+      cached.push(created);
+      this.set(cacheKey, cached, 5 * 60 * 1000);
+    }
+    
+    return created;
+  }
+
+  /**
+   * Update a template with write-through cache update
+   */
+  async updateTemplate(id: string, updates: any): Promise<any> {
+    const templateService = (await import('./TemplateService.js')).default;
+    const updated = await templateService.updateTemplate(id, updates);
+    
+    // Write-through: update in cache directly
+    const cacheKey = 'templates:all';
+    const cached = this.get(cacheKey);
+    if (cached && Array.isArray(cached)) {
+      const index = cached.findIndex((t: any) => t.id === id);
+      if (index !== -1) {
+        cached[index] = updated;
+        this.set(cacheKey, cached, 5 * 60 * 1000);
+      }
+    }
+    
+    return updated;
+  }
+
+  /**
+   * Delete a template with write-through cache update
+   */
+  async deleteTemplate(id: string): Promise<void> {
+    const templateService = (await import('./TemplateService.js')).default;
+    await templateService.deleteTemplate(id);
+    
+    // Write-through: remove from cache directly
+    const cacheKey = 'templates:all';
+    const cached = this.get(cacheKey);
+    if (cached && Array.isArray(cached)) {
+      const filtered = cached.filter((t: any) => t.id !== id);
+      this.set(cacheKey, filtered, 5 * 60 * 1000);
+    }
+  }
+
+  /**
+   * Set a template as default with write-through cache update
+   */
+  async setTemplateAsDefault(id: string): Promise<any> {
+    const templateService = (await import('./TemplateService.js')).default;
+    const updated = await templateService.setAsDefault(id);
+    
+    // Write-through: update all templates in cache to reflect new default
+    const cacheKey = 'templates:all';
+    const cached = this.get(cacheKey);
+    if (cached && Array.isArray(cached)) {
+      const updatedCache = cached.map((t: any) => ({
+        ...t,
+        isDefault: t.id === id
+      }));
+      this.set(cacheKey, updatedCache, 5 * 60 * 1000);
+    }
+    
+    return updated;
   }
 
   async getSession(id: string): Promise<any> {

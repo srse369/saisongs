@@ -89,34 +89,24 @@ router.post('/', async (req, res) => {
       
       // If pitch is the same, return existing (idempotent)
       if (existingPitchNormalized === newPitchNormalized) {
-        return res.status(200).json({ 
-          message: 'Pitch association already exists',
-          pitch: existing,
-          created: false,
-          updated: false
-        });
+        // Return the existing pitch object for frontend to use
+        return res.status(200).json(existing);
       }
       
-      // If pitch is different, update it
+      // If pitch is different, update it and return the updated pitch
       await cacheService.updatePitch(existing.id, pitch);
-      return res.status(200).json({ 
-        message: 'Pitch association updated',
-        created: false,
-        updated: true
-      });
+      // Fetch the updated pitch to return
+      const updatedPitch = await cacheService.getPitch(existing.id);
+      return res.status(200).json(updatedPitch);
     }
     
     // Create new pitch association
-    await cacheService.createPitch({
+    const createdPitch = await cacheService.createPitch({
       song_id: songId,
       singer_id: singerId,
       pitch: pitch
     });
-    res.status(201).json({ 
-      message: 'Pitch association created successfully',
-      created: true,
-      updated: false
-    });
+    res.status(201).json(createdPitch);
   } catch (error) {
     console.error('Error creating pitch:', error);
     res.status(500).json({ error: 'Failed to create pitch association' });

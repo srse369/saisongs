@@ -51,6 +51,61 @@ export const SessionManager: React.FC = () => {
     restoreTemplate();
   }, []);
 
+  // Listen for template changes from presentation mode (via localStorage)
+  // This handles cross-tab synchronization
+  useEffect(() => {
+    const handleStorageChange = async (e: StorageEvent) => {
+      if (e.key === 'selectedSessionTemplateId' && e.newValue) {
+        try {
+          const template = await templateService.getTemplate(e.newValue);
+          if (template) {
+            setSelectedTemplate(template);
+          }
+        } catch (error) {
+          console.error('Error loading template from storage event:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Re-sync template when returning to the Live tab (handles same-tab navigation)
+  useEffect(() => {
+    const syncTemplateFromStorage = async () => {
+      const savedTemplateId = localStorage.getItem('selectedSessionTemplateId');
+      if (savedTemplateId && savedTemplateId !== selectedTemplate?.id) {
+        try {
+          const template = await templateService.getTemplate(savedTemplateId);
+          if (template) {
+            setSelectedTemplate(template);
+          }
+        } catch (error) {
+          console.error('Error syncing template:', error);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncTemplateFromStorage();
+      }
+    };
+
+    const handleFocus = () => {
+      syncTemplateFromStorage();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [selectedTemplate?.id]);
+
   const sessionItems = entries
     .map((entry) => {
       const song = songs.find((s) => s.id === entry.songId);
@@ -83,7 +138,7 @@ export const SessionManager: React.FC = () => {
     }
   };
 
-  const handlePresentSingle = (songId: string) => {
+  const handlePreviewSong = (songId: string) => {
     const item = sessionItems.find(({ entry }) => entry.songId === songId);
     if (!item) {
       navigate(`/presentation/${songId}`);
@@ -96,6 +151,10 @@ export const SessionManager: React.FC = () => {
     }
     if (item.entry.pitch) {
       params.set('pitch', item.entry.pitch);
+    }
+    // Use the selected template for preview
+    if (selectedTemplate?.id) {
+      params.set('templateId', selectedTemplate.id);
     }
     const query = params.toString();
     navigate(`/presentation/${songId}${query ? `?${query}` : ''}`);
@@ -302,11 +361,12 @@ export const SessionManager: React.FC = () => {
                     {index + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    {/* Song Name */}
+                    {/* Song Name - Click to preview with selected template */}
                     <button
                       type="button"
-                      onClick={() => setViewingSong(song)}
+                      onClick={() => handlePreviewSong(song.id)}
                       className="text-left text-base sm:text-lg font-semibold text-blue-700 dark:text-blue-300 hover:underline mb-1"
+                      title="Click to preview"
                     >
                       {song.name}
                     </button>
@@ -368,17 +428,6 @@ export const SessionManager: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
                     </svg>
                     <span className="text-sm font-medium whitespace-nowrap">Reorder</span>
-                  </button>
-                  <button
-                    onClick={() => handlePresentSingle(song.id)}
-                    title="Present"
-                    className="flex items-center gap-2 p-2 rounded-md text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-sm font-medium whitespace-nowrap">Present</span>
                   </button>
                   <button
                     onClick={() => removeSong(entry.songId, entry.singerId)}

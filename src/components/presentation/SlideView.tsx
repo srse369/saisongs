@@ -1,8 +1,7 @@
 import React from 'react';
-import type { Slide, PresentationTemplate } from '../../types';
+import type { Slide, PresentationTemplate, TemplateSlide } from '../../types';
 import { formatPitch } from '../../utils/pitchUtils';
-import { getBackgroundStyles } from '../../utils/templateUtils';
-import { TemplateBackground, TemplateImages, TemplateVideos, TemplateText } from '../../utils/templateUtils';
+import { getBackgroundStyles, getSlideBackgroundStyles, getReferenceSlide, TemplateBackground, TemplateImages, TemplateVideos, TemplateText, SlideBackground, SlideImages, SlideVideos, SlideText } from '../../utils/templateUtils';
 
 interface SlideViewProps {
   slide: Slide;
@@ -13,6 +12,15 @@ interface SlideViewProps {
 export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = true, template }) => {
   const sessionSongIndex = (slide as any).sessionSongIndex;
   const totalSongs = (slide as any).totalSongs;
+  
+  // Check if this is a static slide (template-only, no song content)
+  const isStaticSlide = slide.slideType === 'static';
+  
+  // For static slides, use the templateSlide directly
+  // For song slides, use the reference slide from the template
+  const effectiveSlide: TemplateSlide | undefined = isStaticSlide 
+    ? slide.templateSlide 
+    : (template ? getReferenceSlide(template) : undefined);
   
   // Calculate dynamic font size based on number of lines
   const lyricsLines = slide.content.split('\n').length;
@@ -33,12 +41,36 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
   };
   
   const hasTranslation = showTranslation && slide.translation;
-  const backgroundStyles = getBackgroundStyles(template);
   
+  // Get background styles - for static slides use templateSlide, for song slides use reference slide
+  const backgroundStyles = isStaticSlide && slide.templateSlide 
+    ? getSlideBackgroundStyles(slide.templateSlide)
+    : getBackgroundStyles(template);
+  
+  // Static slide - render only template elements, no song content
+  if (isStaticSlide && slide.templateSlide) {
+    return (
+      <div className="presentation-slide relative overflow-hidden" style={backgroundStyles}>
+        {/* Static slide background */}
+        <SlideBackground templateSlide={slide.templateSlide} />
+        
+        {/* Static slide overlays */}
+        <SlideImages templateSlide={slide.templateSlide} />
+        <SlideVideos templateSlide={slide.templateSlide} />
+        <SlideText templateSlide={slide.templateSlide} />
+      </div>
+    );
+  }
+  
+  // Song slide - render song content with template styling
   return (
     <div className="presentation-slide relative overflow-hidden" style={backgroundStyles}>
-      {/* Template background elements */}
-      <TemplateBackground template={template} />
+      {/* Template background elements (from reference slide) */}
+      {effectiveSlide ? (
+        <SlideBackground templateSlide={effectiveSlide} />
+      ) : (
+        <TemplateBackground template={template} />
+      )}
       
       {/* Song number and slide position at top-left */}
       {(sessionSongIndex || (slide.songSlideCount && slide.songSlideCount > 1 && slide.songSlideNumber)) && (
@@ -126,10 +158,20 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         </div>
       )}
 
-      {/* Template overlays */}
-      <TemplateImages template={template} />
-      <TemplateVideos template={template} />
-      <TemplateText template={template} />
+      {/* Template overlays (from reference slide) */}
+      {effectiveSlide ? (
+        <>
+          <SlideImages templateSlide={effectiveSlide} />
+          <SlideVideos templateSlide={effectiveSlide} />
+          <SlideText templateSlide={effectiveSlide} />
+        </>
+      ) : (
+        <>
+          <TemplateImages template={template} />
+          <TemplateVideos template={template} />
+          <TemplateText template={template} />
+        </>
+      )}
     </div>
   );
 };

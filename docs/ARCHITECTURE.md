@@ -47,7 +47,7 @@ HTTPS (443) → Nginx
 │
 └─ API Requests (/api/*) → Proxied to Backend
         ↓
-    Express Server (3001)
+    Express Server (3111)
         ↓
     Cache Layer (in-memory)
         ↓ (miss)
@@ -485,7 +485,7 @@ if (cached) {
 
 **Development (.env.local):**
 ```bash
-VITE_API_URL=http://localhost:3001/api
+VITE_API_URL=http://localhost:3111/api
 ```
 
 **Production (.env.production):**
@@ -545,7 +545,7 @@ performance.getEntriesByType('resource')
 **Backend (.env on server):**
 ```bash
 NODE_ENV=production
-PORT=3001
+PORT=3111
 HOST=0.0.0.0
 
 # Oracle Database
@@ -589,7 +589,7 @@ module.exports = {
     exec_mode: 'cluster',
     env_production: {
       NODE_ENV: 'production',
-      PORT: 3001,
+      PORT: 3111,
       LD_LIBRARY_PATH: '/opt/oracle/instantclient_21_13:/usr/lib'
     },
     max_memory_restart: '512M',

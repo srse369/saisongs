@@ -57,7 +57,7 @@ create_env_template() {
     if [ ! -f "$APP_PATH/.env" ]; then
         cat > "$APP_PATH/.env" << EOF
 NODE_ENV=production
-PORT=3001
+PORT=3111
 HOST=0.0.0.0
 
 # Oracle Database - Update these with your actual values
@@ -446,7 +446,7 @@ server {
 
     # API proxy
     location /api {
-        proxy_pass http://localhost:3001/api;
+        proxy_pass http://localhost:3111/api;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';

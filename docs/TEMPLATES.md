@@ -19,7 +19,7 @@ npm run build
 #### 3. Create Your First Template
 
 **In Admin UI:**
-1. Open admin panel (http://localhost:5173/admin)
+1. Open admin panel (http://localhost:5111/admin)
 2. Click on "Presentation Templates" in navigation
 3. Click "➕ New Template"
 4. Fill in:
@@ -583,17 +583,17 @@ PresentationMode
 
 #### Get Default Template
 ```bash
-curl http://localhost:3001/api/templates/default
+curl http://localhost:3111/api/templates/default
 ```
 
 #### List All Templates
 ```bash
-curl http://localhost:3001/api/templates
+curl http://localhost:3111/api/templates
 ```
 
 #### Create Template
 ```bash
-curl -X POST http://localhost:3001/api/templates \
+curl -X POST http://localhost:3111/api/templates \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My Template",

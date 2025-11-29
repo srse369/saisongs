@@ -554,9 +554,9 @@ echo ""
 
 # Check if backend is responding
 echo "4. Testing backend API..."
-if curl -f -s http://localhost:3001/api/health > /dev/null; then
+if curl -f -s http://localhost:3111/api/health > /dev/null; then
     echo "✅ Backend API is responding"
-    curl -s http://localhost:3001/api/health
+    curl -s http://localhost:3111/api/health
 else
     echo "❌ Backend API is not responding"
 fi
@@ -627,9 +627,9 @@ sleep 3
 # Test the API
 echo ""
 echo "Testing API..."
-if curl -f -s http://localhost:3001/api/health > /dev/null; then
+if curl -f -s http://localhost:3111/api/health > /dev/null; then
     echo "✅ Backend is running!"
-    curl -s http://localhost:3001/api/health
+    curl -s http://localhost:3111/api/health
 else
     echo "❌ Backend failed to start. Check logs:"
     echo "   pm2 logs songstudio --lines 50"

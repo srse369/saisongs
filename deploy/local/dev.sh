@@ -84,11 +84,11 @@ cmd_start() {
     fi
 
     # Check if services are already running
-    FRONTEND_PID=$(lsof -ti:5173 2>/dev/null || true)
-    BACKEND_PID=$(lsof -ti:3001 2>/dev/null || true)
+    FRONTEND_PID=$(lsof -ti:5111 2>/dev/null || true)
+    BACKEND_PID=$(lsof -ti:3111 2>/dev/null || true)
 
     if [ ! -z "$FRONTEND_PID" ]; then
-        echo -e "${YELLOW}⚠️  Frontend already running on port 5173 (PID: $FRONTEND_PID)${NC}"
+        echo -e "${YELLOW}⚠️  Frontend already running on port 5111 (PID: $FRONTEND_PID)${NC}"
         read -p "   Kill and restart? (y/n) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -100,7 +100,7 @@ cmd_start() {
     fi
 
     if [ ! -z "$BACKEND_PID" ]; then
-        echo -e "${YELLOW}⚠️  Backend already running on port 3001 (PID: $BACKEND_PID)${NC}"
+        echo -e "${YELLOW}⚠️  Backend already running on port 3111 (PID: $BACKEND_PID)${NC}"
         read -p "   Kill and restart? (y/n) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -117,7 +117,7 @@ cmd_start() {
     # Start backend server
     echo ""
     echo -e "${BLUE}🔧 Starting Backend Server...${NC}"
-    echo "   Port: 3001"
+    echo "   Port: 3111"
     echo "   Logs: logs/backend.log"
 
     npm run dev:server > logs/backend.log 2>&1 &
@@ -139,7 +139,7 @@ cmd_start() {
     # Start frontend server
     echo ""
     echo -e "${BLUE}🎨 Starting Frontend Server...${NC}"
-    echo "   Port: 5173"
+    echo "   Port: 5111"
     echo "   Logs: logs/frontend.log"
 
     npm run dev > logs/frontend.log 2>&1 &
@@ -164,9 +164,9 @@ cmd_start() {
     echo -e "${GREEN}========================================${NC}"
     echo ""
     echo -e "${BLUE}🌐 URLs:${NC}"
-    echo "   Frontend: http://localhost:5173"
-    echo "   Backend:  http://localhost:3001"
-    echo "   API:      http://localhost:3001/api"
+    echo "   Frontend: http://localhost:5111"
+    echo "   Backend:  http://localhost:3111"
+    echo "   API:      http://localhost:3111/api"
     echo ""
     echo -e "${BLUE}📝 Logs:${NC}"
     echo "   Frontend: tail -f logs/frontend.log"
@@ -224,9 +224,9 @@ cmd_stop() {
         rm -f logs/frontend.pid
     else
         # Try to find by port
-        FRONTEND_PID=$(lsof -ti:5173 2>/dev/null || true)
+        FRONTEND_PID=$(lsof -ti:5111 2>/dev/null || true)
         if [ ! -z "$FRONTEND_PID" ]; then
-            echo -e "${YELLOW}🎨 Stopping Frontend on port 5173 (PID: $FRONTEND_PID)...${NC}"
+            echo -e "${YELLOW}🎨 Stopping Frontend on port 5111 (PID: $FRONTEND_PID)...${NC}"
             kill $FRONTEND_PID 2>/dev/null || true
             sleep 1
             echo -e "${GREEN}✅ Frontend stopped${NC}"
@@ -257,9 +257,9 @@ cmd_stop() {
         rm -f logs/backend.pid
     else
         # Try to find by port
-        BACKEND_PID=$(lsof -ti:3001 2>/dev/null || true)
+        BACKEND_PID=$(lsof -ti:3111 2>/dev/null || true)
         if [ ! -z "$BACKEND_PID" ]; then
-            echo -e "${YELLOW}🔧 Stopping Backend on port 3001 (PID: $BACKEND_PID)...${NC}"
+            echo -e "${YELLOW}🔧 Stopping Backend on port 3111 (PID: $BACKEND_PID)...${NC}"
             kill $BACKEND_PID 2>/dev/null || true
             sleep 1
             echo -e "${GREEN}✅ Backend stopped${NC}"
@@ -314,13 +314,13 @@ cmd_status() {
 
     # Check frontend
     echo ""
-    echo -e "${BLUE}🎨 Frontend (Port 5173):${NC}"
-    FRONTEND_PID=$(lsof -ti:5173 2>/dev/null || true)
+    echo -e "${BLUE}🎨 Frontend (Port 5111):${NC}"
+    FRONTEND_PID=$(lsof -ti:5111 2>/dev/null || true)
 
     if [ ! -z "$FRONTEND_PID" ]; then
         echo -e "   Status: ${GREEN}● Running${NC}"
         echo "   PID: $FRONTEND_PID"
-        echo "   URL: http://localhost:5173"
+        echo "   URL: http://localhost:5111"
         
         # Check memory usage
         if command -v ps &> /dev/null; then
@@ -341,14 +341,14 @@ cmd_status() {
 
     # Check backend
     echo ""
-    echo -e "${BLUE}🔧 Backend (Port 3001):${NC}"
-    BACKEND_PID=$(lsof -ti:3001 2>/dev/null || true)
+    echo -e "${BLUE}🔧 Backend (Port 3111):${NC}"
+    BACKEND_PID=$(lsof -ti:3111 2>/dev/null || true)
 
     if [ ! -z "$BACKEND_PID" ]; then
         echo -e "   Status: ${GREEN}● Running${NC}"
         echo "   PID: $BACKEND_PID"
-        echo "   URL: http://localhost:3001"
-        echo "   API: http://localhost:3001/api"
+        echo "   URL: http://localhost:3111"
+        echo "   API: http://localhost:3111/api"
         
         # Check memory usage
         if command -v ps &> /dev/null; then
@@ -366,7 +366,7 @@ cmd_status() {
         
         # Test API health
         echo -n "   Health: "
-        HEALTH=$(curl -s http://localhost:3001/api/health 2>/dev/null || echo "")
+        HEALTH=$(curl -s http://localhost:3111/api/health 2>/dev/null || echo "")
         if [ ! -z "$HEALTH" ]; then
             echo -e "${GREEN}✓ API responding${NC}"
         else
@@ -383,7 +383,7 @@ cmd_status() {
         echo -n "   Connection: "
         
         # Try to fetch a small dataset to test DB connection
-        DB_TEST=$(curl -s http://localhost:3001/api/songs 2>/dev/null | head -c 50 || echo "")
+        DB_TEST=$(curl -s http://localhost:3111/api/songs 2>/dev/null | head -c 50 || echo "")
         if [ ! -z "$DB_TEST" ]; then
             echo -e "${GREEN}✓ Connected${NC}"
         else

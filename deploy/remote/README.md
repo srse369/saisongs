@@ -342,7 +342,7 @@ Nginx web server configuration.
 
 **Features:**
 - Serves React frontend (SPA routing)
-- Proxies `/api/` to backend (port 3001)
+- Proxies `/api/` to backend (port 3111)
 - Gzip compression
 - Asset caching (1 year for static files)
 - Security headers

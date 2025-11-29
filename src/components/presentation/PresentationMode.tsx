@@ -3,7 +3,7 @@ import { SlideView } from './SlideView';
 import { SlideNavigation } from './SlideNavigation';
 import TemplateSelector from './TemplateSelector';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { generateSlides } from '../../utils/slideUtils';
+import { generateSlides, generatePresentationSlides } from '../../utils/slideUtils';
 import type { Slide, Song, PresentationTemplate } from '../../types';
 import apiClient from '../../services/ApiClient';
 import templateService from '../../services/TemplateService';
@@ -23,11 +23,21 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
   const [error, setError] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const [activeTemplate, setActiveTemplate] = useState<PresentationTemplate | null>(null);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(templateId);
-
   const [searchParams] = useSearchParams();
   const singerName = searchParams.get('singerName') || undefined;
   const pitch = searchParams.get('pitch') || undefined;
+  // Read templateId from URL params if not provided as prop
+  const urlTemplateId = searchParams.get('templateId') || undefined;
+  
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(templateId || urlTemplateId);
+
+  // Update selectedTemplateId when URL param or prop changes
+  useEffect(() => {
+    const newTemplateId = templateId || urlTemplateId;
+    if (newTemplateId && newTemplateId !== selectedTemplateId) {
+      setSelectedTemplateId(newTemplateId);
+    }
+  }, [templateId, urlTemplateId]);
 
   // Load template on mount or when templateId changes
   useEffect(() => {
@@ -85,34 +95,14 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
           }
         }
 
-        // Generate slides from the song data and attach optional singer/pitch (if provided)
-        const baseSlides = generateSlides(song).map((slide) => ({
-          ...slide,
-          singerName: displaySingerName,
-          pitch: displayPitch,
-        }));
-
-        // Attach "next" metadata for single-song presentation
-        const generatedSlides = baseSlides.map((slide, index) => {
-          const next = baseSlides[index + 1];
-          if (!next) return slide;
-
-          if (next.songName === slide.songName) {
-            return {
-              ...slide,
-              nextSongName: slide.songName,
-              nextIsContinuation: true,
-            };
-          }
-
-          return {
-            ...slide,
-            nextSongName: next.songName,
-            nextSingerName: next.singerName,
-            nextPitch: next.pitch,
-            nextIsContinuation: false,
-          };
-        });
+        // Generate slides using multi-slide template support if available
+        const generatedSlides = generatePresentationSlides(
+          song,
+          activeTemplate,
+          displaySingerName,
+          displayPitch
+        );
+        
         setSlides(generatedSlides);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load song');
@@ -122,7 +112,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     };
 
     loadSong();
-  }, [songId, singerName, pitch]);
+  }, [songId, singerName, pitch, activeTemplate]);
 
   // Auto-hide overlay after 2 seconds
   useEffect(() => {

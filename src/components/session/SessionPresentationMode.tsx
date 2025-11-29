@@ -7,7 +7,7 @@ import { SlideView } from '../presentation/SlideView';
 import { SlideNavigation } from '../presentation/SlideNavigation';
 import TemplateSelector from '../presentation/TemplateSelector';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { generateSlides } from '../../utils/slideUtils';
+import { generateSlides, generateSessionPresentationSlides } from '../../utils/slideUtils';
 import ApiClient from '../../services/ApiClient';
 import templateService from '../../services/TemplateService';
 import type { Slide, Song, PresentationTemplate } from '../../types';
@@ -85,50 +85,22 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         const fullSongs = await Promise.all(songPromises);
         console.log(`✅ Fetched ${fullSongs.length} songs with lyrics for presentation`);
 
-        const allSlides: Slide[] = [];
-
-        entries.forEach((entry, songIndex) => {
-          const song = fullSongs[songIndex];
-          if (!song) return;
-
+        // Build songs array with metadata for multi-slide template support
+        const songsWithMetadata = entries.map((entry, index) => {
+          const song = fullSongs[index];
           const singer = entry.singerId ? singers.find((si) => si.id === entry.singerId) : undefined;
-          const songSlides = generateSlides(song).map((slide) => ({
-            ...slide,
+          return {
+            song: song!,
             singerName: singer?.name,
             pitch: entry.pitch,
-            sessionSongIndex: songIndex + 1, // Track which song in the session (1-based)
-            totalSongs: entries.length, // Total number of songs in session
-          }));
-
-          songSlides.forEach((slide) => {
-            allSlides.push({
-              ...slide,
-              index: allSlides.length,
-            });
-          });
-        });
-
-        // Attach "next" metadata across the flattened session slides
-        const annotatedSlides: Slide[] = allSlides.map((slide, index) => {
-          const next = allSlides[index + 1];
-          if (!next) return slide;
-
-          if (next.songName === slide.songName) {
-            return {
-              ...slide,
-              nextSongName: slide.songName,
-              nextIsContinuation: true,
-            };
-          }
-
-          return {
-            ...slide,
-            nextSongName: next.songName,
-            nextSingerName: next.singerName,
-            nextPitch: next.pitch,
-            nextIsContinuation: false,
           };
-        });
+        }).filter(item => item.song); // Filter out any null songs
+
+        // Generate slides using multi-slide template support
+        const annotatedSlides = generateSessionPresentationSlides(
+          songsWithMetadata,
+          activeTemplate
+        );
 
         setSlides(annotatedSlides);
         setCurrentSlideIndex(0);
@@ -141,7 +113,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
     };
 
     fetchAndBuildSlides();
-  }, [entries, singers]);
+  }, [entries, singers, activeTemplate]);
 
   // Auto-hide overlay after 2 seconds
   useEffect(() => {
@@ -292,6 +264,10 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
           onTemplateSelect={(template) => {
             setSelectedTemplateId(template.id);
             setActiveTemplate(template);
+            // Sync template selection to localStorage for the Live tab
+            if (template.id) {
+              localStorage.setItem('selectedSessionTemplateId', template.id);
+            }
           }}
         />
 

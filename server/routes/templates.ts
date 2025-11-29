@@ -47,7 +47,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new template
+// Create new template (through CacheService for write-through caching)
 router.post('/', async (req, res) => {
   try {
     const template: PresentationTemplate = req.body;
@@ -56,7 +56,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Template name is required' });
     }
 
-    const created = await templateService.createTemplate(template);
+    const created = await cacheService.createTemplate(template);
     res.status(201).json(created);
   } catch (error) {
     console.error('Error creating template:', error);
@@ -65,13 +65,13 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update template
+// Update template (through CacheService for write-through caching)
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updates: Partial<PresentationTemplate> = req.body;
     
-    const updated = await templateService.updateTemplate(id, updates);
+    const updated = await cacheService.updateTemplate(id, updates);
     res.json(updated);
   } catch (error) {
     console.error('Error updating template:', error);
@@ -80,11 +80,11 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Set template as default
+// Set template as default (through CacheService for write-through caching)
 router.post('/:id/set-default', async (req, res) => {
   try {
     const { id } = req.params;
-    const template = await templateService.setAsDefault(id);
+    const template = await cacheService.setTemplateAsDefault(id);
     res.json({ message: 'Template set as default', template });
   } catch (error) {
     console.error('Error setting template as default:', error);
@@ -92,11 +92,11 @@ router.post('/:id/set-default', async (req, res) => {
   }
 });
 
-// Delete template
+// Delete template (through CacheService for write-through caching)
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await templateService.deleteTemplate(id);
+    await cacheService.deleteTemplate(id);
     res.json({ message: 'Template deleted successfully' });
   } catch (error) {
     console.error('Error deleting template:', error);

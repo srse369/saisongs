@@ -29,6 +29,66 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Create new song
+router.post('/', async (req, res) => {
+  try {
+    const songData = req.body;
+    
+    if (!songData.name || !songData.name.trim()) {
+      return res.status(400).json({ error: 'Song name is required' });
+    }
+    
+    console.log('📝 Creating song:', songData.name);
+    const createdSong = await cacheService.createSong(songData);
+    
+    if (createdSong) {
+      console.log('✅ Song created:', createdSong.id);
+      res.status(201).json(createdSong);
+    } else {
+      console.log('⚠️ Song created but not returned');
+      res.status(201).json({ message: 'Song created successfully' });
+    }
+  } catch (error) {
+    console.error('Error creating song:', error);
+    res.status(500).json({ error: 'Failed to create song' });
+  }
+});
+
+// Update song
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const songData = req.body;
+    
+    console.log('📝 Updating song:', id);
+    const updatedSong = await cacheService.updateSong(id, songData);
+    
+    if (updatedSong) {
+      console.log('✅ Song updated:', id);
+      res.json(updatedSong);
+    } else {
+      res.json({ message: 'Song updated successfully' });
+    }
+  } catch (error) {
+    console.error('Error updating song:', error);
+    res.status(500).json({ error: 'Failed to update song' });
+  }
+});
+
+// Delete song
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('🗑️ Deleting song:', id);
+    await cacheService.deleteSong(id);
+    console.log('✅ Song deleted:', id);
+    res.json({ message: 'Song deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting song:', error);
+    res.status(500).json({ error: 'Failed to delete song' });
+  }
+});
+
 // Sync song with external data (extract metadata and update database)
 router.post('/:id/sync', async (req, res) => {
   try {

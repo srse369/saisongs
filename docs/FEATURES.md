@@ -651,13 +651,13 @@ A: Reduce opacity (try 0.3-0.5) or move away from center.
 
 ```bash
 # Get default template
-curl http://localhost:3001/api/templates/default
+curl http://localhost:3111/api/templates/default
 
 # List all templates
-curl http://localhost:3001/api/templates
+curl http://localhost:3111/api/templates
 
 # Create template
-curl -X POST http://localhost:3001/api/templates \
+curl -X POST http://localhost:3111/api/templates \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My Template",

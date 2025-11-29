@@ -144,29 +144,14 @@ class PitchService {
     this.validatePitchInput(input);
 
     try {
-      // Create the association on the server
-      await apiClient.createPitch({
+      // Create the association on the server and use the returned pitch directly
+      const raw = await apiClient.createPitch({
         song_id: input.songId.trim(),
         singer_id: input.singerId.trim(),
         pitch: input.pitch.trim(),
       });
 
-      // Fetch all pitches and find the one we just created by (songId, singerId, pitch)
-      const raw = await apiClient.getPitches();
-      const match = (raw as any[]).find(
-        (row) =>
-          (row.song_id ?? row.SONG_ID) === input.songId.trim() &&
-          (row.singer_id ?? row.SINGER_ID) === input.singerId.trim() &&
-          row.pitch === input.pitch.trim()
-      );
-
-      if (!match) {
-        // Fallback: just map the last row if we can't find an exact match
-        const last = (raw as any[])[(raw as any[]).length - 1];
-        return this.mapRowToPitch(last);
-      }
-
-      return this.mapRowToPitch(match);
+      return this.mapRowToPitch(raw);
     } catch (error: any) {
       console.error('Error creating pitch:', error);
       

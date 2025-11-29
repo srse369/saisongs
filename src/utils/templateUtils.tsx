@@ -2,7 +2,61 @@
  * Template rendering utilities for applying templates to presentation slides
  */
 
-import type { PresentationTemplate } from '../types';
+import type { PresentationTemplate, TemplateSlide } from '../types';
+
+// =============================================================================
+// Template helper functions
+// =============================================================================
+
+/**
+ * Check if template uses new multi-slide format
+ */
+export function isMultiSlideTemplate(template: PresentationTemplate): boolean {
+  return Array.isArray(template.slides) && template.slides.length > 0;
+}
+
+/**
+ * Get the reference slide from a template (the slide used for song content overlay)
+ */
+export function getReferenceSlide(template: PresentationTemplate): TemplateSlide {
+  if (isMultiSlideTemplate(template)) {
+    const index = template.referenceSlideIndex ?? 0;
+    return template.slides![index] || template.slides![0];
+  }
+  // Legacy format - return the template itself as a single slide
+  return {
+    background: template.background,
+    images: template.images,
+    videos: template.videos,
+    text: template.text,
+  };
+}
+
+/**
+ * Migrate legacy template to multi-slide format
+ */
+export function migrateToMultiSlide(template: PresentationTemplate): PresentationTemplate {
+  if (isMultiSlideTemplate(template)) {
+    return template; // Already in new format
+  }
+  
+  // Convert legacy single-slide to multi-slide with one slide
+  return {
+    ...template,
+    slides: [{
+      background: template.background,
+      images: template.images,
+      videos: template.videos,
+      text: template.text,
+    }],
+    referenceSlideIndex: 0,
+    // Keep legacy fields for backward compatibility during transition
+    background: template.background,
+    images: template.images,
+    videos: template.videos,
+    text: template.text,
+  };
+}
 
 /**
  * Get CSS styles from background element
@@ -179,6 +233,152 @@ export const TemplateText: React.FC<{ template: PresentationTemplate | null }> =
   return (
     <>
       {template.text.map((textElement) => (
+        <div
+          key={textElement.id}
+          className={`absolute ${getPositionClasses(textElement.position)}`}
+          style={{
+            ...getElementStyles(textElement),
+            fontSize: textElement.fontSize,
+            color: textElement.color,
+            fontWeight: textElement.fontWeight,
+            fontFamily: textElement.fontFamily,
+            maxWidth: textElement.maxWidth,
+            textAlign: 'center',
+            padding: '1rem',
+          }}
+        >
+          {textElement.content}
+        </div>
+      ))}
+    </>
+  );
+};
+
+// =============================================================================
+// Individual TemplateSlide helper functions (for multi-slide templates)
+// These work with individual slide definitions rather than full templates
+// =============================================================================
+
+/**
+ * Get CSS styles from a TemplateSlide's background element
+ */
+export const getSlideBackgroundStyles = (slide: TemplateSlide | null): React.CSSProperties => {
+  if (!slide?.background) {
+    return { background: '#ffffff' };
+  }
+
+  const { type, value, opacity = 1 } = slide.background;
+
+  switch (type) {
+    case 'color':
+      let bgColor = value;
+      if (opacity < 1 && value.startsWith('#')) {
+        const hex = value.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        bgColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      }
+      return { background: bgColor };
+    case 'image':
+      return {
+        background: `url(${value})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        opacity,
+      };
+    case 'video':
+      return { background: '#000000', opacity };
+    default:
+      return { background: '#ffffff' };
+  }
+};
+
+/**
+ * Render slide background (for individual TemplateSlide)
+ */
+export const SlideBackground: React.FC<{ templateSlide: TemplateSlide | null }> = ({ templateSlide }) => {
+  if (!templateSlide?.background) {
+    return null;
+  }
+
+  const { type, value } = templateSlide.background;
+
+  if (type === 'video') {
+    return (
+      <video
+        src={value}
+        autoPlay
+        loop
+        muted
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ zIndex: -1, opacity: templateSlide.background.opacity ?? 1 }}
+      />
+    );
+  }
+
+  return null;
+};
+
+/**
+ * Render image overlays (for individual TemplateSlide)
+ */
+export const SlideImages: React.FC<{ templateSlide: TemplateSlide | null }> = ({ templateSlide }) => {
+  if (!templateSlide?.images || templateSlide.images.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {templateSlide.images.map((image) => (
+        <img
+          key={image.id}
+          src={image.url}
+          alt={`overlay-${image.id}`}
+          className={`absolute ${getPositionClasses(image.position)}`}
+          style={getElementStyles(image)}
+        />
+      ))}
+    </>
+  );
+};
+
+/**
+ * Render video overlays (for individual TemplateSlide)
+ */
+export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({ templateSlide }) => {
+  if (!templateSlide?.videos || templateSlide.videos.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {templateSlide.videos.map((video) => (
+        <video
+          key={video.id}
+          src={video.url}
+          autoPlay={video.autoPlay ?? true}
+          loop={video.loop ?? true}
+          muted={video.muted ?? true}
+          className={`absolute ${getPositionClasses(video.position)}`}
+          style={getElementStyles(video)}
+        />
+      ))}
+    </>
+  );
+};
+
+/**
+ * Render text overlays (for individual TemplateSlide)
+ */
+export const SlideText: React.FC<{ templateSlide: TemplateSlide | null }> = ({ templateSlide }) => {
+  if (!templateSlide?.text || templateSlide.text.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {templateSlide.text.map((textElement) => (
         <div
           key={textElement.id}
           className={`absolute ${getPositionClasses(textElement.position)}`}

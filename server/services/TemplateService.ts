@@ -56,18 +56,53 @@ export interface TextElement {
   maxWidth?: string;
 }
 
-export interface PresentationTemplate {
-  id?: string;
-  name: string;
-  description?: string;
+// Individual slide within a multi-slide template
+export interface TemplateSlide {
   background?: BackgroundElement;
   images?: ImageElement[];
   videos?: VideoElement[];
   text?: TextElement[];
+}
+
+// Multi-slide presentation template
+export interface PresentationTemplate {
+  id?: string;
+  name: string;
+  description?: string;
+  
+  // Multi-slide structure (new format)
+  slides?: TemplateSlide[];           // Array of slides in the template
+  referenceSlideIndex?: number;       // 0-based index of the slide used for song content overlay
+  
+  // Legacy single-slide fields (for backward compatibility)
+  background?: BackgroundElement;
+  images?: ImageElement[];
+  videos?: VideoElement[];
+  text?: TextElement[];
+  
   isDefault?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
   yaml?: string;
+}
+
+// Helper to check if template uses multi-slide format
+function isMultiSlideTemplate(templateJson: any): boolean {
+  return Array.isArray(templateJson.slides) && templateJson.slides.length > 0;
+}
+
+// Helper to get reference slide from template
+function getReferenceSlide(template: PresentationTemplate): TemplateSlide {
+  if (template.slides && template.slides.length > 0) {
+    const index = template.referenceSlideIndex ?? 0;
+    return template.slides[index] || template.slides[0];
+  }
+  return {
+    background: template.background,
+    images: template.images,
+    videos: template.videos,
+    text: template.text,
+  };
 }
 
 class TemplateService {
@@ -92,20 +127,43 @@ class TemplateService {
           console.error('❌ Error parsing template JSON:', e);
         }
 
-        const template = {
+        // Handle both multi-slide (new) and single-slide (legacy) formats
+        const template: PresentationTemplate = {
           id: row.ID,
           name: row.NAME,
           description: row.DESCRIPTION,
-          background: templateJson.background,
-          images: templateJson.images || [],
-          videos: templateJson.videos || [],
-          text: templateJson.text || [],
           isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
           createdAt: row.CREATED_AT,
           updatedAt: row.UPDATED_AT,
-        } as PresentationTemplate;
+        };
 
-        console.log('📋 Final template:', row.NAME, 'background:', template.background);
+        if (isMultiSlideTemplate(templateJson)) {
+          // New multi-slide format
+          template.slides = templateJson.slides;
+          template.referenceSlideIndex = templateJson.referenceSlideIndex ?? 0;
+          // Also populate legacy fields from reference slide for backward compatibility
+          const refSlide = template.slides[template.referenceSlideIndex] || template.slides[0];
+          template.background = refSlide?.background;
+          template.images = refSlide?.images || [];
+          template.videos = refSlide?.videos || [];
+          template.text = refSlide?.text || [];
+        } else {
+          // Legacy single-slide format
+          template.background = templateJson.background;
+          template.images = templateJson.images || [];
+          template.videos = templateJson.videos || [];
+          template.text = templateJson.text || [];
+          // Auto-migrate to multi-slide format structure
+          template.slides = [{
+            background: template.background,
+            images: template.images,
+            videos: template.videos,
+            text: template.text,
+          }];
+          template.referenceSlideIndex = 0;
+        }
+
+        console.log('📋 Final template:', row.NAME, 'slides:', template.slides?.length, 'refIndex:', template.referenceSlideIndex);
 
         // Reconstruct YAML from template data
         template.yaml = this.templateToYaml(template);
@@ -143,18 +201,41 @@ class TemplateService {
         console.error('❌ Error parsing template JSON:', e);
       }
 
-      const template = {
+      // Handle both multi-slide (new) and single-slide (legacy) formats
+      const template: PresentationTemplate = {
         id: row.ID,
         name: row.NAME,
         description: row.DESCRIPTION,
-        background: templateJson.background,
-        images: templateJson.images || [],
-        videos: templateJson.videos || [],
-        text: templateJson.text || [],
         isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
         createdAt: row.CREATED_AT,
         updatedAt: row.UPDATED_AT,
-      } as PresentationTemplate;
+      };
+
+      if (isMultiSlideTemplate(templateJson)) {
+        // New multi-slide format
+        template.slides = templateJson.slides;
+        template.referenceSlideIndex = templateJson.referenceSlideIndex ?? 0;
+        // Also populate legacy fields from reference slide for backward compatibility
+        const refSlide = template.slides[template.referenceSlideIndex] || template.slides[0];
+        template.background = refSlide?.background;
+        template.images = refSlide?.images || [];
+        template.videos = refSlide?.videos || [];
+        template.text = refSlide?.text || [];
+      } else {
+        // Legacy single-slide format
+        template.background = templateJson.background;
+        template.images = templateJson.images || [];
+        template.videos = templateJson.videos || [];
+        template.text = templateJson.text || [];
+        // Auto-migrate to multi-slide format structure
+        template.slides = [{
+          background: template.background,
+          images: template.images,
+          videos: template.videos,
+          text: template.text,
+        }];
+        template.referenceSlideIndex = 0;
+      }
 
       // Reconstruct YAML from template data
       template.yaml = this.templateToYaml(template);
@@ -190,18 +271,41 @@ class TemplateService {
         console.error('Error parsing template JSON:', e);
       }
 
-      const template = {
+      // Handle both multi-slide (new) and single-slide (legacy) formats
+      const template: PresentationTemplate = {
         id: row.ID,
         name: row.NAME,
         description: row.DESCRIPTION,
-        background: templateJson.background,
-        images: templateJson.images || [],
-        videos: templateJson.videos || [],
-        text: templateJson.text || [],
         isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
         createdAt: row.CREATED_AT,
         updatedAt: row.UPDATED_AT,
-      } as PresentationTemplate;
+      };
+
+      if (isMultiSlideTemplate(templateJson)) {
+        // New multi-slide format
+        template.slides = templateJson.slides;
+        template.referenceSlideIndex = templateJson.referenceSlideIndex ?? 0;
+        // Also populate legacy fields from reference slide for backward compatibility
+        const refSlide = template.slides[template.referenceSlideIndex] || template.slides[0];
+        template.background = refSlide?.background;
+        template.images = refSlide?.images || [];
+        template.videos = refSlide?.videos || [];
+        template.text = refSlide?.text || [];
+      } else {
+        // Legacy single-slide format
+        template.background = templateJson.background;
+        template.images = templateJson.images || [];
+        template.videos = templateJson.videos || [];
+        template.text = templateJson.text || [];
+        // Auto-migrate to multi-slide format structure
+        template.slides = [{
+          background: template.background,
+          images: template.images,
+          videos: template.videos,
+          text: template.text,
+        }];
+        template.referenceSlideIndex = 0;
+      }
 
       // Reconstruct YAML from template data
       template.yaml = this.templateToYaml(template);
@@ -214,17 +318,39 @@ class TemplateService {
   }
 
   /**
+   * Build the JSON structure to save to database
+   * Saves in new multi-slide format while maintaining backward compatibility
+   */
+  private buildTemplateJson(template: PresentationTemplate): string {
+    // If template has slides array, save in new format
+    if (template.slides && template.slides.length > 0) {
+      return JSON.stringify({
+        slides: template.slides,
+        referenceSlideIndex: template.referenceSlideIndex ?? 0,
+      });
+    }
+    
+    // Legacy format - convert to multi-slide format when saving
+    const slide: TemplateSlide = {
+      background: template.background,
+      images: template.images || [],
+      videos: template.videos || [],
+      text: template.text || [],
+    };
+    
+    return JSON.stringify({
+      slides: [slide],
+      referenceSlideIndex: 0,
+    });
+  }
+
+  /**
    * Create a new template
    */
   async createTemplate(template: PresentationTemplate): Promise<PresentationTemplate> {
     try {
       const id = template.id || randomUUID();
-      const templateJson = JSON.stringify({
-        background: template.background,
-        images: template.images || [],
-        videos: template.videos || [],
-        text: template.text || [],
-      });
+      const templateJson = this.buildTemplateJson(template);
 
       // If this is set as default, unset other defaults
       if (template.isDefault) {
@@ -250,7 +376,26 @@ class TemplateService {
       const { cacheService } = await import('./CacheService.js');
       cacheService.invalidate('templates:all');
 
-      return { ...template, id, createdAt: new Date(), updatedAt: new Date() };
+      // Return with normalized structure
+      const result: PresentationTemplate = {
+        ...template,
+        id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      // Ensure slides array is populated
+      if (!result.slides || result.slides.length === 0) {
+        result.slides = [{
+          background: result.background,
+          images: result.images || [],
+          videos: result.videos || [],
+          text: result.text || [],
+        }];
+        result.referenceSlideIndex = 0;
+      }
+      
+      return result;
     } catch (error) {
       console.error('Error creating template:', error);
       throw error;
@@ -273,12 +418,7 @@ class TemplateService {
         id,
       };
 
-      const templateJson = JSON.stringify({
-        background: updated.background,
-        images: updated.images || [],
-        videos: updated.videos || [],
-        text: updated.text || [],
-      });
+      const templateJson = this.buildTemplateJson(updated);
 
       // If this is set as default, unset other defaults
       if (template.isDefault && !existing.isDefault) {
@@ -362,13 +502,46 @@ class TemplateService {
 
   /**
    * Parse YAML and convert to template object
+   * Supports both multi-slide and legacy single-slide YAML formats
    */
   parseYaml(yamlContent: string): Partial<PresentationTemplate> {
     try {
       const parsed = yaml.load(yamlContent) as any;
+      
+      // Check if this is a multi-slide template
+      if (Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+        // New multi-slide format
+        const refIndex = parsed.referenceSlideIndex ?? 0;
+        const refSlide = parsed.slides[refIndex] || parsed.slides[0];
+        
+        return {
+          name: parsed.name,
+          description: parsed.description,
+          slides: parsed.slides,
+          referenceSlideIndex: refIndex,
+          // Also populate legacy fields from reference slide
+          background: refSlide?.background,
+          images: refSlide?.images || [],
+          videos: refSlide?.videos || [],
+          text: refSlide?.text || [],
+          yaml: yamlContent,
+        };
+      }
+      
+      // Legacy single-slide format
+      const slide: TemplateSlide = {
+        background: parsed.background,
+        images: parsed.images || [],
+        videos: parsed.videos || [],
+        text: parsed.text || [],
+      };
+      
       return {
         name: parsed.name,
         description: parsed.description,
+        slides: [slide],
+        referenceSlideIndex: 0,
+        // Also populate legacy fields
         background: parsed.background,
         images: parsed.images || [],
         videos: parsed.videos || [],
@@ -383,15 +556,30 @@ class TemplateService {
 
   /**
    * Convert template to YAML
+   * Always outputs in new multi-slide format
    */
   templateToYaml(template: PresentationTemplate): string {
+    // If template has slides array, use new format
+    if (template.slides && template.slides.length > 0) {
+      return yaml.dump({
+        name: template.name,
+        description: template.description,
+        slides: template.slides,
+        referenceSlideIndex: template.referenceSlideIndex ?? 0,
+      });
+    }
+    
+    // Convert legacy format to multi-slide in YAML output
     return yaml.dump({
       name: template.name,
       description: template.description,
-      background: template.background,
-      images: template.images || [],
-      videos: template.videos || [],
-      text: template.text || [],
+      slides: [{
+        background: template.background,
+        images: template.images || [],
+        videos: template.videos || [],
+        text: template.text || [],
+      }],
+      referenceSlideIndex: 0,
     });
   }
 }

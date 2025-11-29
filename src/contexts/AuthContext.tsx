@@ -26,7 +26,7 @@ const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 // Use Vite proxy in development (/api), full URL in production
 const API_BASE_URL = import.meta.env.VITE_API_URL || (
-  import.meta.env.DEV ? '/api' : 'http://localhost:3001/api'
+  import.meta.env.DEV ? '/api' : 'http://localhost:3111/api'
 );
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {

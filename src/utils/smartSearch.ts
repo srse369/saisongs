@@ -193,6 +193,22 @@ export function smartSearchSongs(
     const fuzzyResults = fuzzySearch.search(parsed.general);
     const fuzzyIds = new Set(fuzzyResults.map(r => r.item.id));
     results = results.filter(s => fuzzyIds.has(s.id));
+    
+    // Sort results: prioritize songs that start with the search term
+    const lowerQuery = parsed.general.toLowerCase();
+    results = results.sort((a, b) => {
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+      const aStartsWith = aName.startsWith(lowerQuery);
+      const bStartsWith = bName.startsWith(lowerQuery);
+      
+      // Prefix matches come first
+      if (aStartsWith && !bStartsWith) return -1;
+      if (!aStartsWith && bStartsWith) return 1;
+      
+      // If both start with query or neither does, sort alphabetically
+      return aName.localeCompare(bName);
+    });
   }
 
   return results;

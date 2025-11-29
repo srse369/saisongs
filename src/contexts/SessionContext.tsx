@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
+// Use sessionStorage (tab-specific) instead of localStorage (shared across tabs)
+// This ensures each browser tab has its own independent live session
 const SESSION_STORAGE_KEY = 'songStudio:sessionSongs';
 
 interface SessionEntry {
@@ -30,11 +32,11 @@ interface SessionProviderProps {
 export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) => {
   const [entries, setEntries] = useState<SessionEntry[]>([]);
 
-  // Load session from localStorage on mount
+  // Load session from sessionStorage on mount (tab-specific storage)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+      const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
@@ -62,11 +64,11 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
     }
   }, []);
 
-  // Persist session to localStorage whenever it changes
+  // Persist session to sessionStorage whenever it changes (tab-specific)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(entries));
+      window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(entries));
     } catch {
       // Ignore storage errors (e.g., quota exceeded)
     }

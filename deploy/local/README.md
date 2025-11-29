@@ -54,8 +54,8 @@ Starts both frontend and backend servers in the background.
 **What it does:**
 - Checks for `.env.local` (creates from `.env.example` if missing)
 - Installs dependencies if needed
-- Starts backend on port 3001
-- Starts frontend on port 5173
+- Starts backend on port 3111
+- Starts frontend on port 5111
 - Saves PIDs to `logs/frontend.pid` and `logs/backend.pid`
 - Offers to show live logs
 
@@ -64,12 +64,12 @@ Starts both frontend and backend servers in the background.
 🚀 Starting Song Studio (Local Development)
 ==========================================
 🔧 Starting Backend Server...
-   Port: 3001
+   Port: 3111
    Logs: logs/backend.log
 ✅ Backend started (PID: 12345)
 
 🎨 Starting Frontend Server...
-   Port: 5173
+   Port: 5111
    Logs: logs/frontend.log
 ✅ Frontend started (PID: 12346)
 
@@ -78,9 +78,9 @@ Starts both frontend and backend servers in the background.
 ========================================
 
 🌐 URLs:
-   Frontend: http://localhost:5173
-   Backend:  http://localhost:3001
-   API:      http://localhost:3001/api
+   Frontend: http://localhost:5111
+   Backend:  http://localhost:3111
+   API:      http://localhost:3111/api
 ```
 
 ---
@@ -117,8 +117,8 @@ Stops all running services.
 Shows the current status of all services.
 
 **What it does:**
-- Checks if frontend is running (port 5173)
-- Checks if backend is running (port 3001)
+- Checks if frontend is running (port 5111)
+- Checks if backend is running (port 3111)
 - Tests API health endpoint
 - Tests database connection
 - Shows memory usage
@@ -129,17 +129,17 @@ Shows the current status of all services.
 📊 Song Studio Status (Local Development)
 ==========================================
 
-🎨 Frontend (Port 5173):
+🎨 Frontend (Port 5111):
    Status: ● Running
    PID: 12346
-   URL: http://localhost:5173
+   URL: http://localhost:5111
    Memory: 245.3 MB
 
-🔧 Backend (Port 3001):
+🔧 Backend (Port 3111):
    Status: ● Running
    PID: 12345
-   URL: http://localhost:3001
-   API: http://localhost:3001/api
+   URL: http://localhost:3111
+   API: http://localhost:3111/api
    Memory: 156.7 MB
    Health: ✓ API responding
 
@@ -204,7 +204,7 @@ View logs from frontend and/or backend.
 # Start services
 ./deploy/local/dev.sh start
 
-# Open browser to http://localhost:5173
+# Open browser to http://localhost:5111
 ```
 
 ### During Development
@@ -251,15 +251,15 @@ View logs from frontend and/or backend.
 
 **Check if ports are in use:**
 ```bash
-# Check port 5173 (frontend)
-lsof -i :5173
+# Check port 5111 (frontend)
+lsof -i :5111
 
-# Check port 3001 (backend)
-lsof -i :3001
+# Check port 3111 (backend)
+lsof -i :3111
 
 # Kill if needed
-kill $(lsof -ti:5173)
-kill $(lsof -ti:3001)
+kill $(lsof -ti:5111)
+kill $(lsof -ti:3111)
 ```
 
 **Check logs for errors:**
@@ -284,7 +284,7 @@ kill $(lsof -ti:3001)
 ./deploy/local/dev.sh logs backend -n 50
 
 # Test API directly
-curl http://localhost:3001/api/health
+curl http://localhost:3111/api/health
 
 # Restart backend
 ./deploy/local/dev.sh restart
@@ -372,7 +372,7 @@ VITE_ADMIN_PASSWORD=AdminPassword
 VITE_EDITOR_PASSWORD=EditorPassword
 
 # API URL (for local development)
-VITE_API_URL=http://localhost:3001/api
+VITE_API_URL=http://localhost:3111/api
 ```
 
 ---
@@ -398,7 +398,7 @@ If you need to use different ports, update `package.json`:
 ```json
 {
   "scripts": {
-    "dev": "vite --port 5173",
+    "dev": "vite --port 5111",
     "dev:server": "tsx watch --tsconfig config/tsconfig.server.json server/index.ts"
   }
 }
@@ -406,7 +406,7 @@ If you need to use different ports, update `package.json`:
 
 And update your `.env.local`:
 ```bash
-PORT=3001  # Backend port
+PORT=3111  # Backend port
 ```
 
 ### Clean Logs
@@ -486,7 +486,7 @@ npm run local:logs
 |---------|------------------|------------|
 | Frontend | Vite dev server (HMR) | Nginx serving built files |
 | Backend | tsx watch (auto-reload) | PM2 (process manager) |
-| Port | 5173 (frontend), 3001 (backend) | 443 (HTTPS), 80 (HTTP) |
+| Port | 5111 (frontend), 3111 (backend) | 443 (HTTPS), 80 (HTTP) |
 | Logs | `logs/` directory | PM2 logs, nginx logs |
 | Process Management | Single bash script | PM2 |
 | Database | Same Oracle DB | Same Oracle DB |

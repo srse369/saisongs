@@ -50,8 +50,8 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const singers = await singerService.getAllSingers();
-      setSingers(singers);
+      const fetchedSingers = await singerService.getAllSingers();
+      setSingers(fetchedSingers);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch singers';
       setError({
@@ -89,7 +89,20 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
     setError(null);
     try {
       const singer = await singerService.createSinger(input);
-      setSingers(prev => [...prev, singer]);
+      
+      // Add the singer to local state immediately for optimistic update
+      setSingers(prev => {
+        // Check if singer already exists (duplicate prevention)
+        if (prev.some(s => s.id === singer.id)) {
+          return prev;
+        }
+        // Insert in sorted order by name
+        const newList = [...prev, singer].sort((a, b) => 
+          a.name.localeCompare(b.name)
+        );
+        return newList;
+      });
+      
       toast.success('Singer created successfully');
       return singer;
     } catch (err) {

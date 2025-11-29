@@ -57,11 +57,29 @@ export const SingerManager: React.FC = () => {
     await deleteSinger(id);
   };
 
-  const filteredSingers = singers.filter((singer) => {
-    if (!searchTerm.trim()) return true;
+  const filteredSingers = React.useMemo(() => {
+    if (!searchTerm.trim()) return singers;
+    
     const q = searchTerm.toLowerCase();
-    return singer.name.toLowerCase().includes(q);
-  });
+    const filtered = singers.filter((singer) => 
+      singer.name.toLowerCase().includes(q)
+    );
+    
+    // Sort results: prioritize singers that start with the search term
+    return filtered.sort((a, b) => {
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+      const aStartsWith = aName.startsWith(q);
+      const bStartsWith = bName.startsWith(q);
+      
+      // Prefix matches come first
+      if (aStartsWith && !bStartsWith) return -1;
+      if (!aStartsWith && bStartsWith) return 1;
+      
+      // If both start with query or neither does, sort alphabetically
+      return aName.localeCompare(bName);
+    });
+  }, [singers, searchTerm]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
