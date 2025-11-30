@@ -50,7 +50,14 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
   // Static slide - render only template elements, no song content
   if (isStaticSlide && slide.templateSlide) {
     return (
-      <div className="presentation-slide relative overflow-hidden" style={backgroundStyles}>
+      <div 
+        className="presentation-slide relative overflow-hidden" 
+        style={{
+          ...backgroundStyles,
+          width: '100%',
+          height: '100%',
+        }}
+      >
         {/* Static slide background */}
         <SlideBackground templateSlide={slide.templateSlide} />
         
@@ -64,7 +71,14 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
   
   // Song slide - render song content with template styling
   return (
-    <div className="presentation-slide relative overflow-hidden" style={backgroundStyles}>
+    <div 
+      className="presentation-slide relative overflow-hidden" 
+      style={{
+        ...backgroundStyles,
+        width: '100%',
+        height: '100%',
+      }}
+    >
       {/* Template background elements (from reference slide) */}
       {effectiveSlide ? (
         <SlideBackground templateSlide={effectiveSlide} />

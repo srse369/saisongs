@@ -9,6 +9,7 @@ import { formatPitch, formatPitchWithName } from '../../utils/pitchUtils';
 interface PitchWithDetails extends SongSingerPitch {
   songName?: string;
   singerName?: string;
+  singerGender?: string;
   externalSourceUrl?: string;
   referenceGentsPitch?: string;
   referenceLadiesPitch?: string;
@@ -52,13 +53,14 @@ export const PitchList: React.FC<PitchListProps> = ({
     referenceGentsPitch: song.referenceGentsPitch,
     referenceLadiesPitch: song.referenceLadiesPitch
   }]));
-  const singerMap = new Map(singers.map(singer => [singer.id, singer.name]));
+  const singerMap = new Map(singers.map(singer => [singer.id, { name: singer.name, gender: singer.gender }]));
 
   // Enrich pitches with song and singer names
   const enrichedPitches: PitchWithDetails[] = pitches.map(pitch => ({
     ...pitch,
     songName: songMap.get(pitch.songId)?.name || 'Unknown Song',
-    singerName: singerMap.get(pitch.singerId) || 'Unknown Singer',
+    singerName: singerMap.get(pitch.singerId)?.name || 'Unknown Singer',
+    singerGender: singerMap.get(pitch.singerId)?.gender,
     externalSourceUrl: songMap.get(pitch.songId)?.externalSourceUrl,
     referenceGentsPitch: songMap.get(pitch.songId)?.referenceGentsPitch,
     referenceLadiesPitch: songMap.get(pitch.songId)?.referenceLadiesPitch,
@@ -170,10 +172,20 @@ export const PitchList: React.FC<PitchListProps> = ({
                 {/* Singer and Pitch */}
                 <div className="text-xs text-gray-500 dark:text-gray-400">
                   <span>Singer: </span>
-                  <span className="font-semibold text-purple-600 dark:text-purple-400">{pitch.singerName}</span>
+                  <span className={`font-semibold ${
+                    pitch.singerGender?.toLowerCase() === 'male' 
+                      ? 'text-blue-600 dark:text-blue-400' 
+                      : pitch.singerGender?.toLowerCase() === 'boy' 
+                        ? 'text-blue-400 dark:text-blue-300' 
+                        : pitch.singerGender?.toLowerCase() === 'female' 
+                          ? 'text-pink-600 dark:text-pink-400' 
+                          : pitch.singerGender?.toLowerCase() === 'girl' 
+                            ? 'text-pink-400 dark:text-pink-300' 
+                            : 'text-gray-600 dark:text-gray-400'
+                  }`}>{pitch.singerName}</span>
                   <span className="mx-2">•</span>
                   <span>Pitch: </span>
-                  <span className="font-bold text-blue-600 dark:text-blue-400">{formatPitch(pitch.pitch)}</span>
+                  <span className="font-bold text-gray-700 dark:text-gray-200">{formatPitch(pitch.pitch)}</span>
                   <span className="ml-1">({pitch.pitch.replace('#', '♯')})</span>
                   {(pitch.referenceGentsPitch || pitch.referenceLadiesPitch) && (
                     <>
@@ -193,6 +205,16 @@ export const PitchList: React.FC<PitchListProps> = ({
               
               {/* Actions */}
               <div className="flex flex-wrap items-center justify-start gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <button
+                      onClick={() => handlePresent(pitch)}
+                      title="Preview"
+                      className="p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </button>
                     <button
                       onClick={() => addSong(pitch.songId, pitch.singerId, pitch.pitch)}
                       disabled={isInLiveSession(pitch.songId, pitch.singerId)}

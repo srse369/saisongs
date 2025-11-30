@@ -22,7 +22,9 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
+  const [templatePickerExpanded, setTemplatePickerExpanded] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState<PresentationTemplate | null>(null);
+  const [songData, setSongData] = useState<Song | null>(null);
   const [searchParams] = useSearchParams();
   const singerName = searchParams.get('singerName') || undefined;
   const pitch = searchParams.get('pitch') || undefined;
@@ -39,71 +41,42 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     }
   }, [templateId, urlTemplateId]);
 
-  // Load template on mount or when templateId changes
+  // Load template and song data on mount
   useEffect(() => {
-    const loadTemplate = async () => {
-      try {
-        if (selectedTemplateId) {
-          const template = await templateService.getTemplate(selectedTemplateId);
-          setActiveTemplate(template);
-        } else {
-          // Try to load default template
-          const defaultTemplate = await templateService.getDefaultTemplate();
-          if (defaultTemplate) {
-            setActiveTemplate(defaultTemplate);
-            setSelectedTemplateId(defaultTemplate.id);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading template:', error);
-        // Continue without template if loading fails
-      }
-    };
-
-    loadTemplate();
-  }, [selectedTemplateId]);
-
-  // Load song and generate slides
-  useEffect(() => {
-    const loadSong = async () => {
+    const loadData = async () => {
       setLoading(true);
       setError(null);
+      
       try {
-        // Fetch the song directly from the API to avoid interfering with global SongContext state
-        const song = (await apiClient.getSong(songId)) as Song | null;
+        // Load template and song in parallel
+        const [template, song] = await Promise.all([
+          (async () => {
+            try {
+              if (selectedTemplateId) {
+                return await templateService.getTemplate(selectedTemplateId);
+              } else {
+                return await templateService.getDefaultTemplate();
+              }
+            } catch (error) {
+              console.error('Error loading template:', error);
+              return null;
+            }
+          })(),
+          apiClient.getSong(songId) as Promise<Song | null>
+        ]);
+
         if (!song) {
           setError('Song not found');
           return;
         }
 
-        // Determine which pitch and singer name to use
-        let displayPitch = pitch;
-        let displaySingerName = singerName;
-        
-        // If no singer pitch is provided, use reference pitches from the song
-        if (!pitch) {
-          // If both reference pitches exist, show both
-          if (song.referenceGentsPitch && song.referenceLadiesPitch) {
-            displaySingerName = 'Gents/Ladies';
-            displayPitch = `${song.referenceGentsPitch} / ${song.referenceLadiesPitch}`;
-          } else if (song.referenceGentsPitch) {
-            displaySingerName = 'Gents';
-            displayPitch = song.referenceGentsPitch;
-          } else if (song.referenceLadiesPitch) {
-            displaySingerName = 'Ladies';
-            displayPitch = song.referenceLadiesPitch;
+        setSongData(song);
+        if (template) {
+          setActiveTemplate(template);
+          if (!selectedTemplateId) {
+            setSelectedTemplateId(template.id);
           }
         }
-
-        // Generate slides using multi-slide template support if available
-        const generatedSlides = generatePresentationSlides(
-          song,
-          activeTemplate,
-          displaySingerName,
-          displayPitch
-        );
-        
-        setSlides(generatedSlides);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load song');
       } finally {
@@ -111,18 +84,54 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
       }
     };
 
-    loadSong();
-  }, [songId, singerName, pitch, activeTemplate]);
+    loadData();
+  }, [songId, selectedTemplateId]);
 
-  // Auto-hide overlay after 2 seconds
+  // Generate slides when song or template changes (after initial load)
   useEffect(() => {
-    if (showOverlay) {
+    if (!songData) return;
+
+    // Determine which pitch and singer name to use
+    let displayPitch = pitch;
+    let displaySingerName = singerName;
+    
+    // If no singer pitch is provided, use reference pitches from the song
+    if (!pitch) {
+      // If both reference pitches exist, show both
+      if (songData.referenceGentsPitch && songData.referenceLadiesPitch) {
+        displaySingerName = 'Gents/Ladies';
+        displayPitch = `${songData.referenceGentsPitch} / ${songData.referenceLadiesPitch}`;
+      } else if (songData.referenceGentsPitch) {
+        displaySingerName = 'Gents';
+        displayPitch = songData.referenceGentsPitch;
+      } else if (songData.referenceLadiesPitch) {
+        displaySingerName = 'Ladies';
+        displayPitch = songData.referenceLadiesPitch;
+      }
+    }
+
+    // Generate slides using multi-slide template support if available
+    // For single song preview, skip intro/outro static slides - only show song content
+    const generatedSlides = generatePresentationSlides(
+      songData,
+      activeTemplate,
+      displaySingerName,
+      displayPitch,
+      { skipStaticSlides: true }
+    );
+    
+    setSlides(generatedSlides);
+  }, [songData, singerName, pitch, activeTemplate]);
+
+  // Auto-hide overlay after 2 seconds (but not when template picker is open)
+  useEffect(() => {
+    if (showOverlay && !templatePickerExpanded) {
       const timer = setTimeout(() => {
         setShowOverlay(false);
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [showOverlay]);
+  }, [showOverlay, templatePickerExpanded]);
 
   // Handle keyboard navigation and mouse movement
   useEffect(() => {
@@ -237,10 +246,25 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
 
   const currentSlide = slides[currentSlideIndex];
 
+  // Calculate aspect ratio dimensions
+  const aspectRatio = activeTemplate?.aspectRatio || '16:9';
+  const slideWidth = aspectRatio === '4:3' ? 1600 : 1920;
+  const slideHeight = aspectRatio === '4:3' ? 1200 : 1080;
+  const aspectRatioValue = slideWidth / slideHeight;
+
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-gray-900">
-      {/* Slide view */}
-      <div className="h-full w-full">
+    <div className="relative h-screen w-screen overflow-hidden bg-black flex items-center justify-center">
+      {/* Slide container with aspect ratio */}
+      <div 
+        className="relative bg-gray-900"
+        style={{
+          width: '100%',
+          height: '100%',
+          maxWidth: `calc(100vh * ${aspectRatioValue})`,
+          maxHeight: `calc(100vw / ${aspectRatioValue})`,
+          aspectRatio: `${slideWidth} / ${slideHeight}`,
+        }}
+      >
         <SlideView slide={currentSlide} showTranslation={true} template={activeTemplate} />
       </div>
 
@@ -260,12 +284,13 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
         <div className="absolute top-4 right-4 z-[1000] flex gap-2 opacity-50 transition-opacity duration-300">
           {/* Template selector */}
           <TemplateSelector 
-          currentTemplateId={selectedTemplateId}
-          onTemplateSelect={(template) => {
-            setSelectedTemplateId(template.id);
-            setActiveTemplate(template);
-          }}
-        />
+            currentTemplateId={selectedTemplateId}
+            onTemplateSelect={(template) => {
+              setSelectedTemplateId(template.id);
+              setActiveTemplate(template);
+            }}
+            onExpandedChange={setTemplatePickerExpanded}
+          />
 
         {/* Fullscreen toggle */}
         <button

@@ -6,7 +6,7 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
-  size?: 'default' | 'large';
+  size?: 'default' | 'large' | 'xlarge' | 'full';
   titleActions?: ReactNode;
 }
 
@@ -44,7 +44,12 @@ export const Modal: React.FC<ModalProps> = ({
     }
   };
 
-  const maxWidthClass = size === 'large' ? 'max-w-5xl' : 'max-w-2xl';
+  const maxWidthClass = {
+    'default': 'max-w-2xl',
+    'large': 'max-w-5xl',
+    'xlarge': 'max-w-7xl',
+    'full': 'max-w-[95vw]',
+  }[size];
 
   return (
     <div

@@ -200,13 +200,16 @@ export function generateSlides(song: Song): Slide[] {
  * @param template - The multi-slide template
  * @param singerName - Optional singer name to display
  * @param pitch - Optional pitch to display
+ * @param options - Optional configuration
+ * @param options.skipStaticSlides - If true, skip intro/outro static slides (for single song preview)
  * @returns Array of slides for the complete presentation
  */
 export function generatePresentationSlides(
   song: Song,
   template: PresentationTemplate | null,
   singerName?: string,
-  pitch?: string
+  pitch?: string,
+  options?: { skipStaticSlides?: boolean }
 ): Slide[] {
   // Generate base song content slides
   const songSlides = generateSlides(song).map((slide) => ({
@@ -219,6 +222,14 @@ export function generatePresentationSlides(
   // If no multi-slide template, just return song slides
   if (!template || !isMultiSlideTemplate(template)) {
     return songSlides;
+  }
+
+  // If skipStaticSlides is true, just return song slides (for single song preview)
+  if (options?.skipStaticSlides) {
+    return songSlides.map((slide, index) => ({
+      ...slide,
+      index,
+    }));
   }
 
   const slides = template.slides!;

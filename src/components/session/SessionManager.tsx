@@ -311,7 +311,7 @@ export const SessionManager: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowLoadModal(true)}
-            className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors"
           >
             Load Session
           </button>
@@ -378,7 +378,17 @@ export const SessionManager: React.FC = () => {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                           </svg>
-                          <span className="font-medium text-gray-900 dark:text-gray-100">{singer.name}</span>
+                          <span className={`font-medium ${
+                            singer.gender?.toLowerCase() === 'male' 
+                              ? 'text-blue-600 dark:text-blue-400' 
+                              : singer.gender?.toLowerCase() === 'boy' 
+                                ? 'text-blue-400 dark:text-blue-300' 
+                                : singer.gender?.toLowerCase() === 'female' 
+                                  ? 'text-pink-600 dark:text-pink-400' 
+                                  : singer.gender?.toLowerCase() === 'girl' 
+                                    ? 'text-pink-400 dark:text-pink-300' 
+                                    : 'text-gray-600 dark:text-gray-400'
+                          }`}>{singer.name}</span>
                         </div>
                       )}
                       {entry.pitch && (
@@ -386,32 +396,32 @@ export const SessionManager: React.FC = () => {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                           </svg>
-                          <span className="font-bold text-blue-600 dark:text-blue-400">{formatPitch(entry.pitch)}</span>
+                          <span className="font-bold text-gray-700 dark:text-gray-200">{formatPitch(entry.pitch)}</span>
                           <span className="text-gray-500 dark:text-gray-400">({entry.pitch.replace('#', '♯')})</span>
                         </div>
                       )}
                     </div>
 
-                    {/* Song Details */}
+                    {/* Song Details - Deity, Language, Tempo, Raga */}
                     <div className="flex flex-wrap gap-2 text-xs">
-                      {song.language && (
-                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded font-medium">
-                          {song.language}
-                        </span>
-                      )}
                       {song.deity && (
                         <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 rounded font-medium">
                           {song.deity}
                         </span>
                       )}
-                      {song.raga && (
-                        <span className="px-2 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded font-medium">
-                          {song.raga}
+                      {song.language && (
+                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded font-medium">
+                          {song.language}
                         </span>
                       )}
                       {song.tempo && (
-                        <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 rounded font-medium">
+                        <span className="px-2 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded font-medium">
                           {song.tempo}
+                        </span>
+                      )}
+                      {song.raga && (
+                        <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 rounded font-medium">
+                          {song.raga}
                         </span>
                       )}
                     </div>
@@ -420,6 +430,16 @@ export const SessionManager: React.FC = () => {
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={() => handlePreviewSong(song.id)}
+                    title="Preview"
+                    className="p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  </button>
                   <button
                     className="flex items-center gap-2 p-2 rounded-md text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                     title="Drag to reorder"

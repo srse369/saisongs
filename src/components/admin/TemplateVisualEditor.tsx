@@ -1067,6 +1067,59 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
                     </div>
 
                     <div>
+                      <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                        Text Align
+                      </label>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateText(index, { textAlign: 'left' })}
+                          className={`flex-1 px-3 py-2 text-sm border rounded-md flex items-center justify-center gap-1 ${
+                            (textEl.textAlign ?? 'left') === 'left'
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                          }`}
+                          title="Align Left"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h14" />
+                          </svg>
+                          Left
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateText(index, { textAlign: 'center' })}
+                          className={`flex-1 px-3 py-2 text-sm border rounded-md flex items-center justify-center gap-1 ${
+                            textEl.textAlign === 'center'
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                          }`}
+                          title="Align Center"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M7 12h10M5 18h14" />
+                          </svg>
+                          Center
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateText(index, { textAlign: 'right' })}
+                          className={`flex-1 px-3 py-2 text-sm border rounded-md flex items-center justify-center gap-1 ${
+                            textEl.textAlign === 'right'
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                          }`}
+                          title="Align Right"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M10 12h10M6 18h14" />
+                          </svg>
+                          Right
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
                       <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
                         Opacity: {Math.round((textEl.opacity ?? 1) * 100)}%
                       </label>

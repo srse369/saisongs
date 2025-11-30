@@ -244,6 +244,7 @@ export const TemplateText: React.FC<{ template: PresentationTemplate | null }> =
             fontFamily: textElement.fontFamily,
             maxWidth: textElement.maxWidth,
             textAlign: 'center',
+            whiteSpace: 'pre-wrap',
             padding: '1rem',
           }}
         >
@@ -389,7 +390,8 @@ export const SlideText: React.FC<{ templateSlide: TemplateSlide | null }> = ({ t
             fontWeight: textElement.fontWeight,
             fontFamily: textElement.fontFamily,
             maxWidth: textElement.maxWidth,
-            textAlign: 'center',
+            textAlign: textElement.textAlign || 'center',
+            whiteSpace: 'pre-wrap',
             padding: '1rem',
           }}
         >

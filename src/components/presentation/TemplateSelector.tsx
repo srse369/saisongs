@@ -1,16 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import templateService from '../../services/TemplateService';
 import type { PresentationTemplate } from '../../types';
 
 interface TemplateSelectorProps {
   onTemplateSelect?: (template: PresentationTemplate) => void;
   currentTemplateId?: string;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
-export default function TemplateSelector({ onTemplateSelect, currentTemplateId }: TemplateSelectorProps) {
+export default function TemplateSelector({ onTemplateSelect, currentTemplateId, onExpandedChange }: TemplateSelectorProps) {
   const [templates, setTemplates] = useState<PresentationTemplate[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Notify parent when expanded state changes
+  useEffect(() => {
+    onExpandedChange?.(expanded);
+  }, [expanded, onExpandedChange]);
 
   // Add pulse animation style
   const pulseStyle = `
@@ -26,6 +33,36 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId }
   useEffect(() => {
     loadTemplates();
   }, []);
+
+  // Handle escape key to close dropdown
+  useEffect(() => {
+    if (!expanded) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        setExpanded(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [expanded]);
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    if (!expanded) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setExpanded(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [expanded]);
 
   const loadTemplates = async () => {
     try {
@@ -52,7 +89,7 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId }
   return (
     <>
       <style>{pulseStyle}</style>
-      <div className="relative">
+      <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setExpanded(!expanded)}
           className={`flex items-center gap-3 px-5 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 shadow-lg hover:shadow-xl transition-all duration-200 font-medium ${
@@ -118,30 +155,20 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId }
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate">{template.description}</p>
                       )}
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {template.background && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                            <span>📌</span>
-                            <span className="capitalize">{template.background.type}</span>
-                          </span>
-                        )}
-                        {template.images && template.images.length > 0 && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                            <span>🖼️</span>
-                            <span>{template.images.length}</span>
-                          </span>
-                        )}
-                        {template.videos && template.videos.length > 0 && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                            <span>🎬</span>
-                            <span>{template.videos.length}</span>
-                          </span>
-                        )}
-                        {template.text && template.text.length > 0 && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                            <span>📝</span>
-                            <span>{template.text.length}</span>
-                          </span>
-                        )}
+                        {/* Aspect ratio indicator */}
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+                          template.aspectRatio === '4:3' 
+                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                            : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                        }`}>
+                          <span>📐</span>
+                          <span>{template.aspectRatio || '16:9'}</span>
+                        </span>
+                        {/* Slide count indicator */}
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                          <span>📑</span>
+                          <span>{template.slides?.length || 1} slide{(template.slides?.length || 1) !== 1 ? 's' : ''} (ref: {(template.referenceSlideIndex ?? 0) + 1})</span>
+                        </span>
                       </div>
                     </div>
                     {currentTemplateId === template.id && (

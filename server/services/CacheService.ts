@@ -919,6 +919,7 @@ class CacheService {
         id: row.ID,
         name: row.NAME,
         description: row.DESCRIPTION,
+        aspectRatio: templateJson.aspectRatio || '16:9',  // Extract aspect ratio from JSON
         isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
         createdAt: row.CREATED_AT,
         updatedAt: row.UPDATED_AT,
@@ -955,6 +956,7 @@ class CacheService {
         template.yaml = yaml.dump({
           name: template.name,
           description: template.description,
+          aspectRatio: template.aspectRatio,
           slides: template.slides,
           referenceSlideIndex: template.referenceSlideIndex ?? 0,
         });
@@ -962,6 +964,7 @@ class CacheService {
         template.yaml = yaml.dump({
           name: template.name,
           description: template.description,
+          aspectRatio: template.aspectRatio,
           background: template.background,
           images: template.images || [],
           videos: template.videos || [],

@@ -88,7 +88,17 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
             <div className="flex flex-col gap-3">
               {/* Singer Name and Gender */}
               <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 className={`text-lg font-semibold ${
+                  singer.gender?.toLowerCase() === 'male' 
+                    ? 'text-blue-600 dark:text-blue-400' 
+                    : singer.gender?.toLowerCase() === 'boy' 
+                      ? 'text-blue-400 dark:text-blue-300' 
+                      : singer.gender?.toLowerCase() === 'female' 
+                        ? 'text-pink-600 dark:text-pink-400' 
+                        : singer.gender?.toLowerCase() === 'girl' 
+                          ? 'text-pink-400 dark:text-pink-300' 
+                          : 'text-gray-600 dark:text-gray-400'
+                }`}>
                   {singer.name}
                 </h3>
                 {singer.gender && (
@@ -103,7 +113,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                   <button
                     onClick={() => handleViewPitches(singer)}
                     title="View Pitches"
-                    className="inline-flex items-center gap-2 p-2 rounded-md text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="inline-flex items-center gap-2 p-2 rounded-md text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
                   >
                     <MusicIcon className="w-5 h-5" />
                     <span className="text-sm font-medium whitespace-nowrap">Pitches</span>

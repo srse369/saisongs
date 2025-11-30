@@ -4,7 +4,21 @@ import type { PresentationTemplate, Slide, TemplateSlide } from '../../types';
 import { RefreshIcon, Modal } from '../common';
 import { SlideView } from '../presentation/SlideView';
 import { TemplateVisualEditor } from './TemplateVisualEditor';
+import { TemplateWysiwygEditor } from './TemplateWysiwygEditor';
 import { isMultiSlideTemplate, getSlideBackgroundStyles, SlideBackground, SlideImages, SlideVideos, SlideText } from '../../utils/templateUtils';
+
+/**
+ * Format a dimension value (x, y, width, height) as an integer string
+ * Handles values like "100px", "100.5px", 100, 100.5
+ */
+function formatDimension(value: string | number | undefined): string {
+  if (value === undefined || value === null) return '';
+  const strVal = String(value);
+  // Remove 'px' suffix if present and parse as float, then round
+  const numVal = parseFloat(strVal.replace('px', ''));
+  if (isNaN(numVal)) return strVal;
+  return `${Math.round(numVal)}px`;
+}
 
 /**
  * Convert a single slide to YAML format
@@ -29,10 +43,10 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
       lines.push(`${indent}  - id: ` + escapeYamlString(img.id));
       lines.push(`${indent}    url: ${escapeYamlString(img.url)}`);
       if (img.position) lines.push(`${indent}    position: ${img.position}`);
-      if (img.x !== undefined) lines.push(`${indent}    x: ${escapeYamlString(String(img.x))}`);
-      if (img.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(String(img.y))}`);
-      if (img.width) lines.push(`${indent}    width: ${escapeYamlString(img.width)}`);
-      if (img.height) lines.push(`${indent}    height: ${escapeYamlString(img.height)}`);
+      if (img.x !== undefined) lines.push(`${indent}    x: ${escapeYamlString(formatDimension(img.x))}`);
+      if (img.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(formatDimension(img.y))}`);
+      if (img.width) lines.push(`${indent}    width: ${escapeYamlString(formatDimension(img.width))}`);
+      if (img.height) lines.push(`${indent}    height: ${escapeYamlString(formatDimension(img.height))}`);
       if (img.opacity !== undefined) lines.push(`${indent}    opacity: ${img.opacity}`);
       if (img.zIndex !== undefined) lines.push(`${indent}    zIndex: ${img.zIndex}`);
     });
@@ -47,10 +61,10 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
       lines.push(`${indent}  - id: ` + escapeYamlString(vid.id));
       lines.push(`${indent}    url: ${escapeYamlString(vid.url)}`);
       if (vid.position) lines.push(`${indent}    position: ${vid.position}`);
-      if (vid.x !== undefined) lines.push(`${indent}    x: ${escapeYamlString(String(vid.x))}`);
-      if (vid.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(String(vid.y))}`);
-      if (vid.width) lines.push(`${indent}    width: ${escapeYamlString(vid.width)}`);
-      if (vid.height) lines.push(`${indent}    height: ${escapeYamlString(vid.height)}`);
+      if (vid.x !== undefined) lines.push(`${indent}    x: ${escapeYamlString(formatDimension(vid.x))}`);
+      if (vid.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(formatDimension(vid.y))}`);
+      if (vid.width) lines.push(`${indent}    width: ${escapeYamlString(formatDimension(vid.width))}`);
+      if (vid.height) lines.push(`${indent}    height: ${escapeYamlString(formatDimension(vid.height))}`);
       if (vid.opacity !== undefined) lines.push(`${indent}    opacity: ${vid.opacity}`);
       if (vid.zIndex !== undefined) lines.push(`${indent}    zIndex: ${vid.zIndex}`);
       if (vid.autoPlay !== undefined) lines.push(`${indent}    autoPlay: ${vid.autoPlay}`);
@@ -66,13 +80,15 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
   if (slide.text && slide.text.length > 0) {
     slide.text.forEach((txt) => {
       lines.push(`${indent}  - id: ` + escapeYamlString(txt.id));
-      lines.push(`${indent}    content: ${escapeYamlString(txt.content)}`);
+      // Use special formatting for content to handle multiline text
+      lines.push(...formatTextContent(txt.content, `${indent}    `));
       if (txt.position) lines.push(`${indent}    position: ${txt.position}`);
-      if (txt.x !== undefined) lines.push(`${indent}    x: ${escapeYamlString(String(txt.x))}`);
-      if (txt.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(String(txt.y))}`);
-      if (txt.fontSize) lines.push(`${indent}    fontSize: ${escapeYamlString(txt.fontSize)}`);
+      if (txt.x !== undefined) lines.push(`${indent}    x: ${escapeYamlString(formatDimension(txt.x))}`);
+      if (txt.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(formatDimension(txt.y))}`);
+      if (txt.fontSize) lines.push(`${indent}    fontSize: ${escapeYamlString(formatDimension(txt.fontSize))}`);
       if (txt.color) lines.push(`${indent}    color: ${escapeYamlString(txt.color)}`);
       if (txt.fontWeight) lines.push(`${indent}    fontWeight: ${txt.fontWeight}`);
+      if (txt.textAlign) lines.push(`${indent}    textAlign: ${txt.textAlign}`);
       if (txt.opacity !== undefined) lines.push(`${indent}    opacity: ${txt.opacity}`);
       if (txt.zIndex !== undefined) lines.push(`${indent}    zIndex: ${txt.zIndex}`);
     });
@@ -97,6 +113,9 @@ function templateToYaml(template: PresentationTemplate): string {
   if (template.description) {
     lines.push(`description: ${escapeYamlString(template.description)}`);
   }
+
+  // Aspect ratio (default is 16:9)
+  lines.push(`aspectRatio: ${template.aspectRatio || '16:9'}`);
 
   // Check if template has multi-slide format
   if (template.slides && template.slides.length > 0) {
@@ -126,11 +145,31 @@ function templateToYaml(template: PresentationTemplate): string {
  */
 function escapeYamlString(str: string): string {
   if (!str) return "''";
-  // If string contains special characters, wrap in quotes
-  if (/[:|{}[\],&*#?!@`"'%]/.test(str) || str.includes('\n')) {
+  // If string contains special characters (but not newlines), wrap in quotes
+  if (/[:|{}[\],&*#?!@`"'%]/.test(str)) {
     return `'${str.replace(/'/g, "''")}'`;
   }
   return str;
+}
+
+/**
+ * Format text content for YAML, handling multiline content with literal block scalar
+ */
+function formatTextContent(content: string, indent: string): string[] {
+  if (!content) return [`${indent}content: ''`];
+  
+  // Check if content has newlines
+  if (content.includes('\n')) {
+    // Use YAML literal block scalar (|) for multiline content
+    const lines: string[] = [`${indent}content: |`];
+    content.split('\n').forEach(line => {
+      lines.push(`${indent}  ${line}`);
+    });
+    return lines;
+  }
+  
+  // Single line content - use regular escaping
+  return [`${indent}content: ${escapeYamlString(content)}`];
 }
 
 export const TemplateManager: React.FC = () => {
@@ -155,8 +194,77 @@ export const TemplateManager: React.FC = () => {
   const [yamlContent, setYamlContent] = useState('');
   const [validationError, setValidationError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [editorMode, setEditorMode] = useState<'visual' | 'yaml'>('visual');
+  const [editorMode, setEditorMode] = useState<'wysiwyg' | 'visual' | 'yaml'>('wysiwyg');
+  const [previewScale, setPreviewScale] = useState(1);
+  const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const previewContainerRef = React.useRef<HTMLDivElement>(null);
+  const fullscreenContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Calculate preview scale when preview opens or window resizes
+  useEffect(() => {
+    if (!previewTemplate || !previewContainerRef.current) return;
+    
+    const calculateScale = () => {
+      const container = previewContainerRef.current;
+      if (!container) return;
+      
+      const aspectRatio = previewTemplate.aspectRatio || '16:9';
+      const slideWidth = aspectRatio === '4:3' ? 1600 : 1920;
+      const slideHeight = aspectRatio === '4:3' ? 1200 : 1080;
+      
+      // Get container dimensions with padding
+      const containerWidth = container.clientWidth - 32; // 16px padding on each side
+      const containerHeight = container.clientHeight - 32;
+      
+      // Skip if container isn't measured yet
+      if (containerWidth <= 0 || containerHeight <= 0) return;
+      
+      const scaleX = containerWidth / slideWidth;
+      const scaleY = containerHeight / slideHeight;
+      const scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 100%
+      
+      setPreviewScale(scale);
+    };
+    
+    // Initial calculation with a small delay to ensure DOM is ready
+    const timeoutId = setTimeout(calculateScale, 50);
+    
+    // Also use ResizeObserver for more reliable updates
+    const resizeObserver = new ResizeObserver(calculateScale);
+    if (previewContainerRef.current) {
+      resizeObserver.observe(previewContainerRef.current);
+    }
+    
+    window.addEventListener('resize', calculateScale);
+    return () => {
+      clearTimeout(timeoutId);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', calculateScale);
+    };
+  }, [previewTemplate]);
+
+  // Handle fullscreen toggle for preview
+  const togglePreviewFullscreen = useCallback(() => {
+    if (!fullscreenContainerRef.current) return;
+    
+    if (!document.fullscreenElement) {
+      fullscreenContainerRef.current.requestFullscreen().catch(err => {
+        console.error('Error attempting to enable fullscreen:', err);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  }, []);
+
+  // Track fullscreen state changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setPreviewFullscreen(!!document.fullscreenElement);
+    };
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   // Get slides array from preview template (for multi-slide preview)
   const previewSlides = useMemo(() => {
@@ -292,8 +400,8 @@ export const TemplateManager: React.FC = () => {
       // Determine the final YAML content based on editor mode
       let finalYamlContent: string;
       
-      if (editorMode === 'visual') {
-        // In visual mode, always generate YAML from the current template
+      if (editorMode === 'wysiwyg' || editorMode === 'visual') {
+        // In visual/wysiwyg mode, always generate YAML from the current template
         finalYamlContent = templateToYaml(editingTemplate);
       } else {
         // In YAML mode, use the edited YAML content
@@ -446,32 +554,18 @@ export const TemplateManager: React.FC = () => {
                     </p>
                   )}
                   <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
-                    {/* Multi-slide indicator */}
-                    {template.slides && template.slides.length > 0 && (
-                      <span className="inline-flex items-center px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
-                        📑 {template.slides.length} slide{template.slides.length !== 1 ? 's' : ''} (ref: {(template.referenceSlideIndex ?? 0) + 1})
-                      </span>
-                    )}
-                    {template.background && (
-                      <span className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                        📌 {template.background.type}
-                      </span>
-                    )}
-                    {template.images && template.images.length > 0 && (
-                      <span className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                        🖼️ {template.images.length} image{template.images.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                    {template.videos && template.videos.length > 0 && (
-                      <span className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                        🎬 {template.videos.length} video{template.videos.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                    {template.text && template.text.length > 0 && (
-                      <span className="inline-flex items-center px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                        📝 {template.text.length} element{template.text.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
+                    {/* Aspect ratio indicator */}
+                    <span className={`inline-flex items-center px-2 py-1 rounded ${
+                      template.aspectRatio === '4:3' 
+                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                        : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                    }`}>
+                      📐 {template.aspectRatio || '16:9'}
+                    </span>
+                    {/* Slide count indicator */}
+                    <span className="inline-flex items-center px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                      📑 {template.slides?.length || 1} slide{(template.slides?.length || 1) !== 1 ? 's' : ''} (ref: {(template.referenceSlideIndex ?? 0) + 1})
+                    </span>
                   </div>
                 </div>
 
@@ -479,13 +573,13 @@ export const TemplateManager: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-start gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
                   <button
                     onClick={() => handlePreview(template)}
-                    className="flex items-center gap-2 p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                    title="Preview"
+                    className="p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
-                    <span className="text-sm font-medium whitespace-nowrap">Preview</span>
                   </button>
                   <button
                     onClick={() => handleEditClick(template)}
@@ -534,23 +628,46 @@ export const TemplateManager: React.FC = () => {
         isOpen={showForm}
         title={editingTemplate?.id ? 'Edit Template' : 'Create Template'}
         onClose={handleFormCancel}
+        size={editorMode === 'wysiwyg' ? 'xlarge' : 'large'}
       >
         <div className="space-y-4">
           {/* Editor Mode Tabs */}
           <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
             <button
-              onClick={() => {
+              onClick={async () => {
+                // When clicking WYSIWYG button, check if we're coming FROM YAML mode
+                if (editorMode === 'yaml' && yamlContent.trim()) {
+                  // Sync YAML changes before switching - await to ensure template is updated first
+                  const validation = await validateYaml(yamlContent);
+                  if (validation.valid && validation.template && editingTemplate) {
+                    setEditingTemplate({
+                      ...editingTemplate,
+                      ...validation.template,
+                    });
+                  }
+                }
+                setEditorMode('wysiwyg');
+              }}
+              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                editorMode === 'wysiwyg'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+              }`}
+            >
+              🖱️ WYSIWYG
+            </button>
+            <button
+              onClick={async () => {
                 // When clicking visual editor button, check if we're coming FROM YAML mode
                 if (editorMode === 'yaml' && yamlContent.trim()) {
-                  // Sync YAML changes to visual before switching
-                  validateYaml(yamlContent).then(validation => {
-                    if (validation.valid && validation.template && editingTemplate) {
-                      setEditingTemplate({
-                        ...editingTemplate,
-                        ...validation.template,
-                      });
-                    }
-                  });
+                  // Sync YAML changes to visual before switching - await to ensure template is updated first
+                  const validation = await validateYaml(yamlContent);
+                  if (validation.valid && validation.template && editingTemplate) {
+                    setEditingTemplate({
+                      ...editingTemplate,
+                      ...validation.template,
+                    });
+                  }
                 }
                 setEditorMode('visual');
               }}
@@ -560,12 +677,12 @@ export const TemplateManager: React.FC = () => {
                   : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
               }`}
             >
-              🎨 Visual Editor
+              📝 Form Editor
             </button>
             <button
               onClick={() => {
-                // When clicking YAML editor button, check if we're coming FROM visual mode
-                if (editorMode === 'visual' && editingTemplate) {
+                // When clicking YAML editor button, check if we're coming FROM visual/wysiwyg mode
+                if ((editorMode === 'visual' || editorMode === 'wysiwyg') && editingTemplate) {
                   // Sync visual changes to YAML before switching
                   setYamlContent(templateToYaml(editingTemplate));
                 }
@@ -577,11 +694,26 @@ export const TemplateManager: React.FC = () => {
                   : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
               }`}
             >
-              ⚙️ YAML Editor
+              ⚙️ YAML
             </button>
           </div>
 
-          {/* Visual Editor Mode */}
+          {/* WYSIWYG Editor Mode */}
+          {editorMode === 'wysiwyg' && editingTemplate && (
+            <>
+              <TemplateWysiwygEditor
+                template={editingTemplate}
+                onTemplateChange={setEditingTemplate}
+              />
+              {validationError && (
+                <div className="p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 rounded text-sm">
+                  {validationError}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Form-based Visual Editor Mode */}
           {editorMode === 'visual' && editingTemplate && (
             <>
               <TemplateVisualEditor
@@ -600,42 +732,6 @@ export const TemplateManager: React.FC = () => {
           {/* YAML Editor Mode */}
           {editorMode === 'yaml' && (
             <>
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
-                  Template Name
-                </label>
-                <input
-                  type="text"
-                  value={editingTemplate?.name || ''}
-                  onChange={(e) =>
-                    setEditingTemplate(
-                      editingTemplate
-                        ? { ...editingTemplate, name: e.target.value }
-                        : null
-                    )
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  value={editingTemplate?.description || ''}
-                  onChange={(e) =>
-                    setEditingTemplate(
-                      editingTemplate
-                        ? { ...editingTemplate, description: e.target.value }
-                        : null
-                    )
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                   YAML Configuration
@@ -673,7 +769,66 @@ export const TemplateManager: React.FC = () => {
             </>
           )}
 
-          <div className="flex gap-2 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+          {/* Template Properties - Always visible */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                Template Name
+              </label>
+              <input
+                type="text"
+                value={editingTemplate?.name || ''}
+                onChange={(e) =>
+                  setEditingTemplate(
+                    editingTemplate
+                      ? { ...editingTemplate, name: e.target.value }
+                      : null
+                  )
+                }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Template name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                Description
+              </label>
+              <input
+                type="text"
+                value={editingTemplate?.description || ''}
+                onChange={(e) =>
+                  setEditingTemplate(
+                    editingTemplate
+                      ? { ...editingTemplate, description: e.target.value }
+                      : null
+                  )
+                }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Template description"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                Aspect Ratio
+              </label>
+              <select
+                value={editingTemplate?.aspectRatio || '16:9'}
+                onChange={(e) =>
+                  setEditingTemplate(
+                    editingTemplate
+                      ? { ...editingTemplate, aspectRatio: e.target.value as '16:9' | '4:3' }
+                      : null
+                  )
+                }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="16:9">16:9 (1920×1080)</option>
+                <option value="4:3">4:3 (1600×1200)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex gap-2 justify-end pt-4">
             <button
               onClick={handleFormCancel}
               className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
@@ -697,191 +852,212 @@ export const TemplateManager: React.FC = () => {
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full h-full max-w-full max-h-screen flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
-              <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
-                  Template Preview: {previewTemplate.name}
-                </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {previewSlides.length > 1 
-                    ? `Slide ${previewSlideIndex + 1} of ${previewSlides.length} • Use arrow keys to navigate • Press Esc to close`
-                    : 'Press Esc to close'}
-                </p>
+              <div className="flex items-center gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                    Template Preview: {previewTemplate.name}
+                  </h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {previewSlides.length > 1 
+                      ? `Slide ${previewSlideIndex + 1} of ${previewSlides.length} • Use arrow keys to navigate • Press Esc to close`
+                      : 'Press Esc to close'}
+                  </p>
+                </div>
+                {/* Aspect ratio and dimensions info */}
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
+                    previewTemplate.aspectRatio === '4:3'
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                      : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                  }`}>
+                    📐 {previewTemplate.aspectRatio || '16:9'}
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                    {previewTemplate.aspectRatio === '4:3' ? '1600×1200' : '1920×1080'} → {Math.round((previewTemplate.aspectRatio === '4:3' ? 1600 : 1920) * previewScale)}×{Math.round((previewTemplate.aspectRatio === '4:3' ? 1200 : 1080) * previewScale)}px
+                  </span>
+                </div>
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setPreviewTemplate(null);
-                  setPreviewSlideIndex(0);
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none ml-4 flex-shrink-0"
-                aria-label="Close preview"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                {/* Fullscreen toggle button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    togglePreviewFullscreen();
+                  }}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                  aria-label={previewFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                  title={previewFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                >
+                  {previewFullscreen ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                  )}
+                </button>
+                {/* Close button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (previewFullscreen) {
+                      document.exitFullscreen();
+                    }
+                    setPreviewTemplate(null);
+                    setPreviewSlideIndex(0);
+                  }}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none"
+                  aria-label="Close preview"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            {/* Preview Content - Shows current slide */}
+            {/* Preview Content - Shows current slide scaled to fit */}
             <div 
-              ref={previewContainerRef}
-              className="flex-1 overflow-auto relative"
-              style={{ overscrollBehavior: 'contain' }}
+              ref={(el) => {
+                (previewContainerRef as any).current = el;
+                (fullscreenContainerRef as any).current = el;
+              }}
+              className="flex-1 overflow-hidden relative flex items-center justify-center bg-gray-900 p-4"
             >
-              {/* Render based on whether it's a static slide or reference slide */}
-              {previewSlideIndex === previewReferenceIndex ? (
-                /* Reference slide - show with sample song content */
-                <SlideView 
-                  slide={{
-                    songName: 'Sample Devotional Song',
-                    content: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6',
-                    translation: 'Translation Line 1\nTranslation Line 2\nTranslation Line 3',
-                    singerName: 'Sample Singer',
-                    pitch: 'C',
-                    nextSongName: 'Next Song',
-                    nextSingerName: 'Next Singer',
-                    nextPitch: 'D',
-                    nextIsContinuation: false,
-                    songSlideNumber: 1,
-                    songSlideCount: 5,
-                    index: previewSlideIndex,
-                  } as Slide}
-                  showTranslation={true}
-                  template={previewTemplate}
-                />
-              ) : (
-                /* Static slide - show template content only */
+              {/* Wrapper that has the final scaled dimensions */}
+              <div 
+                className="relative"
+                style={{
+                  width: Math.round((previewTemplate.aspectRatio === '4:3' ? 1600 : 1920) * previewScale),
+                  height: Math.round((previewTemplate.aspectRatio === '4:3' ? 1200 : 1080) * previewScale),
+                }}
+              >
+                {/* Scaled slide container - uses transform for crisp scaling */}
                 <div 
-                  className="presentation-slide relative overflow-hidden"
-                  style={getSlideBackgroundStyles(previewSlides[previewSlideIndex])}
+                  className="absolute top-0 left-0 shadow-2xl"
+                  style={{
+                    width: previewTemplate.aspectRatio === '4:3' ? 1600 : 1920,
+                    height: previewTemplate.aspectRatio === '4:3' ? 1200 : 1080,
+                    transform: `scale(${previewScale})`,
+                    transformOrigin: 'top left',
+                  }}
                 >
-                  <SlideBackground templateSlide={previewSlides[previewSlideIndex]} />
-                  <SlideImages templateSlide={previewSlides[previewSlideIndex]} />
-                  <SlideVideos templateSlide={previewSlides[previewSlideIndex]} />
-                  <SlideText templateSlide={previewSlides[previewSlideIndex]} />
-                </div>
-              )}
-              
-              {/* Reference Slide Indicator Overlay */}
-              {previewSlideIndex === previewReferenceIndex && previewSlides.length > 1 && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="bg-yellow-500/90 text-black px-6 py-3 rounded-lg text-2xl font-bold shadow-xl transform rotate-[-5deg] border-4 border-yellow-600">
-                    🎯 Reference Slide
+                {/* Render based on whether it's a static slide or reference slide */}
+                {previewSlideIndex === previewReferenceIndex ? (
+                  /* Reference slide - show with sample song content */
+                  <SlideView 
+                    slide={{
+                      songName: 'Sample Devotional Song',
+                      content: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6',
+                      translation: 'Translation Line 1\nTranslation Line 2\nTranslation Line 3',
+                      singerName: 'Sample Singer',
+                      pitch: 'C',
+                      nextSongName: 'Next Song',
+                      nextSingerName: 'Next Singer',
+                      nextPitch: 'D',
+                      nextIsContinuation: false,
+                      songSlideNumber: 1,
+                      songSlideCount: 5,
+                      index: previewSlideIndex,
+                    } as Slide}
+                    showTranslation={true}
+                    template={previewTemplate}
+                  />
+                ) : (
+                  /* Static slide - show template content only */
+                  <div 
+                    className="presentation-slide relative overflow-hidden"
+                    style={{
+                      ...getSlideBackgroundStyles(previewSlides[previewSlideIndex]),
+                      width: '100%',
+                      height: '100%',
+                    }}
+                  >
+                    <SlideBackground templateSlide={previewSlides[previewSlideIndex]} />
+                    <SlideImages templateSlide={previewSlides[previewSlideIndex]} />
+                    <SlideVideos templateSlide={previewSlides[previewSlideIndex]} />
+                    <SlideText templateSlide={previewSlides[previewSlideIndex]} />
                   </div>
-                </div>
-              )}
-              
-              {/* Static Slide Indicator */}
-              {previewSlideIndex !== previewReferenceIndex && previewSlides.length > 1 && (
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none">
-                  <div className="bg-gray-700/80 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                    {previewSlideIndex < previewReferenceIndex ? 'Intro Slide' : 'Outro Slide'} (Static)
+                )}
+                
+                {/* Reference Slide Indicator Overlay */}
+                {previewSlideIndex === previewReferenceIndex && previewSlides.length > 1 && (
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="bg-yellow-500/90 text-black px-6 py-3 rounded-lg text-2xl font-bold shadow-xl transform rotate-[-5deg] border-4 border-yellow-600">
+                      🎯 Reference Slide
+                    </div>
                   </div>
+                )}
+                
+                {/* Static Slide Indicator */}
+                {previewSlideIndex !== previewReferenceIndex && previewSlides.length > 1 && (
+                  <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none">
+                    <div className="bg-gray-700/80 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                      {previewSlideIndex < previewReferenceIndex ? 'Intro Slide' : 'Outro Slide'} (Static)
+                    </div>
+                  </div>
+                )}
                 </div>
-              )}
+              </div>
             </div>
             
-            {/* Slide Navigation (shown for multi-slide templates) */}
-            {previewSlides.length > 1 && (
-              <div className="flex items-center justify-center gap-2 p-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-                <button
-                  onClick={() => setPreviewSlideIndex(prev => Math.max(0, prev - 1))}
-                  disabled={previewSlideIndex === 0}
-                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                
-                {/* Slide dots/indicators */}
-                <div className="flex gap-2 mx-4">
-                  {previewSlides.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setPreviewSlideIndex(idx)}
-                      className={`w-3 h-3 rounded-full transition-colors ${
-                        idx === previewSlideIndex
-                          ? 'bg-blue-500'
-                          : idx === previewReferenceIndex
-                            ? 'bg-yellow-400 hover:bg-yellow-500'
-                            : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
-                      }`}
-                      title={idx === previewReferenceIndex ? `Slide ${idx + 1} (Reference)` : `Slide ${idx + 1}`}
-                    />
-                  ))}
-                </div>
-                
-                <button
-                  onClick={() => setPreviewSlideIndex(prev => Math.min(previewSlides.length - 1, prev + 1))}
-                  disabled={previewSlideIndex === previewSlides.length - 1}
-                  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-                
-                <span className="ml-4 text-sm text-gray-600 dark:text-gray-400">
-                  Slide {previewSlideIndex + 1} / {previewSlides.length}
-                  {previewSlideIndex === previewReferenceIndex && (
-                    <span className="ml-2 text-yellow-500 font-medium">⭐ Reference</span>
-                  )}
-                </span>
+            {/* Slide Navigation (always shown) */}
+            <div className="flex items-center justify-center gap-2 p-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <button
+                onClick={() => setPreviewSlideIndex(prev => Math.max(0, prev - 1))}
+                disabled={previewSlideIndex === 0}
+                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              
+              {/* Slide dots/indicators */}
+              <div className="flex gap-2 mx-4">
+                {previewSlides.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setPreviewSlideIndex(idx)}
+                    className={`w-3 h-3 rounded-full transition-colors ${
+                      idx === previewSlideIndex
+                        ? 'bg-blue-500'
+                        : idx === previewReferenceIndex
+                          ? 'bg-yellow-400 hover:bg-yellow-500'
+                          : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+                    }`}
+                    title={idx === previewReferenceIndex ? `Slide ${idx + 1} (Reference)` : `Slide ${idx + 1}`}
+                  />
+                ))}
               </div>
-            )}
+              
+              <button
+                onClick={() => setPreviewSlideIndex(prev => Math.min(previewSlides.length - 1, prev + 1))}
+                disabled={previewSlideIndex === previewSlides.length - 1}
+                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              
+              <span className="ml-4 text-sm text-gray-600 dark:text-gray-400">
+                Slide {previewSlideIndex + 1} / {previewSlides.length}
+                {previewSlideIndex === previewReferenceIndex && (
+                  <span className="ml-2 text-yellow-500 font-medium">⭐ Reference</span>
+                )}
+              </span>
+            </div>
 
-            {/* Footer with Details - Collapsible info panel */}
+            {/* Footer with Details - Description only */}
             <div className="bg-white dark:bg-gray-800 p-3 border-t border-gray-200 dark:border-gray-700 overflow-y-auto max-h-32 flex-shrink-0">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+              <div className="grid grid-cols-1 gap-2 text-sm">
                 {/* Description */}
                 <div>
                   <h3 className="font-semibold text-gray-900 dark:text-white mb-1 text-xs">Description</h3>
                   <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
                     {previewTemplate.description || '(No description)'}
                   </p>
-                </div>
-
-                {/* Background Info */}
-                {previewTemplate.background && (
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1 text-xs">Background</h3>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="text-xs text-gray-600 dark:text-gray-400">
-                        {previewTemplate.background.type}
-                      </span>
-                      {previewTemplate.background.value && (
-                        <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300 font-mono truncate max-w-xs">
-                          {previewTemplate.background.value}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Elements Count */}
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1 text-xs">Elements</h3>
-                  <div className="space-y-0.5 text-xs">
-                    {previewTemplate.images && previewTemplate.images.length > 0 && (
-                      <div className="text-gray-600 dark:text-gray-400">
-                        🖼️ {previewTemplate.images.length} image{previewTemplate.images.length !== 1 ? 's' : ''}
-                      </div>
-                    )}
-                    {previewTemplate.videos && previewTemplate.videos.length > 0 && (
-                      <div className="text-gray-600 dark:text-gray-400">
-                        🎬 {previewTemplate.videos.length} video{previewTemplate.videos.length !== 1 ? 's' : ''}
-                      </div>
-                    )}
-                    {previewTemplate.text && previewTemplate.text.length > 0 && (
-                      <div className="text-gray-600 dark:text-gray-400">
-                        📝 {previewTemplate.text.length} text element{previewTemplate.text.length !== 1 ? 's' : ''}
-                      </div>
-                    )}
-                    {(!previewTemplate.images || previewTemplate.images.length === 0) &&
-                      (!previewTemplate.videos || previewTemplate.videos.length === 0) &&
-                      (!previewTemplate.text || previewTemplate.text.length === 0) && (
-                      <div className="text-gray-500 dark:text-gray-500 text-xs">No overlays</div>
-                    )}
-                  </div>
                 </div>
               </div>
             </div>

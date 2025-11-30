@@ -28,43 +28,13 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
+  const [templatePickerExpanded, setTemplatePickerExpanded] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState<PresentationTemplate | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>();
+  const [songsData, setSongsData] = useState<Song[]>([]);
+  const [presentationScale, setPresentationScale] = useState(1);
 
-  // Load template from query params or default
-  useEffect(() => {
-    const loadTemplate = async () => {
-      try {
-        const templateId = searchParams.get('templateId');
-        
-        let template: PresentationTemplate | null = null;
-        
-        if (templateId) {
-          // Load specific template from query param
-          template = await templateService.getTemplate(templateId);
-          setSelectedTemplateId(templateId);
-        } else {
-          // Load default template
-          template = await templateService.getDefaultTemplate();
-          if (template) {
-            setSelectedTemplateId(template.id);
-          }
-        }
-        
-        if (template) {
-          setActiveTemplate(template);
-        }
-      } catch (error) {
-        console.error('Error loading template:', error);
-        // Continue without template if loading fails
-      }
-    };
-
-    loadTemplate();
-  }, [searchParams]);
-
-  // Build a flattened slide deck for the entire session
-  // Fetches full song details with CLOBs (lyrics) for presentation
+  // Load template and songs data on mount (in parallel to avoid flicker)
   useEffect(() => {
     if (entries.length === 0) {
       setError('No songs in session');
@@ -72,58 +42,93 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
       return;
     }
 
-    const fetchAndBuildSlides = async () => {
+    const loadData = async () => {
       setLoading(true);
       setError(null);
+      
       try {
-        // Fetch full song details with CLOBs for all songs in session
-        console.log('📥 Fetching full song details for presentation...');
-        const songPromises = entries.map(entry => 
-          ApiClient.get<Song>(`/songs/${entry.songId}`)
-        );
+        const templateId = searchParams.get('templateId');
         
-        const fullSongs = await Promise.all(songPromises);
-        console.log(`✅ Fetched ${fullSongs.length} songs with lyrics for presentation`);
+        // Load template and songs in parallel
+        const [template, fullSongs] = await Promise.all([
+          (async () => {
+            try {
+              if (templateId) {
+                const t = await templateService.getTemplate(templateId);
+                setSelectedTemplateId(templateId);
+                return t;
+              } else {
+                const t = await templateService.getDefaultTemplate();
+                if (t) {
+                  setSelectedTemplateId(t.id);
+                }
+                return t;
+              }
+            } catch (error) {
+              console.error('Error loading template:', error);
+              return null;
+            }
+          })(),
+          (async () => {
+            console.log('📥 Fetching full song details for presentation...');
+            const songPromises = entries.map(entry => 
+              ApiClient.get<Song>(`/songs/${entry.songId}`)
+            );
+            const songs = await Promise.all(songPromises);
+            console.log(`✅ Fetched ${songs.length} songs with lyrics for presentation`);
+            return songs;
+          })()
+        ]);
 
-        // Build songs array with metadata for multi-slide template support
-        const songsWithMetadata = entries.map((entry, index) => {
-          const song = fullSongs[index];
-          const singer = entry.singerId ? singers.find((si) => si.id === entry.singerId) : undefined;
-          return {
-            song: song!,
-            singerName: singer?.name,
-            pitch: entry.pitch,
-          };
-        }).filter(item => item.song); // Filter out any null songs
-
-        // Generate slides using multi-slide template support
-        const annotatedSlides = generateSessionPresentationSlides(
-          songsWithMetadata,
-          activeTemplate
-        );
-
-        setSlides(annotatedSlides);
-        setCurrentSlideIndex(0);
+        setSongsData(fullSongs);
+        if (template) {
+          setActiveTemplate(template);
+        }
       } catch (err) {
-        console.error('Error fetching songs for presentation:', err);
+        console.error('Error fetching data for presentation:', err);
         setError(err instanceof Error ? err.message : 'Failed to load songs for presentation');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAndBuildSlides();
-  }, [entries, singers, activeTemplate]);
+    loadData();
+  }, [entries, searchParams]);
 
-  // Auto-hide overlay after 2 seconds
+  // Generate slides when data changes (after initial load)
   useEffect(() => {
-    if (showOverlay) {
+    if (songsData.length === 0) return;
+
+    // Build songs array with metadata for multi-slide template support
+    const songsWithMetadata = entries.map((entry, index) => {
+      const song = songsData[index];
+      const singer = entry.singerId ? singers.find((si) => si.id === entry.singerId) : undefined;
+      return {
+        song: song!,
+        singerName: singer?.name,
+        pitch: entry.pitch,
+      };
+    }).filter(item => item.song); // Filter out any null songs
+
+    // Generate slides using multi-slide template support
+    const annotatedSlides = generateSessionPresentationSlides(
+      songsWithMetadata,
+      activeTemplate
+    );
+
+    setSlides(annotatedSlides);
+    setCurrentSlideIndex(0);
+  }, [songsData, entries, singers, activeTemplate]);
+
+  // Auto-hide overlay after 2 seconds (but not when template picker is open)
+  useEffect(() => {
+    if (showOverlay && !templatePickerExpanded) {
       const timer = setTimeout(() => {
         setShowOverlay(false);
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [showOverlay]);
+  }, [showOverlay, templatePickerExpanded]);
 
   // Handle keyboard navigation and mouse movement across slides
   useEffect(() => {
@@ -213,6 +218,37 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
     setShowOverlay(true); // Show overlay when clicking navigation buttons
   };
 
+  // Calculate scale for the slide to mimic template preview behavior
+  useEffect(() => {
+    const calculateScale = () => {
+      const aspectRatio = activeTemplate?.aspectRatio || '16:9';
+      const baseWidth = aspectRatio === '4:3' ? 1600 : 1920;
+      const baseHeight = aspectRatio === '4:3' ? 1200 : 1080;
+
+      // Use window size as container, leaving a small padding
+      const containerWidth = window.innerWidth - 64;
+      const containerHeight = window.innerHeight - 96; // leave space for controls
+
+      if (containerWidth <= 0 || containerHeight <= 0) {
+        setPresentationScale(1);
+        return;
+      }
+
+      const scale = Math.min(
+        containerWidth / baseWidth,
+        containerHeight / baseHeight,
+        1
+      );
+
+      setPresentationScale(scale);
+    };
+
+    // Run once on mount / template change and on resize
+    calculateScale();
+    window.addEventListener('resize', calculateScale);
+    return () => window.removeEventListener('resize', calculateScale);
+  }, [activeTemplate]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-900">
@@ -237,11 +273,42 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
 
   const currentSlide = slides[currentSlideIndex];
 
+  // Calculate aspect ratio dimensions
+  const aspectRatio = activeTemplate?.aspectRatio || '16:9';
+  const slideWidth = aspectRatio === '4:3' ? 1600 : 1920;
+  const slideHeight = aspectRatio === '4:3' ? 1200 : 1080;
+
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-gray-900">
-      {/* Slide view */}
-      <div className="h-full w-full">
-        <SlideView slide={currentSlide} showTranslation={true} template={activeTemplate} />
+    <div className="relative h-screen w-screen overflow-hidden bg-black flex items-center justify-center">
+      {/* Centered slide container using scaled wrapper, similar to template preview */}
+      <div
+        className="relative bg-black flex items-center justify-center"
+        style={{
+          width: '100%',
+          height: '100%',
+        }}
+      >
+        {/* Wrapper with final scaled dimensions */}
+        <div
+          className="relative"
+          style={{
+            width: Math.round(slideWidth * presentationScale),
+            height: Math.round(slideHeight * presentationScale),
+          }}
+        >
+          {/* Scaled slide container */}
+          <div
+            className="absolute top-0 left-0 shadow-2xl"
+            style={{
+              width: slideWidth,
+              height: slideHeight,
+              transform: `scale(${presentationScale})`,
+              transformOrigin: 'top left',
+            }}
+          >
+            <SlideView slide={currentSlide} showTranslation={true} template={activeTemplate} />
+          </div>
+        </div>
       </div>
 
       {/* Navigation controls at bottom center - auto-hide after 2 seconds */}
@@ -260,16 +327,17 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         <div className="absolute top-4 right-4 z-[1000] flex gap-2 opacity-50 transition-opacity duration-300">
           {/* Template selector */}
           <TemplateSelector 
-          currentTemplateId={selectedTemplateId}
-          onTemplateSelect={(template) => {
-            setSelectedTemplateId(template.id);
-            setActiveTemplate(template);
-            // Sync template selection to localStorage for the Live tab
-            if (template.id) {
-              localStorage.setItem('selectedSessionTemplateId', template.id);
-            }
-          }}
-        />
+            currentTemplateId={selectedTemplateId}
+            onTemplateSelect={(template) => {
+              setSelectedTemplateId(template.id);
+              setActiveTemplate(template);
+              // Sync template selection to localStorage for the Live tab
+              if (template.id) {
+                localStorage.setItem('selectedSessionTemplateId', template.id);
+              }
+            }}
+            onExpandedChange={setTemplatePickerExpanded}
+          />
 
         {/* Fullscreen toggle */}
         <button

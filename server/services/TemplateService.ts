@@ -51,6 +51,7 @@ export interface TextElement {
   color?: string;
   fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
   fontFamily?: string;
+  textAlign?: 'left' | 'center' | 'right';
   opacity?: number;
   zIndex?: number;
   maxWidth?: string;
@@ -65,10 +66,14 @@ export interface TemplateSlide {
 }
 
 // Multi-slide presentation template
+// Aspect ratio options for templates
+export type AspectRatio = '16:9' | '4:3';
+
 export interface PresentationTemplate {
   id?: string;
   name: string;
   description?: string;
+  aspectRatio?: AspectRatio;          // Template aspect ratio: '16:9' (default) or '4:3'
   
   // Multi-slide structure (new format)
   slides?: TemplateSlide[];           // Array of slides in the template
@@ -136,6 +141,9 @@ class TemplateService {
           createdAt: row.CREATED_AT,
           updatedAt: row.UPDATED_AT,
         };
+
+        // Set aspect ratio (default to 16:9 for legacy templates)
+        template.aspectRatio = templateJson.aspectRatio || '16:9';
 
         if (isMultiSlideTemplate(templateJson)) {
           // New multi-slide format
@@ -211,6 +219,9 @@ class TemplateService {
         updatedAt: row.UPDATED_AT,
       };
 
+      // Set aspect ratio (default to 16:9 for legacy templates)
+      template.aspectRatio = templateJson.aspectRatio || '16:9';
+
       if (isMultiSlideTemplate(templateJson)) {
         // New multi-slide format
         template.slides = templateJson.slides;
@@ -281,6 +292,9 @@ class TemplateService {
         updatedAt: row.UPDATED_AT,
       };
 
+      // Set aspect ratio (default to 16:9 for legacy templates)
+      template.aspectRatio = templateJson.aspectRatio || '16:9';
+
       if (isMultiSlideTemplate(templateJson)) {
         // New multi-slide format
         template.slides = templateJson.slides;
@@ -325,6 +339,7 @@ class TemplateService {
     // If template has slides array, save in new format
     if (template.slides && template.slides.length > 0) {
       return JSON.stringify({
+        aspectRatio: template.aspectRatio || '16:9',
         slides: template.slides,
         referenceSlideIndex: template.referenceSlideIndex ?? 0,
       });
@@ -339,6 +354,7 @@ class TemplateService {
     };
     
     return JSON.stringify({
+      aspectRatio: template.aspectRatio || '16:9',
       slides: [slide],
       referenceSlideIndex: 0,
     });
@@ -508,6 +524,9 @@ class TemplateService {
     try {
       const parsed = yaml.load(yamlContent) as any;
       
+      // Parse aspect ratio (default to 16:9)
+      const aspectRatio: AspectRatio = parsed.aspectRatio === '4:3' ? '4:3' : '16:9';
+      
       // Check if this is a multi-slide template
       if (Array.isArray(parsed.slides) && parsed.slides.length > 0) {
         // New multi-slide format
@@ -517,6 +536,7 @@ class TemplateService {
         return {
           name: parsed.name,
           description: parsed.description,
+          aspectRatio,
           slides: parsed.slides,
           referenceSlideIndex: refIndex,
           // Also populate legacy fields from reference slide
@@ -539,6 +559,7 @@ class TemplateService {
       return {
         name: parsed.name,
         description: parsed.description,
+        aspectRatio,
         slides: [slide],
         referenceSlideIndex: 0,
         // Also populate legacy fields

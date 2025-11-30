@@ -44,6 +44,7 @@ export interface TextElement {
   color?: string;
   fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
   fontFamily?: string;
+  textAlign?: 'left' | 'center' | 'right';
   opacity?: number;
   zIndex?: number;
   maxWidth?: string;
@@ -60,10 +61,20 @@ export interface TemplateSlide {
 // Multi-slide presentation template
 // A template contains multiple slides, with one designated as the "reference slide"
 // for overlaying song content (lyrics, pitch, singer name, etc.)
+// Aspect ratio options for templates
+export type AspectRatio = '16:9' | '4:3';
+
+// Resolution constants for each aspect ratio
+export const ASPECT_RATIO_DIMENSIONS = {
+  '16:9': { width: 1920, height: 1080 },
+  '4:3': { width: 1600, height: 1200 },
+} as const;
+
 export interface PresentationTemplate {
   id?: string;
   name: string;
   description?: string;
+  aspectRatio?: AspectRatio;          // Template aspect ratio: '16:9' (default) or '4:3'
   
   // Multi-slide structure (new format)
   slides?: TemplateSlide[];           // Array of slides in the template
