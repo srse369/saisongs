@@ -24,6 +24,7 @@ export interface ImageElement {
   height?: string;
   opacity?: number;
   zIndex?: number;
+  rotation?: number;
 }
 
 export interface VideoElement {
@@ -39,6 +40,7 @@ export interface VideoElement {
   autoPlay?: boolean;
   loop?: boolean;
   muted?: boolean;
+  rotation?: number;
 }
 
 export interface TextElement {
@@ -47,6 +49,8 @@ export interface TextElement {
   position?: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
   x?: number | string;
   y?: number | string;
+  width?: string;
+  height?: string;
   fontSize?: string;
   color?: string;
   fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
@@ -55,6 +59,16 @@ export interface TextElement {
   opacity?: number;
   zIndex?: number;
   maxWidth?: string;
+  rotation?: number;
+}
+
+// Song content styling for reference slides
+export interface SongContentStyle {
+  yPosition: number;        // Vertical position as percentage (0-100)
+  fontSize: string;         // e.g., "48px", "3rem"
+  fontWeight: 'normal' | 'bold';
+  textAlign: 'left' | 'center' | 'right';
+  color: string;            // e.g., "#ffffff"
 }
 
 // Individual slide within a multi-slide template
@@ -63,6 +77,11 @@ export interface TemplateSlide {
   images?: ImageElement[];
   videos?: VideoElement[];
   text?: TextElement[];
+  
+  // Song content styling (only used on reference slides)
+  songTitleStyle?: SongContentStyle;
+  songLyricsStyle?: SongContentStyle;
+  songTranslationStyle?: SongContentStyle;
 }
 
 // Multi-slide presentation template
@@ -94,6 +113,70 @@ export interface PresentationTemplate {
 // Helper to check if template uses multi-slide format
 function isMultiSlideTemplate(templateJson: any): boolean {
   return Array.isArray(templateJson.slides) && templateJson.slides.length > 0;
+}
+
+// Normalize rotation values to whole integers on all elements in all slides
+function normalizeSlideRotations(slides: TemplateSlide[] | undefined): TemplateSlide[] | undefined {
+  if (!Array.isArray(slides)) return slides;
+
+  return slides.map((slide) => {
+    if (!slide) return slide;
+
+    const images =
+      slide.images &&
+      slide.images.map((img) => {
+        if (!img) return img;
+        if (img.rotation !== undefined) {
+          const r =
+            typeof img.rotation === 'number'
+              ? img.rotation
+              : parseFloat(String(img.rotation));
+          if (!Number.isNaN(r)) {
+            img.rotation = Math.round(r);
+          }
+        }
+        return img;
+      });
+
+    const videos =
+      slide.videos &&
+      slide.videos.map((vid) => {
+        if (!vid) return vid;
+        if (vid.rotation !== undefined) {
+          const r =
+            typeof vid.rotation === 'number'
+              ? vid.rotation
+              : parseFloat(String(vid.rotation));
+          if (!Number.isNaN(r)) {
+            vid.rotation = Math.round(r);
+          }
+        }
+        return vid;
+      });
+
+    const text =
+      slide.text &&
+      slide.text.map((txt) => {
+        if (!txt) return txt;
+        if (txt.rotation !== undefined) {
+          const r =
+            typeof txt.rotation === 'number'
+              ? txt.rotation
+              : parseFloat(String(txt.rotation));
+          if (!Number.isNaN(r)) {
+            txt.rotation = Math.round(r);
+          }
+        }
+        return txt;
+      });
+
+    return {
+      ...slide,
+      images,
+      videos,
+      text,
+    };
+  });
 }
 
 // Helper to get reference slide from template
@@ -531,13 +614,14 @@ class TemplateService {
       if (Array.isArray(parsed.slides) && parsed.slides.length > 0) {
         // New multi-slide format
         const refIndex = parsed.referenceSlideIndex ?? 0;
-        const refSlide = parsed.slides[refIndex] || parsed.slides[0];
+        const normalizedSlides = normalizeSlideRotations(parsed.slides) || parsed.slides;
+        const refSlide = normalizedSlides[refIndex] || normalizedSlides[0];
         
         return {
           name: parsed.name,
           description: parsed.description,
           aspectRatio,
-          slides: parsed.slides,
+          slides: normalizedSlides,
           referenceSlideIndex: refIndex,
           // Also populate legacy fields from reference slide
           background: refSlide?.background,
@@ -555,18 +639,19 @@ class TemplateService {
         videos: parsed.videos || [],
         text: parsed.text || [],
       };
+      const normalizedSlides = normalizeSlideRotations([slide]) || [slide];
       
       return {
         name: parsed.name,
         description: parsed.description,
         aspectRatio,
-        slides: [slide],
+        slides: normalizedSlides,
         referenceSlideIndex: 0,
         // Also populate legacy fields
-        background: parsed.background,
-        images: parsed.images || [],
-        videos: parsed.videos || [],
-        text: parsed.text || [],
+        background: normalizedSlides[0]?.background ?? parsed.background,
+        images: normalizedSlides[0]?.images || [],
+        videos: normalizedSlides[0]?.videos || [],
+        text: normalizedSlides[0]?.text || [],
         yaml: yamlContent,
       };
     } catch (error) {
@@ -585,6 +670,7 @@ class TemplateService {
       return yaml.dump({
         name: template.name,
         description: template.description,
+        aspectRatio: template.aspectRatio || '16:9',
         slides: template.slides,
         referenceSlideIndex: template.referenceSlideIndex ?? 0,
       });
@@ -594,11 +680,12 @@ class TemplateService {
     return yaml.dump({
       name: template.name,
       description: template.description,
+      aspectRatio: template.aspectRatio || '16:9',
       slides: [{
-        background: template.background,
-        images: template.images || [],
-        videos: template.videos || [],
-        text: template.text || [],
+      background: template.background,
+      images: template.images || [],
+      videos: template.videos || [],
+      text: template.text || [],
       }],
       referenceSlideIndex: 0,
     });

@@ -70,10 +70,10 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
             }
           })(),
           (async () => {
-            console.log('📥 Fetching full song details for presentation...');
-            const songPromises = entries.map(entry => 
-              ApiClient.get<Song>(`/songs/${entry.songId}`)
-            );
+        console.log('📥 Fetching full song details for presentation...');
+        const songPromises = entries.map(entry => 
+          ApiClient.get<Song>(`/songs/${entry.songId}`)
+        );
             const songs = await Promise.all(songPromises);
             console.log(`✅ Fetched ${songs.length} songs with lyrics for presentation`);
             return songs;
@@ -306,7 +306,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
               transformOrigin: 'top left',
             }}
           >
-            <SlideView slide={currentSlide} showTranslation={true} template={activeTemplate} />
+        <SlideView slide={currentSlide} showTranslation={true} template={activeTemplate} />
           </div>
         </div>
       </div>
@@ -327,17 +327,17 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         <div className="absolute top-4 right-4 z-[1000] flex gap-2 opacity-50 transition-opacity duration-300">
           {/* Template selector */}
           <TemplateSelector 
-            currentTemplateId={selectedTemplateId}
-            onTemplateSelect={(template) => {
-              setSelectedTemplateId(template.id);
-              setActiveTemplate(template);
+          currentTemplateId={selectedTemplateId}
+          onTemplateSelect={(template) => {
+            setSelectedTemplateId(template.id);
+            setActiveTemplate(template);
               // Sync template selection to localStorage for the Live tab
               if (template.id) {
                 localStorage.setItem('selectedSessionTemplateId', template.id);
               }
-            }}
+          }}
             onExpandedChange={setTemplatePickerExpanded}
-          />
+        />
 
         {/* Fullscreen toggle */}
         <button

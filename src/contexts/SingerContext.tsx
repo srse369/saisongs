@@ -4,11 +4,14 @@ import type { Singer, CreateSingerInput, UpdateSingerInput, ServiceError } from 
 import { singerService } from '../services';
 import { useToast } from './ToastContext';
 
+const SINGERS_CACHE_KEY = 'songStudio:singersCache';
+const SINGERS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 interface SingerContextState {
   singers: Singer[];
   loading: boolean;
   error: ServiceError | null;
-  fetchSingers: () => Promise<void>;
+  fetchSingers: (forceRefresh?: boolean) => Promise<void>;
   getSingerById: (id: string) => Promise<Singer | null>;
   createSinger: (input: CreateSingerInput) => Promise<Singer | null>;
   updateSinger: (id: string, input: UpdateSingerInput) => Promise<Singer | null>;
@@ -40,7 +43,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
     }
     
     // Reset backoff for explicit user-triggered refreshes
-    if (forceRefresh) {
+    if (forceRefresh && typeof window !== 'undefined') {
       const { apiClient } = await import('../services/ApiClient');
       apiClient.resetBackoff('/singers');
       setError(null);
@@ -50,8 +53,44 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
+      // Try to hydrate from browser cache first to speed up page load,
+      // unless the caller explicitly requested a forced refresh.
+      if (!forceRefresh && typeof window !== 'undefined') {
+        const cachedRaw = window.localStorage.getItem(SINGERS_CACHE_KEY);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw) as {
+              timestamp: number;
+              singers: Singer[];
+            };
+            const now = Date.now();
+            if (cached.timestamp && now - cached.timestamp < SINGERS_CACHE_TTL_MS && Array.isArray(cached.singers)) {
+              setSingers(cached.singers);
+              setLoading(false);
+              setHasFetched(true);
+              return;
+            }
+          } catch {
+            // Ignore cache parse errors and fall back to network
+          }
+        }
+      }
+
+      // Fallback: fetch from backend
       const fetchedSingers = await singerService.getAllSingers();
       setSingers(fetchedSingers);
+      setHasFetched(true);
+
+      // Persist to cache for subsequent loads
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(
+          SINGERS_CACHE_KEY,
+          JSON.stringify({
+            timestamp: Date.now(),
+            singers: fetchedSingers,
+          })
+        );
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch singers';
       setError({
@@ -59,9 +98,9 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
         message: errorMessage,
       });
       toast.error(errorMessage);
+      setHasFetched(true);
     } finally {
       setLoading(false);
-      setHasFetched(true);
     }
   }, [toast, hasFetched, error]);
 
@@ -103,6 +142,11 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
         return newList;
       });
       
+      // Clear localStorage cache so fresh data is fetched next time
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(SINGERS_CACHE_KEY);
+      }
+      
       toast.success('Singer created successfully');
       return singer;
     } catch (err) {
@@ -125,6 +169,10 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       const singer = await singerService.updateSinger(id, input);
       if (singer) {
         setSingers(prev => prev.map(s => s.id === id ? singer : s));
+        // Clear localStorage cache so fresh data is fetched next time
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(SINGERS_CACHE_KEY);
+        }
         toast.success('Singer updated successfully');
       }
       return singer;
@@ -148,6 +196,10 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       const success = await singerService.deleteSinger(id);
       if (success) {
         setSingers(prev => prev.filter(singer => singer.id !== id));
+        // Clear localStorage cache so fresh data is fetched next time
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(SINGERS_CACHE_KEY);
+        }
         toast.success('Singer deleted successfully');
       }
       return success;

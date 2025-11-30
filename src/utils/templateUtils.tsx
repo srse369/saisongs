@@ -145,6 +145,13 @@ export const getElementStyles = (element: any): React.CSSProperties => {
     styles.top = typeof element.y === 'number' ? `${element.y}px` : element.y;
   }
 
+   // Apply rotation for elements that use explicit x/y positioning (no predefined position classes)
+   // This avoids overriding Tailwind's transform-based centering for position-based elements.
+   if (element.rotation !== undefined && !element.position) {
+     styles.transform = `rotate(${element.rotation}deg)`;
+     styles.transformOrigin = 'center center';
+   }
+
   return styles;
 };
 
@@ -232,25 +239,59 @@ export const TemplateText: React.FC<{ template: PresentationTemplate | null }> =
 
   return (
     <>
-      {template.text.map((textElement) => (
-        <div
-          key={textElement.id}
-          className={`absolute ${getPositionClasses(textElement.position)}`}
-          style={{
-            ...getElementStyles(textElement),
-            fontSize: textElement.fontSize,
-            color: textElement.color,
-            fontWeight: textElement.fontWeight,
-            fontFamily: textElement.fontFamily,
-            maxWidth: textElement.maxWidth,
-            textAlign: 'center',
-            whiteSpace: 'pre-wrap',
-            padding: '1rem',
-          }}
-        >
-          {textElement.content}
-        </div>
-      ))}
+      {template.text.map((textElement) => {
+        // Build text box styles: position first (x/y), then dimensions (width/height)
+        const boxStyles: React.CSSProperties = {
+          opacity: textElement.opacity ?? 1,
+          zIndex: textElement.zIndex || 0,
+        };
+
+        // Position: use explicit x/y if provided
+        if (textElement.x !== undefined) {
+          boxStyles.left = typeof textElement.x === 'number' ? `${textElement.x}px` : textElement.x;
+        }
+        if (textElement.y !== undefined) {
+          boxStyles.top = typeof textElement.y === 'number' ? `${textElement.y}px` : textElement.y;
+        }
+
+        // Dimensions: width and height define the text box bounds
+        if (textElement.width) {
+          boxStyles.width = typeof textElement.width === 'number' ? `${textElement.width}px` : textElement.width;
+        } else if (textElement.maxWidth) {
+          // Fallback to maxWidth for backward compatibility
+          boxStyles.width = textElement.maxWidth;
+        }
+        if (textElement.height) {
+          boxStyles.height = typeof textElement.height === 'number' ? `${textElement.height}px` : textElement.height;
+        }
+
+        // Rotation (only for explicit x/y positioned elements)
+        if (textElement.rotation !== undefined && !textElement.position) {
+          boxStyles.transform = `rotate(${textElement.rotation}deg)`;
+          boxStyles.transformOrigin = 'center center';
+        }
+
+        // Text styling - match Konva canvas rendering
+        boxStyles.fontSize = textElement.fontSize;
+        boxStyles.color = textElement.color;
+        boxStyles.fontWeight = textElement.fontWeight;
+        boxStyles.fontFamily = textElement.fontFamily || 'Arial';
+        boxStyles.textAlign = textElement.textAlign || 'center';
+        boxStyles.whiteSpace = 'pre-wrap';
+        // Konva uses lineHeight of 1.0 by default (font size = line height)
+        boxStyles.lineHeight = 1;
+        boxStyles.overflow = 'hidden';
+
+        return (
+          <div
+            key={textElement.id}
+            className={`absolute ${getPositionClasses(textElement.position)}`}
+            style={boxStyles}
+          >
+            {textElement.content}
+          </div>
+        );
+      })}
     </>
   );
 };
@@ -344,27 +385,100 @@ export const SlideImages: React.FC<{ templateSlide: TemplateSlide | null }> = ({
   );
 };
 
+// Simple helpers to detect and embed YouTube URLs
+const isYouTubeUrl = (url?: string): boolean => {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return (
+      u.hostname.includes('youtube.com') && u.searchParams.has('v')
+    ) || u.hostname === 'youtu.be';
+  } catch {
+    return false;
+  }
+};
+
+const getYouTubeEmbedUrl = (url: string, autoPlay: boolean): string => {
+  try {
+    const u = new URL(url);
+    let videoId: string | null = null;
+
+    if (u.hostname === 'youtu.be') {
+      videoId = u.pathname.replace('/', '');
+    } else if (u.hostname.includes('youtube.com')) {
+      videoId = u.searchParams.get('v');
+    }
+
+    if (!videoId) {
+      return url;
+    }
+
+    const params = new URLSearchParams({
+      rel: '0',
+      modestbranding: '1',
+      controls: '1',
+      autoplay: autoPlay ? '1' : '0',
+    });
+
+    return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+  } catch {
+    return url;
+  }
+};
+
 /**
  * Render video overlays (for individual TemplateSlide)
+ * - HTML5 videos use <video>.
+ * - YouTube URLs are rendered via an <iframe> embed.
  */
-export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({ templateSlide }) => {
+export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({
+  templateSlide,
+}) => {
   if (!templateSlide?.videos || templateSlide.videos.length === 0) {
     return null;
   }
 
   return (
     <>
-      {templateSlide.videos.map((video) => (
-        <video
-          key={video.id}
-          src={video.url}
-          autoPlay={video.autoPlay ?? true}
-          loop={video.loop ?? true}
-          muted={video.muted ?? true}
-          className={`absolute ${getPositionClasses(video.position)}`}
-          style={getElementStyles(video)}
-        />
-      ))}
+      {templateSlide.videos.map((video) => {
+        const autoPlay = video.autoPlay ?? true;
+        const baseStyles = getElementStyles(video);
+        const width = baseStyles.width || '320px';
+        const height = baseStyles.height || '180px';
+
+        const isYouTube = isYouTubeUrl(video.url);
+
+        return (
+          <div
+            key={video.id}
+            className={`absolute ${getPositionClasses(video.position)}`}
+            style={{
+              ...baseStyles,
+              width,
+              height,
+              backgroundColor: '#000',
+            }}
+          >
+            {isYouTube && video.url ? (
+              <iframe
+                src={getYouTubeEmbedUrl(video.url, autoPlay)}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            ) : (
+              <video
+                src={video.url}
+                autoPlay={autoPlay}
+                loop={video.loop ?? true}
+                muted={video.muted ?? true}
+                controls={!autoPlay}
+                className="w-full h-full object-cover"
+              />
+            )}
+          </div>
+        );
+      })}
     </>
   );
 };
@@ -379,25 +493,59 @@ export const SlideText: React.FC<{ templateSlide: TemplateSlide | null }> = ({ t
 
   return (
     <>
-      {templateSlide.text.map((textElement) => (
-        <div
-          key={textElement.id}
-          className={`absolute ${getPositionClasses(textElement.position)}`}
-          style={{
-            ...getElementStyles(textElement),
-            fontSize: textElement.fontSize,
-            color: textElement.color,
-            fontWeight: textElement.fontWeight,
-            fontFamily: textElement.fontFamily,
-            maxWidth: textElement.maxWidth,
-            textAlign: textElement.textAlign || 'center',
-            whiteSpace: 'pre-wrap',
-            padding: '1rem',
-          }}
-        >
-          {textElement.content}
-        </div>
-      ))}
+      {templateSlide.text.map((textElement) => {
+        // Build text box styles: position first (x/y), then dimensions (width/height)
+        const boxStyles: React.CSSProperties = {
+          opacity: textElement.opacity ?? 1,
+          zIndex: textElement.zIndex || 0,
+        };
+
+        // Position: use explicit x/y if provided
+        if (textElement.x !== undefined) {
+          boxStyles.left = typeof textElement.x === 'number' ? `${textElement.x}px` : textElement.x;
+        }
+        if (textElement.y !== undefined) {
+          boxStyles.top = typeof textElement.y === 'number' ? `${textElement.y}px` : textElement.y;
+        }
+
+        // Dimensions: width and height define the text box bounds
+        if (textElement.width) {
+          boxStyles.width = typeof textElement.width === 'number' ? `${textElement.width}px` : textElement.width;
+        } else if (textElement.maxWidth) {
+          // Fallback to maxWidth for backward compatibility
+          boxStyles.width = textElement.maxWidth;
+        }
+        if (textElement.height) {
+          boxStyles.height = typeof textElement.height === 'number' ? `${textElement.height}px` : textElement.height;
+        }
+
+        // Rotation (only for explicit x/y positioned elements)
+        if (textElement.rotation !== undefined && !textElement.position) {
+          boxStyles.transform = `rotate(${textElement.rotation}deg)`;
+          boxStyles.transformOrigin = 'center center';
+        }
+
+        // Text styling - match Konva canvas rendering
+        boxStyles.fontSize = textElement.fontSize;
+        boxStyles.color = textElement.color;
+        boxStyles.fontWeight = textElement.fontWeight;
+        boxStyles.fontFamily = textElement.fontFamily || 'Arial';
+        boxStyles.textAlign = textElement.textAlign || 'center';
+        boxStyles.whiteSpace = 'pre-wrap';
+        // Konva uses lineHeight of 1.0 by default (font size = line height)
+        boxStyles.lineHeight = 1;
+        boxStyles.overflow = 'hidden';
+
+        return (
+          <div
+            key={textElement.id}
+            className={`absolute ${getPositionClasses(textElement.position)}`}
+            style={boxStyles}
+          >
+            {textElement.content}
+          </div>
+        );
+      })}
     </>
   );
 };

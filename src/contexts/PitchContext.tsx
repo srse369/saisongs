@@ -4,11 +4,14 @@ import type { SongSingerPitch, CreatePitchInput, UpdatePitchInput, ServiceError 
 import { pitchService } from '../services';
 import { useToast } from './ToastContext';
 
+const PITCHES_CACHE_KEY = 'songStudio:pitchesCache';
+const PITCHES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 interface PitchContextState {
   pitches: SongSingerPitch[];
   loading: boolean;
   error: ServiceError | null;
-  fetchAllPitches: () => Promise<void>;
+  fetchAllPitches: (forceRefresh?: boolean) => Promise<void>;
   getPitchesForSong: (songId: string) => Promise<void>;
   getPitchesForSinger: (singerId: string) => Promise<void>;
   createPitch: (input: CreatePitchInput) => Promise<SongSingerPitch | null>;
@@ -41,7 +44,7 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
     }
     
     // Reset backoff for explicit user-triggered refreshes
-    if (forceRefresh) {
+    if (forceRefresh && typeof window !== 'undefined') {
       const { apiClient } = await import('../services/ApiClient');
       apiClient.resetBackoff('/pitches');
       setError(null);
@@ -51,8 +54,44 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const all = await pitchService.getAllPitches();
-      setPitches(all);
+      // Try to hydrate from browser cache first to speed up page load,
+      // unless the caller explicitly requested a forced refresh.
+      if (!forceRefresh && typeof window !== 'undefined') {
+        const cachedRaw = window.localStorage.getItem(PITCHES_CACHE_KEY);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw) as {
+              timestamp: number;
+              pitches: SongSingerPitch[];
+            };
+            const now = Date.now();
+            if (cached.timestamp && now - cached.timestamp < PITCHES_CACHE_TTL_MS && Array.isArray(cached.pitches)) {
+              setPitches(cached.pitches);
+              setLoading(false);
+              setHasFetched(true);
+              return;
+            }
+          } catch {
+            // Ignore cache parse errors and fall back to network
+          }
+        }
+      }
+
+      // Fallback: fetch from backend
+      const fetchedPitches = await pitchService.getAllPitches();
+      setPitches(fetchedPitches);
+      setHasFetched(true);
+
+      // Persist to cache for subsequent loads
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(
+          PITCHES_CACHE_KEY,
+          JSON.stringify({
+            timestamp: Date.now(),
+            pitches: fetchedPitches,
+          })
+        );
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch pitches';
       setError({
@@ -60,9 +99,9 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
         message: errorMessage,
       });
       toast.error(errorMessage);
+      setHasFetched(true);
     } finally {
       setLoading(false);
-      setHasFetched(true);
     }
   }, [toast, hasFetched, error]);
 
@@ -118,6 +157,11 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
         return [...prev, pitch];
       });
       
+      // Clear localStorage cache so fresh data is fetched next time
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(PITCHES_CACHE_KEY);
+      }
+      
       toast.success('Pitch association created successfully');
       return pitch;
     } catch (err) {
@@ -140,6 +184,10 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
       const pitch = await pitchService.updatePitch(id, input);
       if (pitch) {
         setPitches(prev => prev.map(p => p.id === id ? pitch : p));
+        // Clear localStorage cache so fresh data is fetched next time
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(PITCHES_CACHE_KEY);
+        }
         toast.success('Pitch association updated successfully');
       }
       return pitch;
@@ -163,6 +211,10 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
       const success = await pitchService.deletePitch(id);
       if (success) {
         setPitches(prev => prev.filter(pitch => pitch.id !== id));
+        // Clear localStorage cache so fresh data is fetched next time
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(PITCHES_CACHE_KEY);
+        }
         toast.success('Pitch association deleted successfully');
       }
       return success;

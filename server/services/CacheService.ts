@@ -1833,28 +1833,65 @@ export async function warmupCache(): Promise<void> {
         console.error('Error parsing template JSON:', e);
       }
 
+      // Check if this is a multi-slide template
+      const isMultiSlide = Array.isArray(templateJson.slides) && templateJson.slides.length > 0;
+
       const template: any = {
         id: row.ID,
         name: row.NAME,
         description: row.DESCRIPTION,
-        background: templateJson.background,
-        images: templateJson.images || [],
-        videos: templateJson.videos || [],
-        text: templateJson.text || [],
+        aspectRatio: templateJson.aspectRatio || '16:9',  // Extract aspect ratio from JSON
         isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
         createdAt: row.CREATED_AT,
         updatedAt: row.UPDATED_AT,
       };
 
-      // Reconstruct YAML from template data
-      template.yaml = yaml.dump({
-        name: template.name,
-        description: template.description,
-        background: template.background,
-        images: template.images || [],
-        videos: template.videos || [],
-        text: template.text || [],
-      });
+      if (isMultiSlide) {
+        // Multi-slide format
+        template.slides = templateJson.slides;
+        template.referenceSlideIndex = templateJson.referenceSlideIndex ?? 0;
+        // Also populate legacy fields from reference slide for backward compatibility
+        const refSlide = template.slides[template.referenceSlideIndex] || template.slides[0];
+        template.background = refSlide?.background;
+        template.images = refSlide?.images || [];
+        template.videos = refSlide?.videos || [];
+        template.text = refSlide?.text || [];
+      } else {
+        // Legacy single-slide format
+        template.background = templateJson.background;
+        template.images = templateJson.images || [];
+        template.videos = templateJson.videos || [];
+        template.text = templateJson.text || [];
+        // Auto-migrate to multi-slide format
+        template.slides = [{
+          background: template.background,
+          images: template.images,
+          videos: template.videos,
+          text: template.text,
+        }];
+        template.referenceSlideIndex = 0;
+      }
+
+      // Reconstruct YAML from template data (using multi-slide format)
+      if (template.slides && template.slides.length > 0) {
+        template.yaml = yaml.dump({
+          name: template.name,
+          description: template.description,
+          aspectRatio: template.aspectRatio,
+          slides: template.slides,
+          referenceSlideIndex: template.referenceSlideIndex ?? 0,
+        });
+      } else {
+        template.yaml = yaml.dump({
+          name: template.name,
+          description: template.description,
+          aspectRatio: template.aspectRatio,
+          background: template.background,
+          images: template.images || [],
+          videos: template.videos || [],
+          text: template.text || [],
+        });
+      }
 
       return template;
     });

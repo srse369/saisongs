@@ -78,7 +78,7 @@ export const SingerManager: React.FC = () => {
       
       // If both start with query or neither does, sort alphabetically
       return aName.localeCompare(bName);
-    });
+  });
   }, [singers, searchTerm]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

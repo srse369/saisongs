@@ -30,7 +30,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
   const pitch = searchParams.get('pitch') || undefined;
   // Read templateId from URL params if not provided as prop
   const urlTemplateId = searchParams.get('templateId') || undefined;
-  
+
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(templateId || urlTemplateId);
 
   // Update selectedTemplateId when URL param or prop changes
@@ -38,7 +38,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     const newTemplateId = templateId || urlTemplateId;
     if (newTemplateId && newTemplateId !== selectedTemplateId) {
       setSelectedTemplateId(newTemplateId);
-    }
+          }
   }, [templateId, urlTemplateId]);
 
   // Load template and song data on mount
@@ -284,13 +284,13 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
         <div className="absolute top-4 right-4 z-[1000] flex gap-2 opacity-50 transition-opacity duration-300">
           {/* Template selector */}
           <TemplateSelector 
-            currentTemplateId={selectedTemplateId}
-            onTemplateSelect={(template) => {
-              setSelectedTemplateId(template.id);
-              setActiveTemplate(template);
-            }}
+          currentTemplateId={selectedTemplateId}
+          onTemplateSelect={(template) => {
+            setSelectedTemplateId(template.id);
+            setActiveTemplate(template);
+          }}
             onExpandedChange={setTemplatePickerExpanded}
-          />
+        />
 
         {/* Fullscreen toggle */}
         <button

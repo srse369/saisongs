@@ -3,7 +3,6 @@ import { useTemplates } from '../../contexts/TemplateContext';
 import type { PresentationTemplate, Slide, TemplateSlide } from '../../types';
 import { RefreshIcon, Modal } from '../common';
 import { SlideView } from '../presentation/SlideView';
-import { TemplateVisualEditor } from './TemplateVisualEditor';
 import { TemplateWysiwygEditor } from './TemplateWysiwygEditor';
 import { isMultiSlideTemplate, getSlideBackgroundStyles, SlideBackground, SlideImages, SlideVideos, SlideText } from '../../utils/templateUtils';
 
@@ -23,7 +22,7 @@ function formatDimension(value: string | number | undefined): string {
 /**
  * Convert a single slide to YAML format
  */
-function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; text?: any[] }, indent: string = ''): string[] {
+function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; text?: any[]; songTitleStyle?: any; songLyricsStyle?: any; songTranslationStyle?: any }, indent: string = '', isReferenceSlide: boolean = false): string[] {
   const lines: string[] = [];
 
   // Background
@@ -49,6 +48,7 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
       if (img.height) lines.push(`${indent}    height: ${escapeYamlString(formatDimension(img.height))}`);
       if (img.opacity !== undefined) lines.push(`${indent}    opacity: ${img.opacity}`);
       if (img.zIndex !== undefined) lines.push(`${indent}    zIndex: ${img.zIndex}`);
+      if (img.rotation !== undefined) lines.push(`${indent}    rotation: ${Math.round(img.rotation)}`);
     });
   } else {
     lines.push(`${indent}  []`);
@@ -70,6 +70,7 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
       if (vid.autoPlay !== undefined) lines.push(`${indent}    autoPlay: ${vid.autoPlay}`);
       if (vid.loop !== undefined) lines.push(`${indent}    loop: ${vid.loop}`);
       if (vid.muted !== undefined) lines.push(`${indent}    muted: ${vid.muted}`);
+      if (vid.rotation !== undefined) lines.push(`${indent}    rotation: ${Math.round(vid.rotation)}`);
     });
   } else {
     lines.push(`${indent}  []`);
@@ -85,15 +86,47 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
       if (txt.position) lines.push(`${indent}    position: ${txt.position}`);
       if (txt.x !== undefined) lines.push(`${indent}    x: ${escapeYamlString(formatDimension(txt.x))}`);
       if (txt.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(formatDimension(txt.y))}`);
+      if (txt.width) lines.push(`${indent}    width: ${escapeYamlString(formatDimension(txt.width))}`);
+      if (txt.height) lines.push(`${indent}    height: ${escapeYamlString(formatDimension(txt.height))}`);
       if (txt.fontSize) lines.push(`${indent}    fontSize: ${escapeYamlString(formatDimension(txt.fontSize))}`);
       if (txt.color) lines.push(`${indent}    color: ${escapeYamlString(txt.color)}`);
       if (txt.fontWeight) lines.push(`${indent}    fontWeight: ${txt.fontWeight}`);
       if (txt.textAlign) lines.push(`${indent}    textAlign: ${txt.textAlign}`);
+      if (txt.maxWidth) lines.push(`${indent}    maxWidth: ${escapeYamlString(formatDimension(txt.maxWidth))}`);
       if (txt.opacity !== undefined) lines.push(`${indent}    opacity: ${txt.opacity}`);
       if (txt.zIndex !== undefined) lines.push(`${indent}    zIndex: ${txt.zIndex}`);
+      if (txt.rotation !== undefined) lines.push(`${indent}    rotation: ${Math.round(txt.rotation)}`);
     });
   } else {
     lines.push(`${indent}  []`);
+  }
+
+  // Song content styles (only for reference slides)
+  if (isReferenceSlide) {
+    if (slide.songTitleStyle) {
+      lines.push(`${indent}songTitleStyle:`);
+      lines.push(`${indent}  yPosition: ${slide.songTitleStyle.yPosition}`);
+      lines.push(`${indent}  fontSize: ${escapeYamlString(slide.songTitleStyle.fontSize)}`);
+      lines.push(`${indent}  fontWeight: ${slide.songTitleStyle.fontWeight}`);
+      lines.push(`${indent}  textAlign: ${slide.songTitleStyle.textAlign}`);
+      lines.push(`${indent}  color: ${escapeYamlString(slide.songTitleStyle.color)}`);
+    }
+    if (slide.songLyricsStyle) {
+      lines.push(`${indent}songLyricsStyle:`);
+      lines.push(`${indent}  yPosition: ${slide.songLyricsStyle.yPosition}`);
+      lines.push(`${indent}  fontSize: ${escapeYamlString(slide.songLyricsStyle.fontSize)}`);
+      lines.push(`${indent}  fontWeight: ${slide.songLyricsStyle.fontWeight}`);
+      lines.push(`${indent}  textAlign: ${slide.songLyricsStyle.textAlign}`);
+      lines.push(`${indent}  color: ${escapeYamlString(slide.songLyricsStyle.color)}`);
+    }
+    if (slide.songTranslationStyle) {
+      lines.push(`${indent}songTranslationStyle:`);
+      lines.push(`${indent}  yPosition: ${slide.songTranslationStyle.yPosition}`);
+      lines.push(`${indent}  fontSize: ${escapeYamlString(slide.songTranslationStyle.fontSize)}`);
+      lines.push(`${indent}  fontWeight: ${slide.songTranslationStyle.fontWeight}`);
+      lines.push(`${indent}  textAlign: ${slide.songTranslationStyle.textAlign}`);
+      lines.push(`${indent}  color: ${escapeYamlString(slide.songTranslationStyle.color)}`);
+    }
   }
 
   return lines;
@@ -123,8 +156,9 @@ function templateToYaml(template: PresentationTemplate): string {
     lines.push(`referenceSlideIndex: ${template.referenceSlideIndex ?? 0}`);
     lines.push('slides:');
     template.slides.forEach((slide, index) => {
-      lines.push(`  - # Slide ${index + 1}${index === template.referenceSlideIndex ? ' (Reference)' : ''}`);
-      const slideLines = slideToYaml(slide, '    ');
+      const isReference = index === template.referenceSlideIndex;
+      lines.push(`  - # Slide ${index + 1}${isReference ? ' (Reference)' : ''}`);
+      const slideLines = slideToYaml(slide, '    ', isReference);
       lines.push(...slideLines);
     });
   } else {
@@ -194,7 +228,7 @@ export const TemplateManager: React.FC = () => {
   const [yamlContent, setYamlContent] = useState('');
   const [validationError, setValidationError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [editorMode, setEditorMode] = useState<'wysiwyg' | 'visual' | 'yaml'>('wysiwyg');
+  const [editorMode, setEditorMode] = useState<'wysiwyg' | 'yaml'>('wysiwyg');
   const [previewScale, setPreviewScale] = useState(1);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const previewContainerRef = React.useRef<HTMLDivElement>(null);
@@ -400,8 +434,8 @@ export const TemplateManager: React.FC = () => {
       // Determine the final YAML content based on editor mode
       let finalYamlContent: string;
       
-      if (editorMode === 'wysiwyg' || editorMode === 'visual') {
-        // In visual/wysiwyg mode, always generate YAML from the current template
+      if (editorMode === 'wysiwyg') {
+        // In WYSIWYG mode, always generate YAML from the current template
         finalYamlContent = templateToYaml(editingTemplate);
       } else {
         // In YAML mode, use the edited YAML content
@@ -530,7 +564,12 @@ export const TemplateManager: React.FC = () => {
 
       {/* Templates List */}
       <div className="space-y-3">
-        {filteredTemplates.length > 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
+            <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">Loading templates...</p>
+          </div>
+        ) : filteredTemplates.length > 0 ? (
           filteredTemplates.map((template) => (
             <div
               key={template.id}
@@ -553,7 +592,7 @@ export const TemplateManager: React.FC = () => {
                       {template.description}
                     </p>
                   )}
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
                     {/* Aspect ratio indicator */}
                     <span className={`inline-flex items-center px-2 py-1 rounded ${
                       template.aspectRatio === '4:3' 
@@ -561,12 +600,12 @@ export const TemplateManager: React.FC = () => {
                         : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
                     }`}>
                       📐 {template.aspectRatio || '16:9'}
-                    </span>
+                      </span>
                     {/* Slide count indicator */}
                     <span className="inline-flex items-center px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
                       📑 {template.slides?.length || 1} slide{(template.slides?.length || 1) !== 1 ? 's' : ''} (ref: {(template.referenceSlideIndex ?? 0) + 1})
-                    </span>
-                  </div>
+                        </span>
+                    </div>
                 </div>
 
                 {/* Actions Row */}
@@ -631,7 +670,7 @@ export const TemplateManager: React.FC = () => {
         size={editorMode === 'wysiwyg' ? 'xlarge' : 'large'}
       >
         <div className="space-y-4">
-          {/* Editor Mode Tabs */}
+          {/* Editor Mode Tabs (WYSIWYG + YAML) */}
           <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={async () => {
@@ -639,12 +678,12 @@ export const TemplateManager: React.FC = () => {
                 if (editorMode === 'yaml' && yamlContent.trim()) {
                   // Sync YAML changes before switching - await to ensure template is updated first
                   const validation = await validateYaml(yamlContent);
-                  if (validation.valid && validation.template && editingTemplate) {
-                    setEditingTemplate({
-                      ...editingTemplate,
-                      ...validation.template,
-                    });
-                  }
+                    if (validation.valid && validation.template && editingTemplate) {
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        ...validation.template,
+                      });
+                    }
                 }
                 setEditorMode('wysiwyg');
               }}
@@ -657,32 +696,9 @@ export const TemplateManager: React.FC = () => {
               🖱️ WYSIWYG
             </button>
             <button
-              onClick={async () => {
-                // When clicking visual editor button, check if we're coming FROM YAML mode
-                if (editorMode === 'yaml' && yamlContent.trim()) {
-                  // Sync YAML changes to visual before switching - await to ensure template is updated first
-                  const validation = await validateYaml(yamlContent);
-                  if (validation.valid && validation.template && editingTemplate) {
-                    setEditingTemplate({
-                      ...editingTemplate,
-                      ...validation.template,
-                    });
-                  }
-                }
-                setEditorMode('visual');
-              }}
-              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-                editorMode === 'visual'
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
-              }`}
-            >
-              📝 Form Editor
-            </button>
-            <button
               onClick={() => {
-                // When clicking YAML editor button, check if we're coming FROM visual/wysiwyg mode
-                if ((editorMode === 'visual' || editorMode === 'wysiwyg') && editingTemplate) {
+                // When clicking YAML editor button, check if we're coming FROM WYSIWYG mode
+                if (editorMode === 'wysiwyg' && editingTemplate) {
                   // Sync visual changes to YAML before switching
                   setYamlContent(templateToYaml(editingTemplate));
                 }
@@ -704,22 +720,6 @@ export const TemplateManager: React.FC = () => {
               <TemplateWysiwygEditor
                 template={editingTemplate}
                 onTemplateChange={setEditingTemplate}
-              />
-              {validationError && (
-                <div className="p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 rounded text-sm">
-                  {validationError}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Form-based Visual Editor Mode */}
-          {editorMode === 'visual' && editingTemplate && (
-            <>
-              <TemplateVisualEditor
-                template={editingTemplate}
-                onTemplateChange={setEditingTemplate}
-                onPreview={handlePreview}
               />
               {validationError && (
                 <div className="p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 rounded text-sm">
@@ -771,46 +771,46 @@ export const TemplateManager: React.FC = () => {
 
           {/* Template Properties - Always visible */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
-                Template Name
-              </label>
-              <input
-                type="text"
-                value={editingTemplate?.name || ''}
-                onChange={(e) =>
-                  setEditingTemplate(
-                    editingTemplate
-                      ? { ...editingTemplate, name: e.target.value }
-                      : null
-                  )
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <div>
+                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                  Template Name
+                </label>
+                <input
+                  type="text"
+                  value={editingTemplate?.name || ''}
+                  onChange={(e) =>
+                    setEditingTemplate(
+                      editingTemplate
+                        ? { ...editingTemplate, name: e.target.value }
+                        : null
+                    )
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Template name"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
-                Description
-              </label>
-              <input
-                type="text"
-                value={editingTemplate?.description || ''}
-                onChange={(e) =>
-                  setEditingTemplate(
-                    editingTemplate
-                      ? { ...editingTemplate, description: e.target.value }
-                      : null
-                  )
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  value={editingTemplate?.description || ''}
+                  onChange={(e) =>
+                    setEditingTemplate(
+                      editingTemplate
+                        ? { ...editingTemplate, description: e.target.value }
+                        : null
+                    )
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Template description"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                 Aspect Ratio
-              </label>
+                </label>
               <select
                 value={editingTemplate?.aspectRatio || '16:9'}
                 onChange={(e) =>
@@ -825,8 +825,8 @@ export const TemplateManager: React.FC = () => {
                 <option value="16:9">16:9 (1920×1080)</option>
                 <option value="4:3">4:3 (1600×1200)</option>
               </select>
-            </div>
-          </div>
+              </div>
+                </div>
 
           <div className="flex gap-2 justify-end pt-4">
             <button
@@ -853,16 +853,16 @@ export const TemplateManager: React.FC = () => {
             {/* Header */}
             <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
               <div className="flex items-center gap-4">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
-                    Template Preview: {previewTemplate.name}
-                  </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                  Template Preview: {previewTemplate.name}
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {previewSlides.length > 1 
                       ? `Slide ${previewSlideIndex + 1} of ${previewSlides.length} • Use arrow keys to navigate • Press Esc to close`
                       : 'Press Esc to close'}
-                  </p>
-                </div>
+                </p>
+              </div>
                 {/* Aspect ratio and dimensions info */}
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
@@ -879,9 +879,9 @@ export const TemplateManager: React.FC = () => {
               </div>
               <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                 {/* Fullscreen toggle button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
                     togglePreviewFullscreen();
                   }}
                   className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
@@ -905,14 +905,14 @@ export const TemplateManager: React.FC = () => {
                     if (previewFullscreen) {
                       document.exitFullscreen();
                     }
-                    setPreviewTemplate(null);
+                  setPreviewTemplate(null);
                     setPreviewSlideIndex(0);
-                  }}
+                }}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none"
-                  aria-label="Close preview"
-                >
-                  ✕
-                </button>
+                aria-label="Close preview"
+              >
+                ✕
+              </button>
               </div>
             </div>
 
@@ -941,28 +941,28 @@ export const TemplateManager: React.FC = () => {
                     transform: `scale(${previewScale})`,
                     transformOrigin: 'top left',
                   }}
-                >
+            >
                 {/* Render based on whether it's a static slide or reference slide */}
                 {previewSlideIndex === previewReferenceIndex ? (
                   /* Reference slide - show with sample song content */
-                  <SlideView 
-                    slide={{
-                      songName: 'Sample Devotional Song',
-                      content: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6',
-                      translation: 'Translation Line 1\nTranslation Line 2\nTranslation Line 3',
-                      singerName: 'Sample Singer',
-                      pitch: 'C',
-                      nextSongName: 'Next Song',
-                      nextSingerName: 'Next Singer',
-                      nextPitch: 'D',
-                      nextIsContinuation: false,
-                      songSlideNumber: 1,
-                      songSlideCount: 5,
+              <SlideView 
+                slide={{
+                  songName: 'Sample Devotional Song',
+                  content: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6',
+                  translation: 'Translation Line 1\nTranslation Line 2\nTranslation Line 3',
+                  singerName: 'Sample Singer',
+                  pitch: 'C',
+                  nextSongName: 'Next Song',
+                  nextSingerName: 'Next Singer',
+                  nextPitch: 'D',
+                  nextIsContinuation: false,
+                  songSlideNumber: 1,
+                  songSlideCount: 5,
                       index: previewSlideIndex,
-                    } as Slide}
-                    showTranslation={true}
-                    template={previewTemplate}
-                  />
+                } as Slide}
+                showTranslation={true}
+                template={previewTemplate}
+              />
                 ) : (
                   /* Static slide - show template content only */
                   <div 
@@ -977,7 +977,7 @@ export const TemplateManager: React.FC = () => {
                     <SlideImages templateSlide={previewSlides[previewSlideIndex]} />
                     <SlideVideos templateSlide={previewSlides[previewSlideIndex]} />
                     <SlideText templateSlide={previewSlides[previewSlideIndex]} />
-                  </div>
+            </div>
                 )}
                 
                 {/* Reference Slide Indicator Overlay */}
@@ -988,16 +988,16 @@ export const TemplateManager: React.FC = () => {
                     </div>
                   </div>
                 )}
-                
+
                 {/* Static Slide Indicator */}
                 {previewSlideIndex !== previewReferenceIndex && previewSlides.length > 1 && (
                   <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none">
                     <div className="bg-gray-700/80 text-white px-4 py-2 rounded-lg text-sm font-medium">
                       {previewSlideIndex < previewReferenceIndex ? 'Intro Slide' : 'Outro Slide'} (Static)
-                    </div>
-                  </div>
-                )}
-                </div>
+                      </div>
+                      </div>
+                    )}
+                      </div>
               </div>
             </div>
             
@@ -1045,9 +1045,9 @@ export const TemplateManager: React.FC = () => {
                 Slide {previewSlideIndex + 1} / {previewSlides.length}
                 {previewSlideIndex === previewReferenceIndex && (
                   <span className="ml-2 text-yellow-500 font-medium">⭐ Reference</span>
-                )}
+                    )}
               </span>
-            </div>
+                  </div>
 
             {/* Footer with Details - Description only */}
             <div className="bg-white dark:bg-gray-800 p-3 border-t border-gray-200 dark:border-gray-700 overflow-y-auto max-h-32 flex-shrink-0">

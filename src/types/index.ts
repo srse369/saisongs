@@ -17,6 +17,7 @@ export interface ImageElement {
   height?: string;
   opacity?: number;
   zIndex?: number;
+  rotation?: number;
 }
 
 export interface VideoElement {
@@ -32,6 +33,7 @@ export interface VideoElement {
   autoPlay?: boolean;
   loop?: boolean;
   muted?: boolean;
+  rotation?: number;
 }
 
 export interface TextElement {
@@ -40,6 +42,8 @@ export interface TextElement {
   position?: PositionType;
   x?: number | string;
   y?: number | string;
+  width?: string;
+  height?: string;
   fontSize?: string;
   color?: string;
   fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
@@ -48,6 +52,16 @@ export interface TextElement {
   opacity?: number;
   zIndex?: number;
   maxWidth?: string;
+  rotation?: number;
+}
+
+// Song content styling for reference slides
+export interface SongContentStyle {
+  yPosition: number;        // Vertical position as percentage (0-100)
+  fontSize: string;         // e.g., "48px", "3rem"
+  fontWeight: 'normal' | 'bold';
+  textAlign: 'left' | 'center' | 'right';
+  color: string;            // e.g., "#ffffff"
 }
 
 // Individual slide within a multi-slide template
@@ -56,6 +70,11 @@ export interface TemplateSlide {
   images?: ImageElement[];
   videos?: VideoElement[];
   text?: TextElement[];
+  
+  // Song content styling (only used on reference slides)
+  songTitleStyle?: SongContentStyle;
+  songLyricsStyle?: SongContentStyle;
+  songTranslationStyle?: SongContentStyle;
 }
 
 // Multi-slide presentation template
