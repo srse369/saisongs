@@ -3,9 +3,9 @@ import { useTemplates } from '../../contexts/TemplateContext';
 import type { PresentationTemplate, Slide, TemplateSlide, AspectRatio } from '../../types';
 import { ensureSongContentStyles } from '../../types';
 import { RefreshIcon, Modal } from '../common';
-import { SlideView } from '../presentation/SlideView';
+import { PresentationModal } from '../presentation/PresentationModal';
 import { TemplateWysiwygEditor } from './TemplateWysiwygEditor';
-import { isMultiSlideTemplate, getSlideBackgroundStyles, SlideBackground, SlideImages, SlideVideos, SlideText } from '../../utils/templateUtils';
+import { isMultiSlideTemplate } from '../../utils/templateUtils';
 
 /**
  * Format a dimension value (x, y, width, height) as an integer string
@@ -71,7 +71,31 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
       if (vid.autoPlay !== undefined) lines.push(`${indent}    autoPlay: ${vid.autoPlay}`);
       if (vid.loop !== undefined) lines.push(`${indent}    loop: ${vid.loop}`);
       if (vid.muted !== undefined) lines.push(`${indent}    muted: ${vid.muted}`);
+      if (vid.audioOnly !== undefined) lines.push(`${indent}    audioOnly: ${vid.audioOnly}`);
       if (vid.rotation !== undefined) lines.push(`${indent}    rotation: ${Math.round(vid.rotation)}`);
+    });
+  } else {
+    lines.push(`${indent}  []`);
+  }
+
+  // Audios
+  lines.push(`${indent}audios:`);
+  if (slide.audios && slide.audios.length > 0) {
+    slide.audios.forEach((aud) => {
+      lines.push(`${indent}  - id: ` + escapeYamlString(aud.id));
+      lines.push(`${indent}    url: ${escapeYamlString(aud.url)}`);
+      if (aud.position) lines.push(`${indent}    position: ${aud.position}`);
+      if (aud.x !== undefined) lines.push(`${indent}    x: ${escapeYamlString(formatDimension(aud.x))}`);
+      if (aud.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(formatDimension(aud.y))}`);
+      if (aud.width) lines.push(`${indent}    width: ${escapeYamlString(formatDimension(aud.width))}`);
+      if (aud.height) lines.push(`${indent}    height: ${escapeYamlString(formatDimension(aud.height))}`);
+      if (aud.opacity !== undefined) lines.push(`${indent}    opacity: ${aud.opacity}`);
+      if (aud.zIndex !== undefined) lines.push(`${indent}    zIndex: ${aud.zIndex}`);
+      if (aud.autoPlay !== undefined) lines.push(`${indent}    autoPlay: ${aud.autoPlay}`);
+      if (aud.loop !== undefined) lines.push(`${indent}    loop: ${aud.loop}`);
+      if (aud.volume !== undefined) lines.push(`${indent}    volume: ${aud.volume}`);
+      if (aud.visualHidden !== undefined) lines.push(`${indent}    visualHidden: ${aud.visualHidden}`);
+      if (aud.rotation !== undefined) lines.push(`${indent}    rotation: ${Math.round(aud.rotation)}`);
     });
   } else {
     lines.push(`${indent}  []`);
@@ -355,6 +379,25 @@ export const TemplateManager: React.FC = () => {
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
+        
+        // Check if any dropdowns/selects are open (focused)
+        const activeElement = document.activeElement as HTMLElement;
+        if (activeElement && (activeElement.tagName === 'SELECT' || activeElement.classList.contains('dropdown-open'))) {
+          // Blur the dropdown to close it
+          activeElement.blur();
+          return;
+        }
+        
+        // If in fullscreen, exit fullscreen first
+        if (previewFullscreen || document.fullscreenElement) {
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          }
+          setPreviewFullscreen(false);
+          return;
+        }
+        
+        // Finally, close the preview
         setPreviewTemplate(null);
         setPreviewSlideIndex(0);
         return;
@@ -938,236 +981,46 @@ export const TemplateManager: React.FC = () => {
       </Modal>
 
       {/* Full Page Template Preview Modal */}
-      {previewTemplate && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center p-2">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full h-full max-w-full max-h-screen flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
-              <div className="flex items-center gap-4">
-              <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
-                  Template Preview: {previewTemplate.name}
-                </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {previewSlides.length > 1 
-                      ? `Slide ${previewSlideIndex + 1} of ${previewSlides.length} • Use arrow keys to navigate • Press Esc to close`
-                      : 'Press Esc to close'}
-                </p>
-              </div>
-                {/* Aspect ratio and dimensions info */}
-                <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
-                    previewTemplate.aspectRatio === '4:3'
-                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                      : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                  }`}>
-                    📐 {previewTemplate.aspectRatio || '16:9'}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                    {previewTemplate.aspectRatio === '4:3' ? '1600×1200' : '1920×1080'} → {Math.round((previewTemplate.aspectRatio === '4:3' ? 1600 : 1920) * previewScale)}×{Math.round((previewTemplate.aspectRatio === '4:3' ? 1200 : 1080) * previewScale)}px
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-                {/* Fullscreen toggle button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                    togglePreviewFullscreen();
-                  }}
-                  className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-                  aria-label={previewFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-                  title={previewFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-                >
-                  {previewFullscreen ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                    </svg>
-                  )}
-                </button>
-                {/* Close button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (previewFullscreen) {
-                      document.exitFullscreen();
-                    }
-                  setPreviewTemplate(null);
-                    setPreviewSlideIndex(0);
-                }}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none"
-                aria-label="Close preview"
-              >
-                ✕
-              </button>
-              </div>
-            </div>
-
-            {/* Preview Content - Shows current slide scaled to fit */}
-            <div 
-              ref={(el) => {
-                (previewContainerRef as any).current = el;
-                (fullscreenContainerRef as any).current = el;
-              }}
-              className="flex-1 overflow-hidden relative flex items-center justify-center bg-gray-900 p-4"
-            >
-              {/* Wrapper that has the final scaled dimensions */}
-              <div 
-                className="relative"
-                style={{
-                  width: Math.round((previewTemplate.aspectRatio === '4:3' ? 1600 : 1920) * previewScale),
-                  height: Math.round((previewTemplate.aspectRatio === '4:3' ? 1200 : 1080) * previewScale),
-                }}
-              >
-                {/* Scaled slide container - uses transform for crisp scaling */}
-                <div 
-                  className="absolute top-0 left-0 shadow-2xl"
-                  style={{
-                    width: previewTemplate.aspectRatio === '4:3' ? 1600 : 1920,
-                    height: previewTemplate.aspectRatio === '4:3' ? 1200 : 1080,
-                    transform: `scale(${previewScale})`,
-                    transformOrigin: 'top left',
-                  }}
-            >
-                {/* Render based on whether it's a static slide or reference slide */}
-                {previewSlideIndex === previewReferenceIndex ? (
-                  /* Reference slide - show with sample song content */
-              <SlideView 
-                slide={{
-                  songName: 'Sample Devotional Song',
-                  content: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6',
-                  translation: 'Translation Line 1\nTranslation Line 2\nTranslation Line 3',
-                  singerName: 'Sample Singer',
-                  pitch: 'C',
-                  nextSongName: 'Next Song',
-                  nextSingerName: 'Next Singer',
-                  nextPitch: 'D',
-                  nextIsContinuation: false,
-                  songSlideNumber: 1,
-                  songSlideCount: 5,
-                      index: previewSlideIndex,
-                } as Slide}
-                showTranslation={true}
-                template={previewTemplate}
-              />
-                ) : (
-                  /* Static slide - show template content only */
-                  <div 
-                    className="presentation-slide relative overflow-hidden"
-                    style={{
-                      ...getSlideBackgroundStyles(previewSlides[previewSlideIndex]),
-                      width: '100%',
-                      height: '100%',
-                    }}
-                  >
-                    <SlideBackground templateSlide={previewSlides[previewSlideIndex]} />
-                    <SlideImages templateSlide={previewSlides[previewSlideIndex]} />
-                    <SlideVideos templateSlide={previewSlides[previewSlideIndex]} />
-                    <SlideText templateSlide={previewSlides[previewSlideIndex]} />
-            </div>
-                )}
-                
-                {/* Reference Slide Indicator Overlay */}
-                {previewSlideIndex === previewReferenceIndex && previewSlides.length > 1 && (
-                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <div className="bg-yellow-500/90 text-black px-6 py-3 rounded-lg text-2xl font-bold shadow-xl transform rotate-[-5deg] border-4 border-yellow-600">
-                      🎯 Reference Slide
-                    </div>
-                  </div>
-                )}
-
-                {/* Static Slide Indicator */}
-                {previewSlideIndex !== previewReferenceIndex && previewSlides.length > 1 && (
-                  <div className="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none">
-                    <div className="bg-gray-700/80 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                      {previewSlideIndex < previewReferenceIndex ? 'Intro Slide' : 'Outro Slide'} (Static)
-                      </div>
-                      </div>
-                    )}
-                      </div>
-              </div>
-            </div>
-            
-            {/* Slide Navigation (always shown) */}
-            <div className="flex items-center justify-center gap-2 p-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-              <button
-                onClick={() => setPreviewSlideIndex(prev => Math.max(0, prev - 1))}
-                disabled={previewSlideIndex === 0}
-                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              
-              {/* Slide dots/indicators */}
-              <div className="flex gap-2 mx-4">
-                {previewSlides.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setPreviewSlideIndex(idx)}
-                    className={`w-3 h-3 rounded-full transition-colors ${
-                      idx === previewSlideIndex
-                        ? 'bg-blue-500'
-                        : idx === previewReferenceIndex
-                          ? 'bg-yellow-400 hover:bg-yellow-500'
-                          : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
-                    }`}
-                    title={idx === previewReferenceIndex ? `Slide ${idx + 1} (Reference)` : `Slide ${idx + 1}`}
-                  />
-                ))}
-              </div>
-              
-              <button
-                onClick={() => setPreviewSlideIndex(prev => Math.min(previewSlides.length - 1, prev + 1))}
-                disabled={previewSlideIndex === previewSlides.length - 1}
-                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-              
-              <span className="ml-4 text-sm text-gray-600 dark:text-gray-400">
-                Slide {previewSlideIndex + 1} / {previewSlides.length}
-                {previewSlideIndex === previewReferenceIndex && (
-                  <span className="ml-2 text-yellow-500 font-medium">⭐ Reference</span>
-                    )}
-              </span>
-                  </div>
-
-            {/* Footer with Details - Description only */}
-            <div className="bg-white dark:bg-gray-800 p-3 border-t border-gray-200 dark:border-gray-700 overflow-y-auto max-h-32 flex-shrink-0">
-              <div className="grid grid-cols-1 gap-2 text-sm">
-                {/* Description */}
-                <div>
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1 text-xs">Description</h3>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
-                    {previewTemplate.description || '(No description)'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer with Close Button */}
-            <div className="flex gap-2 justify-end p-2 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setPreviewTemplate(null);
-                }}
-                className="px-4 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Close Preview
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PresentationModal
+        isOpen={!!previewTemplate}
+        onClose={() => {
+          if (previewFullscreen && document.fullscreenElement) {
+            document.exitFullscreen();
+          }
+          setPreviewTemplate(null);
+          setPreviewSlideIndex(0);
+        }}
+        title={`Template Preview: ${previewTemplate?.name || ''}`}
+        slides={previewSlides.map((slide, idx) => {
+          if (idx === previewReferenceIndex) {
+            // Return a sample Slide for reference slide
+            return {
+              songName: 'Sample Devotional Song',
+              content: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6',
+              translation: 'Translation Line 1\nTranslation Line 2\nTranslation Line 3',
+              singerName: 'Sample Singer',
+              pitch: 'C',
+              nextSongName: 'Next Song',
+              nextSingerName: 'Next Singer',
+              nextPitch: 'D',
+              nextIsContinuation: false,
+              songSlideNumber: 1,
+              songSlideCount: 5,
+              index: idx,
+            } as Slide;
+          }
+          // Return the template slide as-is
+          return slide;
+        })}
+        currentSlideIndex={previewSlideIndex}
+        onSlideChange={setPreviewSlideIndex}
+        template={previewTemplate}
+        referenceSlideIndex={previewReferenceIndex}
+        showDescription={true}
+        description={previewTemplate?.description}
+        onFullscreenToggle={togglePreviewFullscreen}
+        isFullscreen={previewFullscreen}
+      />
     </div>
   );
 }

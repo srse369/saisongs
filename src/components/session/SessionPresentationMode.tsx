@@ -3,11 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import { useSession } from '../../contexts/SessionContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
-import { SlideView } from '../presentation/SlideView';
-import { SlideNavigation } from '../presentation/SlideNavigation';
+import { PresentationModal } from '../presentation/PresentationModal';
 import TemplateSelector from '../presentation/TemplateSelector';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { generateSlides, generateSessionPresentationSlides } from '../../utils/slideUtils';
+import { generateSessionPresentationSlides } from '../../utils/slideUtils';
 import ApiClient from '../../services/ApiClient';
 import templateService from '../../services/TemplateService';
 import type { Slide, Song, PresentationTemplate } from '../../types';
@@ -15,6 +14,11 @@ import type { Slide, Song, PresentationTemplate } from '../../types';
 interface SessionPresentationModeProps {
   onExit?: () => void;
 }
+
+// Content scale bounds
+const MIN_CONTENT_SCALE = 0.5;
+const MAX_CONTENT_SCALE = 1.5;
+const CONTENT_SCALE_STEP = 0.1;
 
 export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = ({ onExit }) => {
   const [searchParams] = useSearchParams();
@@ -32,7 +36,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const [activeTemplate, setActiveTemplate] = useState<PresentationTemplate | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>();
   const [songsData, setSongsData] = useState<Song[]>([]);
-  const [presentationScale, setPresentationScale] = useState(1);
+  const [contentScale, setContentScale] = useState(1.0);
 
   // Load template and songs data on mount (in parallel to avoid flicker)
   useEffect(() => {
@@ -165,6 +169,21 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
           e.preventDefault();
           toggleFullScreen();
           break;
+        case '+':
+        case '=': // = key (same key as + without shift on most keyboards)
+          e.preventDefault();
+          setContentScale(prev => Math.min(MAX_CONTENT_SCALE, prev + CONTENT_SCALE_STEP));
+          break;
+        case '-':
+        case '_': // _ key (same key as - with shift)
+          e.preventDefault();
+          setContentScale(prev => Math.max(MIN_CONTENT_SCALE, prev - CONTENT_SCALE_STEP));
+          break;
+        case '0':
+          // Reset to default scale
+          e.preventDefault();
+          setContentScale(1.0);
+          break;
       }
     };
 
@@ -265,39 +284,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
 
   const handleNavigate = (index: number) => {
     setCurrentSlideIndex(index);
-    setShowOverlay(true); // Show overlay when clicking navigation buttons
   };
-
-  // Calculate scale for the slide to mimic template preview behavior
-  useEffect(() => {
-    const calculateScale = () => {
-      const aspectRatio = activeTemplate?.aspectRatio || '16:9';
-      const baseWidth = aspectRatio === '4:3' ? 1600 : 1920;
-      const baseHeight = aspectRatio === '4:3' ? 1200 : 1080;
-
-      // Use window size as container, leaving a small padding
-      const containerWidth = window.innerWidth - 64;
-      const containerHeight = window.innerHeight - 96; // leave space for controls
-
-      if (containerWidth <= 0 || containerHeight <= 0) {
-        setPresentationScale(1);
-        return;
-      }
-
-      const scale = Math.min(
-        containerWidth / baseWidth,
-        containerHeight / baseHeight,
-        1
-      );
-
-      setPresentationScale(scale);
-    };
-
-    // Run once on mount / template change and on resize
-    calculateScale();
-    window.addEventListener('resize', calculateScale);
-    return () => window.removeEventListener('resize', calculateScale);
-  }, [activeTemplate]);
 
   if (loading) {
     return (
@@ -323,105 +310,60 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
 
   const currentSlide = slides[currentSlideIndex];
 
-  // Calculate aspect ratio dimensions
-  const aspectRatio = activeTemplate?.aspectRatio || '16:9';
-  const slideWidth = aspectRatio === '4:3' ? 1600 : 1920;
-  const slideHeight = aspectRatio === '4:3' ? 1200 : 1080;
-
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-black flex items-center justify-center">
-      {/* Centered slide container using scaled wrapper, similar to template preview */}
-      <div
-        className="relative bg-black flex items-center justify-center"
-        style={{
-          width: '100%',
-          height: '100%',
-        }}
-      >
-        {/* Wrapper with final scaled dimensions */}
-        <div
-          className="relative"
-          style={{
-            width: Math.round(slideWidth * presentationScale),
-            height: Math.round(slideHeight * presentationScale),
-          }}
-        >
-          {/* Scaled slide container */}
-          <div
-            className="absolute top-0 left-0 shadow-2xl"
-            style={{
-              width: slideWidth,
-              height: slideHeight,
-              transform: `scale(${presentationScale})`,
-              transformOrigin: 'top left',
-            }}
-          >
-        <SlideView slide={currentSlide} showTranslation={true} template={activeTemplate} />
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation controls at bottom center - auto-hide after 2 seconds */}
-      {showOverlay && (
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10 transition-opacity duration-300">
-          <SlideNavigation
-            currentSlide={currentSlideIndex}
-            totalSlides={slides.length}
-            onNavigate={handleNavigate}
-          />
-        </div>
-      )}
-
-      {/* Control buttons - top right */}
-      {showOverlay && (
-        <div className="absolute top-4 right-4 z-[1000] flex gap-2 opacity-50 transition-opacity duration-300">
-          {/* Template selector */}
-          <TemplateSelector 
+    <PresentationModal
+      isOpen={true}
+      onClose={handleExitPresentation}
+      title="Live Session Presentation"
+      slides={slides}
+      currentSlideIndex={currentSlideIndex}
+      onSlideChange={handleNavigate}
+      template={activeTemplate}
+      onFullscreenToggle={toggleFullScreen}
+      isFullscreen={isFullScreen}
+      disableKeyboardNavigation={true}
+      contentScale={contentScale}
+      topRightControls={
+        <TemplateSelector 
           currentTemplateId={selectedTemplateId}
           onTemplateSelect={(template) => {
             setSelectedTemplateId(template.id);
             setActiveTemplate(template);
-              // Sync template selection to localStorage for the Live tab
-              if (template.id) {
-                localStorage.setItem('selectedSessionTemplateId', template.id);
-              }
+            // Sync template selection to localStorage for the Live tab
+            if (template.id) {
+              localStorage.setItem('selectedSessionTemplateId', template.id);
+            }
           }}
-            onExpandedChange={setTemplatePickerExpanded}
+          onExpandedChange={setTemplatePickerExpanded}
         />
-
-        {/* Fullscreen toggle */}
-        <button
-          onClick={toggleFullScreen}
-          className="p-3 bg-gray-800/90 hover:bg-gray-700 text-white rounded-lg backdrop-blur-xs transition-colors"
-          aria-label={isFullScreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-          title={isFullScreen ? 'Exit fullscreen (F)' : 'Enter fullscreen (F)'}
-        >
-          {isFullScreen ? (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+      }
+      footerContent={
+        <div className="flex items-center justify-between">
+          {currentSlide.songName && currentSlide.slideType !== 'static' ? (
+            <div>
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-1 text-xs">Current Song</h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                {currentSlide.songName}
+                {currentSlide.singerName && ` • ${currentSlide.singerName}`}
+                {currentSlide.pitch && ` • Pitch: ${currentSlide.pitch}`}
+                {currentSlide.songSlideNumber && currentSlide.songSlideCount && 
+                  ` • Slide ${currentSlide.songSlideNumber}/${currentSlide.songSlideCount}`}
+              </p>
+            </div>
           ) : (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                {entries.length} {entries.length === 1 ? 'song' : 'songs'} in session
+              </p>
+            </div>
           )}
-        </button>
-
-        {/* Exit button */}
-        <button
-          onClick={handleExitPresentation}
-          className="p-3 bg-red-600/90 hover:bg-red-700 text-white rounded-lg backdrop-blur-xs transition-colors"
-          aria-label="Exit presentation"
-          title="Exit presentation (Esc)"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+            <span>Font: {Math.round(contentScale * 100)}%</span>
+            <span className="text-gray-400 dark:text-gray-500">(+/- to adjust, 0 to reset)</span>
+          </div>
         </div>
-      )}
-
-    </div>
+      }
+    />
   );
 };
 

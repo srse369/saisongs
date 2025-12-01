@@ -34,6 +34,23 @@ export interface VideoElement {
   loop?: boolean;
   muted?: boolean;
   rotation?: number;
+  audioOnly?: boolean; // Hide video, play audio only
+}
+
+export interface AudioElement {
+  id: string;
+  url: string;
+  position?: PositionType;
+  x?: number | string;
+  y?: number | string;
+  width?: string;
+  height?: string;
+  opacity?: number;
+  zIndex?: number;
+  autoPlay?: boolean;
+  loop?: boolean;
+  volume?: number; // 0 to 1
+  visualHidden?: boolean; // Hide visual placeholder, play audio only
 }
 
 export interface TextElement {
@@ -79,6 +96,7 @@ export interface TemplateSlide {
   background?: BackgroundElement;
   images?: ImageElement[];
   videos?: VideoElement[];
+  audios?: AudioElement[];
   text?: TextElement[];
   
   // Song content styling (only used on reference slides)
@@ -180,6 +198,7 @@ export interface PresentationTemplate {
   background?: BackgroundElement;
   images?: ImageElement[];
   videos?: VideoElement[];
+  audios?: AudioElement[];
   text?: TextElement[];
   
   isDefault?: boolean;

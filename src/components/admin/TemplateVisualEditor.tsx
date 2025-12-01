@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import type { PresentationTemplate, BackgroundElement, ImageElement, VideoElement, TextElement, TemplateSlide } from '../../types';
 
 interface TemplateVisualEditorProps {
@@ -14,6 +14,70 @@ const POSITION_OPTIONS = [
 ] as const;
 
 const BACKGROUND_TYPES = ['color', 'image', 'video'] as const;
+
+/**
+ * Detect video aspect ratio and return appropriate dimensions
+ */
+const detectVideoAspectRatio = async (url: string): Promise<{ width: string; height: string } | null> => {
+  return new Promise((resolve) => {
+    // Check if it's a YouTube URL
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('/shorts/');
+    
+    if (isYouTube) {
+      // YouTube videos - determine if it's a Short (vertical) or regular (horizontal)
+      if (url.includes('/shorts/')) {
+        // Shorts are vertical (9:16)
+        resolve({ width: '360px', height: '640px' });
+      } else {
+        // Regular YouTube videos are typically 16:9
+        resolve({ width: '640px', height: '360px' });
+      }
+      return;
+    }
+
+    // For regular video URLs, try to load and detect
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    
+    video.onloadedmetadata = () => {
+      const aspectRatio = video.videoWidth / video.videoHeight;
+      
+      let width: string;
+      let height: string;
+      
+      if (aspectRatio > 1.5) {
+        // Wide video (16:9 or wider)
+        width = '640px';
+        height = '360px';
+      } else if (aspectRatio < 0.7) {
+        // Vertical video (9:16 or taller)
+        width = '360px';
+        height = '640px';
+      } else {
+        // Square-ish video (1:1 or close)
+        width = '480px';
+        height = '480px';
+      }
+      
+      resolve({ width, height });
+      video.remove();
+    };
+    
+    video.onerror = () => {
+      // Default to 16:9 if we can't load
+      resolve({ width: '640px', height: '360px' });
+      video.remove();
+    };
+    
+    // Set a timeout in case video doesn't load
+    setTimeout(() => {
+      resolve({ width: '640px', height: '360px' });
+      video.remove();
+    }, 3000);
+    
+    video.src = url;
+  });
+};
 
 export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
   template,
@@ -229,10 +293,37 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
     });
   }, [currentSlide, updateCurrentSlide]);
 
-  const handleUpdateVideo = useCallback((index: number, updates: Partial<VideoElement>) => {
+  const handleUpdateVideo = useCallback(async (index: number, updates: Partial<VideoElement>) => {
+    console.log('handleUpdateVideo called with:', index, updates);
     const videos = currentSlide.videos || [];
     const newVideos = [...videos];
-    newVideos[index] = { ...newVideos[index], ...updates };
+    const currentVideo = newVideos[index];
+    console.log('Current video:', currentVideo);
+    
+    // If URL is being updated and it's different from the current URL, detect aspect ratio
+    if (updates.url && updates.url !== currentVideo.url && updates.url.trim()) {
+      console.log('Detecting aspect ratio for:', updates.url);
+      console.log('Current dimensions:', currentVideo.width, currentVideo.height);
+      try {
+        const dimensions = await detectVideoAspectRatio(updates.url);
+        console.log('Detected dimensions:', dimensions);
+        if (dimensions) {
+          // Only update dimensions if they haven't been manually set
+          // (i.e., still at default '100%' values)
+          if (currentVideo.width === '100%' && currentVideo.height === '100%') {
+            console.log('Applying detected dimensions');
+            updates.width = dimensions.width;
+            updates.height = dimensions.height;
+          } else {
+            console.log('Skipping - dimensions already set');
+          }
+        }
+      } catch (error) {
+        console.warn('Could not detect video aspect ratio:', error);
+      }
+    }
+    
+    newVideos[index] = { ...currentVideo, ...updates };
     updateCurrentSlide({ videos: newVideos });
   }, [currentSlide, updateCurrentSlide]);
 

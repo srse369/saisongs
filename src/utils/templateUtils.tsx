@@ -156,6 +156,73 @@ export const getElementStyles = (element: any): React.CSSProperties => {
   return styles;
 };
 
+// =============================================================================
+// YouTube helper functions
+// =============================================================================
+
+/**
+ * Check if URL is a YouTube video
+ */
+const isYouTubeUrl = (url?: string): boolean => {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return (
+      (u.hostname.includes('youtube.com') && (u.searchParams.has('v') || u.pathname.includes('/shorts/'))) ||
+      u.hostname === 'youtu.be'
+    );
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Convert YouTube URL to embed format
+ */
+const getYouTubeEmbedUrl = (url: string, autoPlay: boolean): string => {
+  try {
+    const u = new URL(url);
+    let videoId: string | null = null;
+
+    if (u.hostname === 'youtu.be') {
+      videoId = u.pathname.replace('/', '');
+    } else if (u.hostname.includes('youtube.com')) {
+      // Check for Shorts format: /shorts/VIDEO_ID
+      if (u.pathname.includes('/shorts/')) {
+        videoId = u.pathname.split('/shorts/')[1]?.split('/')[0] || null;
+      } else {
+        // Regular video format: ?v=VIDEO_ID
+        videoId = u.searchParams.get('v');
+      }
+    }
+
+    if (!videoId) {
+      return url;
+    }
+
+    const params = new URLSearchParams({
+      autoplay: autoPlay ? '1' : '0',
+      mute: '0', // Allow audio
+      loop: '1',
+      playlist: videoId, // Required for looping to work
+      controls: '1', // Show controls so user can unmute
+      showinfo: '0',
+      rel: '0',
+      modestbranding: '1',
+      playsinline: '1',
+      enablejsapi: '1',
+    });
+
+    return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+  } catch {
+    return url;
+  }
+};
+
+// =============================================================================
+// Template rendering components
+// =============================================================================
+
 /**
  * Render template background
  */
@@ -167,12 +234,27 @@ export const TemplateBackground: React.FC<{ template: PresentationTemplate | nul
   const { type, value } = template.background;
 
   if (type === 'video') {
+    const isYouTube = isYouTubeUrl(value);
+
+    if (isYouTube) {
+      return (
+        <iframe
+          src={getYouTubeEmbedUrl(value, true)}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          style={{ zIndex: -1, opacity: template.background.opacity ?? 1, border: 'none' }}
+          allow="autoplay; encrypted-media; picture-in-picture"
+          title="Background video"
+        />
+      );
+    }
+
     return (
       <video
         src={value}
         autoPlay
         loop
         muted
+        playsInline
         className="absolute inset-0 w-full h-full object-cover"
         style={{ zIndex: -1, opacity: template.background.opacity ?? 1 }}
       />
@@ -215,17 +297,37 @@ export const TemplateVideos: React.FC<{ template: PresentationTemplate | null }>
 
   return (
     <>
-      {template.videos.map((video) => (
-        <video
-          key={video.id}
-          src={video.url}
-          autoPlay={video.autoPlay ?? true}
-          loop={video.loop ?? true}
-          muted={video.muted ?? true}
-          className={`absolute ${getPositionClasses(video.position)}`}
-          style={getElementStyles(video)}
-        />
-      ))}
+      {template.videos.map((video) => {
+        const isYouTube = isYouTubeUrl(video.url);
+        const autoPlay = video.autoPlay ?? true;
+
+        if (isYouTube) {
+          return (
+            <iframe
+              key={video.id}
+              src={getYouTubeEmbedUrl(video.url, autoPlay)}
+              className={`absolute ${getPositionClasses(video.position)}`}
+              style={{ ...getElementStyles(video), border: 'none' }}
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+              title={`Video ${video.id}`}
+            />
+          );
+        }
+
+        return (
+          <video
+            key={video.id}
+            src={video.url}
+            autoPlay={autoPlay}
+            loop={video.loop ?? true}
+            muted={video.muted ?? true}
+            playsInline
+            className={`absolute ${getPositionClasses(video.position)}`}
+            style={getElementStyles(video)}
+          />
+        );
+      })}
     </>
   );
 };
@@ -385,47 +487,6 @@ export const SlideImages: React.FC<{ templateSlide: TemplateSlide | null }> = ({
   );
 };
 
-// Simple helpers to detect and embed YouTube URLs
-const isYouTubeUrl = (url?: string): boolean => {
-  if (!url) return false;
-  try {
-    const u = new URL(url);
-    return (
-      u.hostname.includes('youtube.com') && u.searchParams.has('v')
-    ) || u.hostname === 'youtu.be';
-  } catch {
-    return false;
-  }
-};
-
-const getYouTubeEmbedUrl = (url: string, autoPlay: boolean): string => {
-  try {
-    const u = new URL(url);
-    let videoId: string | null = null;
-
-    if (u.hostname === 'youtu.be') {
-      videoId = u.pathname.replace('/', '');
-    } else if (u.hostname.includes('youtube.com')) {
-      videoId = u.searchParams.get('v');
-    }
-
-    if (!videoId) {
-      return url;
-    }
-
-    const params = new URLSearchParams({
-      rel: '0',
-      modestbranding: '1',
-      controls: '1',
-      autoplay: autoPlay ? '1' : '0',
-    });
-
-    return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
-  } catch {
-    return url;
-  }
-};
-
 /**
  * Render video overlays (for individual TemplateSlide)
  * - HTML5 videos use <video>.
@@ -443,10 +504,10 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({
       {templateSlide.videos.map((video) => {
         const autoPlay = video.autoPlay ?? true;
         const baseStyles = getElementStyles(video);
-        const width = baseStyles.width || '320px';
-        const height = baseStyles.height || '180px';
-
+        const width = video.width || '320px';
+        const height = video.height || '180px';
         const isYouTube = isYouTubeUrl(video.url);
+        const audioOnly = video.audioOnly ?? false;
 
         return (
           <div
@@ -456,15 +517,20 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({
               ...baseStyles,
               width,
               height,
-              backgroundColor: '#000',
+              backgroundColor: audioOnly ? 'transparent' : '#000',
             }}
           >
             {isYouTube && video.url ? (
               <iframe
                 src={getYouTubeEmbedUrl(video.url, autoPlay)}
                 className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                style={{ 
+                  border: 'none',
+                  display: audioOnly ? 'none' : 'block',
+                }}
+                allow="autoplay; encrypted-media; picture-in-picture"
                 allowFullScreen
+                title={`Video ${video.id}`}
               />
             ) : (
               <video
@@ -472,8 +538,12 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({
                 autoPlay={autoPlay}
                 loop={video.loop ?? true}
                 muted={video.muted ?? true}
+                playsInline
                 controls={!autoPlay}
                 className="w-full h-full object-cover"
+                style={{
+                  display: audioOnly ? 'none' : 'block',
+                }}
               />
             )}
           </div>

@@ -32,6 +32,142 @@ function getSlideDimensions(aspectRatio: AspectRatio = '16:9') {
 // Canvas display width (height calculated based on aspect ratio)
 const CANVAS_WIDTH = 640;
 
+/**
+ * Detect video aspect ratio and return appropriate dimensions
+ */
+const detectVideoAspectRatio = async (url: string): Promise<{ width: number; height: number } | null> => {
+  return new Promise((resolve) => {
+    // Check if it's a YouTube URL
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('/shorts/');
+    
+    if (isYouTube) {
+      // YouTube videos - determine if it's a Short (vertical) or regular (horizontal)
+      if (url.includes('/shorts/')) {
+        // Shorts are vertical (9:16)
+        resolve({ width: 360, height: 640 });
+      } else {
+        // Regular YouTube videos are typically 16:9
+        resolve({ width: 640, height: 360 });
+      }
+      return;
+    }
+
+    // For regular video URLs, try to load and detect
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    
+    video.onloadedmetadata = () => {
+      const aspectRatio = video.videoWidth / video.videoHeight;
+      
+      let width: number;
+      let height: number;
+      
+      if (aspectRatio > 1.5) {
+        // Wide video (16:9 or wider)
+        width = 640;
+        height = 360;
+      } else if (aspectRatio < 0.7) {
+        // Vertical video (9:16 or taller)
+        width = 360;
+        height = 640;
+      } else {
+        // Square-ish video (1:1 or close)
+        width = 480;
+        height = 480;
+      }
+      
+      resolve({ width, height });
+      video.remove();
+    };
+    
+    video.onerror = () => {
+      // Default to 16:9 if we can't load
+      resolve({ width: 640, height: 360 });
+      video.remove();
+    };
+    
+    // Set a timeout in case video doesn't load
+    setTimeout(() => {
+      resolve({ width: 640, height: 360 });
+      video.remove();
+    }, 3000);
+    
+    video.src = url;
+  });
+};
+
+/**
+ * Detect image aspect ratio and return appropriate dimensions
+ */
+const detectImageAspectRatio = async (url: string): Promise<{ width: number; height: number } | null> => {
+  return new Promise((resolve) => {
+    let resolved = false;
+    let timeoutId: NodeJS.Timeout;
+    
+    const resolveOnce = (dimensions: { width: number; height: number }) => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeoutId);
+        resolve(dimensions);
+      }
+    };
+    
+    // Try WITHOUT CORS first (works better for most servers)
+    const img = new Image();
+    
+    img.onload = () => {
+      if (resolved) return;
+      
+      // Check if we can actually read the dimensions
+      if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+        console.warn('⊗ Image loaded but dimensions unavailable (likely CORS blocked)');
+        resolveOnce({ width: 400, height: 400 });
+        return;
+      }
+      
+      const aspectRatio = img.naturalWidth / img.naturalHeight;
+      
+      let width: number;
+      let height: number;
+      
+      if (aspectRatio > 1.5) {
+        // Wide image (landscape)
+        width = 640;
+        height = Math.round(640 / aspectRatio);
+      } else if (aspectRatio < 0.7) {
+        // Tall image (portrait)
+        height = 640;
+        width = Math.round(640 * aspectRatio);
+      } else {
+        // Square-ish image
+        const size = 480;
+        width = size;
+        height = Math.round(size / aspectRatio);
+      }
+      
+      console.log(`✓ Image loaded: ${img.naturalWidth}x${img.naturalHeight}, aspect ratio: ${aspectRatio.toFixed(2)}, setting to ${width}x${height}`);
+      resolveOnce({ width, height });
+    };
+    
+    img.onerror = (e) => {
+      console.warn('✗ Failed to load image:', url);
+      // Default to reasonable size
+      resolveOnce({ width: 400, height: 400 });
+    };
+    
+    // Set a shorter timeout since we're not trying CORS
+    timeoutId = setTimeout(() => {
+      if (!resolved) {
+        console.warn('✗ Image load timeout for:', url);
+        resolveOnce({ width: 400, height: 400 });
+      }
+    }, 3000);
+    
+    // Load WITHOUT crossOrigin (better compatibility, but can't always read dimensions)
+    img.src = url;
+  });
+};
+
 // Helper to parse position (using full slide dimensions) - outside component for performance
 function parsePosition(
   value: string | undefined, 
@@ -72,7 +208,7 @@ function parsePosition(
 // Element types for the canvas
 type CanvasElement = {
   id: string;
-  type: 'image' | 'text' | 'video';
+  type: 'image' | 'text' | 'video' | 'audio';
   x: number;
   y: number;
   width: number;
@@ -91,8 +227,11 @@ type CanvasElement = {
   // Common
   opacity?: number;
   zIndex?: number;
-  // For video behavior
+  // For video/audio behavior
   autoPlay?: boolean;
+  audioOnly?: boolean;
+  visualHidden?: boolean;
+  volume?: number;
 };
 
 // URLImage component for loading images
@@ -102,7 +241,8 @@ const URLImage: React.FC<{
   isSelected: boolean;
   onSelect: () => void;
   onChange: (attrs: Partial<CanvasElement>) => void;
-}> = ({ element, isSelected, onSelect, onChange }) => {
+  onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
+}> = ({ element, isSelected, onSelect, onChange, onContextMenu }) => {
   // Try loading without CORS mode first (works better with corporate proxies/firewalls)
   const [image, imageStatus] = useImage(element.url || '');
   const shapeRef = useRef<Konva.Image>(null);
@@ -117,6 +257,7 @@ const URLImage: React.FC<{
         draggable
         onClick={onSelect}
         onTap={onSelect}
+        onContextMenu={onContextMenu}
         onDragEnd={(e) => {
           onChange({
             x: Math.round(e.target.x()),
@@ -170,6 +311,7 @@ const URLImage: React.FC<{
       draggable
       onClick={onSelect}
       onTap={onSelect}
+      onContextMenu={onContextMenu}
       onDragEnd={(e) => {
         onChange({
           x: Math.round(e.target.x()),
@@ -203,7 +345,8 @@ const DraggableText: React.FC<{
   onChange: (attrs: Partial<CanvasElement>) => void;
   stageRef: React.RefObject<Konva.Stage>;
   scale: number;
-}> = ({ element, isSelected, onSelect, onChange, stageRef, scale }) => {
+  onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
+}> = ({ element, isSelected, onSelect, onChange, stageRef, scale, onContextMenu }) => {
   const shapeRef = useRef<Konva.Text>(null);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -323,6 +466,7 @@ const DraggableText: React.FC<{
       draggable={!isEditing}
       onClick={onSelect}
       onTap={onSelect}
+      onContextMenu={onContextMenu}
       onDblClick={handleDblClick}
       onDblTap={handleDblClick}
       onDragEnd={(e) => {
@@ -363,7 +507,8 @@ const VideoPlaceholder: React.FC<{
   isSelected: boolean;
   onSelect: () => void;
   onChange: (attrs: Partial<CanvasElement>) => void;
-}> = ({ element, isSelected, onSelect, onChange }) => {
+  onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
+}> = ({ element, isSelected, onSelect, onChange, onContextMenu }) => {
   const groupRef = useRef<Konva.Group>(null);
 
   return (
@@ -372,9 +517,11 @@ const VideoPlaceholder: React.FC<{
       id={element.id}
       x={element.x}
       y={element.y}
+      rotation={element.rotation || 0}
       draggable
       onClick={onSelect}
       onTap={onSelect}
+      onContextMenu={onContextMenu}
       onDragEnd={(e) => {
         onChange({
           x: Math.round(e.target.x()),
@@ -398,6 +545,8 @@ const VideoPlaceholder: React.FC<{
       }}
     >
       <Rect
+        x={0}
+        y={0}
         width={element.width}
         height={element.height}
         fill="#111827"
@@ -406,11 +555,98 @@ const VideoPlaceholder: React.FC<{
         cornerRadius={6}
       />
       <Text
-        text="▶ Video"
+        text={element.audioOnly ? "🎵 Audio" : "▶ Video"}
         fontSize={16}
         fill="#e5e7eb"
         x={8}
         y={8}
+      />
+    </Group>
+  );
+};
+
+// AudioPlaceholder component for audio elements
+const AudioPlaceholder: React.FC<{
+  element: CanvasElement;
+  isSelected: boolean;
+  onSelect: () => void;
+  onChange: (attrs: Partial<CanvasElement>) => void;
+  onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
+}> = ({ element, isSelected, onSelect, onChange, onContextMenu }) => {
+  const groupRef = useRef<Konva.Group>(null);
+
+  return (
+    <Group
+      ref={groupRef}
+      id={element.id}
+      x={element.x}
+      y={element.y}
+      rotation={element.rotation || 0}
+      draggable
+      onClick={onSelect}
+      onTap={onSelect}
+      onContextMenu={onContextMenu}
+      onDragEnd={(e) => {
+        onChange({
+          x: Math.round(e.target.x()),
+          y: Math.round(e.target.y()),
+        });
+      }}
+      onTransformEnd={() => {
+        const node = groupRef.current;
+        if (!node) return;
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
+        node.scaleX(1);
+        node.scaleY(1);
+        onChange({
+          x: Math.round(node.x()),
+          y: Math.round(node.y()),
+          width: Math.round(Math.max(40, (element.width || 0) * scaleX)),
+          height: Math.round(Math.max(40, (element.height || 0) * scaleY)),
+          rotation: Math.round(node.rotation()),
+        });
+      }}
+    >
+      {/* Background */}
+      <Rect
+        width={element.width}
+        height={element.height}
+        fill={element.visualHidden ? 'transparent' : '#7c3aed'}
+        stroke={isSelected ? '#3b82f6' : (element.visualHidden ? '#9333ea' : '#6b21a8')}
+        strokeWidth={2}
+        cornerRadius={4}
+        opacity={element.visualHidden ? 0.3 : 1}
+      />
+      {/* Audio icon */}
+      <Text
+        text="🔊"
+        fontSize={Math.min(element.width, element.height) * 0.3}
+        x={element.width / 2}
+        y={element.height / 2 - 20}
+        offsetX={Math.min(element.width, element.height) * 0.15}
+        align="center"
+        opacity={element.visualHidden ? 0.5 : 1}
+      />
+      {/* Label */}
+      <Text
+        text={element.url ? (element.visualHidden ? 'Audio (Hidden)' : 'Audio') : 'No URL'}
+        fontSize={12}
+        fill="#ffffff"
+        x={element.width / 2}
+        y={element.height / 2 + 10}
+        offsetX={element.url ? (element.visualHidden ? 45 : 20) : 22}
+        align="center"
+        opacity={element.visualHidden ? 0.5 : 1}
+      />
+      {/* Dimensions */}
+      <Text
+        text={`${Math.round(element.width)}×${Math.round(element.height)}`}
+        fontSize={10}
+        fill="#a78bfa"
+        x={8}
+        y={8}
+        opacity={element.visualHidden ? 0.5 : 1}
       />
     </Group>
   );
@@ -431,6 +667,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   const [slideListHasFocus, setSlideListHasFocus] = useState(true);
   const [canvasHasFocus, setCanvasHasFocus] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; slideIndex: number } | null>(null);
+  const [elementContextMenu, setElementContextMenu] = useState<{ x: number; y: number; elementId: string } | null>(null);
   const [showSongPicker, setShowSongPicker] = useState(false);
   const [songSearchQuery, setSongSearchQuery] = useState('');
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -554,6 +791,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
   }, [historyIndex, history, referenceSlideIndex, template, onTemplateChange]);
@@ -573,6 +811,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
   }, [historyIndex, history, referenceSlideIndex, template, onTemplateChange]);
@@ -634,6 +873,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         background: refSlide?.background,
         images: refSlide?.images || [],
         videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
         text: refSlide?.text || [],
       });
       setSelectedId(newImage.id);
@@ -659,6 +899,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         background: refSlide?.background,
         images: refSlide?.images || [],
         videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
         text: refSlide?.text || [],
       });
       setSelectedId(newText.id);
@@ -680,6 +921,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         background: refSlide?.background,
         images: refSlide?.images || [],
         videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
         text: refSlide?.text || [],
       });
       setSelectedId(newVideo.id);
@@ -692,28 +934,52 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       ...(currentSlide.images || []).map((img): CanvasElement => ({
         id: img.id,
         type: 'image',
-        x: parsePosition(img.x, img.position, 'x', SLIDE_WIDTH, parseFloat(img.width) || 100, SLIDE_WIDTH, SLIDE_HEIGHT),
-        y: parsePosition(img.y, img.position, 'y', SLIDE_HEIGHT, parseFloat(img.height) || 100, SLIDE_WIDTH, SLIDE_HEIGHT),
-        width: parseFloat(img.width) || 100,
-        height: parseFloat(img.height) || 100,
+        x: parsePosition(img.x, img.position, 'x', SLIDE_WIDTH, parseFloat(img.width || '100') || 100, SLIDE_WIDTH, SLIDE_HEIGHT),
+        y: parsePosition(img.y, img.position, 'y', SLIDE_HEIGHT, parseFloat(img.height || '100') || 100, SLIDE_WIDTH, SLIDE_HEIGHT),
+        width: parseFloat(img.width || '100') || 100,
+        height: parseFloat(img.height || '100') || 100,
         url: img.url,
         opacity: img.opacity,
         zIndex: img.zIndex || 1,
         rotation: img.rotation,
       })),
-      ...(currentSlide.videos || []).map((vid): CanvasElement => ({
-        id: vid.id,
-        type: 'video',
-        x: parsePosition(vid.x as string | undefined, vid.position, 'x', SLIDE_WIDTH, parseFloat(vid.width || '160') || 160, SLIDE_WIDTH, SLIDE_HEIGHT),
-        y: parsePosition(vid.y as string | undefined, vid.position, 'y', SLIDE_HEIGHT, parseFloat(vid.height || '90') || 90, SLIDE_WIDTH, SLIDE_HEIGHT),
-        width: parseFloat(vid.width || '160') || 160,
-        height: parseFloat(vid.height || '90') || 90,
-        url: vid.url,
-        opacity: vid.opacity,
-        zIndex: vid.zIndex || 1,
-        autoPlay: vid.autoPlay,
-        rotation: vid.rotation,
-      })),
+      ...(currentSlide.videos || []).map((vid): CanvasElement => {
+        const width = parseFloat(String(vid.width || '160')) || 160;
+        const height = parseFloat(String(vid.height || '90')) || 90;
+        return {
+          id: vid.id,
+          type: 'video',
+          x: parsePosition(vid.x as string | undefined, vid.position, 'x', SLIDE_WIDTH, width, SLIDE_WIDTH, SLIDE_HEIGHT),
+          y: parsePosition(vid.y as string | undefined, vid.position, 'y', SLIDE_HEIGHT, height, SLIDE_WIDTH, SLIDE_HEIGHT),
+          width,
+          height,
+          url: vid.url,
+          opacity: vid.opacity,
+          zIndex: vid.zIndex || 1,
+          autoPlay: vid.autoPlay,
+          audioOnly: vid.audioOnly,
+          rotation: vid.rotation,
+        };
+      }),
+      ...(currentSlide.audios || []).map((aud): CanvasElement => {
+        const width = parseFloat(String(aud.width || '200')) || 200;
+        const height = parseFloat(String(aud.height || '100')) || 100;
+        return {
+          id: aud.id,
+          type: 'audio',
+          x: parsePosition(aud.x as string | undefined, aud.position, 'x', SLIDE_WIDTH, width, SLIDE_WIDTH, SLIDE_HEIGHT),
+          y: parsePosition(aud.y as string | undefined, aud.position, 'y', SLIDE_HEIGHT, height, SLIDE_WIDTH, SLIDE_HEIGHT),
+          width,
+          height,
+          url: aud.url,
+          opacity: aud.opacity,
+          zIndex: aud.zIndex || 1,
+          autoPlay: aud.autoPlay,
+          visualHidden: aud.visualHidden,
+          volume: aud.volume,
+          rotation: aud.rotation,
+        };
+      }),
       ...(currentSlide.text || []).map((txt): CanvasElement => {
         const widthStr = txt.width || txt.maxWidth;
         const width = widthStr ? parseFloat(widthStr) || 600 : 600;
@@ -757,12 +1023,13 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       const node = stageRef.current.findOne('#' + selectedId);
       if (node) {
         transformerRef.current.nodes([node]);
+        transformerRef.current.forceUpdate();
         transformerRef.current.getLayer()?.batchDraw();
       }
     } else {
       transformerRef.current.nodes([]);
     }
-  }, [selectedId]);
+  }, [selectedId, canvasElements]);
 
   // Handle canvas click (focus canvas, optionally deselect)
   const handleStageClick = (e: KonvaEventObject<MouseEvent>) => {
@@ -776,9 +1043,63 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   };
 
   // Update element in template
-  const updateElement = useCallback((elementId: string, updates: Partial<CanvasElement>) => {
+  const updateElement = useCallback(async (elementId: string, updates: Partial<CanvasElement>) => {
     const element = canvasElements.find(el => el.id === elementId);
     if (!element) return;
+
+    // Detect aspect ratio for images when URL changes
+    if (element.type === 'image' && updates.url && updates.url !== element.url && updates.url.trim()) {
+      console.log('🖼️ Detecting image aspect ratio for:', updates.url);
+      try {
+        const dimensions = await detectImageAspectRatio(updates.url);
+        if (dimensions) {
+          // Only update dimensions if they haven't been manually set
+          // Check if current dimensions are defaults
+          const currentWidth = typeof element.width === 'string' 
+            ? parseFloat(element.width) 
+            : element.width || 0;
+          const currentHeight = typeof element.height === 'string' 
+            ? parseFloat(element.height) 
+            : element.height || 0;
+          
+          console.log(`Current dimensions: ${currentWidth}x${currentHeight}`);
+          
+          // Apply auto-sizing if it's a new image or has default dimensions
+          if (currentWidth === 0 || currentHeight === 0 || 
+              (currentWidth === 200 && currentHeight === 200) ||
+              (currentWidth === 320 && currentHeight === 180) ||
+              (currentWidth === 400 && currentHeight === 400)) {
+            console.log(`✓ Applying auto-sizing: ${dimensions.width}x${dimensions.height}`);
+            updates.width = dimensions.width;
+            updates.height = dimensions.height;
+          } else {
+            console.log('⊗ Skipping auto-sizing - dimensions already customized');
+          }
+        }
+      } catch (error) {
+        console.warn('Could not detect image aspect ratio:', error);
+      }
+    }
+
+    // Detect aspect ratio for videos when URL changes
+    if (element.type === 'video' && updates.url && updates.url !== element.url && updates.url.trim()) {
+      try {
+        const dimensions = await detectVideoAspectRatio(updates.url);
+        if (dimensions) {
+          // Only update dimensions if they haven't been manually set
+          // Check if current dimensions are defaults (e.g., 320x180 or 100%)
+          const currentWidth = typeof element.width === 'number' ? element.width : parseFloat(String(element.width || '0'));
+          const currentHeight = typeof element.height === 'number' ? element.height : parseFloat(String(element.height || '0'));
+          
+          if ((currentWidth === 320 && currentHeight === 180) || currentWidth === 0 || currentHeight === 0) {
+            updates.width = dimensions.width;
+            updates.height = dimensions.height;
+          }
+        }
+      } catch (error) {
+        console.warn('Could not detect video aspect ratio:', error);
+      }
+    }
 
     const newSlides = [...slides];
     const slideToUpdate = { ...newSlides[selectedSlideIndex] };
@@ -795,6 +1116,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           height: updates.height !== undefined ? `${Math.round(updates.height)}px` : images[imgIndex].height,
           opacity: updates.opacity ?? images[imgIndex].opacity,
           url: updates.url ?? images[imgIndex].url,
+          zIndex: updates.zIndex !== undefined ? updates.zIndex : images[imgIndex].zIndex,
           rotation:
             updates.rotation !== undefined
               ? Math.round(updates.rotation)
@@ -816,6 +1138,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           opacity: updates.opacity ?? videos[vidIndex].opacity,
           url: updates.url ?? videos[vidIndex].url,
           autoPlay: updates.autoPlay ?? videos[vidIndex].autoPlay,
+          audioOnly: updates.audioOnly ?? videos[vidIndex].audioOnly,
+          zIndex: updates.zIndex !== undefined ? updates.zIndex : videos[vidIndex].zIndex,
           rotation:
             updates.rotation !== undefined
               ? Math.round(updates.rotation)
@@ -823,6 +1147,30 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           position: undefined, // Clear predefined position when using x/y
         };
         slideToUpdate.videos = videos;
+      }
+    } else if (element.type === 'audio') {
+      const audios = [...(slideToUpdate.audios || [])];
+      const audIndex = audios.findIndex(aud => aud.id === elementId);
+      if (audIndex >= 0) {
+        audios[audIndex] = {
+          ...audios[audIndex],
+          x: updates.x !== undefined ? `${Math.round(updates.x)}px` : audios[audIndex].x,
+          y: updates.y !== undefined ? `${Math.round(updates.y)}px` : audios[audIndex].y,
+          width: updates.width !== undefined ? `${Math.round(updates.width)}px` : audios[audIndex].width,
+          height: updates.height !== undefined ? `${Math.round(updates.height)}px` : audios[audIndex].height,
+          opacity: updates.opacity ?? audios[audIndex].opacity,
+          url: updates.url ?? audios[audIndex].url,
+          autoPlay: updates.autoPlay ?? audios[audIndex].autoPlay,
+          visualHidden: updates.visualHidden ?? audios[audIndex].visualHidden,
+          volume: updates.volume ?? audios[audIndex].volume,
+          zIndex: updates.zIndex !== undefined ? updates.zIndex : audios[audIndex].zIndex,
+          rotation:
+            updates.rotation !== undefined
+              ? Math.round(updates.rotation)
+              : audios[audIndex].rotation,
+          position: undefined, // Clear predefined position when using x/y
+        };
+        slideToUpdate.audios = audios;
       }
     } else if (element.type === 'text') {
       const texts = [...(slideToUpdate.text || [])];
@@ -840,6 +1188,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           fontStyle: updates.fontStyle ?? texts[txtIndex].fontStyle,
           textAlign: updates.textAlign ?? texts[txtIndex].textAlign,
           opacity: updates.opacity ?? texts[txtIndex].opacity,
+          zIndex: updates.zIndex !== undefined ? updates.zIndex : texts[txtIndex].zIndex,
           width:
             updates.width !== undefined
               ? `${Math.round(updates.width)}px`
@@ -872,9 +1221,24 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
-  }, [canvasElements, slides, selectedSlideIndex, referenceSlideIndex, template, onTemplateChange]);
+    
+    // Force transformer update after dimension changes
+    if ((updates.width !== undefined || updates.height !== undefined) && selectedId === elementId) {
+      setTimeout(() => {
+        if (transformerRef.current && stageRef.current) {
+          const node = stageRef.current.findOne('#' + elementId);
+          if (node) {
+            transformerRef.current.nodes([node]);
+            transformerRef.current.forceUpdate();
+            transformerRef.current.getLayer()?.batchDraw();
+          }
+        }
+      }, 50);
+    }
+  }, [canvasElements, slides, selectedSlideIndex, referenceSlideIndex, template, onTemplateChange, selectedId]);
 
   // Delete selected element
   const handleDeleteSelected = useCallback(() => {
@@ -890,6 +1254,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       slideToUpdate.images = (slideToUpdate.images || []).filter(img => img.id !== selectedId);
     } else if (element.type === 'video') {
       slideToUpdate.videos = (slideToUpdate.videos || []).filter(vid => vid.id !== selectedId);
+    } else if (element.type === 'audio') {
+      slideToUpdate.audios = (slideToUpdate.audios || []).filter(aud => aud.id !== selectedId);
     } else if (element.type === 'text') {
       slideToUpdate.text = (slideToUpdate.text || []).filter(txt => txt.id !== selectedId);
     }
@@ -903,11 +1269,36 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
 
     setSelectedId(null);
   }, [selectedId, canvasElements, slides, selectedSlideIndex, referenceSlideIndex, template, onTemplateChange]);
+
+  const bringToFront = useCallback(() => {
+    if (!selectedId) return;
+    
+    const element = canvasElements.find(el => el.id === selectedId);
+    if (!element) return;
+
+    // Find max z-index in current slide
+    const maxZIndex = Math.max(0, ...canvasElements.map(el => el.zIndex || 0));
+    
+    updateElement(selectedId, { zIndex: maxZIndex + 1 });
+  }, [selectedId, canvasElements, updateElement]);
+
+  const sendToBack = useCallback(() => {
+    if (!selectedId) return;
+    
+    const element = canvasElements.find(el => el.id === selectedId);
+    if (!element) return;
+
+    // Find min z-index in current slide
+    const minZIndex = Math.min(0, ...canvasElements.map(el => el.zIndex || 0));
+    
+    updateElement(selectedId, { zIndex: minZIndex - 1 });
+  }, [selectedId, canvasElements, updateElement]);
 
   // Keyboard shortcuts for canvas (undo/redo/copy/paste/delete/move)
   useEffect(() => {
@@ -944,6 +1335,30 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         e.preventDefault();
         handlePaste();
         return;
+      }
+
+      // Bold: Ctrl/Cmd + B (requires canvas focus and selected text element)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b' && canvasHasFocus && selectedId) {
+        const element = canvasElements.find(el => el.id === selectedId);
+        if (element && element.type === 'text') {
+          e.preventDefault();
+          updateElement(selectedId, {
+            fontWeight: element.fontWeight === 'bold' ? 'normal' : 'bold'
+          });
+          return;
+        }
+      }
+
+      // Italic: Ctrl/Cmd + I (requires canvas focus and selected text element)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'i' && canvasHasFocus && selectedId) {
+        const element = canvasElements.find(el => el.id === selectedId);
+        if (element && element.type === 'text') {
+          e.preventDefault();
+          updateElement(selectedId, {
+            fontStyle: element.fontStyle === 'italic' ? 'normal' : 'italic'
+          });
+          return;
+        }
       }
 
       // The following shortcuts require canvas focus and a selected element
@@ -1016,6 +1431,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
 
@@ -1050,10 +1466,48 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
 
     setSelectedId(newVideo.id);
+  };
+
+  // Add new audio (using full slide coordinates)
+  const handleAddAudio = () => {
+    const newAudio: AudioElement = {
+      id: `audio-${Date.now()}`,
+      url: '',
+      width: '200px',
+      height: '100px',
+      x: '100px',
+      y: '100px',
+      opacity: 1,
+      zIndex: 1,
+      autoPlay: false,
+      loop: false,
+      volume: 1,
+    };
+
+    const newSlides = [...slides];
+    const slideToUpdate = { ...newSlides[selectedSlideIndex] };
+    slideToUpdate.audios = [...(slideToUpdate.audios || []), newAudio];
+    newSlides[selectedSlideIndex] = slideToUpdate;
+
+    const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
+    onTemplateChange({
+      ...template,
+      slides: newSlides,
+      background: refSlide?.background,
+      images: refSlide?.images || [],
+      videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
+      audios: refSlide?.audios || [],
+      text: refSlide?.text || [],
+    });
+
+    setSelectedId(newAudio.id);
   };
 
   // Add new text (using full slide coordinates)
@@ -1084,6 +1538,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
 
@@ -1164,6 +1619,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         background: refSlide?.background,
         images: refSlide?.images || [],
         videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
         text: refSlide?.text || [],
       });
 
@@ -1207,6 +1663,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
   };
@@ -1247,6 +1704,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
   }, [slides, referenceSlideIndex, SLIDE_WIDTH, SLIDE_HEIGHT, template, onTemplateChange]);
@@ -1336,6 +1794,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     }
   }, [contextMenu]);
 
+  useEffect(() => {
+    const handleClickOutside = () => setElementContextMenu(null);
+    if (elementContextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [elementContextMenu]);
+
   // Slide context menu handlers
   const handleInsertSlide = (atIndex: number) => {
     const newSlide: TemplateSlide = {
@@ -1358,6 +1824,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
     setSelectedSlideIndex(atIndex + 1);
@@ -1392,6 +1859,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
     setSelectedSlideIndex(atIndex + 1);
@@ -1430,6 +1898,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
     setSelectedSlideIndex(newSelectedIndex);
@@ -1461,6 +1930,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
     setSelectedSlideIndex(atIndex - 1);
@@ -1492,6 +1962,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
     setSelectedSlideIndex(atIndex + 1);
@@ -1506,6 +1977,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
     setContextMenu(null);
@@ -1576,6 +2048,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
+      audios: refSlide?.audios || [],
       text: refSlide?.text || [],
     });
 
@@ -1915,6 +2388,40 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               </button>
             </div>
           )}
+          
+          {/* Element context menu */}
+          {elementContextMenu && (
+            <div
+              className="fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-1 z-[9999] min-w-[160px]"
+              style={{ left: elementContextMenu.x, top: elementContextMenu.y }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => {
+                  bringToFront();
+                  setElementContextMenu(null);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                </svg>
+                Bring to Front
+              </button>
+              <button
+                onClick={() => {
+                  sendToBack();
+                  setElementContextMenu(null);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                </svg>
+                Send to Back
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Canvas - Slide Preview (center) */}
@@ -1961,7 +2468,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              Add Image
+              Image
             </button>
             <button
               onClick={handleAddText}
@@ -1970,7 +2477,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
-              Add Text
+              Text
             </button>
             <button
               onClick={handleAddVideo}
@@ -1979,7 +2486,16 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5h16v14H4zM10 9l5 3-5 3V9z" />
               </svg>
-              Add Video
+              Video
+            </button>
+            <button
+              onClick={handleAddAudio}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white rounded-md hover:bg-violet-700 text-xs font-medium shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.414m0 0L9.172 19.122a2.5 2.5 0 003.536 0l2.172-2.172m-5.708 0a5 5 0 007.072 0m-7.072 0l-2.828-2.828M12 8v4l3 3" />
+              </svg>
+              Audio
             </button>
             <button
               onClick={() => {
@@ -2199,6 +2715,20 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                         isSelected={selectedId === element.id}
                         onSelect={() => setSelectedId(element.id)}
                         onChange={(updates) => updateElement(element.id, updates)}
+                        onContextMenu={(e) => {
+                          e.evt.preventDefault();
+                          const stage = e.target.getStage();
+                          if (stage) {
+                            const pointerPos = stage.getPointerPosition();
+                            if (pointerPos) {
+                              setElementContextMenu({
+                                x: pointerPos.x + stage.container().getBoundingClientRect().left,
+                                y: pointerPos.y + stage.container().getBoundingClientRect().top,
+                                elementId: element.id
+                              });
+                            }
+                          }
+                        }}
                       />
                     );
                   } else if (element.type === 'text') {
@@ -2211,6 +2741,20 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                         onChange={(updates) => updateElement(element.id, updates)}
                         stageRef={stageRef}
                         scale={SCALE}
+                        onContextMenu={(e) => {
+                          e.evt.preventDefault();
+                          const stage = e.target.getStage();
+                          if (stage) {
+                            const pointerPos = stage.getPointerPosition();
+                            if (pointerPos) {
+                              setElementContextMenu({
+                                x: pointerPos.x + stage.container().getBoundingClientRect().left,
+                                y: pointerPos.y + stage.container().getBoundingClientRect().top,
+                                elementId: element.id
+                              });
+                            }
+                          }
+                        }}
                       />
                     );
                   } else if (element.type === 'video') {
@@ -2221,6 +2765,44 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                         isSelected={selectedId === element.id}
                         onSelect={() => setSelectedId(element.id)}
                         onChange={(updates) => updateElement(element.id, updates)}
+                        onContextMenu={(e) => {
+                          e.evt.preventDefault();
+                          const stage = e.target.getStage();
+                          if (stage) {
+                            const pointerPos = stage.getPointerPosition();
+                            if (pointerPos) {
+                              setElementContextMenu({
+                                x: pointerPos.x + stage.container().getBoundingClientRect().left,
+                                y: pointerPos.y + stage.container().getBoundingClientRect().top,
+                                elementId: element.id
+                              });
+                            }
+                          }
+                        }}
+                      />
+                    );
+                  } else if (element.type === 'audio') {
+                    return (
+                      <AudioPlaceholder
+                        key={element.id}
+                        element={element}
+                        isSelected={selectedId === element.id}
+                        onSelect={() => setSelectedId(element.id)}
+                        onChange={(updates) => updateElement(element.id, updates)}
+                        onContextMenu={(e) => {
+                          e.evt.preventDefault();
+                          const stage = e.target.getStage();
+                          if (stage) {
+                            const pointerPos = stage.getPointerPosition();
+                            if (pointerPos) {
+                              setElementContextMenu({
+                                x: pointerPos.x + stage.container().getBoundingClientRect().left,
+                                y: pointerPos.y + stage.container().getBoundingClientRect().top,
+                                elementId: element.id
+                              });
+                            }
+                          }
+                        }}
                       />
                     );
                   }
@@ -2420,20 +3002,27 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               {selectedElement.type === 'image' && (
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
-                  <div>
+                    <div>
                     <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Image URL</label>
-                    <input
+                      <input
                       type="url"
                       value={selectedElement.url || ''}
                       onChange={(e) => updateElement(selectedElement.id, { url: e.target.value })}
                       placeholder="https://..."
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Z-Index (layer order)</label>
+                    <input
+                      type="number"
+                      value={selectedElement.zIndex || 0}
+                      onChange={(e) => updateElement(selectedElement.id, { zIndex: parseInt(e.target.value) || 0 })}
                       className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                 </>
-              )}
-
-              {selectedElement.type === 'video' && (
+              )}              {selectedElement.type === 'video' && (
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                     <div>
@@ -2458,6 +3047,91 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       />
                       <span>Auto play</span>
                     </label>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <input
+                        type="checkbox"
+                        checked={selectedElement.audioOnly ?? false}
+                        onChange={(e) =>
+                          updateElement(selectedElement.id, { audioOnly: e.target.checked })
+                        }
+                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>Audio only (hide video)</span>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Z-Index (layer order)</label>
+                    <input
+                      type="number"
+                      value={selectedElement.zIndex || 0}
+                      onChange={(e) => updateElement(selectedElement.id, { zIndex: parseInt(e.target.value) || 0 })}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </>
+              )}
+
+              {selectedElement.type === 'audio' && (
+                <>
+                  <hr className="border-gray-200 dark:border-gray-700" />
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Audio URL</label>
+                    <input
+                      type="url"
+                      value={selectedElement.url || ''}
+                      onChange={(e) => updateElement(selectedElement.id, { url: e.target.value })}
+                      placeholder="https://...audio.mp3"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <input
+                        type="checkbox"
+                        checked={selectedElement.autoPlay ?? false}
+                        onChange={(e) =>
+                          updateElement(selectedElement.id, { autoPlay: e.target.checked })
+                        }
+                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>Auto play</span>
+                    </label>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <input
+                        type="checkbox"
+                        checked={selectedElement.visualHidden ?? false}
+                        onChange={(e) =>
+                          updateElement(selectedElement.id, { visualHidden: e.target.checked })
+                        }
+                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>Hide visual (audio only)</span>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Volume ({Math.round((selectedElement.volume ?? 1) * 100)}%)</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={selectedElement.volume ?? 1}
+                      onChange={(e) => updateElement(selectedElement.id, { volume: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Z-Index (layer order)</label>
+                    <input
+                      type="number"
+                      value={selectedElement.zIndex || 0}
+                      onChange={(e) => updateElement(selectedElement.id, { zIndex: parseInt(e.target.value) || 0 })}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
                   </div>
                 </>
               )}
@@ -2597,6 +3271,15 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       </button>
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Z-Index (layer order)</label>
+                    <input
+                      type="number"
+                      value={selectedElement.zIndex || 0}
+                      onChange={(e) => updateElement(selectedElement.id, { zIndex: parseInt(e.target.value) || 0 })}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
                 </>
               )}
             </div>
@@ -2643,7 +3326,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Width</label>
                 <input
                   type="number"
-                  value={Math.round(selectedSongContentStyle.width)}
+                  value={Math.round(selectedSongContentStyle.width || (SLIDE_WIDTH - 80))}
                   onChange={(e) => handleSongContentStyleChange(selectedSongContentType, {
                     width: Number.isNaN(parseInt(e.target.value, 10)) ? 100 : parseInt(e.target.value, 10),
                   })}

@@ -9,9 +9,11 @@ interface SlideViewProps {
   slide: Slide;
   showTranslation?: boolean;
   template?: PresentationTemplate | null;
+  /** Scale factor for song content (title, lyrics, translation). Default is 1.0 */
+  contentScale?: number;
 }
 
-export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = true, template }) => {
+export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = true, template, contentScale = 1.0 }) => {
   const sessionSongIndex = (slide as any).sessionSongIndex;
   const totalSongs = (slide as any).totalSongs;
   
@@ -24,14 +26,30 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
     ? slide.templateSlide 
     : (template ? getReferenceSlide(template) : undefined);
   
-  // Get song content styles from reference slide (or use defaults)
-  const titleStyle: SongContentStyle = effectiveSlide?.songTitleStyle || DEFAULT_SONG_TITLE_STYLE;
-  const lyricsStyle: SongContentStyle = effectiveSlide?.songLyricsStyle || DEFAULT_SONG_LYRICS_STYLE;
-  const translationStyle: SongContentStyle = effectiveSlide?.songTranslationStyle || DEFAULT_SONG_TRANSLATION_STYLE;
+  // Get song content styles from reference slide (merge with defaults to ensure all properties exist)
+  // Only override defaults with defined template values
+  const titleStyle: SongContentStyle = { 
+    ...DEFAULT_SONG_TITLE_STYLE, 
+    ...(effectiveSlide?.songTitleStyle && Object.fromEntries(
+      Object.entries(effectiveSlide.songTitleStyle).filter(([_, v]) => v !== undefined)
+    ))
+  };
+  const lyricsStyle: SongContentStyle = { 
+    ...DEFAULT_SONG_LYRICS_STYLE, 
+    ...(effectiveSlide?.songLyricsStyle && Object.fromEntries(
+      Object.entries(effectiveSlide.songLyricsStyle).filter(([_, v]) => v !== undefined)
+    ))
+  };
+  const translationStyle: SongContentStyle = { 
+    ...DEFAULT_SONG_TRANSLATION_STYLE, 
+    ...(effectiveSlide?.songTranslationStyle && Object.fromEntries(
+      Object.entries(effectiveSlide.songTranslationStyle).filter(([_, v]) => v !== undefined)
+    ))
+  };
   
-  // Get slide dimensions for percentage calculations (default to 16:9 1920x1080)
-  const slideWidth = 1920;
-  const slideHeight = 1080;
+  // Get slide dimensions based on template aspect ratio
+  const slideWidth = template?.aspectRatio === '4:3' ? 1600 : 1920;
+  const slideHeight = template?.aspectRatio === '4:3' ? 1200 : 1080;
   
   // Helper to convert pixel position to percentage, with fallback to legacy yPosition
   const getTopPosition = (style: SongContentStyle) => {
@@ -39,6 +57,68 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
       return `${(style.y / slideHeight) * 100}%`;
     }
     return `${style.yPosition || 0}%`;
+  };
+  
+  // Helper to get scaled top position for lyrics (moves up as content scales down)
+  // This accounts for both title AND lyrics shrinking to maximize available space
+  const getScaledLyricsTopPosition = () => {
+    const lyricsY = lyricsStyle.y !== undefined ? lyricsStyle.y : (lyricsStyle.yPosition || 20) * slideHeight / 100;
+    const titleY = titleStyle.y !== undefined ? titleStyle.y : (titleStyle.yPosition || 5) * slideHeight / 100;
+    
+    // Parse title font size to get pixel value
+    const titleFontMatch = titleStyle.fontSize.match(/^([\d.]+)(px|rem|em)$/);
+    const titleFontPx = titleFontMatch 
+      ? (titleFontMatch[2] === 'px' ? parseFloat(titleFontMatch[1]) : parseFloat(titleFontMatch[1]) * 16)
+      : 48;
+    
+    // Parse lyrics font size to get pixel value
+    const lyricsFontMatch = lyricsStyle.fontSize.match(/^([\d.]+)(px|rem|em)$/);
+    const lyricsFontPx = lyricsFontMatch 
+      ? (lyricsFontMatch[2] === 'px' ? parseFloat(lyricsFontMatch[1]) : parseFloat(lyricsFontMatch[1]) * 16)
+      : 36;
+    
+    // Calculate space saved by title shrinking
+    const titleSpaceSaved = titleFontPx * (1 - contentScale);
+    
+    // Calculate space saved by lyrics shrinking (estimate ~8 lines of lyrics)
+    const estimatedLyricsLines = 8;
+    const lyricsSpaceSaved = lyricsFontPx * estimatedLyricsLines * (1 - contentScale);
+    
+    // Total space saved - use most of it to move lyrics up
+    const totalSpaceSaved = titleSpaceSaved + lyricsSpaceSaved * 0.3;
+    
+    // Move lyrics up by the space saved
+    const adjustedLyricsY = lyricsY - totalSpaceSaved * 0.8;
+    
+    // Don't move lyrics above the title bottom
+    const minY = titleY + titleFontPx * contentScale + 20;
+    const finalY = Math.max(adjustedLyricsY, minY);
+    
+    return `${(finalY / slideHeight) * 100}%`;
+  };
+  
+  // Helper to get scaled top position for translation (moves down as content scales down)
+  // This spreads lyrics and translation apart to use available space better
+  const getScaledTranslationTopPosition = () => {
+    const translationY = translationStyle.y !== undefined ? translationStyle.y : (translationStyle.yPosition || 75) * slideHeight / 100;
+    
+    // Parse translation font size to get pixel value
+    const translationFontMatch = translationStyle.fontSize.match(/^([\d.]+)(px|rem|em)$/);
+    const translationFontPx = translationFontMatch 
+      ? (translationFontMatch[2] === 'px' ? parseFloat(translationFontMatch[1]) : parseFloat(translationFontMatch[1]) * 16)
+      : 24;
+    
+    // Calculate how much space is saved by the translation shrinking
+    const spaceSaved = translationFontPx * (1 - contentScale);
+    
+    // Move translation down by the space saved
+    const adjustedTranslationY = translationY + spaceSaved * 1.5;
+    
+    // Don't move translation below the slide (leave room for singer/pitch info)
+    const maxY = slideHeight - translationFontPx * contentScale - 60;
+    const finalY = Math.min(adjustedTranslationY, maxY);
+    
+    return `${(finalY / slideHeight) * 100}%`;
   };
   
   const getLeftPosition = (style: SongContentStyle) => {
@@ -56,6 +136,24 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
   };
   
   const hasTranslation = showTranslation && slide.translation;
+  
+  // Helper to scale font size
+  const scaleFontSize = (fontSize: string): string => {
+    if (contentScale === 1.0) return fontSize;
+    const match = fontSize.match(/^([\d.]+)(px|rem|em|%)$/);
+    if (match) {
+      const value = parseFloat(match[1]);
+      const unit = match[2];
+      return `${value * contentScale}${unit}`;
+    }
+    return fontSize;
+  };
+  
+  // Calculate expanded lyrics area when scaling down (inversely proportional)
+  // When scale is 0.7, lyrics area expands from 60% to ~85%
+  const lyricsMaxHeight = contentScale < 1.0 
+    ? `${Math.min(85, 60 / contentScale)}%` 
+    : '60%';
   
   // Get background styles - for static slides use templateSlide, for song slides use reference slide
   const backgroundStyles = isStaticSlide && slide.templateSlide 
@@ -120,16 +218,16 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
           top: getTopPosition(titleStyle),
           left: getLeftPosition(titleStyle),
           width: getWidth(titleStyle),
+          textAlign: (titleStyle.textAlign || 'center') as any,
         }}
       >
         <h1 
           className="leading-tight"
           style={{ 
-            fontSize: titleStyle.fontSize,
+            fontSize: scaleFontSize(titleStyle.fontSize),
             fontWeight: titleStyle.fontWeight,
             fontStyle: titleStyle.fontStyle || 'normal',
             fontFamily: getFontFamily(titleStyle.fontFamily),
-            textAlign: titleStyle.textAlign,
             color: titleStyle.color,
           }}
         >
@@ -141,20 +239,20 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
       <div 
         className="absolute z-10 overflow-auto"
         style={{ 
-          top: getTopPosition(lyricsStyle),
+          top: contentScale < 1.0 ? getScaledLyricsTopPosition() : getTopPosition(lyricsStyle),
           left: getLeftPosition(lyricsStyle),
           width: getWidth(lyricsStyle),
-          maxHeight: '60%',
+          maxHeight: lyricsMaxHeight,
         }}
       >
         <p 
           className="leading-tight whitespace-pre-wrap"
           style={{ 
-            fontSize: lyricsStyle.fontSize,
+            fontSize: scaleFontSize(lyricsStyle.fontSize),
             fontWeight: lyricsStyle.fontWeight,
             fontStyle: lyricsStyle.fontStyle || 'normal',
             fontFamily: getFontFamily(lyricsStyle.fontFamily),
-            textAlign: lyricsStyle.textAlign,
+            textAlign: lyricsStyle.textAlign || 'center',
             color: lyricsStyle.color,
           }}
         >
@@ -167,7 +265,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         <div 
           className="absolute z-10 overflow-auto"
           style={{ 
-            top: getTopPosition(translationStyle),
+            top: contentScale < 1.0 ? getScaledTranslationTopPosition() : getTopPosition(translationStyle),
             left: getLeftPosition(translationStyle),
             width: getWidth(translationStyle),
             maxHeight: '25%',
@@ -176,11 +274,11 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
           <div 
             className="leading-tight"
             style={{ 
-              fontSize: translationStyle.fontSize,
+              fontSize: scaleFontSize(translationStyle.fontSize),
               fontWeight: translationStyle.fontWeight,
               fontStyle: translationStyle.fontStyle || 'normal',
               fontFamily: getFontFamily(translationStyle.fontFamily),
-              textAlign: translationStyle.textAlign,
+              textAlign: translationStyle.textAlign || 'center',
               color: translationStyle.color,
             }}
             dangerouslySetInnerHTML={{ __html: slide.translation }}
