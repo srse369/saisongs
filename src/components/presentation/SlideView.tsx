@@ -1,38 +1,15 @@
 import React from 'react';
 import type { Slide, PresentationTemplate, TemplateSlide, SongContentStyle } from '../../types';
+import { DEFAULT_SONG_TITLE_STYLE, DEFAULT_SONG_LYRICS_STYLE, DEFAULT_SONG_TRANSLATION_STYLE } from '../../types';
 import { formatPitch } from '../../utils/pitchUtils';
 import { getBackgroundStyles, getSlideBackgroundStyles, getReferenceSlide, TemplateBackground, TemplateImages, TemplateVideos, TemplateText, SlideBackground, SlideImages, SlideVideos, SlideText } from '../../utils/templateUtils';
+import { getFontFamily } from '../../utils/fonts';
 
 interface SlideViewProps {
   slide: Slide;
   showTranslation?: boolean;
   template?: PresentationTemplate | null;
 }
-
-// Default song content styles
-const defaultTitleStyle: SongContentStyle = {
-  yPosition: 5,
-  fontSize: '48px',
-  fontWeight: 'bold',
-  textAlign: 'center',
-  color: '#ffffff',
-};
-
-const defaultLyricsStyle: SongContentStyle = {
-  yPosition: 20,
-  fontSize: '36px',
-  fontWeight: 'bold',
-  textAlign: 'center',
-  color: '#ffffff',
-};
-
-const defaultTranslationStyle: SongContentStyle = {
-  yPosition: 75,
-  fontSize: '24px',
-  fontWeight: 'normal',
-  textAlign: 'center',
-  color: '#ffffff',
-};
 
 export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = true, template }) => {
   const sessionSongIndex = (slide as any).sessionSongIndex;
@@ -48,9 +25,35 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
     : (template ? getReferenceSlide(template) : undefined);
   
   // Get song content styles from reference slide (or use defaults)
-  const titleStyle: SongContentStyle = effectiveSlide?.songTitleStyle || defaultTitleStyle;
-  const lyricsStyle: SongContentStyle = effectiveSlide?.songLyricsStyle || defaultLyricsStyle;
-  const translationStyle: SongContentStyle = effectiveSlide?.songTranslationStyle || defaultTranslationStyle;
+  const titleStyle: SongContentStyle = effectiveSlide?.songTitleStyle || DEFAULT_SONG_TITLE_STYLE;
+  const lyricsStyle: SongContentStyle = effectiveSlide?.songLyricsStyle || DEFAULT_SONG_LYRICS_STYLE;
+  const translationStyle: SongContentStyle = effectiveSlide?.songTranslationStyle || DEFAULT_SONG_TRANSLATION_STYLE;
+  
+  // Get slide dimensions for percentage calculations (default to 16:9 1920x1080)
+  const slideWidth = 1920;
+  const slideHeight = 1080;
+  
+  // Helper to convert pixel position to percentage, with fallback to legacy yPosition
+  const getTopPosition = (style: SongContentStyle) => {
+    if (style.y !== undefined) {
+      return `${(style.y / slideHeight) * 100}%`;
+    }
+    return `${style.yPosition || 0}%`;
+  };
+  
+  const getLeftPosition = (style: SongContentStyle) => {
+    if (style.x !== undefined) {
+      return `${(style.x / slideWidth) * 100}%`;
+    }
+    return '0';
+  };
+  
+  const getWidth = (style: SongContentStyle) => {
+    if (style.width !== undefined) {
+      return `${(style.width / slideWidth) * 100}%`;
+    }
+    return '100%';
+  };
   
   const hasTranslation = showTranslation && slide.translation;
   
@@ -112,16 +115,20 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
 
       {/* Song name - positioned using template style */}
       <div 
-        className="absolute left-0 right-0 px-4 z-10"
+        className="absolute z-10"
         style={{ 
-          top: `${titleStyle.yPosition}%`,
+          top: getTopPosition(titleStyle),
+          left: getLeftPosition(titleStyle),
+          width: getWidth(titleStyle),
         }}
       >
         <h1 
-          className="leading-relaxed"
+          className="leading-tight"
           style={{ 
             fontSize: titleStyle.fontSize,
             fontWeight: titleStyle.fontWeight,
+            fontStyle: titleStyle.fontStyle || 'normal',
+            fontFamily: getFontFamily(titleStyle.fontFamily),
             textAlign: titleStyle.textAlign,
             color: titleStyle.color,
           }}
@@ -132,19 +139,21 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
 
       {/* Song lyrics - positioned using template style */}
       <div 
-        className="absolute left-0 right-0 px-4 z-10 overflow-auto"
+        className="absolute z-10 overflow-auto"
         style={{ 
-          top: `${lyricsStyle.yPosition}%`,
-          maxHeight: hasTranslation 
-            ? `${translationStyle.yPosition - lyricsStyle.yPosition - 2}%` 
-            : `${90 - lyricsStyle.yPosition}%`,
+          top: getTopPosition(lyricsStyle),
+          left: getLeftPosition(lyricsStyle),
+          width: getWidth(lyricsStyle),
+          maxHeight: '60%',
         }}
       >
         <p 
-          className="leading-relaxed whitespace-pre-wrap"
+          className="leading-tight whitespace-pre-wrap"
           style={{ 
             fontSize: lyricsStyle.fontSize,
             fontWeight: lyricsStyle.fontWeight,
+            fontStyle: lyricsStyle.fontStyle || 'normal',
+            fontFamily: getFontFamily(lyricsStyle.fontFamily),
             textAlign: lyricsStyle.textAlign,
             color: lyricsStyle.color,
           }}
@@ -156,17 +165,21 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
       {/* Translation (if available and showTranslation is true) - positioned using template style */}
       {hasTranslation && slide.translation && (
         <div 
-          className="absolute left-0 right-0 px-4 z-10 overflow-auto"
+          className="absolute z-10 overflow-auto"
           style={{ 
-            top: `${translationStyle.yPosition}%`,
-            maxHeight: `${95 - translationStyle.yPosition}%`,
+            top: getTopPosition(translationStyle),
+            left: getLeftPosition(translationStyle),
+            width: getWidth(translationStyle),
+            maxHeight: '25%',
           }}
         >
           <div 
-            className="leading-relaxed"
+            className="leading-tight"
             style={{ 
               fontSize: translationStyle.fontSize,
               fontWeight: translationStyle.fontWeight,
+              fontStyle: translationStyle.fontStyle || 'normal',
+              fontFamily: getFontFamily(translationStyle.fontFamily),
               textAlign: translationStyle.textAlign,
               color: translationStyle.color,
             }}

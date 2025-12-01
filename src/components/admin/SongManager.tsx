@@ -34,6 +34,7 @@ export const SongManager: React.FC = () => {
   const [advancedFilters, setAdvancedFilters] = useState<SongSearchFilters>({});
   const [visibleCount, setVisibleCount] = useState(50);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
 
   // Create fuzzy search instance for fallback
   const fuzzySearch = useMemo(() => createSongFuzzySearch(songs), [songs]);
@@ -68,6 +69,15 @@ export const SongManager: React.FC = () => {
   };
 
   const handleFormCancel = () => {
+    // Check for unsaved changes before closing
+    if (checkUnsavedChangesRef.current && checkUnsavedChangesRef.current()) {
+      const confirmed = window.confirm(
+        'You have unsaved changes. Are you sure you want to close without saving?'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
     setIsFormModalOpen(false);
     setEditingSong(null);
   };
@@ -380,6 +390,7 @@ export const SongManager: React.FC = () => {
           song={editingSong}
           onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
+          onUnsavedChangesRef={checkUnsavedChangesRef}
         />
       </Modal>
 

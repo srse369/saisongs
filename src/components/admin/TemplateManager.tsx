@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTemplates } from '../../contexts/TemplateContext';
-import type { PresentationTemplate, Slide, TemplateSlide } from '../../types';
+import type { PresentationTemplate, Slide, TemplateSlide, AspectRatio } from '../../types';
+import { ensureSongContentStyles } from '../../types';
 import { RefreshIcon, Modal } from '../common';
 import { SlideView } from '../presentation/SlideView';
 import { TemplateWysiwygEditor } from './TemplateWysiwygEditor';
@@ -90,7 +91,9 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
       if (txt.height) lines.push(`${indent}    height: ${escapeYamlString(formatDimension(txt.height))}`);
       if (txt.fontSize) lines.push(`${indent}    fontSize: ${escapeYamlString(formatDimension(txt.fontSize))}`);
       if (txt.color) lines.push(`${indent}    color: ${escapeYamlString(txt.color)}`);
+      if (txt.fontFamily) lines.push(`${indent}    fontFamily: ${escapeYamlString(txt.fontFamily)}`);
       if (txt.fontWeight) lines.push(`${indent}    fontWeight: ${txt.fontWeight}`);
+      if (txt.fontStyle) lines.push(`${indent}    fontStyle: ${txt.fontStyle}`);
       if (txt.textAlign) lines.push(`${indent}    textAlign: ${txt.textAlign}`);
       if (txt.maxWidth) lines.push(`${indent}    maxWidth: ${escapeYamlString(formatDimension(txt.maxWidth))}`);
       if (txt.opacity !== undefined) lines.push(`${indent}    opacity: ${txt.opacity}`);
@@ -103,30 +106,26 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
 
   // Song content styles (only for reference slides)
   if (isReferenceSlide) {
-    if (slide.songTitleStyle) {
-      lines.push(`${indent}songTitleStyle:`);
-      lines.push(`${indent}  yPosition: ${slide.songTitleStyle.yPosition}`);
-      lines.push(`${indent}  fontSize: ${escapeYamlString(slide.songTitleStyle.fontSize)}`);
-      lines.push(`${indent}  fontWeight: ${slide.songTitleStyle.fontWeight}`);
-      lines.push(`${indent}  textAlign: ${slide.songTitleStyle.textAlign}`);
-      lines.push(`${indent}  color: ${escapeYamlString(slide.songTitleStyle.color)}`);
-    }
-    if (slide.songLyricsStyle) {
-      lines.push(`${indent}songLyricsStyle:`);
-      lines.push(`${indent}  yPosition: ${slide.songLyricsStyle.yPosition}`);
-      lines.push(`${indent}  fontSize: ${escapeYamlString(slide.songLyricsStyle.fontSize)}`);
-      lines.push(`${indent}  fontWeight: ${slide.songLyricsStyle.fontWeight}`);
-      lines.push(`${indent}  textAlign: ${slide.songLyricsStyle.textAlign}`);
-      lines.push(`${indent}  color: ${escapeYamlString(slide.songLyricsStyle.color)}`);
-    }
-    if (slide.songTranslationStyle) {
-      lines.push(`${indent}songTranslationStyle:`);
-      lines.push(`${indent}  yPosition: ${slide.songTranslationStyle.yPosition}`);
-      lines.push(`${indent}  fontSize: ${escapeYamlString(slide.songTranslationStyle.fontSize)}`);
-      lines.push(`${indent}  fontWeight: ${slide.songTranslationStyle.fontWeight}`);
-      lines.push(`${indent}  textAlign: ${slide.songTranslationStyle.textAlign}`);
-      lines.push(`${indent}  color: ${escapeYamlString(slide.songTranslationStyle.color)}`);
-    }
+    const outputSongStyle = (styleName: string, style: any) => {
+      if (!style) return;
+      lines.push(`${indent}${styleName}:`);
+      lines.push(`${indent}  x: ${style.x}`);
+      lines.push(`${indent}  y: ${style.y}`);
+      lines.push(`${indent}  width: ${style.width}`);
+      if (style.height) lines.push(`${indent}  height: ${style.height}`);
+      lines.push(`${indent}  fontSize: ${escapeYamlString(style.fontSize)}`);
+      lines.push(`${indent}  fontWeight: ${style.fontWeight}`);
+      if (style.fontStyle) lines.push(`${indent}  fontStyle: ${style.fontStyle}`);
+      if (style.fontFamily) lines.push(`${indent}  fontFamily: ${escapeYamlString(style.fontFamily)}`);
+      lines.push(`${indent}  textAlign: ${style.textAlign}`);
+      lines.push(`${indent}  color: ${escapeYamlString(style.color)}`);
+      // Legacy yPosition for backward compatibility
+      if (style.yPosition !== undefined) lines.push(`${indent}  yPosition: ${style.yPosition}`);
+    };
+    
+    outputSongStyle('songTitleStyle', slide.songTitleStyle);
+    outputSongStyle('songLyricsStyle', slide.songLyricsStyle);
+    outputSongStyle('songTranslationStyle', slide.songTranslationStyle);
   }
 
   return lines;
@@ -224,6 +223,7 @@ export const TemplateManager: React.FC = () => {
   const [previewTemplate, setPreviewTemplate] = useState<PresentationTemplate | null>(null);
   const [previewSlideIndex, setPreviewSlideIndex] = useState(0);
   const [editingTemplate, setEditingTemplate] = useState<PresentationTemplate | null>(null);
+  const [originalTemplate, setOriginalTemplate] = useState<PresentationTemplate | null>(null); // Track original state for dirty detection
   const [searchTerm, setSearchTerm] = useState('');
   const [yamlContent, setYamlContent] = useState('');
   const [validationError, setValidationError] = useState('');
@@ -233,6 +233,31 @@ export const TemplateManager: React.FC = () => {
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const previewContainerRef = React.useRef<HTMLDivElement>(null);
   const fullscreenContainerRef = React.useRef<HTMLDivElement>(null);
+  
+  // Check if template has unsaved changes
+  const hasUnsavedChanges = React.useMemo(() => {
+    if (!editingTemplate) return false;
+    if (!originalTemplate) return true; // New template always has "changes"
+    
+    // Compare key fields to detect changes
+    const current = JSON.stringify({
+      name: editingTemplate.name,
+      description: editingTemplate.description,
+      aspectRatio: editingTemplate.aspectRatio,
+      slides: editingTemplate.slides,
+      referenceSlideIndex: editingTemplate.referenceSlideIndex,
+      isDefault: editingTemplate.isDefault,
+    });
+    const original = JSON.stringify({
+      name: originalTemplate.name,
+      description: originalTemplate.description,
+      aspectRatio: originalTemplate.aspectRatio,
+      slides: originalTemplate.slides,
+      referenceSlideIndex: originalTemplate.referenceSlideIndex,
+      isDefault: originalTemplate.isDefault,
+    });
+    return current !== original;
+  }, [editingTemplate, originalTemplate]);
 
   // Calculate preview scale when preview opens or window resizes
   useEffect(() => {
@@ -376,23 +401,61 @@ export const TemplateManager: React.FC = () => {
   }, [templates, searchTerm]);
 
   const handleCreateClick = () => {
-    setEditingTemplate({
+    // Create a new slide with default song content styles
+    const defaultSlide = ensureSongContentStyles(
+      {
+        background: { type: 'color' as const, value: '#1a1a2e' },
+        images: [],
+        videos: [],
+        text: [],
+      },
+      '16:9'
+    );
+    
+    const newTemplate: PresentationTemplate = {
       name: 'New Template',
       description: '',
-      background: { type: 'color', value: '#ffffff' },
+      aspectRatio: '16:9',
+      slides: [defaultSlide],
+      referenceSlideIndex: 0,
+      // Legacy fields for compatibility
+      background: defaultSlide.background,
       images: [],
       videos: [],
       text: [],
       yaml: '',
       isDefault: false,
-    });
+    };
+    setEditingTemplate(newTemplate);
+    setOriginalTemplate(null); // New template has no original
     setYamlContent('');
     setValidationError('');
     setShowForm(true);
   };
 
   const handleEditClick = (template: PresentationTemplate) => {
-    setEditingTemplate(template);
+    // Deep clone the template to preserve original state
+    const clonedTemplate = JSON.parse(JSON.stringify(template));
+    
+    // Ensure reference slide has song content styles with defaults
+    let templateWithDefaults = { ...template };
+    const aspectRatio: AspectRatio = template.aspectRatio || '16:9';
+    const referenceIndex = template.referenceSlideIndex ?? 0;
+    
+    if (templateWithDefaults.slides && templateWithDefaults.slides.length > 0) {
+      const updatedSlides = [...templateWithDefaults.slides];
+      updatedSlides[referenceIndex] = ensureSongContentStyles(
+        updatedSlides[referenceIndex],
+        aspectRatio
+      );
+      templateWithDefaults = {
+        ...templateWithDefaults,
+        slides: updatedSlides,
+      };
+    }
+    
+    setEditingTemplate(templateWithDefaults);
+    setOriginalTemplate(clonedTemplate);
     setYamlContent(template.yaml || '');
     setValidationError('');
     setShowForm(true);
@@ -431,12 +494,30 @@ export const TemplateManager: React.FC = () => {
     try {
       setValidationError('');
 
+      // Ensure reference slide has song content styles with defaults
+      const aspectRatio: AspectRatio = editingTemplate.aspectRatio || '16:9';
+      const referenceIndex = editingTemplate.referenceSlideIndex ?? 0;
+      
+      // Apply defaults to reference slide if song content styles are missing
+      let templateWithDefaults = { ...editingTemplate };
+      if (templateWithDefaults.slides && templateWithDefaults.slides.length > 0) {
+        const updatedSlides = [...templateWithDefaults.slides];
+        updatedSlides[referenceIndex] = ensureSongContentStyles(
+          updatedSlides[referenceIndex],
+          aspectRatio
+        );
+        templateWithDefaults = {
+          ...templateWithDefaults,
+          slides: updatedSlides,
+        };
+      }
+
       // Determine the final YAML content based on editor mode
       let finalYamlContent: string;
       
       if (editorMode === 'wysiwyg') {
-        // In WYSIWYG mode, always generate YAML from the current template
-        finalYamlContent = templateToYaml(editingTemplate);
+        // In WYSIWYG mode, always generate YAML from the current template (with defaults applied)
+        finalYamlContent = templateToYaml(templateWithDefaults);
       } else {
         // In YAML mode, use the edited YAML content
         finalYamlContent = yamlContent;
@@ -450,7 +531,7 @@ export const TemplateManager: React.FC = () => {
       }
 
       const templateData = {
-        ...editingTemplate,
+        ...templateWithDefaults,
         ...validation.template,
         yaml: finalYamlContent,
       } as PresentationTemplate;
@@ -465,6 +546,7 @@ export const TemplateManager: React.FC = () => {
       if (result) {
         setShowForm(false);
         setEditingTemplate(null);
+        setOriginalTemplate(null);
         setYamlContent('');
         setSearchTerm(''); // Clear search to show newly created/updated template
         setSuccessMessage(
@@ -481,8 +563,17 @@ export const TemplateManager: React.FC = () => {
   };
 
   const handleFormCancel = () => {
+    if (hasUnsavedChanges) {
+      const confirmed = window.confirm(
+        'You have unsaved changes. Are you sure you want to close without saving?'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
     setShowForm(false);
     setEditingTemplate(null);
+    setOriginalTemplate(null);
     setYamlContent('');
     setValidationError('');
   };

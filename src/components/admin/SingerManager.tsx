@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSingers } from '../../contexts/SingerContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { RefreshIcon } from '../common';
@@ -13,6 +13,7 @@ export const SingerManager: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSinger, setEditingSinger] = useState<Singer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
 
   useEffect(() => {
     // Only fetch singers if we don't already have them in memory.
@@ -34,6 +35,15 @@ export const SingerManager: React.FC = () => {
   };
 
   const handleFormCancel = () => {
+    // Check for unsaved changes before closing
+    if (checkUnsavedChangesRef.current && checkUnsavedChangesRef.current()) {
+      const confirmed = window.confirm(
+        'You have unsaved changes. Are you sure you want to close without saving?'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
     setIsFormOpen(false);
     setEditingSinger(null);
   };
@@ -194,6 +204,7 @@ export const SingerManager: React.FC = () => {
           singer={editingSinger}
           onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
+          onUnsavedChangesRef={checkUnsavedChangesRef}
         />
       </Modal>
     </div>

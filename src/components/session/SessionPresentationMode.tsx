@@ -181,25 +181,75 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
     };
   }, [slides.length]);
 
-  // Handle fullscreen changes
+  // Handle fullscreen changes (with vendor prefixes for cross-browser support)
   useEffect(() => {
     const handleFullScreenChange = () => {
-      setIsFullScreen(!!document.fullscreenElement);
+      const isFS = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullScreen(isFS);
     };
 
     document.addEventListener('fullscreenchange', handleFullScreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullScreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullScreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullScreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullScreenChange);
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullScreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullScreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullScreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullScreenChange);
+    };
   }, []);
 
   const toggleFullScreen = useCallback(async () => {
     try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
+      const elem = document.documentElement as any;
+      
+      // Check if we're currently in fullscreen
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      
+      if (!isCurrentlyFullscreen) {
+        // Try to enter fullscreen with vendor prefixes
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          // Safari/iOS - note: iOS Safari doesn't support fullscreen for non-video elements
+          await elem.webkitRequestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+          await elem.mozRequestFullScreen();
+        } else if (elem.msRequestFullscreen) {
+          await elem.msRequestFullscreen();
+        } else {
+          // Fallback: No fullscreen API available (common on iOS)
+          alert('Fullscreen is not supported on this device. For the best experience on iOS, add this page to your home screen.');
+        }
       } else {
-        await document.exitFullscreen();
+        // Exit fullscreen with vendor prefixes
+        const doc = document as any;
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen();
+        } else if (doc.mozCancelFullScreen) {
+          await doc.mozCancelFullScreen();
+        } else if (doc.msExitFullscreen) {
+          await doc.msExitFullscreen();
+        }
       }
     } catch (err) {
       console.error('Error toggling fullscreen:', err);
+      // On iOS Safari, fullscreen API throws an error
+      alert('Fullscreen is not supported on this device. For the best experience, rotate your device to landscape mode.');
     }
   }, []);
 

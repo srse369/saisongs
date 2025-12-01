@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Song, CreateSongInput } from '../../types';
 
 interface SongFormProps {
   song?: Song | null;
   onSubmit: (input: CreateSongInput) => Promise<void>;
   onCancel: () => void;
+  onUnsavedChangesRef?: React.MutableRefObject<(() => boolean) | null>;
 }
 
-export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) => {
+export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, onUnsavedChangesRef }) => {
   const [name, setName] = useState('');
   const [externalSourceUrl, setExternalSourceUrl] = useState('');
   const [lyrics, setLyrics] = useState('');
@@ -28,6 +29,76 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditMode = !!song;
+  
+  // Track if form has unsaved changes
+  const hasUnsavedChanges = useMemo(() => {
+    if (song) {
+      // Edit mode - compare with original values
+      return (
+        name !== song.name ||
+        externalSourceUrl !== song.externalSourceUrl ||
+        lyrics !== (song.lyrics || '') ||
+        meaning !== (song.meaning || '') ||
+        language !== (song.language || '') ||
+        deity !== (song.deity || '') ||
+        tempo !== (song.tempo || '') ||
+        beat !== (song.beat || '') ||
+        raga !== (song.raga || '') ||
+        level !== (song.level || '') ||
+        songTags !== (song.songTags || '') ||
+        audioLink !== (song.audioLink || '') ||
+        videoLink !== (song.videoLink || '') ||
+        goldenVoice !== (song.goldenVoice || false) ||
+        referenceGentsPitch !== (song.referenceGentsPitch || '') ||
+        referenceLadiesPitch !== (song.referenceLadiesPitch || '')
+      );
+    } else {
+      // Create mode - check if any field has content
+      return !!(
+        name.trim() ||
+        externalSourceUrl.trim() ||
+        lyrics.trim() ||
+        meaning.trim() ||
+        language.trim() ||
+        deity.trim() ||
+        tempo.trim() ||
+        beat.trim() ||
+        raga.trim() ||
+        level.trim() ||
+        songTags.trim() ||
+        audioLink.trim() ||
+        videoLink.trim() ||
+        goldenVoice ||
+        referenceGentsPitch.trim() ||
+        referenceLadiesPitch.trim()
+      );
+    }
+  }, [song, name, externalSourceUrl, lyrics, meaning, language, deity, tempo, beat, raga, level, songTags, audioLink, videoLink, goldenVoice, referenceGentsPitch, referenceLadiesPitch]);
+
+  // Expose hasUnsavedChanges check to parent via ref
+  useEffect(() => {
+    if (onUnsavedChangesRef) {
+      onUnsavedChangesRef.current = () => hasUnsavedChanges;
+    }
+    return () => {
+      if (onUnsavedChangesRef) {
+        onUnsavedChangesRef.current = null;
+      }
+    };
+  }, [hasUnsavedChanges, onUnsavedChangesRef]);
+
+  // Handle cancel with unsaved changes check
+  const handleCancel = () => {
+    if (hasUnsavedChanges) {
+      const confirmed = window.confirm(
+        'You have unsaved changes. Are you sure you want to close without saving?'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    onCancel();
+  };
 
   useEffect(() => {
     if (song) {
@@ -417,7 +488,7 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel }) 
       <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
         <button
           type="button"
-          onClick={onCancel}
+          onClick={handleCancel}
           disabled={isSubmitting}
           className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
         >

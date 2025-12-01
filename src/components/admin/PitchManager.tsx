@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { usePitches } from '../../contexts/PitchContext';
 import { useSongs } from '../../contexts/SongContext';
@@ -53,6 +53,7 @@ export const PitchManager: React.FC = () => {
 
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [visibleCount, setVisibleCount] = useState(100);
+  const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // Sync advanced filters with URL parameters (when navigating from Songs/Singers tab)
@@ -122,11 +123,20 @@ export const PitchManager: React.FC = () => {
     clearPitchError();
   };
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
+    // Check for unsaved changes before closing
+    if (checkUnsavedChangesRef.current && checkUnsavedChangesRef.current()) {
+      const confirmed = window.confirm(
+        'You have unsaved changes. Are you sure you want to close without saving?'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
     setShowForm(false);
     setEditingPitch(null);
     clearPitchError();
-  };
+  }, [clearPitchError]);
 
   const handleSubmit = async (input: CreatePitchInput) => {
     let result;
@@ -500,6 +510,7 @@ export const PitchManager: React.FC = () => {
             singers={singers}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
+            onUnsavedChangesRef={checkUnsavedChangesRef}
           />
         </Modal>
       )}

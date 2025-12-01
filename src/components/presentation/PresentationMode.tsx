@@ -25,6 +25,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
   const [templatePickerExpanded, setTemplatePickerExpanded] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState<PresentationTemplate | null>(null);
   const [songData, setSongData] = useState<Song | null>(null);
+  const [presentationScale, setPresentationScale] = useState(1);
   const [searchParams] = useSearchParams();
   const singerName = searchParams.get('singerName') || undefined;
   const pitch = searchParams.get('pitch') || undefined;
@@ -184,25 +185,107 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     };
   }, [slides.length]);
 
-  // Handle fullscreen changes
+  // Handle fullscreen changes (with vendor prefixes for cross-browser support)
   useEffect(() => {
     const handleFullScreenChange = () => {
-      setIsFullScreen(!!document.fullscreenElement);
+      const isFS = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullScreen(isFS);
     };
 
     document.addEventListener('fullscreenchange', handleFullScreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullScreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullScreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullScreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullScreenChange);
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullScreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullScreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullScreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullScreenChange);
+    };
   }, []);
+
+  // Calculate scale for the slide to fit the screen while maintaining aspect ratio
+  useEffect(() => {
+    const calculateScale = () => {
+      const aspectRatio = activeTemplate?.aspectRatio || '16:9';
+      const baseWidth = aspectRatio === '4:3' ? 1600 : 1920;
+      const baseHeight = aspectRatio === '4:3' ? 1200 : 1080;
+
+      // Use window size as container, leaving space for controls
+      const containerWidth = window.innerWidth - 32; // small padding
+      const containerHeight = window.innerHeight - 64; // leave space for controls
+
+      if (containerWidth <= 0 || containerHeight <= 0) {
+        setPresentationScale(1);
+        return;
+      }
+
+      const scale = Math.min(
+        containerWidth / baseWidth,
+        containerHeight / baseHeight,
+        1 // Don't scale up beyond 100%
+      );
+
+      setPresentationScale(scale);
+    };
+
+    // Run once on mount / template change and on resize
+    calculateScale();
+    window.addEventListener('resize', calculateScale);
+    return () => window.removeEventListener('resize', calculateScale);
+  }, [activeTemplate]);
 
   const toggleFullScreen = useCallback(async () => {
     try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
+      const elem = document.documentElement as any;
+      
+      // Check if we're currently in fullscreen
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      
+      if (!isCurrentlyFullscreen) {
+        // Try to enter fullscreen with vendor prefixes
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          // Safari/iOS - note: iOS Safari doesn't support fullscreen for non-video elements
+          await elem.webkitRequestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+          await elem.mozRequestFullScreen();
+        } else if (elem.msRequestFullscreen) {
+          await elem.msRequestFullscreen();
+        } else {
+          // Fallback: No fullscreen API available (common on iOS)
+          // Show a message to the user
+          alert('Fullscreen is not supported on this device. For the best experience on iOS, add this page to your home screen.');
+        }
       } else {
-        await document.exitFullscreen();
+        // Exit fullscreen with vendor prefixes
+        const doc = document as any;
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen();
+        } else if (doc.mozCancelFullScreen) {
+          await doc.mozCancelFullScreen();
+        } else if (doc.msExitFullscreen) {
+          await doc.msExitFullscreen();
+        }
       }
     } catch (err) {
       console.error('Error toggling fullscreen:', err);
+      // On iOS Safari, fullscreen API throws an error
+      alert('Fullscreen is not supported on this device. For the best experience, rotate your device to landscape mode.');
     }
   }, []);
 
@@ -250,22 +333,38 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
   const aspectRatio = activeTemplate?.aspectRatio || '16:9';
   const slideWidth = aspectRatio === '4:3' ? 1600 : 1920;
   const slideHeight = aspectRatio === '4:3' ? 1200 : 1080;
-  const aspectRatioValue = slideWidth / slideHeight;
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-black flex items-center justify-center">
-      {/* Slide container with aspect ratio */}
-      <div 
-        className="relative bg-gray-900"
+      {/* Centered slide container using scaled wrapper for proper font scaling on mobile */}
+      <div
+        className="relative bg-black flex items-center justify-center"
         style={{
           width: '100%',
           height: '100%',
-          maxWidth: `calc(100vh * ${aspectRatioValue})`,
-          maxHeight: `calc(100vw / ${aspectRatioValue})`,
-          aspectRatio: `${slideWidth} / ${slideHeight}`,
         }}
       >
-        <SlideView slide={currentSlide} showTranslation={true} template={activeTemplate} />
+        {/* Wrapper with final scaled dimensions */}
+        <div
+          className="relative"
+          style={{
+            width: Math.round(slideWidth * presentationScale),
+            height: Math.round(slideHeight * presentationScale),
+          }}
+        >
+          {/* Scaled slide container - transform scales everything including fonts */}
+          <div
+            className="absolute top-0 left-0 shadow-2xl"
+            style={{
+              width: slideWidth,
+              height: slideHeight,
+              transform: `scale(${presentationScale})`,
+              transformOrigin: 'top left',
+            }}
+          >
+            <SlideView slide={currentSlide} showTranslation={true} template={activeTemplate} />
+          </div>
+        </div>
       </div>
 
       {/* Navigation controls at bottom center - auto-hide after 2 seconds */}

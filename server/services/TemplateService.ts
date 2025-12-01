@@ -54,6 +54,7 @@ export interface TextElement {
   fontSize?: string;
   color?: string;
   fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
+  fontStyle?: 'normal' | 'italic';
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';
   opacity?: number;
@@ -64,11 +65,20 @@ export interface TextElement {
 
 // Song content styling for reference slides
 export interface SongContentStyle {
-  yPosition: number;        // Vertical position as percentage (0-100)
+  // Position in slide coordinates (pixels)
+  x: number;
+  y: number;
+  width: number;
+  height?: number;
+  // Font styling
   fontSize: string;         // e.g., "48px", "3rem"
   fontWeight: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
+  fontFamily?: string;
   textAlign: 'left' | 'center' | 'right';
   color: string;            // e.g., "#ffffff"
+  // Legacy: yPosition as percentage (deprecated, use y instead)
+  yPosition?: number;
 }
 
 // Individual slide within a multi-slide template
@@ -87,6 +97,66 @@ export interface TemplateSlide {
 // Multi-slide presentation template
 // Aspect ratio options for templates
 export type AspectRatio = '16:9' | '4:3';
+
+// Default song content styles for reference slides
+const DEFAULT_SONG_TITLE_STYLE: SongContentStyle = {
+  x: 40,
+  y: 54, // ~5% of 1080
+  width: 1840,
+  fontSize: '48px',
+  fontWeight: 'bold',
+  textAlign: 'center',
+  color: '#ffffff',
+};
+
+const DEFAULT_SONG_LYRICS_STYLE: SongContentStyle = {
+  x: 40,
+  y: 216, // ~20% of 1080
+  width: 1840,
+  fontSize: '36px',
+  fontWeight: 'bold',
+  textAlign: 'center',
+  color: '#ffffff',
+};
+
+const DEFAULT_SONG_TRANSLATION_STYLE: SongContentStyle = {
+  x: 40,
+  y: 810, // ~75% of 1080
+  width: 1840,
+  fontSize: '24px',
+  fontWeight: 'normal',
+  textAlign: 'center',
+  color: '#ffffff',
+};
+
+// Ensure a slide has song content styles, applying defaults if missing
+function ensureSongContentStyles(slide: TemplateSlide, aspectRatio: AspectRatio = '16:9'): TemplateSlide {
+  const dimensions = aspectRatio === '4:3' ? { width: 1600, height: 1200 } : { width: 1920, height: 1080 };
+  const scaleY = dimensions.height / 1080;
+  const scaleX = dimensions.width / 1920;
+  
+  return {
+    ...slide,
+    songTitleStyle: slide.songTitleStyle || {
+      ...DEFAULT_SONG_TITLE_STYLE,
+      x: Math.round(DEFAULT_SONG_TITLE_STYLE.x * scaleX),
+      y: Math.round(DEFAULT_SONG_TITLE_STYLE.y * scaleY),
+      width: Math.round(DEFAULT_SONG_TITLE_STYLE.width * scaleX),
+    },
+    songLyricsStyle: slide.songLyricsStyle || {
+      ...DEFAULT_SONG_LYRICS_STYLE,
+      x: Math.round(DEFAULT_SONG_LYRICS_STYLE.x * scaleX),
+      y: Math.round(DEFAULT_SONG_LYRICS_STYLE.y * scaleY),
+      width: Math.round(DEFAULT_SONG_LYRICS_STYLE.width * scaleX),
+    },
+    songTranslationStyle: slide.songTranslationStyle || {
+      ...DEFAULT_SONG_TRANSLATION_STYLE,
+      x: Math.round(DEFAULT_SONG_TRANSLATION_STYLE.x * scaleX),
+      y: Math.round(DEFAULT_SONG_TRANSLATION_STYLE.y * scaleY),
+      width: Math.round(DEFAULT_SONG_TRANSLATION_STYLE.width * scaleX),
+    },
+  };
+}
 
 export interface PresentationTemplate {
   id?: string;
@@ -256,6 +326,15 @@ class TemplateService {
 
         console.log('📋 Final template:', row.NAME, 'slides:', template.slides?.length, 'refIndex:', template.referenceSlideIndex);
 
+        // Ensure reference slide has song content styles with defaults
+        if (template.slides && template.slides.length > 0) {
+          const refIndex = template.referenceSlideIndex ?? 0;
+          template.slides[refIndex] = ensureSongContentStyles(
+            template.slides[refIndex],
+            template.aspectRatio || '16:9'
+          );
+        }
+
         // Reconstruct YAML from template data
         template.yaml = this.templateToYaml(template);
 
@@ -331,6 +410,15 @@ class TemplateService {
         template.referenceSlideIndex = 0;
       }
 
+      // Ensure reference slide has song content styles with defaults
+      if (template.slides && template.slides.length > 0) {
+        const refIndex = template.referenceSlideIndex ?? 0;
+        template.slides[refIndex] = ensureSongContentStyles(
+          template.slides[refIndex],
+          template.aspectRatio || '16:9'
+        );
+      }
+
       // Reconstruct YAML from template data
       template.yaml = this.templateToYaml(template);
 
@@ -402,6 +490,15 @@ class TemplateService {
           text: template.text,
         }];
         template.referenceSlideIndex = 0;
+      }
+
+      // Ensure reference slide has song content styles with defaults
+      if (template.slides && template.slides.length > 0) {
+        const refIndex = template.referenceSlideIndex ?? 0;
+        template.slides[refIndex] = ensureSongContentStyles(
+          template.slides[refIndex],
+          template.aspectRatio || '16:9'
+        );
       }
 
       // Reconstruct YAML from template data

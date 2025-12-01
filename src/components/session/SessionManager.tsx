@@ -441,15 +441,6 @@ export const SessionManager: React.FC = () => {
                     </svg>
                   </button>
                   <button
-                    className="flex items-center gap-2 p-2 rounded-md text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                    title="Drag to reorder"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                    </svg>
-                    <span className="text-sm font-medium whitespace-nowrap">Reorder</span>
-                  </button>
-                  <button
                     onClick={() => removeSong(entry.songId, entry.singerId)}
                     title="Remove"
                     className="flex items-center gap-2 p-2 rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"

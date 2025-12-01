@@ -3,6 +3,7 @@
  */
 
 import type { PresentationTemplate, TemplateSlide } from '../types';
+import { getFontFamily } from './fonts';
 
 // =============================================================================
 // Template helper functions
@@ -254,16 +255,15 @@ export const TemplateText: React.FC<{ template: PresentationTemplate | null }> =
           boxStyles.top = typeof textElement.y === 'number' ? `${textElement.y}px` : textElement.y;
         }
 
-        // Dimensions: width and height define the text box bounds
+        // Dimensions: width controls text wrapping, height is auto-sized like Konva
         if (textElement.width) {
           boxStyles.width = typeof textElement.width === 'number' ? `${textElement.width}px` : textElement.width;
         } else if (textElement.maxWidth) {
           // Fallback to maxWidth for backward compatibility
           boxStyles.width = textElement.maxWidth;
         }
-        if (textElement.height) {
-          boxStyles.height = typeof textElement.height === 'number' ? `${textElement.height}px` : textElement.height;
-        }
+        // Note: We don't set a fixed height for text - Konva auto-sizes height based on content,
+        // so we let CSS do the same. This ensures all lines of text are visible.
 
         // Rotation (only for explicit x/y positioned elements)
         if (textElement.rotation !== undefined && !textElement.position) {
@@ -275,12 +275,12 @@ export const TemplateText: React.FC<{ template: PresentationTemplate | null }> =
         boxStyles.fontSize = textElement.fontSize;
         boxStyles.color = textElement.color;
         boxStyles.fontWeight = textElement.fontWeight;
-        boxStyles.fontFamily = textElement.fontFamily || 'Arial';
+        boxStyles.fontStyle = textElement.fontStyle || 'normal';
+        boxStyles.fontFamily = getFontFamily(textElement.fontFamily);
         boxStyles.textAlign = textElement.textAlign || 'center';
         boxStyles.whiteSpace = 'pre-wrap';
         // Konva uses lineHeight of 1.0 by default (font size = line height)
         boxStyles.lineHeight = 1;
-        boxStyles.overflow = 'hidden';
 
         return (
           <div
@@ -508,16 +508,15 @@ export const SlideText: React.FC<{ templateSlide: TemplateSlide | null }> = ({ t
           boxStyles.top = typeof textElement.y === 'number' ? `${textElement.y}px` : textElement.y;
         }
 
-        // Dimensions: width and height define the text box bounds
+        // Dimensions: width controls text wrapping, height is auto-sized like Konva
         if (textElement.width) {
           boxStyles.width = typeof textElement.width === 'number' ? `${textElement.width}px` : textElement.width;
         } else if (textElement.maxWidth) {
           // Fallback to maxWidth for backward compatibility
           boxStyles.width = textElement.maxWidth;
         }
-        if (textElement.height) {
-          boxStyles.height = typeof textElement.height === 'number' ? `${textElement.height}px` : textElement.height;
-        }
+        // Note: We don't set a fixed height for text - Konva auto-sizes height based on content,
+        // so we let CSS do the same. This ensures all lines of text are visible.
 
         // Rotation (only for explicit x/y positioned elements)
         if (textElement.rotation !== undefined && !textElement.position) {
@@ -529,12 +528,12 @@ export const SlideText: React.FC<{ templateSlide: TemplateSlide | null }> = ({ t
         boxStyles.fontSize = textElement.fontSize;
         boxStyles.color = textElement.color;
         boxStyles.fontWeight = textElement.fontWeight;
-        boxStyles.fontFamily = textElement.fontFamily || 'Arial';
+        boxStyles.fontStyle = textElement.fontStyle || 'normal';
+        boxStyles.fontFamily = getFontFamily(textElement.fontFamily);
         boxStyles.textAlign = textElement.textAlign || 'center';
         boxStyles.whiteSpace = 'pre-wrap';
         // Konva uses lineHeight of 1.0 by default (font size = line height)
         boxStyles.lineHeight = 1;
-        boxStyles.overflow = 'hidden';
 
         return (
           <div
