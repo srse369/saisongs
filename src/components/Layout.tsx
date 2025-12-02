@@ -72,12 +72,14 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <MusicIcon className="w-4 h-4 mr-1.5" />
                     Pitches
                   </Link>
-                  <Link to="/admin/templates" className={getLinkClasses('/admin/templates')}>
-                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4m0-21h10a2 2 0 012 2v14a2 2 0 01-2 2m-10-21v21m0-21H9m10 0h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m0-21v21m0-21H9" />
-                    </svg>
-                    Templates
-                  </Link>
+                  {userRole === 'admin' && (
+                    <Link to="/admin/templates" className={getLinkClasses('/admin/templates')}>
+                      <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4m0-21h10a2 2 0 012 2v14a2 2 0 01-2 2m-10-21v21m0-21H9m10 0h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m0-21v21m0-21H9" />
+                      </svg>
+                      Templates
+                    </Link>
+                  )}
                 </>
               )}
               
@@ -278,16 +280,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <MusicIcon className="w-5 h-5 mr-2 inline" />
                     Pitches
                   </Link>
-                  <Link
-                    to="/admin/templates"
-                    className={`block ${getLinkClasses('/admin/templates')}`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4m0-21h10a2 2 0 012 2v14a2 2 0 01-2 2m-10-21v21m0-21H9m10 0h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m0-21v21m0-21H9" />
-                    </svg>
-                    Templates
-                  </Link>
+                  {userRole === 'admin' && (
+                    <Link
+                      to="/admin/templates"
+                      className={`block ${getLinkClasses('/admin/templates')}`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4m0-21h10a2 2 0 012 2v14a2 2 0 01-2 2m-10-21v21m0-21H9m10 0h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m0-21v21m0-21H9" />
+                      </svg>
+                      Templates
+                    </Link>
+                  )}
                 </>
               )}
               
