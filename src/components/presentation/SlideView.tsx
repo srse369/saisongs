@@ -2,7 +2,7 @@ import React from 'react';
 import type { Slide, PresentationTemplate, TemplateSlide, SongContentStyle } from '../../types';
 import { DEFAULT_SONG_TITLE_STYLE, DEFAULT_SONG_LYRICS_STYLE, DEFAULT_SONG_TRANSLATION_STYLE } from '../../types';
 import { formatPitch } from '../../utils/pitchUtils';
-import { getBackgroundStyles, getSlideBackgroundStyles, getReferenceSlide, TemplateBackground, TemplateImages, TemplateVideos, TemplateText, SlideBackground, SlideImages, SlideVideos, SlideText } from '../../utils/templateUtils';
+import { getBackgroundStyles, getSlideBackgroundStyles, getReferenceSlide, TemplateBackground, TemplateImages, TemplateVideos, TemplateAudios, TemplateText, SlideBackground, SlideImages, SlideVideos, SlideAudios, SlideText } from '../../utils/templateUtils';
 import { getFontFamily } from '../../utils/fonts';
 
 interface SlideViewProps {
@@ -177,6 +177,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         {/* Static slide overlays */}
         <SlideImages templateSlide={slide.templateSlide} />
         <SlideVideos templateSlide={slide.templateSlide} />
+        <SlideAudios templateSlide={slide.templateSlide} />
         <SlideText templateSlide={slide.templateSlide} />
       </div>
     );
@@ -330,6 +331,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         <>
           <SlideImages templateSlide={effectiveSlide} />
           <SlideVideos templateSlide={effectiveSlide} />
+          <SlideAudios templateSlide={effectiveSlide} />
           <SlideText templateSlide={effectiveSlide} />
         </>
       ) : (

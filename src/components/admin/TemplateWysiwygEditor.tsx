@@ -22,6 +22,8 @@ preloadFonts();
 interface TemplateWysiwygEditorProps {
   template: PresentationTemplate;
   onTemplateChange: (template: PresentationTemplate) => void;
+  onEscape?: (hasChanges: boolean) => void;
+  onSlideIndexChange?: (index: number) => void;
 }
 
 // Get slide dimensions based on aspect ratio
@@ -229,7 +231,8 @@ type CanvasElement = {
   zIndex?: number;
   // For video/audio behavior
   autoPlay?: boolean;
-  audioOnly?: boolean;
+  hideVideo?: boolean;
+  hideAudio?: boolean;
   visualHidden?: boolean;
   volume?: number;
 };
@@ -346,7 +349,8 @@ const DraggableText: React.FC<{
   stageRef: React.RefObject<Konva.Stage>;
   scale: number;
   onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
-}> = ({ element, isSelected, onSelect, onChange, stageRef, scale, onContextMenu }) => {
+  onEditingChange?: (isEditing: boolean) => void;
+}> = ({ element, isSelected, onSelect, onChange, stageRef, scale, onContextMenu, onEditingChange }) => {
   const shapeRef = useRef<Konva.Text>(null);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -416,6 +420,7 @@ const DraggableText: React.FC<{
     textarea.focus();
     textarea.select();
     setIsEditing(true);
+    onEditingChange?.(true);
 
     // Auto-resize textarea height
     const resizeTextarea = () => {
@@ -432,14 +437,18 @@ const DraggableText: React.FC<{
       document.body.removeChild(textarea);
       textNode.show();
       setIsEditing(false);
+      onEditingChange?.(false);
     };
 
     // Handle keydown (Enter without shift to finish, Escape to cancel)
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
         document.body.removeChild(textarea);
         textNode.show();
         setIsEditing(false);
+        onEditingChange?.(false);
       }
       // Allow Enter for newlines (shift+enter or just enter for multiline)
     };
@@ -555,7 +564,7 @@ const VideoPlaceholder: React.FC<{
         cornerRadius={6}
       />
       <Text
-        text={element.audioOnly ? "🎵 Audio" : "▶ Video"}
+        text={element.hideVideo ? "🎵 Audio" : "▶ Video"}
         fontSize={16}
         fill="#e5e7eb"
         x={8}
@@ -661,11 +670,14 @@ type HistoryState = {
 export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   template,
   onTemplateChange,
+  onEscape,
+  onSlideIndexChange,
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedSlideIndex, setSelectedSlideIndex] = useState(0);
   const [slideListHasFocus, setSlideListHasFocus] = useState(true);
   const [canvasHasFocus, setCanvasHasFocus] = useState(false);
+  const [isTextEditing, setIsTextEditing] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; slideIndex: number } | null>(null);
   const [elementContextMenu, setElementContextMenu] = useState<{ x: number; y: number; elementId: string } | null>(null);
   const [showSongPicker, setShowSongPicker] = useState(false);
@@ -676,6 +688,19 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  
+  // On mount, ensure first slide is selected and canvas has focus
+  useEffect(() => {
+    setSelectedSlideIndex(0);
+    setSelectedId(null);
+    setSlideListHasFocus(false);
+    setCanvasHasFocus(true);
+  }, []); // Run only once on mount
+  
+  // Notify parent when selected slide index changes
+  useEffect(() => {
+    onSlideIndexChange?.(selectedSlideIndex);
+  }, [selectedSlideIndex, onSlideIndexChange]);
   
   // Wait for fonts to load before rendering canvas
   useEffect(() => {
@@ -957,7 +982,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           opacity: vid.opacity,
           zIndex: vid.zIndex || 1,
           autoPlay: vid.autoPlay,
-          audioOnly: vid.audioOnly,
+          hideVideo: vid.hideVideo,
+          hideAudio: vid.hideAudio,
           rotation: vid.rotation,
         };
       }),
@@ -1138,7 +1164,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           opacity: updates.opacity ?? videos[vidIndex].opacity,
           url: updates.url ?? videos[vidIndex].url,
           autoPlay: updates.autoPlay ?? videos[vidIndex].autoPlay,
-          audioOnly: updates.audioOnly ?? videos[vidIndex].audioOnly,
+          hideVideo: updates.hideVideo ?? videos[vidIndex].hideVideo,
+          hideAudio: updates.hideAudio ?? videos[vidIndex].hideAudio,
+          visualHidden: updates.visualHidden ?? videos[vidIndex].visualHidden,
           zIndex: updates.zIndex !== undefined ? updates.zIndex : videos[vidIndex].zIndex,
           rotation:
             updates.rotation !== undefined
@@ -1309,6 +1337,27 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         return;
       }
 
+      // Escape: Three-tier behavior - exit text edit → deselect element → close dialog
+      if (e.key === 'Escape') {
+        // Tier 1: If text is being edited, the textarea's handler will exit edit mode
+        // (that handler calls e.preventDefault() and e.stopPropagation())
+        if (isTextEditing) {
+          // Text editing handler will take care of it
+          return;
+        }
+        
+        // Tier 2: If an element is selected (but not editing), deselect it
+        if (selectedId) {
+          e.preventDefault();
+          e.stopPropagation();
+          setSelectedId(null);
+          return;
+        }
+        
+        // Tier 3: If nothing selected, let it propagate to Modal for exit handling
+        return;
+      }
+
       // Undo: Ctrl/Cmd + Z (works even without canvas focus)
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -1362,7 +1411,23 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       }
 
       // The following shortcuts require canvas focus and a selected element
-      if (!canvasHasFocus || !selectedId) return;
+      if (!canvasHasFocus || !selectedId) {
+        // Allow ArrowUp/ArrowDown to navigate slides when on canvas with no selection
+        if (canvasHasFocus && !selectedId) {
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const prevIndex = Math.max(0, selectedSlideIndex - 1);
+            setSelectedSlideIndex(prevIndex);
+            return;
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const nextIndex = Math.min(slides.length - 1, selectedSlideIndex + 1);
+            setSelectedSlideIndex(nextIndex);
+            return;
+          }
+        }
+        return;
+      }
 
       // Handle Delete/Backspace to delete selected element
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -1402,9 +1467,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       });
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canvasHasFocus, selectedId, canvasElements, updateElement, handleDeleteSelected, handleUndo, handleRedo, handleCopy, handlePaste]);
+    window.addEventListener('keydown', handleKeyDown, true); // Use capture phase to handle before Modal
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [canvasHasFocus, selectedId, canvasElements, updateElement, handleDeleteSelected, handleUndo, handleRedo, handleCopy, handlePaste, selectedSlideIndex, slides.length]);
 
   // Add new image (using full slide coordinates)
   const handleAddImage = () => {
@@ -1479,7 +1544,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     const newAudio: AudioElement = {
       id: `audio-${Date.now()}`,
       url: '',
-      width: '200px',
+      width: '1200px',
       height: '100px',
       x: '100px',
       y: '100px',
@@ -2075,10 +2140,10 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   return (
     <div className="flex flex-col gap-4">
       {/* Main editor area */}
-      <div className="flex gap-4">
+      <div className="flex gap-4" style={{ height: '580px' }}>
         {/* Slide thumbnails list (left) */}
         <div
-          className="w-44 flex-shrink-0 bg-gray-900/40 dark:bg-gray-900/60 rounded-lg p-2 max-h-[600px] overflow-y-auto"
+          className="w-44 flex-shrink-0 bg-gray-900/40 dark:bg-gray-900/60 rounded-lg p-2 overflow-y-auto"
         >
           {slides.map((slide, idx) => {
             const isSelected = idx === selectedSlideIndex;
@@ -2152,12 +2217,10 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       }
                     }
                   }}
-                  className={`w-full mb-2 last:mb-0 rounded-md text-left transition-colors cursor-grab active:cursor-grabbing ${
+                  className={`w-full mb-2 rounded-md text-left transition-colors cursor-grab active:cursor-grabbing outline-none ${
                     isSelected
-                      ? slideListHasFocus
-                        ? 'border-2 border-white bg-gray-800'
-                        : 'border border-blue-500 bg-gray-800'
-                      : 'border border-gray-700 bg-gray-900 hover:bg-gray-800'
+                      ? 'border-4 border-white bg-gray-800'
+                      : 'border-0 bg-gray-900 hover:bg-gray-800'
                   } ${draggedSlideIndex === idx ? 'opacity-50' : ''}`}
                 >
                 {/* Thumbnail with aspect ratio and elements */}
@@ -2741,6 +2804,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                         onChange={(updates) => updateElement(element.id, updates)}
                         stageRef={stageRef}
                         scale={SCALE}
+                        onEditingChange={setIsTextEditing}
                         onContextMenu={(e) => {
                           e.evt.preventDefault();
                           const stage = e.target.getStage();
@@ -2832,15 +2896,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
 
         {/* Properties Panel */}
         <div
-          className="w-72 flex-shrink-0 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-4 max-h-[600px] overflow-y-auto"
-          onMouseDown={() => {
-            setSlideListHasFocus(false);
-            setCanvasHasFocus(false);
-          }}
-          onFocusCapture={() => {
-            setSlideListHasFocus(false);
-            setCanvasHasFocus(false);
-          }}
+          className="w-72 flex-shrink-0 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-4 overflow-y-auto"
         >
           <h3 className="font-semibold text-gray-900 dark:text-white text-lg">Properties</h3>
           
@@ -3035,6 +3091,18 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                         className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                   </div>
+                  {selectedElement.url && selectedElement.hideVideo && selectedElement.url.trim() && (
+                    <div className="mt-2">
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Audio Preview</label>
+                      <audio
+                        key={selectedElement.url}
+                        src={selectedElement.url}
+                        controls
+                        className="w-full"
+                        style={{ height: '40px' }}
+                      />
+                    </div>
+                  )}
                   <div className="flex items-center justify-between mt-1">
                     <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                       <input
@@ -3052,13 +3120,26 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                       <input
                         type="checkbox"
-                        checked={selectedElement.audioOnly ?? false}
+                        checked={selectedElement.hideVideo ?? false}
                         onChange={(e) =>
-                          updateElement(selectedElement.id, { audioOnly: e.target.checked })
+                          updateElement(selectedElement.id, { hideVideo: e.target.checked })
                         }
                         className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                       />
-                      <span>Audio only (hide video)</span>
+                      <span>Hide Video player</span>
+                    </label>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <input
+                        type="checkbox"
+                        checked={selectedElement.hideAudio ?? false}
+                        onChange={(e) =>
+                          updateElement(selectedElement.id, { hideAudio: e.target.checked })
+                        }
+                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>Hide Audio player</span>
                     </label>
                   </div>
                   <div>
@@ -3086,6 +3167,18 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
+                  {selectedElement.url && selectedElement.url.trim() && (
+                    <div className="mt-2">
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Preview</label>
+                      <audio
+                        key={selectedElement.url}
+                        src={selectedElement.url}
+                        controls
+                        className="w-full"
+                        style={{ height: '40px' }}
+                      />
+                    </div>
+                  )}
                   <div className="flex items-center justify-between mt-1">
                     <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                       <input
@@ -3109,7 +3202,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                         }
                         className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                       />
-                      <span>Hide visual (audio only)</span>
+                      <span>Hide Audio player</span>
                     </label>
                   </div>
                   <div>

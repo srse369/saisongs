@@ -34,7 +34,9 @@ export interface VideoElement {
   loop?: boolean;
   muted?: boolean;
   rotation?: number;
-  audioOnly?: boolean; // Hide video, play audio only
+  audioOnly?: boolean; // DEPRECATED: Use hideVideo instead
+  hideVideo?: boolean; // Hide video, show audio controls only
+  hideAudio?: boolean; // Mute audio
 }
 
 export interface AudioElement {

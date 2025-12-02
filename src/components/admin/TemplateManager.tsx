@@ -71,7 +71,8 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
       if (vid.autoPlay !== undefined) lines.push(`${indent}    autoPlay: ${vid.autoPlay}`);
       if (vid.loop !== undefined) lines.push(`${indent}    loop: ${vid.loop}`);
       if (vid.muted !== undefined) lines.push(`${indent}    muted: ${vid.muted}`);
-      if (vid.audioOnly !== undefined) lines.push(`${indent}    audioOnly: ${vid.audioOnly}`);
+      if (vid.hideVideo !== undefined) lines.push(`${indent}    hideVideo: ${vid.hideVideo}`);
+      if (vid.hideAudio !== undefined) lines.push(`${indent}    hideAudio: ${vid.hideAudio}`);
       if (vid.rotation !== undefined) lines.push(`${indent}    rotation: ${Math.round(vid.rotation)}`);
     });
   } else {
@@ -252,11 +253,9 @@ export const TemplateManager: React.FC = () => {
   const [yamlContent, setYamlContent] = useState('');
   const [validationError, setValidationError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [editorSelectedSlideIndex, setEditorSelectedSlideIndex] = useState(0);
   const [editorMode, setEditorMode] = useState<'wysiwyg' | 'yaml'>('wysiwyg');
-  const [previewScale, setPreviewScale] = useState(1);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
-  const previewContainerRef = React.useRef<HTMLDivElement>(null);
-  const fullscreenContainerRef = React.useRef<HTMLDivElement>(null);
   
   // Check if template has unsaved changes
   const hasUnsavedChanges = React.useMemo(() => {
@@ -282,62 +281,6 @@ export const TemplateManager: React.FC = () => {
     });
     return current !== original;
   }, [editingTemplate, originalTemplate]);
-
-  // Calculate preview scale when preview opens or window resizes
-  useEffect(() => {
-    if (!previewTemplate || !previewContainerRef.current) return;
-    
-    const calculateScale = () => {
-      const container = previewContainerRef.current;
-      if (!container) return;
-      
-      const aspectRatio = previewTemplate.aspectRatio || '16:9';
-      const slideWidth = aspectRatio === '4:3' ? 1600 : 1920;
-      const slideHeight = aspectRatio === '4:3' ? 1200 : 1080;
-      
-      // Get container dimensions with padding
-      const containerWidth = container.clientWidth - 32; // 16px padding on each side
-      const containerHeight = container.clientHeight - 32;
-      
-      // Skip if container isn't measured yet
-      if (containerWidth <= 0 || containerHeight <= 0) return;
-      
-      const scaleX = containerWidth / slideWidth;
-      const scaleY = containerHeight / slideHeight;
-      const scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 100%
-      
-      setPreviewScale(scale);
-    };
-    
-    // Initial calculation with a small delay to ensure DOM is ready
-    const timeoutId = setTimeout(calculateScale, 50);
-    
-    // Also use ResizeObserver for more reliable updates
-    const resizeObserver = new ResizeObserver(calculateScale);
-    if (previewContainerRef.current) {
-      resizeObserver.observe(previewContainerRef.current);
-    }
-    
-    window.addEventListener('resize', calculateScale);
-    return () => {
-      clearTimeout(timeoutId);
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', calculateScale);
-    };
-  }, [previewTemplate]);
-
-  // Handle fullscreen toggle for preview
-  const togglePreviewFullscreen = useCallback(() => {
-    if (!fullscreenContainerRef.current) return;
-    
-    if (!document.fullscreenElement) {
-      fullscreenContainerRef.current.requestFullscreen().catch(err => {
-        console.error('Error attempting to enable fullscreen:', err);
-      });
-    } else {
-      document.exitFullscreen();
-    }
-  }, []);
 
   // Track fullscreen state changes
   useEffect(() => {
@@ -854,6 +797,7 @@ export const TemplateManager: React.FC = () => {
               <TemplateWysiwygEditor
                 template={editingTemplate}
                 onTemplateChange={setEditingTemplate}
+                onSlideIndexChange={setEditorSelectedSlideIndex}
               />
               {validationError && (
                 <div className="p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 rounded text-sm">
@@ -962,20 +906,37 @@ export const TemplateManager: React.FC = () => {
               </div>
                 </div>
 
-          <div className="flex gap-2 justify-end pt-4">
+          <div className="flex gap-2 justify-between pt-2">
             <button
-              onClick={handleFormCancel}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              onClick={() => {
+                if (editingTemplate) {
+                  setPreviewSlideIndex(editorSelectedSlideIndex);
+                  setPreviewTemplate(editingTemplate);
+                }
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
             >
-              Cancel
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Preview
             </button>
-            <button
-              onClick={handleFormSubmit}
-              disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {editingTemplate?.id ? 'Update Template' : 'Create Template'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleFormCancel}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleFormSubmit}
+                disabled={loading}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {editingTemplate?.id ? 'Update Template' : 'Create Template'}
+              </button>
+            </div>
           </div>
         </div>
       </Modal>
@@ -1018,8 +979,8 @@ export const TemplateManager: React.FC = () => {
         referenceSlideIndex={previewReferenceIndex}
         showDescription={true}
         description={previewTemplate?.description}
-        onFullscreenToggle={togglePreviewFullscreen}
         isFullscreen={previewFullscreen}
+        disableKeyboardNavigation={true}
       />
     </div>
   );

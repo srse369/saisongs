@@ -300,6 +300,100 @@ export const TemplateVideos: React.FC<{ template: PresentationTemplate | null }>
       {template.videos.map((video) => {
         const isYouTube = isYouTubeUrl(video.url);
         const autoPlay = video.autoPlay ?? true;
+        const hideVideo = video.hideVideo ?? false;
+        const hideAudio = video.hideAudio ?? false;
+        const visualHidden = video.visualHidden ?? false;
+
+        // If visualHidden or hideAudio is true, hide the entire element but still play audio
+        if (visualHidden || hideAudio) {
+          if (isYouTube) {
+            return (
+              <iframe
+                key={video.id}
+                src={getYouTubeEmbedUrl(video.url, autoPlay)}
+                style={{ 
+                  display: 'none',
+                }}
+                allow="autoplay; encrypted-media"
+                title={`Hidden Video ${video.id}`}
+              />
+            );
+          } else {
+            return (
+              <video
+                key={video.id}
+                src={video.url}
+                autoPlay={autoPlay}
+                loop={video.loop ?? true}
+                muted={video.muted ?? true}
+                playsInline
+                style={{ display: 'none' }}
+              />
+            );
+          }
+        }
+
+        if (hideVideo) {
+          // For YouTube videos with hideVideo, show compact iframe for audio playback
+          if (isYouTube) {
+            const audioWidth = (video.width === '320px' || video.width === '200px') ? '1200px' : (video.width || '1200px');
+            const elementStyles = getElementStyles(video);
+            const isFullscreen = !!document.fullscreenElement;
+            const topPosition = isFullscreen ? '-355px' : '-340px';
+            return (
+              <div
+                key={video.id}
+                className={`absolute ${getPositionClasses(video.position)}`}
+                style={{
+                  ...elementStyles,
+                  top: topPosition,  // Position video off-screen, controls at top
+                  height: '400px',  // Always 400px height
+                  display: 'block',
+                  width: audioWidth,
+                  zIndex: Math.max(elementStyles.zIndex || 0, 1),  // Ensure visible
+                  overflow: 'visible',
+                }}
+              >
+                <iframe
+                  src={getYouTubeEmbedUrl(video.url, autoPlay)}
+                  className="w-full h-full"
+                  style={{ 
+                    border: 'none',
+                  }}
+                  allow="autoplay; encrypted-media"
+                  title={`Audio ${video.id}`}
+                />
+              </div>
+            );
+          }
+          
+          // For regular video files, render as audio with controls
+          const audioWidth = (video.width === '320px' || video.width === '200px') ? '1200px' : (video.width || '1200px');
+          const elementStyles = getElementStyles(video);
+          return (
+            <div
+              key={video.id}
+              className={`absolute ${getPositionClasses(video.position)}`}
+              style={{
+                ...elementStyles,
+                display: 'block',
+                width: audioWidth,  // Override small widths with 1200px
+                zIndex: Math.max(elementStyles.zIndex || 0, 1),  // Ensure visible
+              }}
+            >
+              <audio
+                src={video.url}
+                autoPlay={autoPlay}
+                loop={video.loop ?? true}
+                controls
+                className="w-full"
+                style={{
+                  height: video.height || 'auto',
+                }}
+              />
+            </div>
+          );
+        }
 
         if (isYouTube) {
           return (
@@ -326,6 +420,48 @@ export const TemplateVideos: React.FC<{ template: PresentationTemplate | null }>
             className={`absolute ${getPositionClasses(video.position)}`}
             style={getElementStyles(video)}
           />
+        );
+      })}
+    </>
+  );
+};
+
+/**
+ * Render audio elements
+ */
+export const TemplateAudios: React.FC<{ template: PresentationTemplate | null }> = ({ template }) => {
+  if (!template?.audios || template.audios.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {template.audios.map((audio) => {
+        const autoPlay = audio.autoPlay ?? true;
+        const visualHidden = audio.visualHidden ?? false;
+
+        return (
+          <div
+            key={audio.id}
+            className={`absolute ${getPositionClasses(audio.position)}`}
+            style={{
+              ...getElementStyles(audio),
+              width: audio.width || '1200px',
+              display: 'block',
+            }}
+          >
+            <audio
+              src={audio.url}
+              autoPlay={autoPlay}
+              loop={audio.loop ?? false}
+              controls={!visualHidden}
+              className="w-full"
+              style={{
+                height: audio.height || 'auto',
+                display: visualHidden ? 'none' : 'block',
+              }}
+            />
+          </div>
         );
       })}
     </>
@@ -507,7 +643,99 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({
         const width = video.width || '320px';
         const height = video.height || '180px';
         const isYouTube = isYouTubeUrl(video.url);
-        const audioOnly = video.audioOnly ?? false;
+        const hideVideo = video.hideVideo ?? false;
+        const hideAudio = video.hideAudio ?? false;
+        const visualHidden = video.visualHidden ?? false;
+
+        // If visualHidden or hideAudio is true, hide the entire element but still play audio
+        if (visualHidden || hideAudio) {
+          if (isYouTube) {
+            return (
+              <iframe
+                key={video.id}
+                src={getYouTubeEmbedUrl(video.url, autoPlay)}
+                style={{ 
+                  display: 'none',
+                }}
+                allow="autoplay; encrypted-media"
+                title={`Hidden Video ${video.id}`}
+              />
+            );
+          } else {
+            return (
+              <video
+                key={video.id}
+                src={video.url}
+                autoPlay={autoPlay}
+                loop={video.loop ?? true}
+                muted={video.muted ?? true}
+                playsInline
+                style={{ display: 'none' }}
+              />
+            );
+          }
+        }
+
+        if (hideVideo) {
+          // For YouTube videos with hideVideo, we can't extract audio easily
+          // Show a message or use iframe hidden (audio still plays)
+          if (isYouTube) {
+            const audioWidth = (video.width === '320px' || video.width === '200px') ? '1200px' : (video.width || '1200px');
+            const isFullscreen = !!document.fullscreenElement;
+            const topPosition = isFullscreen ? '-355px' : '-340px';
+            return (
+              <div
+                key={video.id}
+                className={`absolute ${getPositionClasses(video.position)}`}
+                style={{
+                  ...baseStyles,
+                  top: topPosition,  // Position video off-screen, controls at top
+                  height: '400px',  // Always 400px height
+                  width: audioWidth,  // Override width after baseStyles
+                  display: 'block',
+                  zIndex: Math.max(baseStyles.zIndex || 0, 1),  // Ensure visible
+                  overflow: 'visible',
+                }}
+              >
+                <iframe
+                  src={getYouTubeEmbedUrl(video.url, autoPlay)}
+                  className="w-full h-full"
+                  style={{ 
+                    border: 'none',
+                  }}
+                  allow="autoplay; encrypted-media"
+                  title={`Audio ${video.id}`}
+                />
+              </div>
+            );
+          }
+          
+          // For regular video files, render as audio with controls
+          const audioWidth = (video.width === '320px' || video.width === '200px') ? '1200px' : (video.width || '1200px');
+          return (
+            <div
+              key={video.id}
+              className={`absolute ${getPositionClasses(video.position)}`}
+              style={{
+                ...baseStyles,
+                display: 'block',
+                width: audioWidth,  // Override small widths with 1200px
+                zIndex: Math.max(baseStyles.zIndex || 0, 1),  // Ensure visible
+              }}
+            >
+              <audio
+                src={video.url}
+                autoPlay={autoPlay}
+                loop={video.loop ?? true}
+                controls
+                className="w-full"
+                style={{
+                  height: video.height || 'auto',
+                }}
+              />
+            </div>
+          );
+        }
 
         return (
           <div
@@ -517,7 +745,7 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({
               ...baseStyles,
               width,
               height,
-              backgroundColor: audioOnly ? 'transparent' : '#000',
+              backgroundColor: '#000',
             }}
           >
             {isYouTube && video.url ? (
@@ -526,7 +754,6 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({
                 className="w-full h-full"
                 style={{ 
                   border: 'none',
-                  display: audioOnly ? 'none' : 'block',
                 }}
                 allow="autoplay; encrypted-media; picture-in-picture"
                 allowFullScreen
@@ -541,11 +768,51 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({
                 playsInline
                 controls={!autoPlay}
                 className="w-full h-full object-cover"
-                style={{
-                  display: audioOnly ? 'none' : 'block',
-                }}
               />
             )}
+          </div>
+        );
+      })}
+    </>
+  );
+};
+
+/**
+ * Render audio elements (for individual TemplateSlide)
+ */
+export const SlideAudios: React.FC<{ templateSlide: TemplateSlide | null }> = ({ templateSlide }) => {
+  if (!templateSlide?.audios || templateSlide.audios.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {templateSlide.audios.map((audio) => {
+        const autoPlay = audio.autoPlay ?? true;
+        const visualHidden = audio.visualHidden ?? false;
+        const baseStyles = getElementStyles(audio);
+
+        return (
+          <div
+            key={audio.id}
+            className={`absolute ${getPositionClasses(audio.position)}`}
+            style={{
+              ...baseStyles,
+              width: audio.width || '1200px',
+              display: 'block',
+            }}
+          >
+            <audio
+              src={audio.url}
+              autoPlay={autoPlay}
+              loop={audio.loop ?? false}
+              controls={!visualHidden}
+              className="w-full"
+              style={{
+                height: audio.height || 'auto',
+                display: visualHidden ? 'none' : 'block',
+              }}
+            />
           </div>
         );
       })}

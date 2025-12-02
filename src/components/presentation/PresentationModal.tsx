@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { SlideView } from './SlideView';
-import { getSlideBackgroundStyles, SlideBackground, SlideImages, SlideVideos, SlideText } from '../../utils/templateUtils';
+import { getSlideBackgroundStyles, SlideBackground, SlideImages, SlideVideos, SlideAudios, SlideText } from '../../utils/templateUtils';
 import type { Slide, TemplateSlide, PresentationTemplate } from '../../types';
 
 interface PresentationModalProps {
@@ -53,27 +53,47 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
   // Calculate scale
   useEffect(() => {
     const calculateScale = () => {
-      const containerWidth = window.innerWidth - 32;
-      const containerHeight = window.innerHeight - 224;
+      if (isFullscreen) {
+        // In fullscreen, use full window dimensions
+        const containerWidth = window.innerWidth;
+        const containerHeight = window.innerHeight;
 
-      if (containerWidth <= 0 || containerHeight <= 0) {
-        setScale(1);
-        return;
+        if (containerWidth <= 0 || containerHeight <= 0) {
+          setScale(1);
+          return;
+        }
+
+        const newScale = Math.min(
+          containerWidth / slideWidth,
+          containerHeight / slideHeight,
+          1
+        );
+
+        setScale(newScale);
+      } else {
+        // Not fullscreen, account for UI chrome
+        const containerWidth = window.innerWidth - 32;
+        const containerHeight = window.innerHeight - 224;
+
+        if (containerWidth <= 0 || containerHeight <= 0) {
+          setScale(1);
+          return;
+        }
+
+        const newScale = Math.min(
+          containerWidth / slideWidth,
+          containerHeight / slideHeight,
+          1
+        );
+
+        setScale(newScale);
       }
-
-      const newScale = Math.min(
-        containerWidth / slideWidth,
-        containerHeight / slideHeight,
-        1
-      );
-
-      setScale(newScale);
     };
 
     calculateScale();
     window.addEventListener('resize', calculateScale);
     return () => window.removeEventListener('resize', calculateScale);
-  }, [slideWidth, slideHeight]);
+  }, [slideWidth, slideHeight, isFullscreen]);
 
   // Keyboard navigation (can be disabled when parent handles it)
   useEffect(() => {
@@ -126,72 +146,74 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center p-2">
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full h-full max-w-full max-h-screen flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
-                {title}
-              </h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {slides.length > 1 
-                  ? `Slide ${currentSlideIndex + 1} of ${slides.length} • Use arrow keys to navigate • Press Esc to close`
-                  : 'Press Esc to close'}
-              </p>
-            </div>
-            {/* Aspect ratio and dimensions info */}
-            {template && (
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
-                  aspectRatio === '4:3'
-                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                    : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                }`}>
-                  📐 {aspectRatio}
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                  {slideWidth}×{slideHeight} → {Math.round(slideWidth * scale)}×{Math.round(slideHeight * scale)}px
-                </span>
+        {/* Header - Hidden in fullscreen */}
+        {!isFullscreen && (
+          <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
+            <div className="flex items-center gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                  {title}
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {slides.length > 1 
+                    ? `Slide ${currentSlideIndex + 1} of ${slides.length} • Use arrow keys to navigate • Press Esc to close`
+                    : 'Press Esc to close'}
+                </p>
               </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2 ml-4 flex-shrink-0">
-            {/* Custom top-right controls (e.g., template selector) */}
-            {topRightControls}
-            
-            {/* Fullscreen toggle button */}
-            <button
-              onClick={handleFullscreenToggle}
-              className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-            >
-              {isFullscreen ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                </svg>
+              {/* Aspect ratio and dimensions info */}
+              {template && (
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded ${
+                    aspectRatio === '4:3'
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                      : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                  }`}>
+                    📐 {aspectRatio}
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                    {slideWidth}×{slideHeight} → {Math.round(slideWidth * scale)}×{Math.round(slideHeight * scale)}px
+                  </span>
+                </div>
               )}
-            </button>
-            {/* Close button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isFullscreen && document.fullscreenElement) {
-                  document.exitFullscreen();
-                }
-                onClose();
-              }}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none"
-              aria-label="Close"
-            >
-              ✕
-            </button>
+            </div>
+            <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+              {/* Custom top-right controls (e.g., template selector) */}
+              {topRightControls}
+              
+              {/* Fullscreen toggle button */}
+              <button
+                onClick={handleFullscreenToggle}
+                className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              >
+                {isFullscreen ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                  </svg>
+                )}
+              </button>
+              {/* Close button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isFullscreen && document.fullscreenElement) {
+                    document.exitFullscreen();
+                  }
+                  onClose();
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Preview Content - Shows current slide scaled to fit */}
         <div 
@@ -199,7 +221,7 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
             (containerRef as any).current = el;
             (fullscreenContainerRef as any).current = el;
           }}
-          className="flex-1 overflow-hidden relative flex items-center justify-center bg-gray-900 p-4"
+          className={`flex-1 overflow-hidden relative flex items-center justify-center bg-gray-900 ${isFullscreen ? 'p-0' : 'p-4'}`}
         >
           {/* Wrapper that has the final scaled dimensions */}
           <div 
@@ -239,6 +261,7 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
                   <SlideBackground templateSlide={currentSlide as TemplateSlide} />
                   <SlideImages templateSlide={currentSlide as TemplateSlide} />
                   <SlideVideos templateSlide={currentSlide as TemplateSlide} />
+                  <SlideAudios templateSlide={currentSlide as TemplateSlide} />
                   <SlideText templateSlide={currentSlide as TemplateSlide} />
                 </div>
               ) : null}
@@ -264,8 +287,9 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
           </div>
         </div>
         
-        {/* Slide Navigation (always shown) */}
-        <div className="flex items-center justify-center gap-2 p-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+        {/* Slide Navigation - Hidden in fullscreen */}
+        {!isFullscreen && (
+          <div className="flex items-center justify-center gap-2 p-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
           <button
             onClick={() => onSlideChange(Math.max(0, currentSlideIndex - 1))}
             disabled={currentSlideIndex === 0}
@@ -319,9 +343,10 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
             )}
           </span>
         </div>
+        )}
 
-        {/* Footer with Details */}
-        {(showDescription || footerContent) && (
+        {/* Footer with Details - Hidden in fullscreen */}
+        {!isFullscreen && (showDescription || footerContent) && (
           <div className="bg-white dark:bg-gray-800 p-3 border-t border-gray-200 dark:border-gray-700 overflow-y-auto max-h-32 flex-shrink-0">
             <div className="grid grid-cols-1 gap-2 text-sm">
               {showDescription && description && (
@@ -337,8 +362,9 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
           </div>
         )}
 
-        {/* Footer with Close Button */}
-        <div className="flex gap-2 justify-end p-2 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
+        {/* Footer with Close Button - Hidden in fullscreen */}
+        {!isFullscreen && (
+          <div className="flex gap-2 justify-end p-2 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -352,6 +378,7 @@ export const PresentationModal: React.FC<PresentationModalProps> = ({
             Close
           </button>
         </div>
+        )}
       </div>
     </div>
   );
