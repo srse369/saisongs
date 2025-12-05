@@ -88,12 +88,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               
               {/* Database connection indicator + Auth controls */}
               <div className="ml-2 flex items-center space-x-2">
-                <DatabaseStatusDropdown 
-                  isConnected={isConnected}
-                  connectionError={connectionError}
-                  resetConnection={resetConnection}
-                  isAdmin={isAdmin}
-                />
+                {/* Only show database status to authenticated users */}
+                {isAuthenticated && (
+                  <DatabaseStatusDropdown 
+                    isConnected={isConnected}
+                    connectionError={connectionError}
+                    resetConnection={resetConnection}
+                    isAdmin={isAdmin}
+                  />
+                )}
 
                 {/* Login/Logout buttons */}
                 {isAuthenticated ? (
