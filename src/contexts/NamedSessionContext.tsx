@@ -171,7 +171,7 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (currentSession && currentSession.id === sessionId) {
         setCurrentSession({ ...currentSession, items: updatedItems });
       }
-      showToast('Session items updated successfully', 'success');
+      // Don't show toast here - it's an internal operation, parent will show appropriate message
       return updatedItems;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update session items';

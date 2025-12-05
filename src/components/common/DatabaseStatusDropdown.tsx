@@ -17,6 +17,12 @@ interface DatabaseStats {
   sessions: number;
 }
 
+interface BrevoStatus {
+  status: 'ok' | 'error';
+  message?: string;
+  configured: boolean;
+}
+
 export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
   isConnected,
   connectionError,
@@ -29,6 +35,8 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
   const [statsError, setStatsError] = useState<string | null>(null);
   const [reloadingCache, setReloadingCache] = useState(false);
   const [reloadMessage, setReloadMessage] = useState<string | null>(null);
+  const [brevoStatus, setBrevoStatus] = useState<BrevoStatus | null>(null);
+  const [brevoLoading, setBrevoLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -48,7 +56,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
     };
   }, [isOpen]);
 
-  // Fetch stats when dropdown opens and connected
+  // Fetch stats and Brevo status when dropdown opens
   useEffect(() => {
     const fetchStats = async () => {
       if (isOpen && isConnected && !stats) {
@@ -71,8 +79,28 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
       }
     };
 
+    const fetchBrevoStatus = async () => {
+      if (isOpen && !brevoStatus) {
+        setBrevoLoading(true);
+        try {
+          const response = await apiClient.get<BrevoStatus>('/health/brevo');
+          setBrevoStatus(response);
+        } catch (error) {
+          console.error('Failed to fetch Brevo status:', error);
+          setBrevoStatus({
+            status: 'error',
+            message: error instanceof Error ? error.message : 'Failed to check status',
+            configured: false
+          });
+        } finally {
+          setBrevoLoading(false);
+        }
+      }
+    };
+
     fetchStats();
-  }, [isOpen, isConnected, stats]);
+    fetchBrevoStatus();
+  }, [isOpen, isConnected, stats, brevoStatus]);
 
   const handleToggle = () => {
     setIsOpen(!isOpen);
@@ -81,6 +109,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
       setStats(null);
       setStatsError(null);
       setReloadMessage(null);
+      setBrevoStatus(null);
     }
   };
 
@@ -205,6 +234,46 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                     )}
                   </div>
                 )}
+                
+                {/* Brevo API Status */}
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Email Service (Brevo):</p>
+                  {brevoLoading ? (
+                    <div className="flex items-center justify-center py-2">
+                      <svg className="animate-spin h-4 w-4 text-blue-600 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  ) : brevoStatus ? (
+                    <div className="flex items-center space-x-2 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
+                      {brevoStatus.status === 'ok' ? (
+                        <>
+                          <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-sm text-green-700 dark:text-green-300 font-medium">Connected</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                          <div className="flex-1">
+                            <span className="text-sm text-red-700 dark:text-red-300 font-medium">
+                              {brevoStatus.configured ? 'Error' : 'Not Configured'}
+                            </span>
+                            {brevoStatus.message && (
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 break-words">
+                                {brevoStatus.message}
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
                 
                 {/* Reload Cache Button (Admin Only) */}
                 {isAdmin && (

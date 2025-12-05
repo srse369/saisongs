@@ -12,14 +12,8 @@ router.get('/', async (req, res) => {
   try {
     const allSessions = await cacheService.getAllSessions();
     
-    // Filter sessions by center access if user is authenticated
-    let sessions = allSessions;
-    if (req.user) {
-      const accessibleCenterIds = [...(req.user.centerIds || []), ...(req.user.editorFor || [])];
-      sessions = cacheService.filterByCenterAccess(allSessions, req.user.role, accessibleCenterIds);
-    }
-    
-    res.json(sessions);
+    // All sessions are visible to everyone (no filtering by center)
+    res.json(allSessions);
   } catch (error) {
     console.error('Error fetching sessions:', error);
     // Return empty array if database not configured or connection failed (for development)
@@ -102,13 +96,32 @@ router.put('/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    // Viewers can only update their own sessions
-    if (user.role === 'viewer') {
-      if (existingSession.created_by !== user.email) {
-        return res.status(403).json({ 
-          error: 'Access denied',
-          message: 'You can only update sessions that you created'
-        });
+    // Admins can edit any session
+    if (user.role !== 'admin') {
+      // Viewers can only edit their own sessions
+      if (user.role === 'viewer') {
+        if (existingSession.created_by !== user.email) {
+          return res.status(403).json({ 
+            error: 'Access denied',
+            message: 'You can only edit sessions that you created'
+          });
+        }
+      } 
+      // Editors can only edit sessions for centers they manage
+      else if (user.role === 'editor') {
+        const editorCenterIds = user.editorFor || [];
+        const sessionCenterIds = existingSession.center_ids || [];
+        
+        // Check if editor manages at least one of the session's centers
+        const hasAccess = sessionCenterIds.length === 0 || 
+          sessionCenterIds.some((cid: number) => editorCenterIds.includes(cid));
+        
+        if (!hasAccess) {
+          return res.status(403).json({ 
+            error: 'Access denied',
+            message: 'You can only edit sessions for centers where you are an editor'
+          });
+        }
       }
     }
 
@@ -138,7 +151,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Get the session with its items to check singer centers
+    // Get the session to check ownership and centers
     const session = await cacheService.getSession(id);
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
@@ -162,42 +175,25 @@ router.delete('/:id', requireAuth, async (req, res) => {
       return res.status(204).send();
     }
 
-    // For editors, check if session has singers with specific pitches
-    const sessionItems = session.items || [];
-    const itemsWithSingers = sessionItems.filter((item: any) => item.singerId);
-
-    if (itemsWithSingers.length === 0) {
-      // Session has no singers, any editor can delete
+    // Editors can only delete sessions for centers they manage
+    if (user.role === 'editor') {
+      const editorCenterIds = user.editorFor || [];
+      const sessionCenterIds = session.center_ids || [];
+      
+      // Check if editor manages at least one of the session's centers
+      const hasAccess = sessionCenterIds.length === 0 || 
+        sessionCenterIds.some((cid: number) => editorCenterIds.includes(cid));
+      
+      if (!hasAccess) {
+        return res.status(403).json({ 
+          error: 'Access denied',
+          message: 'You can only delete sessions for centers where you are an editor'
+        });
+      }
+      
       await cacheService.deleteSession(id);
       return res.status(204).send();
     }
-
-    // Get all unique singer IDs from the session
-    const singerIds = [...new Set(itemsWithSingers.map((item: any) => item.singerId))];
-    
-    // Get all singers to check their center associations
-    const allCenterIds = new Set<number>();
-    for (const singerId of singerIds) {
-      const singer = await cacheService.getSinger(String(singerId));
-      if (singer && singer.center_ids) {
-        singer.center_ids.forEach((cid: number) => allCenterIds.add(cid));
-      }
-    }
-
-    // Editor must have access to ALL centers that have singers in this session
-    const editableCenterIds = user.editorFor || [];
-    const hasAccessToAllCenters = Array.from(allCenterIds).every(cid => 
-      editableCenterIds.includes(cid)
-    );
-
-    if (!hasAccessToAllCenters) {
-      return res.status(403).json({ 
-        error: 'You can only delete sessions where you are an editor for all centers represented by the singers' 
-      });
-    }
-
-    await cacheService.deleteSession(id);
-    res.status(204).send();
   } catch (error) {
     console.error('Error deleting session:', error);
     res.status(500).json({ error: 'Failed to delete session' });

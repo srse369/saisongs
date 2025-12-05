@@ -78,8 +78,15 @@ class EmailService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('❌ Brevo API Error:', response.status, errorData);
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { raw: errorText };
+        }
+        console.error('❌ Brevo API Error:', response.status, response.statusText);
+        console.error('Error details:', JSON.stringify(errorData, null, 2));
         return false;
       }
 
@@ -89,6 +96,53 @@ class EmailService {
     } catch (error) {
       console.error('❌ Error sending email:', error);
       return false;
+    }
+  }
+
+  /**
+   * Check Brevo API health status
+   */
+  async checkHealth(): Promise<{ status: 'ok' | 'error'; message?: string; configured: boolean }> {
+    if (!this.apiKey) {
+      return { 
+        status: 'error', 
+        message: 'API key not configured', 
+        configured: false 
+      };
+    }
+
+    try {
+      // Check Brevo account endpoint to verify API key and connectivity
+      const response = await fetch('https://api.brevo.com/v3/account', {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'api-key': this.apiKey,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { raw: errorText };
+        }
+        return {
+          status: 'error',
+          message: `API Error: ${response.status} ${response.statusText}`,
+          configured: true
+        };
+      }
+
+      return { status: 'ok', configured: true };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        configured: true
+      };
     }
   }
 

@@ -614,13 +614,11 @@ export const SessionManager: React.FC = () => {
                       </div>
                     )}
                     <div className="flex flex-wrap items-center gap-2 mt-2">
-                      {session.created_by && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          Created by: {session.created_by}
-                        </span>
-                      )}
                       <span className="text-xs text-gray-400 dark:text-gray-500">
-                        Last saved: {new Date(session.updatedAt).toLocaleString()}
+                        Created: {new Date(session.createdAt).toLocaleString()}
+                      </span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        Updated: {new Date(session.updatedAt).toLocaleString()}
                       </span>
                       <CenterBadges centerIds={session.center_ids || []} showAllIfEmpty={false} />
                     </div>

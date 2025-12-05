@@ -202,7 +202,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
       
       {/* Song number and slide position at top-left */}
       {(sessionSongIndex || (slide.songSlideCount && slide.songSlideCount > 1 && slide.songSlideNumber)) && (
-        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 text-[0.95rem] sm:text-[1rem] text-blue-100/80 bg-gray-800/25 rounded-lg px-2 py-1 z-[1000] opacity-50">
+        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 text-[1.9rem] sm:text-[2rem] text-blue-100/80 bg-gray-800/25 rounded-lg px-2 py-1 z-[1000] opacity-50">
           {sessionSongIndex && totalSongs && (
             <div>Song {sessionSongIndex}/{totalSongs}</div>
           )}
@@ -289,7 +289,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
 
       {/* Singer / pitch (when available) at bottom-left */}
       {(slide.singerName || slide.pitch) && (
-        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 text-[0.95rem] sm:text-[1rem] text-blue-100/70 z-[1000] opacity-50">
+        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 text-[1.9rem] sm:text-[2rem] text-blue-100/70 z-[1000] opacity-50">
           {slide.singerName && (
             <span>
               Singer: {slide.singerName}
@@ -312,7 +312,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
       {/* Next-song hint at bottom-right */}
       {slide.nextSongName && (
         <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 text-right z-[1000] opacity-50">
-          <div className="text-[0.95rem] sm:text-[1rem] text-blue-100/80">
+          <div className="text-[1.9rem] sm:text-[2rem] text-blue-100/80">
             {slide.nextIsContinuation ? (
               <>Next: {slide.nextSongName} (contd.)</>
             ) : (

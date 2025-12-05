@@ -227,6 +227,9 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
               <div className="text-sm text-gray-600 mb-2">
                 Sent to: <span className="font-medium">{email}</span>
               </div>
+              <div className="text-xs text-gray-500 mb-3 bg-blue-50 p-2 rounded border border-blue-200">
+                💡 Didn't receive the code? Check your spam/junk folder
+              </div>
               <input
                 id="otp"
                 type="text"

@@ -17,6 +17,7 @@ import templatesRouter from './routes/templates.js';
 import { requireAuth, requireEditor, requireAdmin } from './middleware/simpleAuth.js';
 import { warmupCache, cacheService } from './services/CacheService.js';
 import { OracleSessionStore } from './middleware/OracleSessionStore.js';
+import { emailService } from './services/EmailService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3111;
@@ -106,7 +107,21 @@ app.post('/api/cache/reload', requireAdmin, async (req, res) => {
     console.error('[CACHE] Error reloading cache:', error);
     res.status(500).json({ 
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to reload cache' 
+      message: error instanceof Error ? error.message : 'Failed to reload cache'
+    });
+  }
+});
+
+// Brevo API health check endpoint
+app.get('/api/health/brevo', async (req, res) => {
+  try {
+    const healthStatus = await emailService.checkHealth();
+    res.json(healthStatus);
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Failed to check Brevo status',
+      configured: false
     });
   }
 });
