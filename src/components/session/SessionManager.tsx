@@ -228,9 +228,16 @@ export const SessionManager: React.FC = () => {
     setSessionToLoad(sessionId);
     try {
       await loadSession(sessionId);
+      setShowLoadModal(false);
     } catch (error) {
       console.error('Error loading session:', error);
-      alert('Failed to load session. Please try again.');
+      // Check if it's an access denied error
+      if (error instanceof Error && error.message.includes('Access denied')) {
+        alert('Access denied: You do not have permission to load this session.');
+      } else {
+        alert('Failed to load session. Please try again.');
+      }
+    } finally {
       setLoadingSession(false);
       setSessionToLoad(null);
     }
@@ -620,7 +627,7 @@ export const SessionManager: React.FC = () => {
                       <span className="text-xs text-gray-400 dark:text-gray-500">
                         Updated: {new Date(session.updatedAt).toLocaleString()}
                       </span>
-                      <CenterBadges centerIds={session.center_ids || []} showAllIfEmpty={false} />
+                      <CenterBadges centerIds={session.center_ids || []} showAllIfEmpty={true} />
                     </div>
                   </button>
                   

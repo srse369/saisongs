@@ -11,9 +11,39 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const allSessions = await cacheService.getAllSessions();
+    const user = req.user;
     
-    // All sessions are visible to everyone (no filtering by center)
-    res.json(allSessions);
+    // Filter sessions based on user role and centers
+    let filteredSessions = allSessions;
+    
+    if (!user) {
+      // Non-authenticated users see only public sessions (no center restriction)
+      filteredSessions = allSessions.filter(s => !s.center_ids || s.center_ids.length === 0);
+    } else if (user.role === 'admin') {
+      // Admins see all sessions
+      filteredSessions = allSessions;
+    } else if (user.role === 'editor') {
+      // Editors see sessions for their centers + public sessions
+      const editorCenterIds = user.editorFor || [];
+      filteredSessions = allSessions.filter(s => {
+        const sessionCenterIds = s.center_ids || [];
+        // Show if public OR if editor manages at least one of the session's centers
+        return sessionCenterIds.length === 0 || 
+          sessionCenterIds.some((cid: number) => editorCenterIds.includes(cid));
+      });
+    } else if (user.role === 'viewer') {
+      // Viewers see sessions for their centers + public sessions + their own sessions
+      const userCenterIds = user.centerIds || [];
+      filteredSessions = allSessions.filter(s => {
+        const sessionCenterIds = s.center_ids || [];
+        // Show if: public OR user's center OR created by user
+        return sessionCenterIds.length === 0 || 
+          sessionCenterIds.some((cid: number) => userCenterIds.includes(cid)) ||
+          s.created_by === user.email;
+      });
+    }
+    
+    res.json(filteredSessions);
   } catch (error) {
     console.error('Error fetching sessions:', error);
     // Return empty array if database not configured or connection failed (for development)
@@ -38,6 +68,41 @@ router.get('/:id', async (req, res) => {
 
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const user = req.user;
+    const sessionCenterIds = session.center_ids || [];
+    
+    // Check access based on user role and centers
+    if (sessionCenterIds.length > 0) {
+      // Session is restricted to specific centers
+      if (!user) {
+        // Non-authenticated users can't access center-restricted sessions
+        return res.status(403).json({ error: 'Access denied', message: 'This session is restricted to specific centers' });
+      } else if (user.role === 'admin') {
+        // Admins can access all sessions
+      } else if (user.role === 'editor') {
+        // Editors must manage at least one of the session's centers
+        const editorCenterIds = user.editorFor || [];
+        const hasAccess = sessionCenterIds.some((cid: number) => editorCenterIds.includes(cid));
+        if (!hasAccess) {
+          return res.status(403).json({ 
+            error: 'Access denied', 
+            message: 'This session is restricted to centers you do not manage' 
+          });
+        }
+      } else if (user.role === 'viewer') {
+        // Viewers must belong to one of the session's centers OR be the creator
+        const userCenterIds = user.centerIds || [];
+        const hasAccess = sessionCenterIds.some((cid: number) => userCenterIds.includes(cid)) ||
+          session.created_by === user.email;
+        if (!hasAccess) {
+          return res.status(403).json({ 
+            error: 'Access denied', 
+            message: 'This session is restricted to centers you do not belong to' 
+          });
+        }
+      }
     }
 
     res.json(session);

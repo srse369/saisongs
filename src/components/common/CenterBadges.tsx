@@ -80,8 +80,8 @@ export const CenterBadges: React.FC<CenterBadgesProps> = ({
     }
     
     return (
-      <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">
-        🌐 All Centers
+      <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded">
+        🌐 Public Session
       </span>
     );
   }

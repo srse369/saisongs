@@ -1235,13 +1235,17 @@ class CacheService {
     `);
 
     const mappedSessions = sessions.map((row: any) => {
-      let centerIds: number[] = [];
+      let centerIds: number[] | undefined = undefined;
       try {
         if (row.CENTER_IDS) {
-          centerIds = JSON.parse(row.CENTER_IDS);
+          const parsed = JSON.parse(row.CENTER_IDS);
+          // Only set centerIds if it's a non-empty array
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            centerIds = parsed;
+          }
         }
       } catch (e) {
-        console.error('Error parsing center_ids for session:', e);
+        console.error('Error parsing center_ids for session:', row.NAME, e);
       }
       
       return {
@@ -1457,6 +1461,8 @@ class CacheService {
         RAWTOHEX(id) as id,
         name,
         description,
+        center_ids,
+        created_by,
         created_at,
         updated_at
       FROM song_sessions 
@@ -1466,6 +1472,20 @@ class CacheService {
     if (sessions.length === 0) return null;
 
     const sessionRow = sessions[0];
+    
+    // Parse center_ids
+    let centerIds: number[] | undefined = undefined;
+    try {
+      if (sessionRow.CENTER_IDS) {
+        const parsed = JSON.parse(sessionRow.CENTER_IDS);
+        // Only set centerIds if it's a non-empty array
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          centerIds = parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing center_ids for session:', sessionRow.NAME, e);
+    }
 
     // Get session items with details
     const items = await db.query(`
@@ -1504,6 +1524,8 @@ class CacheService {
       id: sessionRow.ID,
       name: sessionRow.NAME,
       description: sessionRow.DESCRIPTION,
+      center_ids: centerIds,
+      created_by: sessionRow.CREATED_BY,
       createdAt: sessionRow.CREATED_AT,
       updatedAt: sessionRow.UPDATED_AT,
       items: mappedItems,
@@ -1625,13 +1647,17 @@ class CacheService {
     if (sessions.length === 0) return null;
 
     const session = sessions[0];
-    let parsedCenterIds: number[] = [];
+    let parsedCenterIds: number[] | undefined = undefined;
     try {
       if (session.CENTER_IDS) {
-        parsedCenterIds = JSON.parse(session.CENTER_IDS);
+        const parsed = JSON.parse(session.CENTER_IDS);
+        // Only set centerIds if it's a non-empty array
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          parsedCenterIds = parsed;
+        }
       }
     } catch (e) {
-      console.error('Error parsing center_ids:', e);
+      console.error('Error parsing center_ids for session:', session.NAME, e);
     }
     
     const mappedSession = {
