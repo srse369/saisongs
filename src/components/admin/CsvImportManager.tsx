@@ -6,6 +6,7 @@ import { CsvImportService, type ImportPreviewItem, type ImportResult } from '../
 import { normalizePitch, addPitchMapping, removePitchMapping } from '../../utils/pitchNormalization';
 import { findTopSongMatches, normalizeSongNameForMapping } from '../../utils/songMatcher';
 import { saveSongMapping, savePitchMapping, getStoredPitchMappings, getStoredSongMappings, deleteSongMapping, deletePitchMapping } from '../../services/ImportMappingService';
+import { compareStringsIgnoringSpecialChars } from '../../utils';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 
 type ImportStep = 'instructions' | 'scraping' | 'preview' | 'importing' | 'complete';
@@ -765,7 +766,7 @@ Why fear when I am here,Ameya,5m</pre>
                               ))}
                               <optgroup label="All Songs">
                                 {songs
-                                  .sort((a, b) => a.name.localeCompare(b.name))
+                                  .sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name))
                                   .map(song => (
                                     <option key={song.id} value={song.id}>
                                       {song.name}
@@ -1002,4 +1003,6 @@ Why fear when I am here,Ameya,5m</pre>
     </div>
   );
 };
+
+export default CsvImportManager;
 

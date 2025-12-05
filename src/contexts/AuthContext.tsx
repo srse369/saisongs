@@ -9,9 +9,14 @@ interface AuthContextState {
   userRole: UserRole;
   isEditor: boolean;
   isAdmin: boolean;
-  login: (password: string) => Promise<boolean>;
-  logout: () => void;
-  downgradeRole: () => void;
+  userId: number | null;
+  userName: string | null;
+  userEmail: string | null;
+  centerIds: number[];
+  editorFor: number[];
+  isLoading: boolean;
+  setAuthenticatedUser: (role: UserRole, userId: number, email: string, name?: string, centerIds?: number[], editorFor?: number[]) => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextState | undefined>(undefined);
@@ -20,10 +25,6 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-const AUTH_ROLE_KEY = 'songstudio_auth_role';
-const AUTH_EXPIRY_KEY = 'songstudio_auth_expiry';
-const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-
 // Use Vite proxy in development (/api), full URL in production
 const API_BASE_URL = import.meta.env.VITE_API_URL || (
   import.meta.env.DEV ? '/api' : 'http://localhost:3111/api'
@@ -31,124 +32,104 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || (
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [userRole, setUserRole] = useState<UserRole>('public');
+  const [userId, setUserId] = useState<number | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [centerIds, setCenterIds] = useState<number[]>([]);
+  const [editorFor, setEditorFor] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Check authentication status on mount
   useEffect(() => {
-    const checkAuth = () => {
-      const storedRole = sessionStorage.getItem(AUTH_ROLE_KEY) as UserRole | null;
-      const expiry = sessionStorage.getItem(AUTH_EXPIRY_KEY);
-      
-      if (storedRole && expiry) {
-        const expiryTime = parseInt(expiry, 10);
-        if (Date.now() < expiryTime) {
-          setUserRole(storedRole);
+    const checkAuth = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/session`, {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.authenticated && data.user) {
+            setUserRole(data.user.role as UserRole);
+            setUserId(data.user.id);
+            setUserName(data.user.name);
+            setUserEmail(data.user.email);
+            setCenterIds(data.user.centerIds || []);
+            setEditorFor(data.user.editorFor || []);
+          } else {
+            setUserRole('public');
+            setUserId(null);
+            setUserName(null);
+            setUserEmail(null);
+            setCenterIds([]);
+            setEditorFor([]);
+          }
         } else {
-          // Session expired
-          sessionStorage.removeItem(AUTH_ROLE_KEY);
-          sessionStorage.removeItem(AUTH_EXPIRY_KEY);
           setUserRole('public');
+          setUserId(null);
+          setUserName(null);
+          setUserEmail(null);
+          setCenterIds([]);
+          setEditorFor([]);
         }
+      } catch (error) {
+        console.error('Session check error:', error);
+        setUserRole('public');
+        setUserId(null);
+        setUserName(null);
+        setUserEmail(null);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     checkAuth();
   }, []);
 
-  const login = useCallback(async (password: string): Promise<boolean> => {
-    try {
-      // Call backend authentication endpoint
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ password }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const role = data.role as UserRole;
-
-        // Debug logging
-        console.log('[AuthContext] Login successful:', { 
-          receivedRole: role, 
-          backendResponse: data 
-        });
-
-        // Store role and expiry in sessionStorage
-        const expiryTime = Date.now() + SESSION_DURATION;
-        sessionStorage.setItem(AUTH_ROLE_KEY, role);
-        sessionStorage.setItem(AUTH_EXPIRY_KEY, expiryTime.toString());
-        
-        console.log('[AuthContext] Stored in sessionStorage:', {
-          role,
-          stored: sessionStorage.getItem(AUTH_ROLE_KEY)
-        });
-        
-        // Use flushSync to ensure state is updated synchronously
-        // This prevents the "tabs not clickable" issue after login
-        flushSync(() => {
-          setUserRole(role);
-        });
-        
-        console.log('[AuthContext] State updated to:', role);
-        return true;
-      } else {
-        // Login failed
-        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Login failed:', error);
-        return false;
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      return false;
-    }
-  }, []);
-
-  const logout = useCallback(() => {
-    sessionStorage.removeItem(AUTH_ROLE_KEY);
-    sessionStorage.removeItem(AUTH_EXPIRY_KEY);
-    setUserRole('public');
-  }, []);
-
-  const downgradeRole = useCallback(() => {
-    let newRole: UserRole = 'public';
-    
-    // Cycle down one level: admin → editor → viewer → public
-    if (userRole === 'admin') {
-      newRole = 'editor';
-    } else if (userRole === 'editor') {
-      newRole = 'viewer';
-    } else if (userRole === 'viewer') {
-      newRole = 'public';
-    } else {
-      // Already public, do nothing
-      return;
-    }
-
-    // Update storage immediately (fast operation)
-    if (newRole === 'public') {
-      sessionStorage.removeItem(AUTH_ROLE_KEY);
-      sessionStorage.removeItem(AUTH_EXPIRY_KEY);
-    } else {
-      sessionStorage.setItem(AUTH_ROLE_KEY, newRole);
-      // Keep the same expiry time
-    }
-    
-    // Defer state update to avoid blocking the click handler
-    requestAnimationFrame(() => {
-      setUserRole(newRole);
+  const setAuthenticatedUser = useCallback((role: UserRole, id: number, email: string, name?: string, centersIds?: number[], editorsFor?: number[]) => {
+    // Use flushSync to ensure state is updated synchronously
+    flushSync(() => {
+      setUserRole(role);
+      setUserId(id);
+      setUserName(name || null);
+      setUserEmail(email);
+      setCenterIds(centersIds || []);
+      setEditorFor(editorsFor || []);
     });
-  }, [userRole]);
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUserRole('public');
+      setUserId(null);
+      setUserName(null);
+      setUserEmail(null);
+      setCenterIds([]);
+      setEditorFor([]);
+    }
+  }, []);
 
   const value: AuthContextState = {
     isAuthenticated: userRole !== 'public', // Authenticated = viewer, editor, or admin
     userRole,
+    userId,
+    userName,
+    userEmail,
+    centerIds,
+    editorFor,
     isEditor: userRole === 'editor' || userRole === 'admin',
     isAdmin: userRole === 'admin',
-    login,
+    isLoading,
+    setAuthenticatedUser,
     logout,
-    downgradeRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

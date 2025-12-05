@@ -1,6 +1,7 @@
 import express from 'express';
 import { cacheService } from '../services/CacheService.js';
-import { requireEditor } from '../middleware/simpleAuth.js';
+import { databaseService } from '../services/DatabaseService.js';
+import { requireAuth, requireEditor } from '../middleware/simpleAuth.js';
 
 const router = express.Router();
 
@@ -9,7 +10,15 @@ const router = express.Router();
 // Get all sessions
 router.get('/', async (req, res) => {
   try {
-    const sessions = await cacheService.getAllSessions();
+    const allSessions = await cacheService.getAllSessions();
+    
+    // Filter sessions by center access if user is authenticated
+    let sessions = allSessions;
+    if (req.user) {
+      const accessibleCenterIds = [...(req.user.centerIds || []), ...(req.user.editorFor || [])];
+      sessions = cacheService.filterByCenterAccess(allSessions, req.user.role, accessibleCenterIds);
+    }
+    
     res.json(sessions);
   } catch (error) {
     console.error('Error fetching sessions:', error);
@@ -45,15 +54,27 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create session
-router.post('/', requireEditor, async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, center_ids } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Session name is required' });
     }
 
-    const session = await cacheService.createSession(name, description);
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // For non-admins, auto-assign their center(s) if no center_ids specified
+    let sessionCenterIds = center_ids;
+    if (user.role !== 'admin' && (!center_ids || center_ids.length === 0)) {
+      // Use the user's primary center(s)
+      sessionCenterIds = user.centerIds || [];
+    }
+
+    const session = await cacheService.createSession(name, description, sessionCenterIds, user.email);
     res.status(201).json(session);
   } catch (error: any) {
     console.error('Error creating session:', error);
@@ -65,16 +86,33 @@ router.post('/', requireEditor, async (req, res) => {
 });
 
 // Update session
-router.put('/:id', requireEditor, async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description } = req.body;
+    const { name, description, center_ids } = req.body;
+    const user = req.user;
 
-    if (name === undefined && description === undefined) {
+    if (name === undefined && description === undefined && center_ids === undefined) {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
-    const session = await cacheService.updateSession(id, { name, description });
+    // Get existing session to check ownership
+    const existingSession = await cacheService.getSession(id);
+    if (!existingSession) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Viewers can only update their own sessions
+    if (user.role === 'viewer') {
+      if (existingSession.created_by !== user.email) {
+        return res.status(403).json({ 
+          error: 'Access denied',
+          message: 'You can only update sessions that you created'
+        });
+      }
+    }
+
+    const session = await cacheService.updateSession(id, { name, description, center_ids, updated_by: user.email });
     
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
@@ -91,9 +129,73 @@ router.put('/:id', requireEditor, async (req, res) => {
 });
 
 // Delete session
-router.delete('/:id', requireEditor, async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const user = req.user;
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Get the session with its items to check singer centers
+    const session = await cacheService.getSession(id);
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Admins can delete any session
+    if (user.role === 'admin') {
+      await cacheService.deleteSession(id);
+      return res.status(204).send();
+    }
+
+    // Viewers can only delete their own sessions
+    if (user.role === 'viewer') {
+      if (session.created_by !== user.email) {
+        return res.status(403).json({ 
+          error: 'Access denied',
+          message: 'You can only delete sessions that you created'
+        });
+      }
+      await cacheService.deleteSession(id);
+      return res.status(204).send();
+    }
+
+    // For editors, check if session has singers with specific pitches
+    const sessionItems = session.items || [];
+    const itemsWithSingers = sessionItems.filter((item: any) => item.singerId);
+
+    if (itemsWithSingers.length === 0) {
+      // Session has no singers, any editor can delete
+      await cacheService.deleteSession(id);
+      return res.status(204).send();
+    }
+
+    // Get all unique singer IDs from the session
+    const singerIds = [...new Set(itemsWithSingers.map((item: any) => item.singerId))];
+    
+    // Get all singers to check their center associations
+    const allCenterIds = new Set<number>();
+    for (const singerId of singerIds) {
+      const singer = await cacheService.getSinger(String(singerId));
+      if (singer && singer.center_ids) {
+        singer.center_ids.forEach((cid: number) => allCenterIds.add(cid));
+      }
+    }
+
+    // Editor must have access to ALL centers that have singers in this session
+    const editableCenterIds = user.editorFor || [];
+    const hasAccessToAllCenters = Array.from(allCenterIds).every(cid => 
+      editableCenterIds.includes(cid)
+    );
+
+    if (!hasAccessToAllCenters) {
+      return res.status(403).json({ 
+        error: 'You can only delete sessions where you are an editor for all centers represented by the singers' 
+      });
+    }
+
     await cacheService.deleteSession(id);
     res.status(204).send();
   } catch (error) {
@@ -127,13 +229,28 @@ router.get('/:sessionId/items', async (req, res) => {
 });
 
 // Add session item
-router.post('/:sessionId/items', requireEditor, async (req, res) => {
+router.post('/:sessionId/items', requireAuth, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { songId, singerId, pitch, sequenceOrder } = req.body;
+    const user = req.user;
 
     if (!songId || sequenceOrder === undefined) {
       return res.status(400).json({ error: 'songId and sequenceOrder are required' });
+    }
+
+    // Viewers can only add items to their own sessions
+    if (user.role === 'viewer') {
+      const session = await cacheService.getSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      if (session.created_by !== user.email) {
+        return res.status(403).json({ 
+          error: 'Access denied',
+          message: 'You can only add items to sessions that you created'
+        });
+      }
     }
 
     await cacheService.addSessionItem(sessionId, { songId, singerId, pitch, sequenceOrder });
@@ -148,13 +265,34 @@ router.post('/:sessionId/items', requireEditor, async (req, res) => {
 });
 
 // Update session item
-router.put('/items/:id', requireEditor, async (req, res) => {
+router.put('/items/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { singerId, pitch, sequenceOrder } = req.body;
+    const user = req.user;
 
     if (singerId === undefined && pitch === undefined && sequenceOrder === undefined) {
       return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    // Viewers can only update items in their own sessions
+    if (user.role === 'viewer') {
+      // Query database to get the session_id for this item
+      const result = await databaseService.query(
+        'SELECT RAWTOHEX(session_id) as session_id FROM song_session_items WHERE RAWTOHEX(id) = :1',
+        [id]
+      );
+      if (!result || result.length === 0) {
+        return res.status(404).json({ error: 'Session item not found' });
+      }
+      const sessionId = result[0].SESSION_ID || result[0].session_id;
+      const session = await cacheService.getSession(sessionId);
+      if (!session || session.created_by !== user.email) {
+        return res.status(403).json({ 
+          error: 'Access denied',
+          message: 'You can only update items in sessions that you created'
+        });
+      }
     }
 
     await cacheService.updateSessionItem(id, { singerId, pitch, sequenceOrder });
@@ -169,9 +307,31 @@ router.put('/items/:id', requireEditor, async (req, res) => {
 });
 
 // Delete session item
-router.delete('/items/:id', requireEditor, async (req, res) => {
+router.delete('/items/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const user = req.user;
+
+    // Viewers can only delete items from their own sessions
+    if (user.role === 'viewer') {
+      // Query database to get the session_id for this item
+      const result = await databaseService.query(
+        'SELECT RAWTOHEX(session_id) as session_id FROM song_session_items WHERE RAWTOHEX(id) = :1',
+        [id]
+      );
+      if (!result || result.length === 0) {
+        return res.status(404).json({ error: 'Session item not found' });
+      }
+      const sessionId = result[0].SESSION_ID || result[0].session_id;
+      const session = await cacheService.getSession(sessionId);
+      if (!session || session.created_by !== user.email) {
+        return res.status(403).json({ 
+          error: 'Access denied',
+          message: 'You can only delete items from sessions that you created'
+        });
+      }
+    }
+
     await cacheService.deleteSessionItem(id);
     res.status(204).send();
   } catch (error) {
@@ -181,13 +341,28 @@ router.delete('/items/:id', requireEditor, async (req, res) => {
 });
 
 // Reorder session items
-router.put('/:sessionId/reorder', requireEditor, async (req, res) => {
+router.put('/:sessionId/reorder', requireAuth, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { itemIds } = req.body;
+    const user = req.user;
 
     if (!Array.isArray(itemIds)) {
       return res.status(400).json({ error: 'itemIds must be an array' });
+    }
+
+    // Viewers can only reorder items in their own sessions
+    if (user.role === 'viewer') {
+      const session = await cacheService.getSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      if (session.created_by !== user.email) {
+        return res.status(403).json({ 
+          error: 'Access denied',
+          message: 'You can only reorder items in sessions that you created'
+        });
+      }
     }
 
     await cacheService.reorderSessionItems(sessionId, itemIds);
@@ -199,13 +374,28 @@ router.put('/:sessionId/reorder', requireEditor, async (req, res) => {
 });
 
 // Set all session items (replace existing)
-router.put('/:sessionId/items', requireEditor, async (req, res) => {
+router.put('/:sessionId/items', requireAuth, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { items } = req.body;
+    const user = req.user;
 
     if (!Array.isArray(items)) {
       return res.status(400).json({ error: 'items must be an array' });
+    }
+
+    // Viewers can only set items in their own sessions
+    if (user.role === 'viewer') {
+      const session = await cacheService.getSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      if (session.created_by !== user.email) {
+        return res.status(403).json({ 
+          error: 'Access denied',
+          message: 'You can only set items in sessions that you created'
+        });
+      }
     }
 
     const resultItems = await cacheService.setSessionItems(sessionId, items);
@@ -217,7 +407,7 @@ router.put('/:sessionId/items', requireEditor, async (req, res) => {
 });
 
 // Duplicate session
-router.post('/:id/duplicate', requireEditor, async (req, res) => {
+router.post('/:id/duplicate', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { newName } = req.body;

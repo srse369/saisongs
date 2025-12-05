@@ -163,6 +163,7 @@ export interface PresentationTemplate {
   name: string;
   description?: string;
   aspectRatio?: AspectRatio;          // Template aspect ratio: '16:9' (default) or '4:3'
+  center_ids?: number[];              // Centers that have access to this template
   
   // Multi-slide structure (new format)
   slides?: TemplateSlide[];           // Array of slides in the template
@@ -278,9 +279,7 @@ class TemplateService {
       return result.map((row: any) => {
         let templateJson: any = {};
         try {
-          console.log('📦 Raw TEMPLATE_JSON from DB:', row.NAME, row.TEMPLATE_JSON);
           templateJson = typeof row.TEMPLATE_JSON === 'string' ? JSON.parse(row.TEMPLATE_JSON) : row.TEMPLATE_JSON || {};
-          console.log('✅ Parsed templateJson:', row.NAME, templateJson);
         } catch (e) {
           console.error('❌ Error parsing template JSON:', e);
         }
@@ -364,9 +363,7 @@ class TemplateService {
       const row = result[0];
       let templateJson: any = {};
       try {
-        console.log('📦 Raw TEMPLATE_JSON from DB (getTemplate):', row.NAME, row.TEMPLATE_JSON);
         templateJson = typeof row.TEMPLATE_JSON === 'string' ? JSON.parse(row.TEMPLATE_JSON) : row.TEMPLATE_JSON || {};
-        console.log('✅ Parsed templateJson (getTemplate):', row.NAME, templateJson);
       } catch (e) {
         console.error('❌ Error parsing template JSON:', e);
       }
@@ -556,15 +553,21 @@ class TemplateService {
         );
       }
 
+      // Prepare center_ids as JSON string
+      const centerIdsJson = template.center_ids && template.center_ids.length > 0 
+        ? JSON.stringify(template.center_ids) 
+        : null;
+
       await databaseService.query(`
         INSERT INTO presentation_templates
-        (id, name, description, template_json, is_default, created_at, updated_at)
-        VALUES (:1, :2, :3, :4, :5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        (id, name, description, template_json, center_ids, is_default, created_at, updated_at)
+        VALUES (:1, :2, :3, :4, :5, :6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       `, [
         id,
         template.name,
         template.description || null,
         templateJson,
+        centerIdsJson,
         template.isDefault ? 1 : 0,
       ]);
 
@@ -624,15 +627,21 @@ class TemplateService {
         );
       }
 
+      // Prepare center_ids as JSON string
+      const centerIdsJson = updated.center_ids && updated.center_ids.length > 0 
+        ? JSON.stringify(updated.center_ids) 
+        : null;
+
       await databaseService.query(`
         UPDATE presentation_templates
-        SET name = :1, description = :2, template_json = :3, is_default = :4, updated_at = CURRENT_TIMESTAMP
-        WHERE id = :5
+        SET name = :1, description = :2, template_json = :3, is_default = :4, center_ids = :5, updated_at = CURRENT_TIMESTAMP
+        WHERE id = :6
       `, [
         updated.name,
         updated.description || null,
         templateJson,
         updated.isDefault ? 1 : 0,
+        centerIdsJson,
         id,
       ]);
 

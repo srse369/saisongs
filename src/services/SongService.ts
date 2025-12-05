@@ -24,8 +24,14 @@ class SongService {
       if (!createInput.name || createInput.name.trim().length === 0) {
         throw new ValidationError('Song name is required', 'name');
       }
-      if (!createInput.externalSourceUrl || createInput.externalSourceUrl.trim().length === 0) {
-        throw new ValidationError('external source URL is required', 'externalSourceUrl');
+      if (!createInput.language || createInput.language.trim().length === 0) {
+        throw new ValidationError('Language is required', 'language');
+      }
+      if (!createInput.deity || createInput.deity.trim().length === 0) {
+        throw new ValidationError('Deity is required', 'deity');
+      }
+      if (!createInput.lyrics || createInput.lyrics.trim().length === 0) {
+        throw new ValidationError('Lyrics are required', 'lyrics');
       }
     }
 
@@ -98,7 +104,9 @@ class SongService {
         song_tags: input.songTags || null,
         audio_link: input.audioLink || null,
         video_link: input.videoLink || null,
-        golden_voice: input.goldenVoice || 0,
+        golden_voice: input.goldenVoice ? 1 : 0,
+        reference_gents_pitch: input.referenceGentsPitch || null,
+        reference_ladies_pitch: input.referenceLadiesPitch || null,
       });
     } catch (error) {
       console.error('Error creating song:', error);
@@ -128,10 +136,12 @@ class SongService {
         beat: input.beat,
         raga: input.raga,
         level: input.level,
-        songTags: input.songTags,
-        audioLink: input.audioLink,
-        videoLink: input.videoLink,
-        goldenVoice: input.goldenVoice,
+        song_tags: input.songTags,
+        audio_link: input.audioLink,
+        video_link: input.videoLink,
+        golden_voice: input.goldenVoice ? 1 : 0,
+        reference_gents_pitch: input.referenceGentsPitch,
+        reference_ladies_pitch: input.referenceLadiesPitch,
       });
       return this.getSongById(id);
     } catch (error) {
@@ -153,7 +163,11 @@ class SongService {
       return true;
     } catch (error) {
       console.error('Error deleting song:', error);
-      return false;
+      throw new DatabaseError(
+        ErrorCode.QUERY_ERROR,
+        error instanceof Error ? error.message : 'Failed to delete song',
+        error
+      );
     }
   }
 

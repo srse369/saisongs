@@ -7,6 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import type { Song, PresentationTemplate } from '../../types';
 import { Modal } from '../common/Modal';
+import { CenterBadges } from '../common/CenterBadges';
+import { CenterMultiSelect } from '../common/CenterMultiSelect';
 import { SongDetails } from '../admin/SongDetails';
 import { formatPitch } from '../../utils/pitchUtils';
 import TemplateSelector from '../presentation/TemplateSelector';
@@ -17,7 +19,7 @@ export const SessionManager: React.FC = () => {
   const { songs } = useSongs();
   const { singers } = useSingers();
   const { sessions, createSession, setSessionItems, loadSession, currentSession, loadSessions, loading, deleteSession } = useNamedSessions();
-  const { isEditor } = useAuth();
+  const { isEditor, isAuthenticated, userEmail, userRole } = useAuth();
   const navigate = useNavigate();
 
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
@@ -26,6 +28,7 @@ export const SessionManager: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<PresentationTemplate | null>(null);
   const [sessionName, setSessionName] = useState('');
   const [sessionDescription, setSessionDescription] = useState('');
+  const [sessionCenterIds, setSessionCenterIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [loadingSession, setLoadingSession] = useState(false);
   const [sessionToLoad, setSessionToLoad] = useState<string | null>(null);
@@ -191,6 +194,7 @@ export const SessionManager: React.FC = () => {
       const newSession = await createSession({
         name: sessionName.trim(),
         description: sessionDescription.trim() || undefined,
+        center_ids: sessionCenterIds,
       });
 
       if (!newSession) {
@@ -210,6 +214,7 @@ export const SessionManager: React.FC = () => {
       // Reset form and close modal
       setSessionName('');
       setSessionDescription('');
+      setSessionCenterIds([]);
       setShowSaveModal(false);
     } catch (error) {
       console.error('Error saving session:', error);
@@ -317,13 +322,15 @@ export const SessionManager: React.FC = () => {
           </button>
           {sessionItems.length > 0 && (
             <>
-              <button
-                type="button"
-                onClick={() => setShowSaveModal(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              >
-                Save Session
-              </button>
+              {isAuthenticated && (
+                <button
+                  type="button"
+                  onClick={() => setShowSaveModal(true)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                >
+                  Save Session
+                </button>
+              )}
               <button
                 type="button"
                 onClick={clearSession}
@@ -473,6 +480,7 @@ export const SessionManager: React.FC = () => {
           setShowSaveModal(false);
           setSessionName('');
           setSessionDescription('');
+          setSessionCenterIds([]);
         }}
         title="Save Session"
       >
@@ -512,6 +520,15 @@ export const SessionManager: React.FC = () => {
             />
           </div>
 
+          <div>
+            <CenterMultiSelect
+              selectedCenterIds={sessionCenterIds}
+              onChange={setSessionCenterIds}
+              label="Restrict to Centers (optional)"
+              disabled={saving}
+            />
+          </div>
+
           <div className="flex gap-2 justify-end pt-4">
             <button
               type="button"
@@ -519,6 +536,7 @@ export const SessionManager: React.FC = () => {
                 setShowSaveModal(false);
                 setSessionName('');
                 setSessionDescription('');
+                setSessionCenterIds([]);
               }}
               disabled={saving}
               className="px-4 py-2 text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
@@ -595,12 +613,20 @@ export const SessionManager: React.FC = () => {
                         {session.description}
                       </div>
                     )}
-                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                      Last saved: {new Date(session.updatedAt).toLocaleString()}
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      {session.created_by && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Created by: {session.created_by}
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        Last saved: {new Date(session.updatedAt).toLocaleString()}
+                      </span>
+                      <CenterBadges centerIds={session.center_ids || []} showAllIfEmpty={false} />
                     </div>
                   </button>
                   
-                  {isEditor && (
+                  {isAuthenticated && (userRole !== 'viewer' || session.created_by === userEmail) && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

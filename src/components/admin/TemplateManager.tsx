@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTemplates } from '../../contexts/TemplateContext';
+import { useAuth } from '../../contexts/AuthContext';
 import type { PresentationTemplate, Slide, TemplateSlide, AspectRatio } from '../../types';
 import { ensureSongContentStyles } from '../../types';
-import { RefreshIcon, Modal } from '../common';
+import { RefreshIcon, Modal, CenterMultiSelect, CenterBadges } from '../common';
 import { PresentationModal } from '../presentation/PresentationModal';
 import { TemplateWysiwygEditor } from './TemplateWysiwygEditor';
 import { isMultiSlideTemplate } from '../../utils/templateUtils';
@@ -231,6 +232,7 @@ function formatTextContent(content: string, indent: string): string[] {
 }
 
 export const TemplateManager: React.FC = () => {
+  const { isAdmin, isEditor, editorFor } = useAuth();
   const {
     templates,
     loading,
@@ -240,15 +242,28 @@ export const TemplateManager: React.FC = () => {
     updateTemplate,
     deleteTemplate,
     setAsDefault,
+    duplicateTemplate,
     validateYaml,
     clearError,
   } = useTemplates();
+
+  // Check if user can edit a template
+  const canEditTemplate = useCallback((template: PresentationTemplate) => {
+    if (isAdmin) return true;
+    const templateCenterIds = template.center_ids || [];
+    // Templates with no centers can only be edited by admins
+    if (templateCenterIds.length === 0) return false;
+    const userEditorFor = editorFor || [];
+    return templateCenterIds.some(cid => userEditorFor.includes(cid));
+  }, [isAdmin, editorFor]);
 
   const [showForm, setShowForm] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<PresentationTemplate | null>(null);
   const [previewSlideIndex, setPreviewSlideIndex] = useState(0);
   const [editingTemplate, setEditingTemplate] = useState<PresentationTemplate | null>(null);
   const [originalTemplate, setOriginalTemplate] = useState<PresentationTemplate | null>(null); // Track original state for dirty detection
+  const [duplicatingTemplate, setDuplicatingTemplate] = useState<PresentationTemplate | null>(null);
+  const [centerIds, setCenterIds] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [yamlContent, setYamlContent] = useState('');
   const [validationError, setValidationError] = useState('');
@@ -414,6 +429,7 @@ export const TemplateManager: React.FC = () => {
     };
     setEditingTemplate(newTemplate);
     setOriginalTemplate(null); // New template has no original
+    setCenterIds([]); // Reset center IDs
     setYamlContent('');
     setValidationError('');
     setShowForm(true);
@@ -442,9 +458,57 @@ export const TemplateManager: React.FC = () => {
     
     setEditingTemplate(templateWithDefaults);
     setOriginalTemplate(clonedTemplate);
+    setCenterIds(template.center_ids || []); // Load existing center IDs
     setYamlContent(template.yaml || '');
     setValidationError('');
     setShowForm(true);
+  };
+
+  const handleDuplicateClick = (template: PresentationTemplate) => {
+    // Generate timestamp-based name
+    const now = new Date();
+    const timestamp = now.toLocaleString('en-US', { 
+      month: '2-digit', 
+      day: '2-digit', 
+      year: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit',
+      hour12: false 
+    }).replace(/,/g, '');
+    const newName = `${template.name} (${timestamp})`;
+    
+    // Set center assignment based on user role
+    // Admin: no centers (global template)
+    // Editor: all centers user is editor for
+    const newCenterIds = isAdmin ? [] : (editorFor || []);
+    
+    setDuplicatingTemplate({ ...template, name: newName });
+    setCenterIds(newCenterIds);
+  };
+
+  const handleDuplicateConfirm = async () => {
+    if (!duplicatingTemplate) return;
+
+    try {
+      const result = await duplicateTemplate(
+        duplicatingTemplate.id!,
+        duplicatingTemplate.name,
+        centerIds
+      );
+      
+      if (result) {
+        setDuplicatingTemplate(null);
+        setSuccessMessage(`Template duplicated as "${duplicatingTemplate.name}"`);
+        setTimeout(() => setSuccessMessage(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error duplicating template:', error);
+    }
+  };
+
+  const handleDuplicateCancel = () => {
+    setDuplicatingTemplate(null);
   };
 
   const handleDelete = async (templateId: string) => {
@@ -520,6 +584,7 @@ export const TemplateManager: React.FC = () => {
         ...templateWithDefaults,
         ...validation.template,
         yaml: finalYamlContent,
+        center_ids: centerIds, // Include center assignment
       } as PresentationTemplate;
 
       let result;
@@ -682,6 +747,8 @@ export const TemplateManager: React.FC = () => {
                     <span className="inline-flex items-center px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
                       📑 {template.slides?.length || 1} slide{(template.slides?.length || 1) !== 1 ? 's' : ''} (ref: {(template.referenceSlideIndex ?? 0) + 1})
                         </span>
+                    {/* Center badges - show actual centers for all users */}
+                    <CenterBadges centerIds={template.center_ids || []} />
                     </div>
                 </div>
 
@@ -697,16 +764,29 @@ export const TemplateManager: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                   </button>
-                  <button
-                    onClick={() => handleEditClick(template)}
-                    className="flex items-center gap-2 p-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    <span className="text-sm font-medium whitespace-nowrap">Edit</span>
-                  </button>
-                  {!template.isDefault && (
+                  {canEditTemplate(template) && (
+                    <button
+                      onClick={() => handleEditClick(template)}
+                      className="flex items-center gap-2 p-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      <span className="text-sm font-medium whitespace-nowrap">Edit</span>
+                    </button>
+                  )}
+                  {isEditor && (
+                    <button
+                      onClick={() => handleDuplicateClick(template)}
+                      className="flex items-center gap-2 p-2 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-sm font-medium whitespace-nowrap">Duplicate</span>
+                    </button>
+                  )}
+                  {canEditTemplate(template) && !template.isDefault && (
                     <button
                       onClick={() => handleSetDefault(template.id!)}
                       className="flex items-center gap-2 p-2 text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors"
@@ -717,15 +797,17 @@ export const TemplateManager: React.FC = () => {
                       <span className="text-sm font-medium whitespace-nowrap">Set Default</span>
                     </button>
                   )}
-                  <button
-                    onClick={() => handleDelete(template.id!)}
-                    className="flex items-center gap-2 p-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {canEditTemplate(template) && (
+                    <button
+                      onClick={() => handleDelete(template.id!)}
+                      className="flex items-center gap-2 p-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                     <span className="text-sm font-medium whitespace-nowrap">Delete</span>
                   </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -906,6 +988,16 @@ export const TemplateManager: React.FC = () => {
               </div>
                 </div>
 
+          {/* Center Assignment */}
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <CenterMultiSelect
+              selectedCenterIds={centerIds}
+              onChange={setCenterIds}
+              editableOnly={!isAdmin}
+              label={isAdmin ? "Centers (optional - leave empty for all centers)" : "Centers (select from your editor centers)"}
+            />
+          </div>
+
           <div className="flex gap-2 justify-between pt-2">
             <button
               onClick={() => {
@@ -982,6 +1074,54 @@ export const TemplateManager: React.FC = () => {
         isFullscreen={previewFullscreen}
         disableKeyboardNavigation={true}
       />
+
+      {/* Duplicate Template Confirmation Modal */}
+      <Modal
+        isOpen={!!duplicatingTemplate}
+        onClose={handleDuplicateCancel}
+        title="Duplicate Template"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-700 dark:text-gray-300">
+            Duplicate template <span className="font-semibold">{duplicatingTemplate?.name?.split(' (')[0]}</span>?
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              New Template Name
+            </label>
+            <input
+              type="text"
+              value={duplicatingTemplate?.name || ''}
+              onChange={(e) => setDuplicatingTemplate(prev => prev ? { ...prev, name: e.target.value } : null)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+          </div>
+          <div>
+            <CenterMultiSelect
+              selectedCenterIds={centerIds}
+              onChange={setCenterIds}
+              editableOnly={!isAdmin}
+              label={isAdmin ? "Centers (leave empty for global template)" : "Centers (pre-selected with your editor centers)"}
+            />
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={handleDuplicateCancel}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDuplicateConfirm}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              Duplicate
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
+
+export default TemplateManager;

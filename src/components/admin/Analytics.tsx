@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { WorldMap } from './WorldMap';
 import { LoadingSpinner } from '../common/LoadingSpinner';
+import { RoleBadge } from '../common/RoleBadge';
+import type { UserRole } from '../../contexts/AuthContext';
 import { API_BASE_URL } from '../../services/ApiClient';
 
 interface AnalyticsSummary {
@@ -255,17 +257,7 @@ export const Analytics: React.FC = () => {
                     {visit.pagePath || '/'}
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      visit.userRole === 'admin' 
-                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
-                        : visit.userRole === 'editor'
-                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                        : visit.userRole === 'viewer'
-                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                    }`}>
-                      {visit.userRole || 'public'}
-                    </span>
+                    <RoleBadge role={(visit.userRole || 'public') as UserRole} size="sm" />
                   </td>
                 </tr>
               ))}
@@ -276,4 +268,6 @@ export const Analytics: React.FC = () => {
     </div>
   );
 };
+
+export default Analytics;
 

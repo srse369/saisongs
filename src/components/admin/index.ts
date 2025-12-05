@@ -9,6 +9,7 @@ export { PitchForm } from './PitchForm';
 export { PitchList } from './PitchList';
 export { PitchManager } from './PitchManager';
 export { PasswordDialog } from './PasswordDialog';
+export { OTPLoginDialog } from './OTPLoginDialog';
 export { BulkImportUI } from './BulkImportUI';
 export { CsvImportManager } from './CsvImportManager';
 export { NamedSessionManager } from './NamedSessionManager';
@@ -18,4 +19,5 @@ export { Analytics } from './Analytics';
 export { WorldMap } from './WorldMap';
 export { FeedbackManager } from './FeedbackManager';
 export { TemplateManager } from './TemplateManager';
+export { CentersManager } from './CentersManager';
 

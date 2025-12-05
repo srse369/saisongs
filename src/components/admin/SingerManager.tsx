@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSingers } from '../../contexts/SingerContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { compareStringsIgnoringSpecialChars } from '../../utils';
 import { RefreshIcon } from '../common';
 import { SingerForm } from './SingerForm';
 import { SingerList } from './SingerList';
@@ -9,20 +10,20 @@ import type { Singer, CreateSingerInput } from '../../types';
 
 export const SingerManager: React.FC = () => {
   const { singers, loading, error, fetchSingers, createSinger, updateSinger, deleteSinger } = useSingers();
-  const { isEditor } = useAuth();
+  const { isEditor, userId } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSinger, setEditingSinger] = useState<Singer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
+  const lastFetchedUserIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Only fetch singers if we don't already have them in memory.
-    // This avoids refetching every time we enter the tab while still
-    // loading data on first use or after a full reload.
-    if (!loading && singers.length === 0) {
-      fetchSingers();
+    // Fetch singers when user changes to get correct filtered data
+    if (userId !== lastFetchedUserIdRef.current) {
+      lastFetchedUserIdRef.current = userId;
+      fetchSingers(true);
     }
-  }, [fetchSingers, loading, singers.length]);
+  }, [fetchSingers, userId]);
 
   const handleCreateClick = () => {
     setEditingSinger(null);
@@ -48,9 +49,41 @@ export const SingerManager: React.FC = () => {
     setEditingSinger(null);
   };
 
-  const handleFormSubmit = async (input: CreateSingerInput) => {
+  const handleFormSubmit = async (input: CreateSingerInput, adminFields?: { is_admin: boolean; editor_for: number[] }) => {
     if (editingSinger) {
       const result = await updateSinger(editingSinger.id, input);
+      if (result && adminFields) {
+        // If admin fields provided, update them via separate API calls
+        const API_BASE_URL = import.meta.env.VITE_API_URL || (
+          import.meta.env.DEV ? '/api' : 'http://localhost:3111/api'
+        );
+        
+        try {
+          // Update is_admin status
+          await fetch(`${API_BASE_URL}/singers/${editingSinger.id}/admin`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ is_admin: adminFields.is_admin ? 1 : 0 }),
+          });
+          
+          // Update editor_for
+          await fetch(`${API_BASE_URL}/singers/${editingSinger.id}/editor-for`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ editor_for: adminFields.editor_for }),
+          });
+          
+          // Clear centers cache since editor assignments affect center data
+          window.localStorage.removeItem('songStudio:centersCache');
+          
+          // Refresh singers to get updated data
+          await fetchSingers(true);
+        } catch (error) {
+          console.error('Error updating admin fields:', error);
+        }
+      }
       if (result) {
         setIsFormOpen(false);
         setEditingSinger(null);
@@ -87,7 +120,7 @@ export const SingerManager: React.FC = () => {
       if (!aStartsWith && bStartsWith) return 1;
       
       // If both start with query or neither does, sort alphabetically
-      return aName.localeCompare(bName);
+      return compareStringsIgnoringSpecialChars(a.name, b.name);
   });
   }, [singers, searchTerm]);
 
@@ -210,3 +243,5 @@ export const SingerManager: React.FC = () => {
     </div>
   );
 };
+
+export default SingerManager;

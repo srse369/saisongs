@@ -1,25 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { PasswordDialog } from '../admin/PasswordDialog';
+import { OTPLoginDialog } from '../admin/OTPLoginDialog';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
+  requireEditor?: boolean;
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireAdmin = false }) => {
-  const { isAuthenticated, isAdmin } = useAuth();
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireAdmin = false, requireEditor = false }) => {
+  const { isAuthenticated, isAdmin, isEditor, isLoading } = useAuth();
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
-    // If not authenticated when component mounts, show password dialog
-    if (!isAuthenticated) {
-      setShowPasswordDialog(true);
+    // Only show login dialog after loading completes and user is not authenticated
+    if (!isLoading && !isAuthenticated) {
+      setShowLoginDialog(true);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isLoading]);
+
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // If user successfully logged in, render the protected content
   if (loginSuccess || isAuthenticated) {
@@ -38,21 +51,36 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
         </div>
       );
     }
+    if (requireEditor && !isEditor && !isAdmin) {
+      // User is authenticated but not editor or admin
+      return (
+        <div className="p-8 text-center">
+          <h2 className="text-xl font-bold text-red-600 mb-4">Access Denied</h2>
+          <p className="text-gray-700 dark:text-gray-300">This page requires editor privileges.</p>
+          <button 
+            onClick={() => window.history.back()}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Go Back
+          </button>
+        </div>
+      );
+    }
     return <>{children}</>;
   }
 
-  // Show password dialog if not authenticated
+  // Show login dialog if not authenticated
   return (
     <>
-      <PasswordDialog
-        isOpen={showPasswordDialog}
+      <OTPLoginDialog
+        isOpen={showLoginDialog}
         onClose={() => {
-          setShowPasswordDialog(false);
+          setShowLoginDialog(false);
           // If they close without logging in, go back
           window.history.back();
         }}
-        onSuccess={() => {
-          setShowPasswordDialog(false);
+        onSuccess={(role, userId, userEmail, userName, centerIds, editorFor) => {
+          setShowLoginDialog(false);
           setLoginSuccess(true);
         }}
       />

@@ -148,6 +148,18 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
       newErrors.name = 'Song name must be 255 characters or less';
     }
 
+    if (!language.trim()) {
+      newErrors.language = 'Language is required';
+    }
+
+    if (!deity.trim()) {
+      newErrors.deity = 'Deity is required';
+    }
+
+    if (!lyrics.trim()) {
+      newErrors.lyrics = 'Lyrics are required';
+    }
+
     if (externalSourceUrl.trim() && !isValidUrl(externalSourceUrl.trim())) {
       newErrors.externalSourceUrl = 'Please enter a valid URL';
     }
@@ -246,39 +258,49 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
 
       {/* Additional Fields Section */}
       <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-        <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Song Details (Optional)</h3>
+        <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Song Details</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Language */}
           <div>
             <label htmlFor="language" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Language
+              Language <span className="text-red-500 dark:text-red-400">*</span>
             </label>
             <input
               id="language"
               type="text"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 ${
+                errors.language ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
+              }`}
               placeholder="e.g., sanskrit / hindi"
               disabled={isSubmitting}
             />
+            {errors.language && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.language}</p>
+            )}
           </div>
 
           {/* Deity */}
           <div>
             <label htmlFor="deity" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Deity
+              Deity <span className="text-red-500 dark:text-red-400">*</span>
             </label>
             <input
               id="deity"
               type="text"
               value={deity}
               onChange={(e) => setDeity(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 ${
+                errors.deity ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
+              }`}
               placeholder="e.g., sai, devi, krishna"
               disabled={isSubmitting}
             />
+            {errors.deity && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.deity}</p>
+            )}
           </div>
 
           {/* Tempo */}
@@ -349,17 +371,22 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
         {/* Lyrics */}
         <div className="mt-4">
           <label htmlFor="lyrics" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Lyrics
+            Lyrics <span className="text-red-500 dark:text-red-400">*</span>
           </label>
           <textarea
             id="lyrics"
             value={lyrics}
             onChange={(e) => setLyrics(e.target.value)}
             rows={6}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 font-mono text-sm"
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono text-sm ${
+              errors.lyrics ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
+            }`}
             placeholder="Enter song lyrics (use \n for line breaks)"
             disabled={isSubmitting}
           />
+          {errors.lyrics && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.lyrics}</p>
+          )}
         </div>
 
         {/* Meaning */}

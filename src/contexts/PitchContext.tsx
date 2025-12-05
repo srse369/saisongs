@@ -16,7 +16,7 @@ interface PitchContextState {
   getPitchesForSinger: (singerId: string) => Promise<void>;
   createPitch: (input: CreatePitchInput) => Promise<SongSingerPitch | null>;
   updatePitch: (id: string, input: UpdatePitchInput) => Promise<SongSingerPitch | null>;
-  deletePitch: (id: string) => Promise<boolean>;
+  deletePitch: (id: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -204,28 +204,22 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
     }
   }, [toast]);
 
-  const deletePitch = useCallback(async (id: string): Promise<boolean> => {
+  const deletePitch = useCallback(async (id: string): Promise<void> => {
     setLoading(true);
-    setError(null);
     try {
-      const success = await pitchService.deletePitch(id);
-      if (success) {
-        setPitches(prev => prev.filter(pitch => pitch.id !== id));
-        // Clear localStorage cache so fresh data is fetched next time
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(PITCHES_CACHE_KEY);
-        }
-        toast.success('Pitch association deleted successfully');
+      await pitchService.deletePitch(id);
+      setPitches(prev => prev.filter(pitch => pitch.id !== id));
+      // Clear localStorage cache so fresh data is fetched next time
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(PITCHES_CACHE_KEY);
       }
-      return success;
+      toast.success('Pitch association deleted successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete pitch';
-      setError({
-        code: 'UNKNOWN_ERROR',
-        message: errorMessage,
-      });
+      // Only show error via toast, don't persist to state
+      // This prevents non-dismissible error banners in PitchManager
       toast.error(errorMessage);
-      return false;
+      // Don't re-throw - error already shown via toast, prevents "Uncaught promise" console errors
     } finally {
       setLoading(false);
     }

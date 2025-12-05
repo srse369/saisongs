@@ -4,6 +4,7 @@ import { usePitches } from '../../contexts/PitchContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { compareStringsIgnoringSpecialChars } from '../../utils';
 import { PitchForm } from './PitchForm';
 import { PitchList } from './PitchList';
 import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
@@ -14,7 +15,7 @@ import { Modal } from '../common/Modal';
 import { SongDetails } from './SongDetails';
 
 export const PitchManager: React.FC = () => {
-  const { isEditor } = useAuth();
+  const { isEditor, userId } = useAuth();
   const { 
     pitches, 
     loading: pitchLoading, 
@@ -55,6 +56,7 @@ export const PitchManager: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(100);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const lastFetchedUserIdRef = useRef<number | null>(null);
 
   // Sync advanced filters with URL parameters (when navigating from Songs/Singers tab)
   useEffect(() => {
@@ -87,28 +89,29 @@ export const PitchManager: React.FC = () => {
   }, [songFilterId, singerFilterId, songs, singers]);
 
   // Fetch songs, singers, and all existing pitch associations when needed.
-  // We avoid refetching on every tab entry by only loading when the in-memory
-  // collections are empty (e.g. first load or after a full reload).
+  // Force refresh when userId changes to get correct filtered data
+  // Parallelize fetches for better performance
   useEffect(() => {
-    if (!songsLoading && songs.length === 0) {
-      fetchSongs();
-    }
-    if (!singersLoading && singers.length === 0) {
-      fetchSingers();
-    }
-    if (!pitchLoading && pitches.length === 0) {
-      fetchAllPitches();
+    if (userId !== lastFetchedUserIdRef.current) {
+      lastFetchedUserIdRef.current = userId;
+      
+      // Fetch all data in parallel for faster loading
+      Promise.all([
+        !songsLoading && fetchSongs(true),
+        !singersLoading && fetchSingers(true),
+        !pitchLoading && fetchAllPitches()
+      ]).catch(error => {
+        console.error('Error fetching data in parallel:', error);
+      });
     }
   }, [
     fetchSongs,
     fetchSingers,
     fetchAllPitches,
+    userId,
     songsLoading,
     singersLoading,
     pitchLoading,
-    songs.length,
-    singers.length,
-    pitches.length,
   ]);
 
   const handleCreateClick = () => {
@@ -149,7 +152,14 @@ export const PitchManager: React.FC = () => {
       result = await createPitch(input);
     }
 
+    // Close form on success or permission error
+    // Permission errors are already shown via toast, so we close the form
+    // to avoid the "unsaved changes" dialog issue
     if (result) {
+      setShowForm(false);
+      setEditingPitch(null);
+    } else if (editingPitch && pitchError?.message?.includes('Access denied')) {
+      // Close form on permission error to avoid unsaved changes dialog
       setShowForm(false);
       setEditingPitch(null);
     }
@@ -277,9 +287,9 @@ export const PitchManager: React.FC = () => {
       }
       
       // Sort by song name first, then by singer name
-      const songCompare = aSongName.localeCompare(bSongName);
+      const songCompare = compareStringsIgnoringSpecialChars(songA?.name || '', songB?.name || '');
       if (songCompare !== 0) return songCompare;
-      return aSingerName.localeCompare(bSingerName);
+      return compareStringsIgnoringSpecialChars(singerA?.name || '', singerB?.name || '');
     });
   }, [pitches, debouncedSearchTerm, advancedFilters, songFilterId, singerFilterId, songMap, singerMap]);
 
@@ -528,3 +538,5 @@ export const PitchManager: React.FC = () => {
     </div>
   );
 };
+
+export default PitchManager;

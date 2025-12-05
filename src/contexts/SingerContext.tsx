@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Singer, CreateSingerInput, UpdateSingerInput, ServiceError } from '../types';
 import { singerService } from '../services';
 import { useToast } from './ToastContext';
+import { compareStringsIgnoringSpecialChars } from '../utils';
 
 const SINGERS_CACHE_KEY = 'songStudio:singersCache';
 const SINGERS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -15,7 +16,7 @@ interface SingerContextState {
   getSingerById: (id: string) => Promise<Singer | null>;
   createSinger: (input: CreateSingerInput) => Promise<Singer | null>;
   updateSinger: (id: string, input: UpdateSingerInput) => Promise<Singer | null>;
-  deleteSinger: (id: string) => Promise<boolean>;
+  deleteSinger: (id: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -137,7 +138,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
         }
         // Insert in sorted order by name
         const newList = [...prev, singer].sort((a, b) => 
-          a.name.localeCompare(b.name)
+          compareStringsIgnoringSpecialChars(a.name, b.name)
         );
         return newList;
       });
@@ -189,28 +190,22 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
     }
   }, [toast]);
 
-  const deleteSinger = useCallback(async (id: string): Promise<boolean> => {
+  const deleteSinger = useCallback(async (id: string): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
-      const success = await singerService.deleteSinger(id);
-      if (success) {
-        setSingers(prev => prev.filter(singer => singer.id !== id));
-        // Clear localStorage cache so fresh data is fetched next time
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(SINGERS_CACHE_KEY);
-        }
-        toast.success('Singer deleted successfully');
+      await singerService.deleteSinger(id);
+      setSingers(prev => prev.filter(singer => singer.id !== id));
+      // Clear localStorage cache so fresh data is fetched next time
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(SINGERS_CACHE_KEY);
       }
-      return success;
+      toast.success('Singer deleted successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete singer';
-      setError({
-        code: 'UNKNOWN_ERROR',
-        message: errorMessage,
-      });
+      // Show toast notification but don't persist error in state
+      // since we have a persistent error display in the UI
       toast.error(errorMessage);
-      return false;
     } finally {
       setLoading(false);
     }

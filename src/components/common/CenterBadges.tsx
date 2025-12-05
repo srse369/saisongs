@@ -1,0 +1,119 @@
+import React, { useState, useEffect } from 'react';
+
+interface Center {
+  id: number;
+  name: string;
+  badge_text_color?: string;
+}
+
+interface CenterBadgesProps {
+  centerIds: number[];
+  showAllIfEmpty?: boolean; // Show "All Centers" badge if centerIds is empty
+  showWarningIfEmpty?: boolean; // Show warning badge if centerIds is empty (for singers)
+}
+
+// Singleton cache for centers data to prevent multiple fetches
+let centersCache: Center[] | null = null;
+let centersFetchPromise: Promise<Center[]> | null = null;
+
+const fetchCentersOnce = async (): Promise<Center[]> => {
+  // Return cached data if available
+  if (centersCache) {
+    return centersCache;
+  }
+
+  // Return existing promise if fetch is in progress
+  if (centersFetchPromise) {
+    return centersFetchPromise;
+  }
+
+  // Start new fetch
+  centersFetchPromise = (async () => {
+    try {
+      const response = await fetch('/api/centers');
+      if (response.ok) {
+        const data = await response.json();
+        centersCache = data;
+        return data;
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to fetch centers:', error);
+      return [];
+    } finally {
+      centersFetchPromise = null;
+    }
+  })();
+
+  return centersFetchPromise;
+};
+
+/**
+ * Displays center badges based on the provided center IDs
+ * Fetches center details and renders them as colored badges
+ */
+export const CenterBadges: React.FC<CenterBadgesProps> = ({ 
+  centerIds, 
+  showAllIfEmpty = true,
+  showWarningIfEmpty = false
+}) => {
+  const [centers, setCenters] = useState<Center[]>(centersCache || []);
+  const [loading, setLoading] = useState(!centersCache);
+
+  useEffect(() => {
+    fetchCentersOnce().then(data => {
+      setCenters(data);
+      setLoading(false);
+    });
+  }, []);
+
+  // If no center IDs are provided, show appropriate badge
+  if (!centerIds || centerIds.length === 0) {
+    if (!showAllIfEmpty) return null;
+    
+    if (showWarningIfEmpty) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded" title="No centers assigned - needs admin attention">
+          ⚠️ No Centers
+        </span>
+      );
+    }
+    
+    return (
+      <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">
+        🌐 All Centers
+      </span>
+    );
+  }
+
+  if (loading) {
+    return (
+      <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded">
+        Loading...
+      </span>
+    );
+  }
+
+  // Filter centers that match the provided IDs
+  const selectedCenters = centers.filter(c => centerIds.includes(c.id));
+
+  if (selectedCenters.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {selectedCenters.map(center => (
+        <span
+          key={center.id}
+          className="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-200 dark:bg-gray-700 rounded"
+          style={{ 
+            color: center.badge_text_color || '#374151'
+          }}
+        >
+          📍 {center.name}
+        </span>
+      ))}
+    </>
+  );
+};

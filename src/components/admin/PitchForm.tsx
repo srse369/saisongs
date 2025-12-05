@@ -24,6 +24,23 @@ export const PitchForm: React.FC<PitchFormProps> = ({
   const [pitchValue, setPitchValue] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [centers, setCenters] = useState<Array<{id: number; name: string}>>([]);
+
+  // Fetch centers for display
+  useEffect(() => {
+    const fetchCenters = async () => {
+      try {
+        const response = await fetch('/api/centers');
+        if (response.ok) {
+          const data = await response.json();
+          setCenters(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch centers:', error);
+      }
+    };
+    fetchCenters();
+  }, []);
 
   const isEditMode = !!pitch;
   
@@ -50,16 +67,8 @@ export const PitchForm: React.FC<PitchFormProps> = ({
     };
   }, [hasUnsavedChanges, onUnsavedChangesRef]);
 
-  // Handle cancel with unsaved changes check
+  // Handle cancel - parent will check for unsaved changes via ref
   const handleCancel = () => {
-    if (hasUnsavedChanges) {
-      const confirmed = window.confirm(
-        'You have unsaved changes. Are you sure you want to close without saving?'
-      );
-      if (!confirmed) {
-        return;
-      }
-    }
     onCancel();
   };
   
@@ -161,11 +170,16 @@ export const PitchForm: React.FC<PitchFormProps> = ({
           disabled={isSubmitting || isEditMode}
         >
           <option value="">Select a singer</option>
-          {singers.map((singer) => (
-            <option key={singer.id} value={singer.id}>
-              {singer.name}
-            </option>
-          ))}
+          {singers.map((singer) => {
+            const singerCenters = singer.center_ids && singer.center_ids.length > 0
+              ? centers.filter(c => singer.center_ids!.includes(c.id)).map(c => c.name).join(', ')
+              : '';
+            return (
+              <option key={singer.id} value={singer.id}>
+                {singer.name}{singerCenters ? ` (${singerCenters})` : ''}
+              </option>
+            );
+          })}
         </select>
         {errors.singerId && (
           <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.singerId}</p>

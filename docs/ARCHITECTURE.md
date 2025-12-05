@@ -246,9 +246,9 @@ const poolConfig = {
   connectString: process.env.ORACLE_CONNECT_STRING,
   
   // Minimal connections for Free Tier
-  poolMin: 1,
-  poolMax: 1,  // ONLY 1 connection
-  poolIncrement: 0,
+  poolMin: 0,
+  poolMax: 2,  // ONLY 1 connection
+  poolIncrement: 1,
   
   // Health checks
   poolPingInterval: 60,  // Verify connection every 60s
@@ -558,9 +558,9 @@ ORACLE_WALLET_PASSWORD=your_wallet_password
 ADMIN_PASSWORD=your_admin_password
 
 # Database Pool
-DB_POOL_MIN=1
-DB_POOL_MAX=1
-DB_POOL_INCREMENT=0
+DB_POOL_MIN=0
+DB_POOL_MAX=2
+DB_POOL_INCREMENT=1
 
 # URLs
 APP_URL=https://saisongs.org

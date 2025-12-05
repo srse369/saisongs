@@ -99,23 +99,28 @@ class ApiClient {
 
     const url = `${this.baseUrl}${endpoint}`;
     
-    // Get user role from session storage for backend validation
-    const userRole = sessionStorage.getItem('songstudio_auth_role');
-    
     try {
       const response = await fetch(url, {
         ...options,
+        credentials: 'include', // Send session cookies with every request
         headers: {
           'Content-Type': 'application/json',
-          ...(userRole && { 'X-User-Role': userRole }),
           ...options?.headers,
         },
       });
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Request failed' }));
-        this.recordFailure(endpoint);
-        throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
+        
+        // Only record failure and trigger backoff for server errors (5xx) or network errors,
+        // not for client errors (4xx) like 400, 401, 403, 404
+        if (response.status >= 500) {
+          this.recordFailure(endpoint);
+        }
+        
+        // Use message if available (more detailed), otherwise fall back to error field
+        const errorMsg = error.message || error.error || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(errorMsg);
       }
 
       // Handle 204 No Content responses

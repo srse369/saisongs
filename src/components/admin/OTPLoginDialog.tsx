@@ -1,0 +1,282 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import type { UserRole } from '../../contexts/AuthContext';
+
+interface OTPLoginDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (role: UserRole, userId: number, email: string, name?: string, centerIds?: number[], editorFor?: number[]) => void;
+}
+
+type Step = 'email' | 'otp';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || (
+  import.meta.env.DEV ? '/api' : 'http://localhost:3111/api'
+);
+
+export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+}) => {
+  const [step, setStep] = useState<Step>('email');
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [otpExpiry, setOtpExpiry] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState(0);
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      setStep('email');
+      setEmail('');
+      setOtp('');
+      setError('');
+      setLoading(false);
+      setOtpExpiry(null);
+      setCountdown(0);
+    }
+  }, [isOpen]);
+
+  // Countdown timer for OTP expiry
+  useEffect(() => {
+    if (otpExpiry && step === 'otp') {
+      const interval = setInterval(() => {
+        const remaining = Math.floor((otpExpiry - Date.now()) / 1000);
+        if (remaining <= 0) {
+          setCountdown(0);
+          setError('OTP expired. Please request a new one.');
+          setStep('email');
+          setOtpExpiry(null);
+        } else {
+          setCountdown(remaining);
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [otpExpiry, step]);
+
+  const handleRequestOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/request-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStep('otp');
+        setOtpExpiry(Date.now() + 10 * 60 * 1000); // 10 minutes
+        setError('');
+      } else {
+        // Show specific message for non-existent email
+        if (response.status === 404) {
+          setError(data.message || 'Please contact your nearest center to get access.');
+        } else {
+          setError(data.error || 'Failed to send OTP. Please try again.');
+        }
+      }
+    } catch (err) {
+      console.error('Request OTP error:', err);
+      setError('Network error. Please check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          email: email.trim().toLowerCase(), 
+          code: otp.trim() 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const role = data.role as UserRole;
+        const userId = data.user?.id || 0;
+        const userEmail = data.user?.email || email.trim().toLowerCase();
+        const userName = data.user?.name;
+        const centerIds = data.user?.centerIds || [];
+        const editorFor = data.user?.editorFor || [];
+        onSuccess(role, userId, userEmail, userName, centerIds, editorFor);
+        onClose();
+      } else {
+        setError(data.error || 'Invalid OTP. Please try again.');
+        setOtp('');
+      }
+    } catch (err) {
+      console.error('Verify OTP error:', err);
+      setError('Network error. Please check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackToEmail = useCallback(() => {
+    setStep('email');
+    setOtp('');
+    setError('');
+    setOtpExpiry(null);
+    setCountdown(0);
+  }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose();
+    }
+  }, [onClose]);
+
+  if (!isOpen) return null;
+
+  const formatCountdown = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={handleKeyDown}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-gray-800">
+            {step === 'email' ? 'Sign In' : 'Enter OTP'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        {step === 'email' ? (
+          <form onSubmit={handleRequestOTP} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your.email@example.com"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+                autoFocus
+                disabled={loading}
+              />
+            </div>
+
+            {error && (
+              <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || !email.trim()}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              {loading ? 'Sending...' : 'Send OTP'}
+            </button>
+
+            <p className="text-sm text-gray-500 text-center">
+              We'll send a 6-digit code to your email
+            </p>
+          </form>
+        ) : (
+          <form onSubmit={handleVerifyOTP} className="space-y-4">
+            <div>
+              <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
+                Enter 6-digit code
+              </label>
+              <div className="text-sm text-gray-600 mb-2">
+                Sent to: <span className="font-medium">{email}</span>
+              </div>
+              <input
+                id="otp"
+                type="text"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl tracking-widest font-mono"
+                required
+                autoFocus
+                disabled={loading}
+                maxLength={6}
+              />
+              {countdown > 0 && (
+                <div className="text-sm text-gray-500 mt-2 text-center">
+                  Code expires in {formatCountdown(countdown)}
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <button
+                type="submit"
+                disabled={loading || otp.length !== 6}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+              >
+                {loading ? 'Verifying...' : 'Verify'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBackToEmail}
+                disabled={loading}
+                className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Back to Email
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-500 text-center">
+              Didn't receive the code? Click "Back to Email" to resend
+            </p>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};

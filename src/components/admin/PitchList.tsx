@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { SongSingerPitch, Song, Singer } from '../../types';
 import { Modal } from '../common/Modal';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,7 @@ interface PitchWithDetails extends SongSingerPitch {
   songName?: string;
   singerName?: string;
   singerGender?: string;
+  singerCenterIds?: number[];
   externalSourceUrl?: string;
   referenceGentsPitch?: string;
   referenceLadiesPitch?: string;
@@ -47,13 +48,31 @@ export const PitchList: React.FC<PitchListProps> = ({
   };
 
   // Create a map for quick lookups
+  const [centers, setCenters] = useState<Array<{id: number; name: string}>>([]);
+
+  // Fetch centers for display
+  useEffect(() => {
+    const fetchCenters = async () => {
+      try {
+        const response = await fetch('/api/centers');
+        if (response.ok) {
+          const data = await response.json();
+          setCenters(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch centers:', error);
+      }
+    };
+    fetchCenters();
+  }, []);
+
   const songMap = new Map(songs.map(song => [song.id, { 
     name: song.name, 
     externalSourceUrl: song.externalSourceUrl,
     referenceGentsPitch: song.referenceGentsPitch,
     referenceLadiesPitch: song.referenceLadiesPitch
   }]));
-  const singerMap = new Map(singers.map(singer => [singer.id, { name: singer.name, gender: singer.gender }]));
+  const singerMap = new Map(singers.map(singer => [singer.id, { name: singer.name, gender: singer.gender, center_ids: singer.center_ids }]));
 
   // Enrich pitches with song and singer names
   const enrichedPitches: PitchWithDetails[] = pitches.map(pitch => ({
@@ -61,6 +80,7 @@ export const PitchList: React.FC<PitchListProps> = ({
     songName: songMap.get(pitch.songId)?.name || 'Unknown Song',
     singerName: singerMap.get(pitch.singerId)?.name || 'Unknown Singer',
     singerGender: singerMap.get(pitch.singerId)?.gender,
+    singerCenterIds: singerMap.get(pitch.singerId)?.center_ids,
     externalSourceUrl: songMap.get(pitch.songId)?.externalSourceUrl,
     referenceGentsPitch: songMap.get(pitch.songId)?.referenceGentsPitch,
     referenceLadiesPitch: songMap.get(pitch.songId)?.referenceLadiesPitch,
@@ -77,10 +97,10 @@ export const PitchList: React.FC<PitchListProps> = ({
     setIsDeleting(true);
     try {
       await onDelete(pitchToDelete.id);
-      setDeleteModalOpen(false);
-      setPitchToDelete(null);
     } finally {
       setIsDeleting(false);
+      setDeleteModalOpen(false);
+      setPitchToDelete(null);
     }
   };
 
@@ -182,7 +202,14 @@ export const PitchList: React.FC<PitchListProps> = ({
                           : pitch.singerGender?.toLowerCase() === 'girl' 
                             ? 'text-pink-400 dark:text-pink-300' 
                             : 'text-gray-600 dark:text-gray-400'
-                  }`}>{pitch.singerName}</span>
+                  }`}>
+                    {pitch.singerName}
+                    {pitch.singerCenterIds && pitch.singerCenterIds.length > 0 && (
+                      <span className="font-normal text-gray-500 dark:text-gray-400">
+                        {' '}({centers.filter(c => pitch.singerCenterIds!.includes(c.id)).map(c => c.name).join(', ')})
+                      </span>
+                    )}
+                  </span>
                   <span className="mx-2">•</span>
                   <span>Pitch: </span>
                   <span className="font-bold text-gray-700 dark:text-gray-200">{formatPitch(pitch.pitch)}</span>
@@ -242,7 +269,7 @@ export const PitchList: React.FC<PitchListProps> = ({
                         <span className="text-sm font-medium whitespace-nowrap">Edit</span>
                       </button>
                     )}
-                    {isAdmin && (
+                    {isEditor && (
                       <button
                         onClick={() => handleDeleteClick(pitch)}
                         title="Delete"

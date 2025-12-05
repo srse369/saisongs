@@ -204,6 +204,7 @@ export interface PresentationTemplate {
   text?: TextElement[];
   
   isDefault?: boolean;
+  center_ids?: number[];              // Centers that have access to this template (empty = all centers)
   createdAt?: Date;
   updatedAt?: Date;
   yaml?: string;
@@ -239,6 +240,7 @@ export interface Song {
   referenceGentsPitch?: string;
   referenceLadiesPitch?: string;
   
+  createdBy?: string;                  // User ID who created the song
   createdAt: Date;
   updatedAt: Date;
 }
@@ -247,6 +249,10 @@ export interface Singer {
   id: string;
   name: string;
   gender?: 'Male' | 'Female' | 'Boy' | 'Girl' | 'Other';
+  email?: string;                      // Optional email for singer
+  center_ids?: number[];               // Centers that have access to this singer (empty = all centers)
+  editor_for?: number[];               // Centers this user can edit (if they have editor permissions)
+  is_admin?: boolean;                  // Whether this user is an admin
   createdAt: Date;
   updatedAt: Date;
 }
@@ -264,6 +270,8 @@ export interface NamedSession {
   id: string;
   name: string;
   description?: string;
+  center_ids?: number[];              // Centers that have access to this session (empty = all centers)
+  created_by?: string;                // Email of user who created the session
   createdAt: Date;
   updatedAt: Date;
 }
@@ -350,11 +358,15 @@ export interface UpdateSongInput {
 export interface CreateSingerInput {
   name: string;
   gender?: 'Male' | 'Female' | 'Boy' | 'Girl' | 'Other';
+  email?: string;
+  center_ids?: number[];
 }
 
 export interface UpdateSingerInput {
   name?: string;
   gender?: 'Male' | 'Female' | 'Boy' | 'Girl' | 'Other';
+  email?: string;
+  center_ids?: number[];
 }
 
 export interface CreatePitchInput {
@@ -370,11 +382,13 @@ export interface UpdatePitchInput {
 export interface CreateNamedSessionInput {
   name: string;
   description?: string;
+  center_ids?: number[];
 }
 
 export interface UpdateNamedSessionInput {
   name?: string;
   description?: string;
+  center_ids?: number[];
 }
 
 export interface CreateSessionItemInput {

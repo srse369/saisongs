@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../contexts/AuthContext';
-import { MusicIcon, SongIcon } from './common';
+import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, CenterBadges } from './common';
 import { FeedbackDrawer } from './common/FeedbackDrawer';
 
 interface LayoutProps {
@@ -15,7 +15,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const { isConnected, connectionError, resetConnection } = useDatabase();
-  const { isAuthenticated, userRole, logout, downgradeRole } = useAuth();
+  const { isAuthenticated, userRole, userName, userEmail, logout, centerIds, editorFor, isAdmin } = useAuth();
 
   // Check if current path matches the link
   const isActive = (path: string) => {
@@ -48,18 +48,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
-              <Link to="/" className={getLinkClasses('/')}>
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                Home
-              </Link>
               <Link to="/admin/songs" className={getLinkClasses('/admin/songs')}>
                 <SongIcon className="w-4 h-4 mr-1.5" />
                 Songs
               </Link>
               
-              {/* Singers and Pitches tabs only visible when authenticated */}
+              {/* Singers and Pitches tabs visible to all authenticated users */}
               {isAuthenticated && (
                 <>
                   <Link to="/admin/singers" className={getLinkClasses('/admin/singers')}>
@@ -72,14 +66,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <MusicIcon className="w-4 h-4 mr-1.5" />
                     Pitches
                   </Link>
-                  {userRole === 'admin' && (
-                    <Link to="/admin/templates" className={getLinkClasses('/admin/templates')}>
-                      <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4m0-21h10a2 2 0 012 2v14a2 2 0 01-2 2m-10-21v21m0-21H9m10 0h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m0-21v21m0-21H9" />
-                      </svg>
-                      Templates
-                    </Link>
-                  )}
                 </>
               )}
               
@@ -91,55 +77,31 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Live
               </Link>
               
-              {/* Analytics tab - Admin only */}
-              {userRole === 'admin' && (
-                <>
-                  <Link to="/admin/analytics" className={getLinkClasses('/admin/analytics')}>
-                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Analytics
-                  </Link>
-                  <Link to="/admin/feedback" className={getLinkClasses('/admin/feedback')}>
-                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                    </svg>
-                    Feedback
-                  </Link>
-                </>
+              {(userRole === 'admin' || userRole === 'editor') && (
+                <Link to="/admin/templates" className={getLinkClasses('/admin/templates')}>
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4m0-21h10a2 2 0 012 2v14a2 2 0 01-2 2m-10-21v21m0-21H9m10 0h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m0-21v21m0-21H9" />
+                  </svg>
+                  Templates
+                </Link>
               )}
               
-              {/* Database connection indicator + Admin mode indicator */}
+              {/* Database connection indicator + Auth controls */}
               <div className="ml-2 flex items-center space-x-2">
-                {isConnected ? (
-                  <div className="flex items-center text-green-600 dark:text-green-400" title="Database connected">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
+                <DatabaseStatusDropdown 
+                  isConnected={isConnected}
+                  connectionError={connectionError}
+                  resetConnection={resetConnection}
+                  isAdmin={isAdmin}
+                />
+
+                {/* Login/Logout buttons */}
+                {isAuthenticated ? (
+                  <UserDropdown />
                 ) : (
                   <button
-                    onClick={resetConnection}
-                    className="flex items-center text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
-                    title={connectionError || 'Database disconnected - Click to reconnect'}
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                )}
-
-                {/* Role indicator */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isAuthenticated) {
-                      // Cycle down one role: admin → editor → viewer → public
-                      downgradeRole();
-                      // Navigate to home page after role change
-                      navigate('/');
-                    } else {
-                      // In public mode: open password dialog to login
+                    onClick={() => {
+                      // Trigger login dialog
                       const event = new KeyboardEvent('keydown', {
                         key: 'i',
                         code: 'KeyI',
@@ -148,72 +110,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                         bubbles: true,
                       });
                       window.dispatchEvent(event);
-                    }
-                  }}
-                  className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-medium border ${
-                    userRole === 'admin'
-                      ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
-                      : userRole === 'editor'
-                      ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
-                      : userRole === 'viewer'
-                      ? 'bg-purple-50 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300'
-                      : 'bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300'
-                  }`}
-                  title={
-                    userRole === 'admin'
-                      ? 'Click to downgrade to Editor mode'
-                      : userRole === 'editor'
-                      ? 'Click to downgrade to Viewer mode'
-                      : userRole === 'viewer'
-                      ? 'Click to downgrade to Public mode'
-                      : 'Click to login'
-                  }
-                >
-                  <svg
-                    className={`w-3 h-3 mr-1 ${
-                      userRole === 'admin' ? 'text-emerald-600 dark:text-emerald-400' : userRole === 'editor' ? 'text-blue-600 dark:text-blue-400' : userRole === 'viewer' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                    }}
+                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors"
+                    title="Sign in"
                   >
-                    {userRole === 'admin' ? (
-                      <>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                        />
-                      </>
-                    ) : userRole === 'editor' ? (
-                      <>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </>
-                    )}
-                  </svg>
-                  {userRole === 'admin' ? 'Admin' : userRole === 'editor' ? 'Editor' : userRole === 'viewer' ? 'Viewer' : 'Public'}
-                </button>
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                    Sign In
+                  </button>
+                )}
               </div>
             </nav>
 
@@ -241,16 +147,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           {isMobileMenuOpen && (
             <nav className="md:hidden py-4 space-y-1 border-t border-gray-200 dark:border-gray-700 animate-fade-in">
               <Link
-                to="/"
-                className={`block ${getLinkClasses('/')}`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                Home
-              </Link>
-              <Link
                 to="/admin/songs"
                 className={`block ${getLinkClasses('/admin/songs')}`}
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -259,7 +155,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Songs
               </Link>
               
-              {/* Singers and Pitches tabs only visible when authenticated */}
+              {/* Singers and Pitches tabs visible to all authenticated users */}
               {isAuthenticated && (
                 <>
                   <Link
@@ -280,18 +176,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <MusicIcon className="w-5 h-5 mr-2 inline" />
                     Pitches
                   </Link>
-                  {userRole === 'admin' && (
-                    <Link
-                      to="/admin/templates"
-                      className={`block ${getLinkClasses('/admin/templates')}`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4m0-21h10a2 2 0 012 2v14a2 2 0 01-2 2m-10-21v21m0-21H9m10 0h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m0-21v21m0-21H9" />
-                      </svg>
-                      Templates
-                    </Link>
-                  )}
                 </>
               )}
               
@@ -307,33 +191,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Live Session
               </Link>
               
-              {/* Analytics tab - Admin only */}
-              {userRole === 'admin' && (
-                <>
-                  <Link
-                    to="/admin/analytics"
-                    className={`block ${getLinkClasses('/admin/analytics')}`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Analytics
-                  </Link>
-                  <Link
-                    to="/admin/feedback"
-                    className={`block ${getLinkClasses('/admin/feedback')}`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                    </svg>
-                    Feedback
-                  </Link>
-                </>
+              {(userRole === 'admin' || userRole === 'editor') && (
+                <Link
+                  to="/admin/templates"
+                  className={`block ${getLinkClasses('/admin/templates')}`}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4m0-21h10a2 2 0 012 2v14a2 2 0 01-2 2m-10-21v21m0-21H9m10 0h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m0-21v21m0-21H9" />
+                  </svg>
+                  Templates
+                </Link>
               )}
               
-              {/* Database status and Role indicator in mobile menu */}
+              {/* Database status and Auth controls in mobile menu */}
               <div className="px-3 py-2 space-y-3 border-t border-gray-200 dark:border-gray-700 mt-2 pt-3">
                 {/* Database status */}
                 <div className="flex items-center space-x-2">
@@ -359,15 +230,113 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   )}
                 </div>
 
-                {/* Role indicator */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isAuthenticated) {
-                      downgradeRole();
-                      // Navigate to home page after role change
-                      navigate('/');
-                    } else {
+                {/* Login/Logout and Role */}
+                {isAuthenticated ? (
+                  <>
+                    {/* Role indicator */}
+                    {/* User Info Card */}
+                    <div className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <div className="flex items-center space-x-3 mb-3">
+                        <div className="flex-shrink-0">
+                          <RoleBadge role={userRole} size="md" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                            {userName || 'Unknown User'}
+                          </p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                            {userEmail || 'No email'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Center Access Info */}
+                      {(centerIds.length > 0 || editorFor.length > 0) && (
+                        <div className="space-y-2 mb-3 pb-3 border-b border-gray-200 dark:border-gray-600">
+                          {centerIds.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                Associated Centers:
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                <CenterBadges centerIds={centerIds} showAllIfEmpty={false} />
+                              </div>
+                            </div>
+                          )}
+                          {editorFor.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                Editor For:
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                <CenterBadges centerIds={editorFor} showAllIfEmpty={false} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Admin Menu Items */}
+                      {userRole === 'admin' && (
+                        <div className="space-y-1 mb-3">
+                          <button
+                            onClick={() => {
+                              navigate('/admin/centers');
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            Centers
+                          </button>
+                          <button
+                            onClick={() => {
+                              navigate('/admin/analytics');
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Analytics
+                          </button>
+                          <button
+                            onClick={() => {
+                              navigate('/admin/feedback');
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                            </svg>
+                            Feedback
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Logout button */}
+                      <button
+                        onClick={async () => {
+                          await logout();
+                          navigate('/');
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-md transition-colors border border-gray-300 dark:border-gray-600"
+                      >
+                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Sign Out
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => {
                       const event = new KeyboardEvent('keydown', {
                         key: 'i',
                         code: 'KeyI',
@@ -376,65 +345,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                         bubbles: true,
                       });
                       window.dispatchEvent(event);
-                    }
-                  }}
-                  className={`w-full flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium border ${
-                    userRole === 'admin'
-                      ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
-                      : userRole === 'editor'
-                      ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
-                      : userRole === 'viewer'
-                      ? 'bg-purple-50 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300'
-                      : 'bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300'
-                  }`}
-                >
-                  <svg
-                    className={`w-4 h-4 mr-2 ${
-                      userRole === 'admin' ? 'text-emerald-600 dark:text-emerald-400' : userRole === 'editor' ? 'text-blue-600 dark:text-blue-400' : userRole === 'viewer' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors"
                   >
-                    {userRole === 'admin' ? (
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                      />
-                    ) : userRole === 'editor' ? (
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    ) : (
-                      <>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </>
-                    )}
-                  </svg>
-                  {userRole === 'admin' 
-                    ? 'Admin Mode - Tap to downgrade' 
-                    : userRole === 'editor' 
-                    ? 'Editor Mode - Tap to downgrade' 
-                    : userRole === 'viewer'
-                    ? 'Viewer Mode - Tap to downgrade'
-                    : 'Public Mode - Tap to login'}
-                </button>
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                    Sign In
+                  </button>
+                )}
               </div>
             </nav>
           )}

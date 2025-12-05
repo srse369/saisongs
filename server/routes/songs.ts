@@ -2,6 +2,7 @@ import express from 'express';
 import { cacheService } from '../services/CacheService.js';
 import { databaseService } from '../services/DatabaseService.js';
 import { extractFromHtml } from '../services/SongExtractor.js';
+import { requireAuth } from '../middleware/simpleAuth.js';
 
 const router = express.Router();
 
@@ -30,16 +31,35 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new song
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   try {
     const songData = req.body;
+    const user = req.user;
     
     if (!songData.name || !songData.name.trim()) {
       return res.status(400).json({ error: 'Song name is required' });
     }
     
-    console.log('📝 Creating song:', songData.name);
-    const createdSong = await cacheService.createSong(songData);
+    if (!songData.language || !songData.language.trim()) {
+      return res.status(400).json({ error: 'Language is required' });
+    }
+    
+    if (!songData.deity || !songData.deity.trim()) {
+      return res.status(400).json({ error: 'Deity is required' });
+    }
+    
+    if (!songData.lyrics || !songData.lyrics.trim()) {
+      return res.status(400).json({ error: 'Lyrics are required' });
+    }
+    
+    // Add creator information (use email as it's unique and human-readable)
+    const songWithCreator = {
+      ...songData,
+      created_by: user.email
+    };
+    
+    console.log('📝 Creating song:', songData.name, 'by user:', user.email);
+    const createdSong = await cacheService.createSong(songWithCreator);
     
     if (createdSong) {
       console.log('✅ Song created:', createdSong.id);
@@ -55,13 +75,20 @@ router.post('/', async (req, res) => {
 });
 
 // Update song
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const songData = req.body;
+    const user = req.user;
     
-    console.log('📝 Updating song:', id);
-    const updatedSong = await cacheService.updateSong(id, songData);
+    // Add updater information
+    const songWithUpdater = {
+      ...songData,
+      updated_by: user.email
+    };
+    
+    console.log('📝 Updating song:', id, 'by user:', user.email);
+    const updatedSong = await cacheService.updateSong(id, songWithUpdater);
     
     if (updatedSong) {
       console.log('✅ Song updated:', id);
@@ -76,10 +103,65 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete song
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('🗑️ Deleting song:', id);
+    const user = req.user;
+    
+    console.log('🗑️ Delete request for song:', id, 'by user:', user.id, 'role:', user.role);
+    
+    // Get the song to check creator
+    const song = await cacheService.getSong(id);
+    if (!song) {
+      return res.status(404).json({ 
+        error: 'Song not found',
+        message: 'The song you are trying to delete does not exist'
+      });
+    }
+    
+    // Check if song is used in pitches (applies to ALL users including admins)
+    const pitchQuery = 'SELECT COUNT(*) as count FROM song_singer_pitches WHERE song_id = HEXTORAW(:1)';
+    const pitchResult = await databaseService.query(pitchQuery, [id]);
+    const pitchCount = pitchResult[0]?.COUNT || 0;
+    
+    if (pitchCount > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete song',
+        message: `This song is used in ${pitchCount} pitch(es) and cannot be deleted. Please remove all pitch associations first.`
+      });
+    }
+    
+    // Check if song is used in sessions (applies to ALL users including admins)
+    const sessionQuery = 'SELECT COUNT(*) as count FROM song_session_items WHERE song_id = HEXTORAW(:1)';
+    const sessionResult = await databaseService.query(sessionQuery, [id]);
+    const sessionCount = sessionResult[0]?.COUNT || 0;
+    
+    if (sessionCount > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete song',
+        message: `This song is used in ${sessionCount} session(s) and cannot be deleted. Please remove from sessions first.`
+      });
+    }
+    
+    // Permission checks (only after ensuring no orphan data)
+    if (user.role !== 'admin') {
+      // Editors can only delete songs they created
+      if (user.role === 'editor') {
+        if (song.createdBy !== user.email) {
+          return res.status(403).json({ 
+            error: 'Access denied',
+            message: 'You can only delete songs that you created'
+          });
+        }
+      } else {
+        // Viewers cannot delete
+        return res.status(403).json({ 
+          error: 'Access denied',
+          message: 'You do not have permission to delete songs'
+        });
+      }
+    }
+    
     await cacheService.deleteSong(id);
     console.log('✅ Song deleted:', id);
     res.json({ message: 'Song deleted successfully' });

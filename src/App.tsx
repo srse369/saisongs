@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { SongManager, SingerManager, PitchManager, PasswordDialog, BulkImportUI, CsvImportManager, Analytics, FeedbackManager, TemplateManager } from './components/admin';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
+import { OTPLoginDialog } from './components/admin';
 import { SongList, PresentationMode } from './components/presentation';
 import { SessionManager } from './components/session/SessionManager';
 import { SessionPresentationMode } from './components/session/SessionPresentationMode';
@@ -15,13 +16,36 @@ import { SessionProvider } from './contexts/SessionContext';
 import { NamedSessionProvider } from './contexts/NamedSessionContext';
 import { useAdminShortcut } from './hooks';
 import { usePageTracking } from './hooks/usePageTracking';
-import { useState, useEffect, useRef } from 'react';
+
+// Lazy load admin components for better initial load performance
+const SongManager = lazy(() => import('./components/admin/SongManager'));
+const SingerManager = lazy(() => import('./components/admin/SingerManager'));
+const PitchManager = lazy(() => import('./components/admin/PitchManager'));
+const TemplateManager = lazy(() => import('./components/admin/TemplateManager'));
+const CentersManager = lazy(() => import('./components/admin/CentersManager'));
+const Analytics = lazy(() => import('./components/admin/Analytics'));
+const FeedbackManager = lazy(() => import('./components/admin/FeedbackManager'));
+const BulkImportUI = lazy(() => import('./components/admin/BulkImportUI'));
+const CsvImportManager = lazy(() => import('./components/admin/CsvImportManager'));
 import './App.css';
+
+// Loading fallback component for lazy-loaded routes
+// This is a minimal spinner that fits within the existing layout
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <div className="text-center">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 function AppContent() {
   // Initialize admin keyboard shortcut (Ctrl+Shift+I or Cmd+Shift+I)
   const { isPasswordDialogOpen, closePasswordDialog } = useAdminShortcut();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading, setAuthenticatedUser } = useAuth();
   const { fetchSongs } = useSongs();
   const { fetchSingers } = useSingers();
   const { fetchAllPitches } = usePitches();
@@ -50,16 +74,29 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]); // Fetch when authentication status changes
 
+  // Show loading state during initial auth check
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <ToastContainer />
       
-      {/* Password Dialog - triggered by keyboard shortcut */}
-      <PasswordDialog
+      {/* OTP Login Dialog - triggered by keyboard shortcut */}
+      <OTPLoginDialog
         isOpen={isPasswordDialogOpen}
         onClose={closePasswordDialog}
-        onSuccess={() => {
-          // Successful admin login – nothing else automatic
+        onSuccess={(role, userId, userEmail, userName, centerIds, editorFor) => {
+          setAuthenticatedUser(role, userId, userEmail, userName, centerIds, editorFor);
+          closePasswordDialog();
         }}
       />
       
@@ -89,14 +126,24 @@ function AppContent() {
                   />
                   
                   {/* Public route - Song list (no singer/pitch info) */}
-                  <Route path="/admin/songs" element={<Layout><SongManager /></Layout>} />
+                  <Route path="/admin/songs" element={
+                    <Layout>
+                      <Suspense fallback={<LoadingFallback />}>
+                        <SongManager />
+                      </Suspense>
+                    </Layout>
+                  } />
                   
                   {/* Protected routes - Singer and pitch data requires authentication */}
                   <Route 
                     path="/admin/singers" 
                     element={
                       <ProtectedRoute>
-                        <Layout><SingerManager /></Layout>
+                        <Layout>
+                          <Suspense fallback={<LoadingFallback />}>
+                            <SingerManager />
+                          </Suspense>
+                        </Layout>
                       </ProtectedRoute>
                     } 
                   />
@@ -104,7 +151,11 @@ function AppContent() {
                     path="/admin/pitches" 
                     element={
                       <ProtectedRoute>
-                        <Layout><PitchManager /></Layout>
+                        <Layout>
+                          <Suspense fallback={<LoadingFallback />}>
+                            <PitchManager />
+                          </Suspense>
+                        </Layout>
                       </ProtectedRoute>
                     } 
                   />
@@ -112,7 +163,11 @@ function AppContent() {
                     path="/admin/analytics" 
                     element={
                       <ProtectedRoute requireAdmin={true}>
-                        <Layout><Analytics /></Layout>
+                        <Layout>
+                          <Suspense fallback={<LoadingFallback />}>
+                            <Analytics />
+                          </Suspense>
+                        </Layout>
                       </ProtectedRoute>
                     } 
                   />
@@ -120,15 +175,35 @@ function AppContent() {
                     path="/admin/feedback" 
                     element={
                       <ProtectedRoute requireAdmin={true}>
-                        <Layout><FeedbackManager /></Layout>
+                        <Layout>
+                          <Suspense fallback={<LoadingFallback />}>
+                            <FeedbackManager />
+                          </Suspense>
+                        </Layout>
                       </ProtectedRoute>
                     } 
                   />
                   <Route 
                     path="/admin/templates" 
                     element={
+                      <ProtectedRoute requireEditor={true}>
+                        <Layout>
+                          <Suspense fallback={<LoadingFallback />}>
+                            <TemplateManager />
+                          </Suspense>
+                        </Layout>
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/admin/centers" 
+                    element={
                       <ProtectedRoute requireAdmin={true}>
-                        <Layout><TemplateManager /></Layout>
+                        <Layout>
+                          <Suspense fallback={<LoadingFallback />}>
+                            <CentersManager />
+                          </Suspense>
+                        </Layout>
                       </ProtectedRoute>
                     } 
                   />
@@ -146,8 +221,6 @@ function AppContent() {
 
 // Bulk Import Page - wraps BulkImportUI with layout and explanation
 function BulkImportPage() {
-  const [isImportOpen, setIsImportOpen] = useState(false);
-
   return (
     <div className="px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
       <div className="max-w-3xl">
@@ -159,21 +232,7 @@ function BulkImportPage() {
           or run a full discovery and import process. Admin authentication is required.
         </p>
       </div>
-      <div>
-        <button
-          type="button"
-          onClick={() => setIsImportOpen(true)}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-        >
-          Open Bulk Import Tool
-        </button>
-      </div>
-      <BulkImportUI
-        isOpen={isImportOpen}
-        onClose={() => {
-          setIsImportOpen(false);
-        }}
-      />
+      <BulkImportUI inline={true} />
     </div>
   );
 }
@@ -224,92 +283,29 @@ function App() {
 
 // Home Page Component
 function HomePage() {
-  const { isAuthenticated, isAdmin } = useAuth();
+  const { isAuthenticated, userName } = useAuth();
 
   return (
     <div className="px-4 py-8 sm:py-12 animate-fade-in">
       <div className="text-center max-w-4xl mx-auto">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-8 sm:mb-12">
-          Sai Devotional Song Studio
-        </h1>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 mt-8 sm:mt-12 max-w-6xl mx-auto">
-        <Link
-          to="/session"
-          className="group block p-6 sm:p-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md hover:scale-105 transition-all duration-200"
-        >
-          <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 dark:bg-blue-900 rounded-full mb-4 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 transition-colors">
-            <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+        {isAuthenticated ? (
+          <div className="mt-8 space-y-4">
+            <p className="text-xl sm:text-2xl text-gray-700 dark:text-gray-300">
+              Welcome back, {userName}!
+            </p>
+            <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">
+              Use the navigation menu above to manage songs, singers, pitches, or start a live session.
+            </p>
           </div>
-          <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-            Start Session
-          </h2>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-            Browse and present songs in full-screen slideshow mode
-          </p>
-        </Link>
-
-        <Link
-          to="/admin/songs"
-          className="group block p-6 sm:p-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md hover:scale-105 transition-all duration-200"
-        >
-          <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 dark:bg-purple-900 rounded-full mb-4 group-hover:bg-purple-200 dark:group-hover:bg-purple-800 transition-colors">
-            <svg className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+        ) : (
+          <div className="mt-8 space-y-4">
+            <p className="text-xl sm:text-2xl text-gray-700 dark:text-gray-300">
+              Welcome to Sai Devotional Song Studio
+            </p>
+            <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">
+              A comprehensive platform for managing and presenting devotional songs with lyrics, meanings, and pitch information.
+            </p>
           </div>
-          <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-            Manage Content
-          </h2>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-            Add, edit, and organize songs, singers, and pitch information
-          </p>
-        </Link>
-
-        {isAuthenticated && (
-          <>
-            {isAdmin && (
-              <>
-                <Link
-                  to="/admin/import"
-                  className="group block p-6 sm:p-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md hover:scale-105 transition-all duration-200"
-                >
-                  <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-amber-100 dark:bg-amber-900 rounded-full mb-4 group-hover:bg-amber-200 dark:group-hover:bg-amber-800 transition-colors">
-                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-amber-600 dark:text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582M20 4v5h-.581M4 12h16M10 16l2 2 2-2M12 14v4" />
-                    </svg>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                    Import Songs
-                  </h2>
-                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                    Import or update songs in bulk from external sources
-                  </p>
-                </Link>
-                <Link
-                  to="/admin/import-csv"
-                  className="group block p-6 sm:p-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md hover:scale-105 transition-all duration-200"
-                >
-                  <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-green-100 dark:bg-green-900 rounded-full mb-4 group-hover:bg-green-200 dark:group-hover:bg-green-800 transition-colors">
-                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-green-600 dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                    Import Singers and Pitches
-                  </h2>
-                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                    Import singers and pitches from external source
-                  </p>
-                </Link>
-              </>
-            )}
-          </>
         )}
       </div>
     </div>

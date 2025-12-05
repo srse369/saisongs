@@ -2,6 +2,7 @@
 import './config/env.js';
 
 import express from 'express';
+import session from 'express-session';
 import cors from 'cors';
 import songsRouter from './routes/songs.js';
 import singersRouter from './routes/singers.js';
@@ -9,24 +10,105 @@ import pitchesRouter from './routes/pitches.js';
 import sessionsRouter from './routes/sessions.js';
 import importMappingsRouter from './routes/importMappings.js';
 import authRouter from './routes/auth.js';
+import centersRouter from './routes/centers.js';
 import analyticsRouter from './routes/analytics.js';
 import feedbackRouter from './routes/feedback.js';
 import templatesRouter from './routes/templates.js';
 import { requireAuth, requireEditor, requireAdmin } from './middleware/simpleAuth.js';
-import { warmupCache } from './services/CacheService.js';
+import { warmupCache, cacheService } from './services/CacheService.js';
+import { OracleSessionStore } from './middleware/OracleSessionStore.js';
 
 const app = express();
 const PORT = process.env.PORT || 3111;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5111',
+  credentials: true, // Allow cookies/session
+}));
+
+// Session middleware with Oracle persistent store
+app.use(session({
+  store: new OracleSessionStore(),
+  secret: process.env.SESSION_SECRET || 'dev-session-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  rolling: false, // Don't reset expiry on every request
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true, // Prevent XSS
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    sameSite: 'lax',
+  },
+}));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Note: Analytics tracking is done client-side via /api/analytics/track endpoint
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check endpoint with optional database stats
+app.get('/api/health', async (req, res) => {
+  try {
+    const response: any = { 
+      status: 'ok', 
+      timestamp: new Date().toISOString() 
+    };
+
+    // If query param requests stats, fetch them
+    if (req.query.stats === 'true') {
+      try {
+        // Fetch counts for each entity
+        const [centers, songs, users, pitches, templates, sessions] = await Promise.all([
+          cacheService.getAllCenters(),
+          cacheService.getAllSongs(),
+          cacheService.getAllSingers(), // Users
+          cacheService.getAllPitches(),
+          cacheService.getAllTemplates(),
+          cacheService.getAllSessions(),
+        ]);
+
+        response.stats = {
+          centers: centers.length,
+          songs: songs.length,
+          users: users.length,
+          pitches: pitches.length,
+          templates: templates.length,
+          sessions: sessions.length,
+        };
+      } catch (error) {
+        console.error('Error fetching database stats:', error);
+        // Include error details in response for debugging
+        response.stats = null;
+        response.statsError = error instanceof Error ? error.message : 'Unknown error';
+      }
+    }
+
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'error', 
+      message: error instanceof Error ? error.message : 'Health check failed' 
+    });
+  }
+});
+
+// Cache reload endpoint (admin only)
+app.post('/api/cache/reload', requireAdmin, async (req, res) => {
+  try {
+    console.log('[CACHE] Manual cache reload requested by:', req.user?.email);
+    await warmupCache();
+    res.json({ 
+      success: true,
+      message: 'Cache reloaded successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[CACHE] Error reloading cache:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to reload cache' 
+    });
+  }
 });
 
 // API Routes
@@ -37,9 +119,10 @@ app.use('/api/sessions', sessionsRouter);  // Sessions public for presentation m
 app.use('/api/analytics', analyticsRouter);  // Analytics (routes handle their own auth)
 app.use('/api/feedback', feedbackRouter);  // Feedback is public
 app.use('/api/templates', templatesRouter);  // Templates public for presentation mode
+app.use('/api/centers', centersRouter);  // Centers GET is public for UI, but POST/PUT/DELETE require admin (enforced in routes)
 
-// Protected routes - require authentication
-app.use('/api/singers', requireAuth, singersRouter);  // Singer data is private
+// Protected routes - requireEditor enforced at route level for granular control
+app.use('/api/singers', singersRouter);  // Singer routes require editor/admin (enforced in route handlers)
 app.use('/api/pitches', requireAuth, pitchesRouter);  // Pitch data is private
 app.use('/api/import-mappings', requireAdmin, importMappingsRouter);  // Admin only
 

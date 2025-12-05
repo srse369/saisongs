@@ -22,6 +22,10 @@ class SingerService {
     const id = row.id ?? row.ID;
     const name = row.name ?? row.NAME;
     const gender = row.gender ?? row.GENDER;
+    const email = row.email ?? row.EMAIL;
+    const centerIds = row.center_ids ?? row.CENTER_IDS;
+    const editorFor = row.editor_for ?? row.EDITOR_FOR;
+    const isAdmin = row.is_admin ?? row.IS_ADMIN;
     const createdRaw = row.createdAt ?? row.created_at ?? row.CREATED_AT;
     const updatedRaw = row.updatedAt ?? row.updated_at ?? row.UPDATED_AT;
 
@@ -29,6 +33,10 @@ class SingerService {
       id,
       name,
       gender,
+      email,
+      center_ids: centerIds,
+      editor_for: editorFor,
+      is_admin: isAdmin,
       createdAt: createdRaw ? new Date(createdRaw) : new Date(),
       updatedAt: updatedRaw ? new Date(updatedRaw) : new Date(),
     };
@@ -115,6 +123,8 @@ class SingerService {
       const raw = await apiClient.createSinger({
         name: input.name.trim(),
         gender: input.gender,
+        email: input.email,
+        center_ids: input.center_ids,
       });
 
       // Map and return the created singer
@@ -142,6 +152,8 @@ class SingerService {
       await apiClient.updateSinger(id, {
         name: input.name?.trim(),
         gender: input.gender,
+        email: input.email,
+        center_ids: input.center_ids,
       });
       return this.getSingerById(id);
     } catch (error) {
@@ -157,16 +169,10 @@ class SingerService {
   /**
    * Deletes a singer by ID
    * @param id - Singer UUID
-   * @returns true if deleted, false if not found
+   * @throws {DatabaseError} if deletion fails
    */
-  async deleteSinger(id: string): Promise<boolean> {
-    try {
-      await apiClient.deleteSinger(id);
-      return true;
-    } catch (error) {
-      console.error('Error deleting singer:', error);
-      return false;
-    }
+  async deleteSinger(id: string): Promise<void> {
+    await apiClient.deleteSinger(id);
   }
 }
 

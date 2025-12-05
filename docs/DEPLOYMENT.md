@@ -72,8 +72,8 @@ ORACLE_WALLET_PASSWORD=your_wallet_password
 ADMIN_PASSWORD=your_admin_password
 
 # Database pool
-DB_POOL_MIN=1
-DB_POOL_MAX=1
+DB_POOL_MIN=0
+DB_POOL_MAX=2
 DB_POOL_INCREMENT=1
 
 # URLs

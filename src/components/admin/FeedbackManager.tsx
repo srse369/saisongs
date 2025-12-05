@@ -352,3 +352,5 @@ export const FeedbackManager: React.FC = () => {
     </div>
   );
 };
+
+export default FeedbackManager;

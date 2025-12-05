@@ -10,6 +10,7 @@ import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedSongSearch, type SongSearchFilters } from '../common/AdvancedSongSearch';
 import { RefreshIcon } from '../common';
 import { createSongFuzzySearch, parseNaturalQuery } from '../../utils/smartSearch';
+import { compareStringsIgnoringSpecialChars } from '../../utils';
 import songService from '../../services/SongService';
 import type { Song, CreateSongInput } from '../../types';
 
@@ -24,7 +25,7 @@ export const SongManager: React.FC = () => {
     deleteSong,
     clearError,
   } = useSongs();
-  const { isEditor } = useAuth();
+  const { isEditor, userId } = useAuth();
   const toast = useToast();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -35,18 +36,18 @@ export const SongManager: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(50);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
+  const lastFetchedUserIdRef = useRef<number | null>(null);
 
   // Create fuzzy search instance for fallback
   const fuzzySearch = useMemo(() => createSongFuzzySearch(songs), [songs]);
 
   useEffect(() => {
-    // Only fetch songs if we don't already have them loaded.
-    // AppContent will warm up the cache on initial app load; this is a
-    // safety net for direct navigation or hard reloads.
-    if (!loading && songs.length === 0) {
-      fetchSongs();
+    // Fetch songs when user changes to get correct filtered data
+    if (userId !== lastFetchedUserIdRef.current) {
+      lastFetchedUserIdRef.current = userId;
+      fetchSongs(true);
     }
-  }, [fetchSongs, loading, songs.length]);
+  }, [fetchSongs, userId]);
 
   const handleCreateClick = () => {
     setEditingSong(null);
@@ -228,7 +229,7 @@ export const SongManager: React.FC = () => {
         if (!aStartsWith && bStartsWith) return 1;
         
         // If both start with query or neither does, sort alphabetically
-        return aName.localeCompare(bName);
+        return compareStringsIgnoringSpecialChars(a.name, b.name);
       });
     }
 
@@ -407,3 +408,5 @@ export const SongManager: React.FC = () => {
     </div>
   );
 };
+
+export default SongManager;

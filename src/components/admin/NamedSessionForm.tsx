@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { NamedSession, CreateNamedSessionInput, UpdateNamedSessionInput } from '../../types';
+import { CenterMultiSelect } from '../common/CenterMultiSelect';
 
 interface NamedSessionFormProps {
   session?: NamedSession;
@@ -14,12 +15,14 @@ export const NamedSessionForm: React.FC<NamedSessionFormProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [centerIds, setCenterIds] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (session) {
       setName(session.name);
       setDescription(session.description || '');
+      setCenterIds(session.center_ids || []);
     }
   }, [session]);
 
@@ -28,10 +31,15 @@ export const NamedSessionForm: React.FC<NamedSessionFormProps> = ({
     setSubmitting(true);
 
     try {
-      await onSubmit({ name, description: description || undefined });
+      await onSubmit({ 
+        name, 
+        description: description || undefined,
+        center_ids: centerIds.length > 0 ? centerIds : undefined
+      });
       // Reset form
       setName('');
       setDescription('');
+      setCenterIds([]);
     } finally {
       setSubmitting(false);
     }
@@ -68,6 +76,18 @@ export const NamedSessionForm: React.FC<NamedSessionFormProps> = ({
           placeholder="Optional description"
           disabled={submitting}
         />
+      </div>
+
+      <div>
+        <CenterMultiSelect
+          selectedCenterIds={centerIds}
+          onChange={setCenterIds}
+          label="Restrict to Centers (optional)"
+          disabled={submitting}
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Leave empty to make accessible to all users, or select specific centers to restrict access
+        </p>
       </div>
 
       <div className="flex gap-2 justify-end">

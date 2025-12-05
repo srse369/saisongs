@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { Song, CreateSongInput, UpdateSongInput, ServiceError } from '../types';
 import { songService } from '../services';
 import { useToast } from './ToastContext';
+import { compareStringsIgnoringSpecialChars } from '../utils';
 
 const SONGS_CACHE_KEY = 'songStudio:songsCache';
 const SONGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -72,7 +73,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
                 ...s,
                 createdAt: s.createdAt ? new Date(s.createdAt) : new Date(),
                 updatedAt: s.updatedAt ? new Date(s.updatedAt) : new Date(),
-              }));
+              })).sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
               setSongs(hydratedSongs);
               setLoading(false);
               return;
@@ -85,7 +86,8 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
 
       // Fallback: fetch from backend
       const freshSongs = await songService.getAllSongs();
-      setSongs(freshSongs);
+      const sortedSongs = freshSongs.sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
+      setSongs(sortedSongs);
 
       // Persist to cache for subsequent loads
       if (typeof window !== 'undefined') {
@@ -93,7 +95,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
           SONGS_CACHE_KEY,
           JSON.stringify({
             timestamp: Date.now(),
-            songs: freshSongs,
+            songs: sortedSongs,
           })
         );
       }
@@ -140,8 +142,8 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
         if (prev.some(s => s.id === song.id)) {
           return prev;
         }
-        // Insert in sorted order by name
-        return [...prev, song].sort((a, b) => a.name.localeCompare(b.name));
+        // Insert in sorted order by name (ignoring special characters)
+        return [...prev, song].sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
       });
       
       // Clear localStorage cache so it doesn't return stale data
@@ -211,10 +213,8 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
       return success;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete song';
-      setError({
-        code: 'UNKNOWN_ERROR',
-        message: errorMessage,
-      });
+      // Show toast notification but don't persist error in state
+      // since we have a persistent error display in the UI
       toast.error(errorMessage);
       return false;
     } finally {

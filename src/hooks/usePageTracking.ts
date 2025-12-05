@@ -11,8 +11,16 @@ export const usePageTracking = () => {
   const location = useLocation();
   const { userRole } = useAuth();
   const publicIpCache = useRef<string | null>(null);
+  const lastTrackedPath = useRef<string | null>(null);
+  const trackingInProgress = useRef<boolean>(false);
 
   useEffect(() => {
+    // Prevent duplicate tracking for the same path
+    if (lastTrackedPath.current === location.pathname || trackingInProgress.current) {
+      return;
+    }
+    
+    trackingInProgress.current = true;
     // Detect client's public IP address with multiple fallback services
     const getPublicIp = async (): Promise<string | null> => {
       // Return cached IP if available
@@ -70,7 +78,7 @@ export const usePageTracking = () => {
         const publicIp = await getPublicIp();
         
         // Send tracking beacon (non-blocking)
-        fetch(`${API_BASE_URL}/analytics/track`, {
+        await fetch(`${API_BASE_URL}/analytics/track`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -86,12 +94,17 @@ export const usePageTracking = () => {
         }).catch(() => {
           // Silently fail - don't disrupt user experience
         });
+        
+        // Mark this path as tracked
+        lastTrackedPath.current = location.pathname;
       } catch (error) {
         // Ignore tracking errors
+      } finally {
+        trackingInProgress.current = false;
       }
     };
 
     trackPageView();
-  }, [location.pathname, userRole]); // Track on route change OR role change
+  }, [location.pathname]); // Only track on pathname change, not userRole
 };
 

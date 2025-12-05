@@ -55,7 +55,7 @@ class DatabaseService {
       poolMin: 0,                   // Start with 0 connections (create on-demand)
       // TODO: Increase poolMax once session leak is resolved. See TROUBLESHOOTING.md for details.
       // Normal production value should be 3-5 for Oracle Free Tier (20 connection limit).
-      poolMax: 1,                   // EMERGENCY: Reduced to 1 until session leak is fixed
+      poolMax: 2,                   // EMERGENCY: Reduced to 1 until session leak is fixed
       poolIncrement: 1,             // Add 1 connection at a time
       poolTimeout: 30,              // Reduced to 30 seconds
       queueTimeout: 10000,           // 5 seconds (increased for local development)
@@ -169,6 +169,11 @@ class DatabaseService {
     let connection: oracledb.Connection | undefined;
     const connectionStartTime = Date.now();
     
+    // Log database access
+    const truncatedSql = sql.trim().replace(/\s+/g, ' ').substring(0, 100);
+    const paramCount = Array.isArray(params) ? params.length : Object.keys(params).length;
+    console.log(`[DB] ${truncatedSql}${sql.length > 100 ? '...' : ''}`, paramCount > 0 ? `[${paramCount} params]` : '');
+    
     try {
       connection = await this.pool.getConnection();
       
@@ -199,7 +204,7 @@ class DatabaseService {
           try {
             await this.pool.reconfigure({
               poolMin: 0,
-              poolMax: 1, // Temporarily reduce to 1
+              poolMax: 2, // Temporarily reduce to 1
             });
             console.log('   ↻ Attempted pool cleanup - reducing max connections to 1');
           } catch (reconfigError) {
@@ -330,7 +335,7 @@ class DatabaseService {
       // This triggers Oracle to close unused connections
       await this.pool.reconfigure({
         poolMin: 0,
-        poolMax: 1, // Keep at 1 until leak is fixed
+        poolMax: 2, // Keep at 1 until leak is fixed
       });
       
     } catch (error) {

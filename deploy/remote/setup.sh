@@ -70,9 +70,9 @@ ORACLE_WALLET_PASSWORD=your_wallet_password
 ADMIN_PASSWORD=change_this_password
 
 # Database Pool Settings
-DB_POOL_MIN=1
-DB_POOL_MAX=1
-DB_POOL_INCREMENT=0
+DB_POOL_MIN=0
+DB_POOL_MAX=2
+DB_POOL_INCREMENT=1
 
 # URLs - Update with your domain/IP
 APP_URL=https://${IP_OR_DOMAIN}

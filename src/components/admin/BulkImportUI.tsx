@@ -7,10 +7,12 @@ import { useSongs } from '../../contexts/SongContext';
  * Props for the BulkImportUI component
  */
 interface BulkImportUIProps {
-  /** Whether the import UI modal is currently open */
-  isOpen: boolean;
-  /** Callback function when modal is closed */
-  onClose: () => void;
+  /** Whether the import UI modal is currently open (only for modal mode) */
+  isOpen?: boolean;
+  /** Callback function when modal is closed (only for modal mode) */
+  onClose?: () => void;
+  /** Whether to display inline without modal wrapper */
+  inline?: boolean;
 }
 
 /**
@@ -55,7 +57,7 @@ interface ImportState {
  * />
  * ```
  */
-export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) => {
+export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose, inline }) => {
   const { fetchSongs } = useSongs();
   
   const [importState, setImportState] = useState<ImportState>({
@@ -73,7 +75,6 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
   });
 
   const [showErrors, setShowErrors] = useState(false);
-  const [showManualImport, setShowManualImport] = useState(false);
   const [pastedJson, setPastedJson] = useState('');
 
   /**
@@ -132,10 +133,10 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
       }
       
       // Transform superSongJson format to our format
-      // Each song in superSongJson has: song_id, lyrics, meaning, language, deity, tempo, beat, raga, level, songtags, audio_link, video_link, golden_voice, url
+      // Each song in superSongJson has: song_id, title, title2, lyrics, meaning, language, deity, tempo, beat, raga, level, songtags, audio_link, video_link, golden_voice, url
       const externalSourceUrl = import.meta.env.VITE_EXTERNAL_SOURCE_URL || 'https://localhost:3000';
       const songs = rawSongs.map((s: any) => ({
-        name: s.name || 'Unknown',
+        name: s.name || s.title || s.title2 || 'Unknown',
         url: s.url ? `${externalSourceUrl}${s.url}` : `${externalSourceUrl}/node/${s.song_id}`,
         lyrics: s.lyrics,
         meaning: s.meaning,
@@ -238,61 +239,6 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
    * Resets state, calls ImportService with progress callback,
    * handles completion and errors, and refreshes song list on success
    */
-  const handleStartImport = async () => {
-    // Reset state and start import
-    setImportState({
-      status: 'importing',
-      progress: {
-        total: 0,
-        processed: 0,
-        created: 0,
-        updated: 0,
-        failed: 0,
-        currentSong: null,
-      },
-      errors: [],
-      criticalError: null,
-    });
-
-    try {
-      // Call ImportService with progress callback
-      const result = await importService.importAllSongs((progress) => {
-        setImportState((prev) => ({
-          ...prev,
-          progress,
-        }));
-      });
-
-      // Handle completion
-      if (result.success) {
-        setImportState((prev) => ({
-          ...prev,
-          status: 'completed',
-          progress: result.stats,
-          errors: result.errors,
-        }));
-        
-        // Refresh song list after successful import (force network fetch)
-        await fetchSongs(true);
-      } else {
-        // Critical error occurred
-        setImportState((prev) => ({
-          ...prev,
-          status: 'error',
-          criticalError: result.errors[0]?.error || 'Unknown error occurred',
-          errors: result.errors,
-        }));
-      }
-    } catch (error) {
-      // Handle unexpected errors
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setImportState((prev) => ({
-        ...prev,
-        status: 'error',
-        criticalError: errorMessage,
-      }));
-    }
-  };
 
   /**
    * Handles closing the import UI modal
@@ -318,7 +264,7 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
         criticalError: null,
       });
       setShowErrors(false);
-      onClose();
+      onClose?.();
     }
   };
 
@@ -337,35 +283,10 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
   const hasError = importState.status === 'error';
   const hasErrors = importState.errors.length > 0;
 
-  return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Import Songs">
+  const content = (
       <div className="space-y-4">
-        {/* Idle State - Start Import Button */}
-        {importState.status === 'idle' && !showManualImport && (
-          <div className="text-center py-8">
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Import all songs from external sources into the database.
-            </p>
-            <div className="space-y-3">
-              <button
-                onClick={handleStartImport}
-                className="px-6 py-3 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-medium"
-              >
-                Start Automatic Import
-              </button>
-              <div className="text-sm text-gray-500 dark:text-gray-400">or</div>
-              <button
-                onClick={() => setShowManualImport(true)}
-                className="px-6 py-3 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-medium"
-              >
-                Manual Import (Paste JSON)
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Manual Import - Paste JSON */}
-        {importState.status === 'idle' && showManualImport && (
+        {importState.status === 'idle' && (
           <div className="space-y-4">
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
               <h3 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
@@ -400,15 +321,6 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
             </div>
             
             <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  setShowManualImport(false);
-                  setPastedJson('');
-                }}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
-              >
-                Cancel
-              </button>
               <button
                 onClick={() => handleManualImport(pastedJson)}
                 disabled={!pastedJson.trim()}
@@ -600,6 +512,24 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose }) =
           </div>
         )}
       </div>
+  );
+
+  // Render inline without modal wrapper
+  if (inline) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Import Songs</h2>
+        {content}
+      </div>
+    );
+  }
+
+  // Render in modal
+  return (
+    <Modal isOpen={isOpen || false} onClose={handleClose} title="Import Songs">
+      {content}
     </Modal>
   );
 };
+
+export default BulkImportUI;

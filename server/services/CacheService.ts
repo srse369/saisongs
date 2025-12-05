@@ -13,7 +13,7 @@ interface CacheEntry<T> {
 
 class CacheService {
   private cache: Map<string, CacheEntry<any>> = new Map();
-  private readonly DEFAULT_TTL_MS = 2 * 60 * 1000; // 2 minutes
+  private readonly DEFAULT_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
   /**
    * Get data from cache if not expired
@@ -43,7 +43,7 @@ class CacheService {
    * Set data in cache with TTL
    * @param key Cache key
    * @param data Data to cache
-   * @param ttlMs Time to live in milliseconds (default: 2 minutes)
+   * @param ttlMs Time to live in milliseconds (default: 10 minutes)
    */
   set<T>(key: string, data: T, ttlMs: number = this.DEFAULT_TTL_MS): void {
     const entry: CacheEntry<T> = {
@@ -79,6 +79,25 @@ class CacheService {
         count++;
       }
     }
+  }
+
+  /**
+   * Invalidate user-related caches (singers, centers, sessions)
+   * Call this whenever user data changes (permissions, admin status, etc.)
+   */
+  private invalidateUserRelatedCaches(): void {
+    this.invalidatePattern('singers:');
+    this.invalidatePattern('centers:');
+    this.invalidatePattern('sessions:');
+  }
+
+  /**
+   * Invalidate center-related caches (centers, singers with center filters)
+   * Call this whenever center data or center-user relationships change
+   */
+  private invalidateCenterRelatedCaches(): void {
+    this.invalidatePattern('centers:');
+    this.invalidatePattern('singers:'); // Singers are filtered by centers
   }
 
   /**
@@ -124,6 +143,37 @@ class CacheService {
     return databaseService;
   }
 
+  /**
+   * Filter resources by center access permissions
+   * Implements the same logic as user_has_center_access Oracle function
+   * @param resources Array of resources with center_ids property
+   * @param userRole User's role ('admin', 'editor', or 'viewer')
+   * @param centerIds User's accessible center IDs (centerIds + editorFor combined)
+   * @returns Filtered array of resources the user can access
+   */
+  filterByCenterAccess<T extends { center_ids?: number[] }>(
+    resources: T[],
+    userRole?: string,
+    centerIds?: number[]
+  ): T[] {
+    // Admin users have access to everything
+    if (userRole === 'admin' || !centerIds) {
+      return resources;
+    }
+
+    return resources.filter(resource => {
+      // Untagged content (null or empty center_ids) is visible to everyone
+      if (!resource.center_ids || resource.center_ids.length === 0) {
+        return true;
+      }
+
+      // Check if user has access to any of the resource's centers
+      return resource.center_ids.some(contentCenterId => 
+        centerIds.includes(contentCenterId)
+      );
+    });
+  }
+
   // ==================== SONGS ====================
 
   /**
@@ -152,10 +202,11 @@ class CacheService {
         golden_voice,
         reference_gents_pitch,
         reference_ladies_pitch,
+        created_by,
         created_at,
         updated_at
       FROM songs
-      ORDER BY name
+      ORDER BY LTRIM(REGEXP_REPLACE(LOWER(name), '[^a-zA-Z0-9 ]', ''), '0123456789 ')
     `);
 
     const mappedSongs = songs.map((song: any) => ({
@@ -173,6 +224,7 @@ class CacheService {
       goldenVoice: !!extractValue(song.GOLDEN_VOICE),
       referenceGentsPitch: extractValue(song.REFERENCE_GENTS_PITCH),
       referenceLadiesPitch: extractValue(song.REFERENCE_LADIES_PITCH),
+      createdBy: extractValue(song.CREATED_BY),
       createdAt: extractValue(song.CREATED_AT),
       updatedAt: extractValue(song.UPDATED_AT),
       // CLOB fields set to null - fetch on-demand via getSong(id)
@@ -215,6 +267,7 @@ class CacheService {
         golden_voice,
         reference_gents_pitch,
         reference_ladies_pitch,
+        created_by,
         created_at,
         updated_at
       FROM songs
@@ -242,6 +295,7 @@ class CacheService {
       goldenVoice: !!extractValue(song.GOLDEN_VOICE),
       referenceGentsPitch: extractValue(song.REFERENCE_GENTS_PITCH),
       referenceLadiesPitch: extractValue(song.REFERENCE_LADIES_PITCH),
+      createdBy: extractValue(song.CREATED_BY),
       createdAt: extractValue(song.CREATED_AT),
       updatedAt: extractValue(song.UPDATED_AT)
     };
@@ -255,21 +309,22 @@ class CacheService {
     const db = await this.getDatabase();
     const params = [
       String(songData.name || ''),
-      String(songData.external_source_url || ''),
+      songData.external_source_url ? String(songData.external_source_url) : null,
       String(songData.lyrics || ''),
       String(songData.meaning || ''),
       String(songData.language || ''),
       String(songData.deity || ''),
-      String(songData.tempo || ''),
-      String(songData.beat || ''),
-      String(songData.raga || ''),
-      String(songData.level || ''),
-      String(songData.song_tags || ''),
-      String(songData.audio_link || ''),
-      String(songData.video_link || ''),
+      songData.tempo ? String(songData.tempo) : null,
+      songData.beat ? String(songData.beat) : null,
+      songData.raga ? String(songData.raga) : null,
+      songData.level ? String(songData.level) : null,
+      songData.song_tags ? String(songData.song_tags) : null,
+      songData.audio_link ? String(songData.audio_link) : null,
+      songData.video_link ? String(songData.video_link) : null,
       Number(songData.golden_voice || 0),
       songData.reference_gents_pitch ? String(songData.reference_gents_pitch) : null,
-      songData.reference_ladies_pitch ? String(songData.reference_ladies_pitch) : null
+      songData.reference_ladies_pitch ? String(songData.reference_ladies_pitch) : null,
+      songData.created_by ? String(songData.created_by) : null
     ];
 
     await db.query(`
@@ -277,9 +332,9 @@ class CacheService {
         name, external_source_url, lyrics, meaning,
         "LANGUAGE", deity, tempo, beat, raga, "LEVEL",
         song_tags, audio_link, video_link, golden_voice,
-        reference_gents_pitch, reference_ladies_pitch
+        reference_gents_pitch, reference_ladies_pitch, created_by
       ) VALUES (
-        :1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16
+        :1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17
       )
     `, params);
 
@@ -361,23 +416,27 @@ class CacheService {
     const db = await this.getDatabase();
     const params = [
       String(songData.name || ''),
-      String(songData.external_source_url || ''),
+      songData.external_source_url ? String(songData.external_source_url) : null,
       String(songData.lyrics || ''),
       String(songData.meaning || ''),
       String(songData.language || ''),
       String(songData.deity || ''),
-      String(songData.tempo || ''),
-      String(songData.beat || ''),
-      String(songData.raga || ''),
-      String(songData.level || ''),
-      String(songData.song_tags || ''),
-      String(songData.audio_link || ''),
-      String(songData.video_link || ''),
+      songData.tempo ? String(songData.tempo) : null,
+      songData.beat ? String(songData.beat) : null,
+      songData.raga ? String(songData.raga) : null,
+      songData.level ? String(songData.level) : null,
+      songData.song_tags ? String(songData.song_tags) : null,
+      songData.audio_link ? String(songData.audio_link) : null,
+      songData.video_link ? String(songData.video_link) : null,
       Number(songData.golden_voice || 0),
       songData.reference_gents_pitch ? String(songData.reference_gents_pitch) : null,
       songData.reference_ladies_pitch ? String(songData.reference_ladies_pitch) : null,
       String(id)
     ];
+
+    // Add updated_by if provided
+    const updated_by = songData.updated_by ? String(songData.updated_by) : null;
+    params.push(updated_by);
 
     await db.query(`
       UPDATE songs SET
@@ -397,8 +456,9 @@ class CacheService {
         golden_voice = :14,
         reference_gents_pitch = :15,
         reference_ladies_pitch = :16,
+        updated_by = :17,
         updated_at = CURRENT_TIMESTAMP
-      WHERE RAWTOHEX(id) = :17
+      WHERE RAWTOHEX(id) = :18
     `, params);
 
     // Write-through cache: Fetch only the updated song
@@ -493,7 +553,10 @@ class CacheService {
       const updated = cached.filter((song: any) => song.id !== id);
       this.set('songs:all', updated, 5 * 60 * 1000);
     }
-    // No else - if cache doesn't exist, nothing to update
+    
+    // CASCADE will delete associated pitches - invalidate pitch cache
+    this.invalidate('pitches:all');
+    // Note: Cannot invalidate individual pitch caches without querying which pitches were affected
   }
 
   // ==================== SINGERS ====================
@@ -509,21 +572,50 @@ class CacheService {
         RAWTOHEX(id) as id,
         name,
         gender,
+        email,
+        is_admin,
+        center_ids,
+        editor_for,
         created_at,
         updated_at
-      FROM singers
+      FROM users
       WHERE name IS NOT NULL
       ORDER BY name
     `);
 
-    // Normalize field names (Oracle returns uppercase: ID, NAME, GENDER, CREATED_AT, UPDATED_AT)
-    const normalizedSingers = singers.map((s: any) => ({
-      id: s.id || s.ID,
-      name: s.name || s.NAME,
-      gender: s.gender || s.GENDER,
-      created_at: s.created_at || s.CREATED_AT,
-      updated_at: s.updated_at || s.UPDATED_AT,
-    })).filter((s: any) => s.name); // Filter out any singers with no name
+    // Normalize field names (Oracle returns uppercase: ID, NAME, GENDER, CENTER_IDS, EDITOR_FOR, CREATED_AT, UPDATED_AT)
+    const normalizedSingers = singers.map((s: any) => {
+      let centerIds: number[] = [];
+      let editorFor: number[] = [];
+      
+      try {
+        if (s.CENTER_IDS || s.center_ids) {
+          centerIds = JSON.parse(s.CENTER_IDS || s.center_ids);
+        }
+      } catch (e) {
+        console.error('Error parsing center_ids for singer:', e);
+      }
+      
+      try {
+        if (s.EDITOR_FOR || s.editor_for) {
+          editorFor = JSON.parse(s.EDITOR_FOR || s.editor_for);
+        }
+      } catch (e) {
+        console.error('Error parsing editor_for for singer:', e);
+      }
+      
+      return {
+        id: s.id || s.ID,
+        name: s.name || s.NAME,
+        gender: s.gender || s.GENDER,
+        email: s.email || s.EMAIL,
+        is_admin: (s.is_admin || s.IS_ADMIN) === 1,
+        center_ids: centerIds,
+        editor_for: editorFor,
+        created_at: s.created_at || s.CREATED_AT,
+        updated_at: s.updated_at || s.UPDATED_AT,
+      };
+    }).filter((s: any) => s.name); // Filter out any singers with no name
 
     this.set(cacheKey, normalizedSingers, 5 * 60 * 1000);
     return normalizedSingers;
@@ -536,20 +628,61 @@ class CacheService {
         RAWTOHEX(id) as id,
         name,
         gender,
+        email,
+        is_admin,
+        center_ids,
+        editor_for,
         created_at,
         updated_at
-      FROM singers
+      FROM users
       WHERE RAWTOHEX(id) = :1
     `, [id]);
     
-    return singers.length > 0 ? singers[0] : null;
+    if (singers.length === 0) return null;
+    
+    const s = singers[0];
+    let centerIds: number[] = [];
+    let editorFor: number[] = [];
+    
+    try {
+      if (s.CENTER_IDS || s.center_ids) {
+        centerIds = JSON.parse(s.CENTER_IDS || s.center_ids);
+      }
+    } catch (e) {
+      console.error('Error parsing center_ids for singer:', e);
+    }
+    
+    try {
+      if (s.EDITOR_FOR || s.editor_for) {
+        editorFor = JSON.parse(s.EDITOR_FOR || s.editor_for);
+      }
+    } catch (e) {
+      console.error('Error parsing editor_for for singer:', e);
+    }
+    
+    return {
+      id: s.id || s.ID,
+      name: s.name || s.NAME,
+      gender: s.gender || s.GENDER,
+      email: s.email || s.EMAIL,
+      is_admin: (s.is_admin || s.IS_ADMIN) === 1,
+      center_ids: centerIds,
+      editor_for: editorFor,
+      created_at: s.created_at || s.CREATED_AT,
+      updated_at: s.updated_at || s.UPDATED_AT,
+    };
   }
 
-  async createSinger(name: string, gender?: string): Promise<any> {
+  async createSinger(name: string, gender?: string, email?: string, centerIds?: number[], created_by?: string): Promise<any> {
     try {
       const db = await this.getDatabase();
       
-      await db.query(`INSERT INTO singers (name, gender) VALUES (:1, :2)`, [name, gender || null]);
+      // Prepare center_ids as JSON string
+      const centerIdsJson = centerIds && centerIds.length > 0 
+        ? JSON.stringify(centerIds) 
+        : null;
+      
+      await db.query(`INSERT INTO users (name, gender, email, center_ids, created_by) VALUES (:1, :2, :3, :4, :5)`, [name, gender || null, email || null, centerIdsJson, created_by || null]);
       
       // Write-through cache: Fetch only the newly created singer
       const newSingers = await db.query(`
@@ -557,9 +690,11 @@ class CacheService {
           RAWTOHEX(id) as id,
           name,
           gender,
+          email,
+          center_ids,
           created_at,
           updated_at
-        FROM singers
+        FROM users
         WHERE name = :1
         ORDER BY created_at DESC
         FETCH FIRST 1 ROWS ONLY
@@ -568,11 +703,22 @@ class CacheService {
       if (newSingers.length > 0) {
         const rawSinger = newSingers[0];
         
+        let parsedCenterIds: number[] = [];
+        try {
+          if (rawSinger.CENTER_IDS || rawSinger.center_ids) {
+            parsedCenterIds = JSON.parse(rawSinger.CENTER_IDS || rawSinger.center_ids);
+          }
+        } catch (e) {
+          console.error('Error parsing center_ids:', e);
+        }
+        
         // Normalize field names to lowercase (Oracle might return uppercase)
         const normalizedSinger = {
           id: rawSinger.id || rawSinger.ID,
           name: rawSinger.name || rawSinger.NAME,
           gender: rawSinger.gender || rawSinger.GENDER,
+          email: rawSinger.email || rawSinger.EMAIL,
+          center_ids: parsedCenterIds,
           created_at: rawSinger.created_at || rawSinger.CREATED_AT,
           updated_at: rawSinger.updated_at || rawSinger.UPDATED_AT,
         };
@@ -580,8 +726,8 @@ class CacheService {
         // Write-through cache: Add to cache or create minimal cache with new singer
         const cached = this.get('singers:all');
         if (cached && Array.isArray(cached)) {
-          const updated = [...cached, rawSinger].sort((a, b) => 
-            (a.NAME || a.name || '').localeCompare(b.NAME || b.name || '')
+          const updated = [...cached, normalizedSinger].sort((a, b) => 
+            (a.name || '').localeCompare(b.name || '')
           );
           this.set('singers:all', updated, 5 * 60 * 1000);
         } else {
@@ -602,15 +748,24 @@ class CacheService {
     }
   }
 
-  async updateSinger(id: string, name: string, gender?: string): Promise<void> {
+  async updateSinger(id: string, name: string, gender?: string, email?: string, centerIds?: number[], updated_by?: string): Promise<void> {
     const db = await this.getDatabase();
+    
+    // Prepare center_ids as JSON string
+    const centerIdsJson = centerIds && centerIds.length > 0 
+      ? JSON.stringify(centerIds) 
+      : null;
+    
     await db.query(`
-      UPDATE singers SET
+      UPDATE users SET
         name = :1,
         gender = :2,
+        email = :3,
+        center_ids = :4,
+        updated_by = :5,
         updated_at = CURRENT_TIMESTAMP
-      WHERE RAWTOHEX(id) = :3
-    `, [name, gender || null, id]);
+      WHERE RAWTOHEX(id) = :6
+    `, [name, gender || null, email || null, centerIdsJson, updated_by || null, id]);
     
     // Write-through cache: Fetch only the updated singer
     const updatedSingers = await db.query(`
@@ -618,32 +773,200 @@ class CacheService {
         RAWTOHEX(id) as id,
         name,
         gender,
+        email,
+        center_ids,
         created_at,
         updated_at
-      FROM singers
+      FROM users
       WHERE RAWTOHEX(id) = :1
     `, [id]);
     
     if (updatedSingers.length > 0) {
+      const s = updatedSingers[0];
+      let parsedCenterIds: number[] = [];
+      try {
+        if (s.CENTER_IDS || s.center_ids) {
+          parsedCenterIds = JSON.parse(s.CENTER_IDS || s.center_ids);
+        }
+      } catch (e) {
+        console.error('Error parsing center_ids:', e);
+      }
+      
+      const normalizedSinger = {
+        id: s.id || s.ID,
+        name: s.name || s.NAME,
+        gender: s.gender || s.GENDER,
+        email: s.email || s.EMAIL,
+        center_ids: parsedCenterIds,
+        created_at: s.created_at || s.CREATED_AT,
+        updated_at: s.updated_at || s.UPDATED_AT,
+      };
+      
+      console.log('[CACHE] Updating singer in cache:', { id, name: normalizedSinger.name, center_ids: parsedCenterIds });
+      
       const cached = this.get('singers:all');
       if (cached && Array.isArray(cached)) {
         const updated = cached
-          .map((singer: any) => singer.ID === id ? updatedSingers[0] : singer)
-          .sort((a, b) => (a.NAME || '').localeCompare(b.NAME || ''));
+          .map((singer: any) => singer.id === id ? normalizedSinger : singer)
+          .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         this.set('singers:all', updated, 5 * 60 * 1000);
+        console.log('[CACHE] singers:all cache updated, total singers:', updated.length);
+      } else {
+        console.log('[CACHE] No singers:all cache found, skipping cache update');
       }
+    }
+    
+    // If center associations changed, invalidate center caches
+    if (centerIds !== undefined) {
+      this.invalidatePattern('centers:');
     }
   }
 
   async deleteSinger(id: string): Promise<void> {
     const db = await this.getDatabase();
-    await db.query(`DELETE FROM singers WHERE RAWTOHEX(id) = :1`, [id]);
+    await db.query(`DELETE FROM users WHERE RAWTOHEX(id) = :1`, [id]);
     
     // Write-through cache: Remove from cached list
     const cached = this.get('singers:all');
     if (cached && Array.isArray(cached)) {
       const updated = cached.filter((singer: any) => singer.ID !== id);
       this.set('singers:all', updated, 5 * 60 * 1000);
+    }
+    
+    // CASCADE will delete associated pitches - invalidate pitch cache
+    this.invalidate('pitches:all');
+    // Note: Cannot invalidate individual pitch caches without querying which pitches were affected
+  }
+
+  async updateSingerAdminStatus(id: string, isAdmin: number): Promise<void> {
+    const db = await this.getDatabase();
+    
+    // First check if user has email (required for admin)
+    const users = await db.query(
+      `SELECT email FROM users WHERE RAWTOHEX(id) = :1`,
+      [id]
+    );
+    
+    if (users.length === 0) {
+      throw new Error('User not found');
+    }
+    
+    const user = users[0];
+    const email = user.email || user.EMAIL;
+    
+    if (isAdmin === 1 && !email) {
+      throw new Error('Cannot set admin flag: user must have an email address');
+    }
+    
+    // Update admin status
+    await db.query(
+      `UPDATE users SET is_admin = :1 WHERE RAWTOHEX(id) = :2`,
+      [isAdmin, id]
+    );
+    
+    // Invalidate user-related caches
+    this.invalidateUserRelatedCaches();
+  }
+
+  async updateUserEditorFor(id: string, editorFor: number[]): Promise<void> {
+    const db = await this.getDatabase();
+    
+    // Validate that user exists
+    const users = await db.query(
+      `SELECT id FROM users WHERE RAWTOHEX(id) = :1`,
+      [id]
+    );
+    
+    if (users.length === 0) {
+      throw new Error('User not found');
+    }
+    
+    // Convert editor_for array to JSON string
+    const editorForJson = editorFor.length > 0 
+      ? JSON.stringify(editorFor) 
+      : null;
+    
+    // Update editor_for
+    await db.query(
+      `UPDATE users SET editor_for = :1 WHERE RAWTOHEX(id) = :2`,
+      [editorForJson, id]
+    );
+    
+    // Invalidate user-related caches (affects singers view and centers editor lists)
+    this.invalidateUserRelatedCaches();
+  }
+
+  async addUserEditorAccess(userId: string, centerId: number): Promise<void> {
+    const db = await this.getDatabase();
+    
+    // Get current editor_for array (userId is hex string from RAWTOHEX)
+    const users = await db.query<any>(
+      `SELECT editor_for FROM users WHERE RAWTOHEX(id) = :1`,
+      [userId]
+    );
+    
+    if (users.length === 0) {
+      throw new Error('User not found');
+    }
+    
+    let editorFor: number[] = [];
+    if (users[0].EDITOR_FOR || users[0].editor_for) {
+      try {
+        editorFor = JSON.parse(users[0].EDITOR_FOR || users[0].editor_for);
+      } catch {
+        editorFor = [];
+      }
+    }
+    
+    // Add center if not already present
+    if (!editorFor.includes(centerId)) {
+      editorFor.push(centerId);
+      const editorForJson = JSON.stringify(editorFor);
+      
+      await db.query(
+        `UPDATE users SET editor_for = :1 WHERE RAWTOHEX(id) = :2`,
+        [editorForJson, userId]
+      );
+      
+      // Invalidate user-related caches
+      this.invalidateUserRelatedCaches();
+    }
+  }
+
+  async removeUserEditorAccess(userId: string, centerId: number): Promise<void> {
+    const db = await this.getDatabase();
+    
+    // Get current editor_for array (userId is hex string from RAWTOHEX)
+    const users = await db.query<any>(
+      `SELECT editor_for FROM users WHERE RAWTOHEX(id) = :1`,
+      [userId]
+    );
+    
+    if (users.length === 0) {
+      throw new Error('User not found');
+    }
+    
+    let editorFor: number[] = [];
+    if (users[0].EDITOR_FOR || users[0].editor_for) {
+      try {
+        editorFor = JSON.parse(users[0].EDITOR_FOR || users[0].editor_for);
+      } catch {
+        editorFor = [];
+      }
+    }
+    
+    // Remove center if present
+    const filtered = editorFor.filter(id => id !== centerId);
+    if (filtered.length !== editorFor.length) {
+      const editorForJson = filtered.length > 0 ? JSON.stringify(filtered) : null;
+      
+      await db.query(
+        `UPDATE users SET editor_for = :1 WHERE RAWTOHEX(id) = :2`,
+        [editorForJson, userId]
+      );
+      
+      // Invalidate user-related caches
+      this.invalidateUserRelatedCaches();
     }
   }
 
@@ -659,6 +982,7 @@ class CacheService {
     }
 
     // Fetch pitches with song and singer names for proper sorting
+    // Use LEFT JOIN to include orphaned pitches (where song or singer was deleted)
     const db = await this.getDatabase();
     const pitches = await db.query(`
       SELECT 
@@ -671,9 +995,9 @@ class CacheService {
         ssp.created_at,
         ssp.updated_at
       FROM song_singer_pitches ssp
-      JOIN songs s ON ssp.song_id = s.id
-      JOIN singers si ON ssp.singer_id = si.id
-      ORDER BY s.name, si.name
+      LEFT JOIN songs s ON ssp.song_id = s.id
+      LEFT JOIN users si ON ssp.singer_id = si.id
+      ORDER BY LTRIM(REGEXP_REPLACE(LOWER(s.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ') NULLS LAST, LTRIM(REGEXP_REPLACE(LOWER(si.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ') NULLS LAST
     `);
 
     // Normalize field names (Oracle returns uppercase)
@@ -693,6 +1017,12 @@ class CacheService {
   }
 
   async getPitch(id: string): Promise<any> {
+    const cacheKey = `pitch:${id}`;
+    const cached = this.get(cacheKey);
+    
+    // Don't use cached data for getPitch to avoid stale orphaned records
+    // If we have it cached, verify it still exists in DB
+
     const db = await this.getDatabase();
     const pitches = await db.query(`
       SELECT 
@@ -705,12 +1035,32 @@ class CacheService {
         ssp.created_at,
         ssp.updated_at
       FROM song_singer_pitches ssp
-      JOIN songs s ON ssp.song_id = s.id
-      JOIN singers si ON ssp.singer_id = si.id
+      LEFT JOIN songs s ON ssp.song_id = s.id
+      LEFT JOIN users si ON ssp.singer_id = si.id
       WHERE RAWTOHEX(ssp.id) = :1
     `, [id]);
     
-    return pitches.length > 0 ? pitches[0] : null;
+    if (pitches.length === 0) {
+      // Not found in DB - invalidate cache if it exists
+      this.invalidate(cacheKey);
+      return null;
+    }
+    
+    // Normalize field names (Oracle returns uppercase)
+    const p = pitches[0];
+    const normalized = {
+      id: p.id || p.ID,
+      song_id: p.song_id || p.SONG_ID,
+      singer_id: p.singer_id || p.SINGER_ID,
+      pitch: p.pitch || p.PITCH,
+      song_name: p.song_name || p.SONG_NAME,
+      singer_name: p.singer_name || p.SINGER_NAME,
+      created_at: p.created_at || p.CREATED_AT,
+      updated_at: p.updated_at || p.UPDATED_AT,
+    };
+
+    this.set(cacheKey, normalized, 5 * 60 * 1000);
+    return normalized;
   }
 
   async getSongPitches(songId: string): Promise<any[]> {
@@ -725,7 +1075,7 @@ class CacheService {
         ssp.created_at,
         ssp.updated_at
       FROM song_singer_pitches ssp
-      JOIN singers si ON ssp.singer_id = si.id
+      JOIN users si ON ssp.singer_id = si.id
       WHERE RAWTOHEX(ssp.song_id) = :1
       ORDER BY si.name
     `, [songId]);
@@ -733,10 +1083,12 @@ class CacheService {
 
   async createPitch(pitchData: any): Promise<any> {
     const db = await this.getDatabase();
+    const created_by = pitchData.created_by ? String(pitchData.created_by) : null;
+    
     await db.query(`
-      INSERT INTO song_singer_pitches (song_id, singer_id, pitch)
-      VALUES (HEXTORAW(:1), HEXTORAW(:2), :3)
-    `, [pitchData.song_id, pitchData.singer_id, pitchData.pitch]);
+      INSERT INTO song_singer_pitches (song_id, singer_id, pitch, created_by)
+      VALUES (HEXTORAW(:1), HEXTORAW(:2), :3, :4)
+    `, [pitchData.song_id, pitchData.singer_id, pitchData.pitch, created_by]);
     
     // Write-through cache: Fetch only the newly created pitch with joins
     const newPitches = await db.query(`
@@ -751,7 +1103,7 @@ class CacheService {
         ssp.updated_at
       FROM song_singer_pitches ssp
       JOIN songs s ON ssp.song_id = s.id
-      JOIN singers si ON ssp.singer_id = si.id
+      JOIN users si ON ssp.singer_id = si.id
       WHERE RAWTOHEX(ssp.song_id) = :1 AND RAWTOHEX(ssp.singer_id) = :2
       ORDER BY ssp.created_at DESC
       FETCH FIRST 1 ROWS ONLY
@@ -792,14 +1144,15 @@ class CacheService {
     return null;
   }
 
-  async updatePitch(id: string, pitch: string): Promise<void> {
+  async updatePitch(id: string, pitch: string, updated_by?: string): Promise<void> {
     const db = await this.getDatabase();
     await db.query(`
       UPDATE song_singer_pitches SET
         pitch = :1,
+        updated_by = :2,
         updated_at = CURRENT_TIMESTAMP
-      WHERE RAWTOHEX(id) = :2
-    `, [pitch, id]);
+      WHERE RAWTOHEX(id) = :3
+    `, [pitch, updated_by || null, id]);
     
     // Write-through cache: Fetch only the updated pitch with joins
     const updatedPitches = await db.query(`
@@ -814,7 +1167,7 @@ class CacheService {
         ssp.updated_at
       FROM song_singer_pitches ssp
       JOIN songs s ON ssp.song_id = s.id
-      JOIN singers si ON ssp.singer_id = si.id
+      JOIN users si ON ssp.singer_id = si.id
       WHERE RAWTOHEX(ssp.id) = :1
     `, [id]);
     
@@ -837,6 +1190,9 @@ class CacheService {
         // Replace the pitch in cache (use lowercase 'id' to match normalized cache)
         const updated = cached.map((p: any) => p.id === id ? normalizedPitch : p);
         this.set('pitches:all', updated, 5 * 60 * 1000);
+        
+        // Also update individual pitch cache
+        this.set(`pitch:${id}`, normalizedPitch, 5 * 60 * 1000);
       }
     }
   }
@@ -852,6 +1208,9 @@ class CacheService {
       const updated = cached.filter((pitch: any) => pitch.id !== id);
       this.set('pitches:all', updated, 5 * 60 * 1000);
     }
+    
+    // Also invalidate individual pitch cache
+    this.invalidate(`pitch:${id}`);
   }
 
   // ==================== SESSIONS ====================
@@ -867,19 +1226,34 @@ class CacheService {
         RAWTOHEX(id) as id,
         name,
         description,
+        center_ids,
+        created_by,
         created_at,
         updated_at
-      FROM named_sessions 
+      FROM song_sessions 
       ORDER BY name
     `);
 
-    const mappedSessions = sessions.map((row: any) => ({
-      id: row.ID,
-      name: row.NAME,
-      description: row.DESCRIPTION,
-      createdAt: row.CREATED_AT,
-      updatedAt: row.UPDATED_AT,
-    }));
+    const mappedSessions = sessions.map((row: any) => {
+      let centerIds: number[] = [];
+      try {
+        if (row.CENTER_IDS) {
+          centerIds = JSON.parse(row.CENTER_IDS);
+        }
+      } catch (e) {
+        console.error('Error parsing center_ids for session:', e);
+      }
+      
+      return {
+        id: row.ID,
+        name: row.NAME,
+        description: row.DESCRIPTION,
+        center_ids: centerIds,
+        created_by: row.CREATED_BY,
+        createdAt: row.CREATED_AT,
+        updatedAt: row.UPDATED_AT,
+      };
+    });
 
     this.set(cacheKey, mappedSessions, 5 * 60 * 1000);
     return mappedSessions;
@@ -897,6 +1271,7 @@ class CacheService {
         name,
         description,
         template_json,
+        center_ids,
         is_default,
         created_at,
         updated_at
@@ -912,6 +1287,15 @@ class CacheService {
         console.error('Error parsing template JSON:', e);
       }
 
+      let centerIds: number[] = [];
+      try {
+        if (row.CENTER_IDS) {
+          centerIds = JSON.parse(row.CENTER_IDS);
+        }
+      } catch (e) {
+        console.error('Error parsing center_ids for template:', e);
+      }
+
       // Check if this is a multi-slide template
       const isMultiSlide = Array.isArray(templateJson.slides) && templateJson.slides.length > 0;
 
@@ -920,6 +1304,7 @@ class CacheService {
         name: row.NAME,
         description: row.DESCRIPTION,
         aspectRatio: templateJson.aspectRatio || '16:9',  // Extract aspect ratio from JSON
+        center_ids: centerIds,
         isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
         createdAt: row.CREATED_AT,
         updatedAt: row.UPDATED_AT,
@@ -977,6 +1362,14 @@ class CacheService {
 
     this.set(cacheKey, mappedTemplates, 5 * 60 * 1000);
     return mappedTemplates;
+  }
+
+  /**
+   * Get a single template by ID
+   */
+  async getTemplate(id: string): Promise<any> {
+    const templateService = (await import('./TemplateService.js')).default;
+    return await templateService.getTemplate(id);
   }
 
   /**
@@ -1066,7 +1459,7 @@ class CacheService {
         description,
         created_at,
         updated_at
-      FROM named_sessions 
+      FROM song_sessions 
       WHERE RAWTOHEX(id) = :1
     `, [id]);
 
@@ -1087,9 +1480,9 @@ class CacheService {
         si.updated_at,
         s.name as song_name,
         sg.name as singer_name
-      FROM session_items si
+      FROM song_session_items si
       JOIN songs s ON si.song_id = s.id
-      LEFT JOIN singers sg ON si.singer_id = sg.id
+      LEFT JOIN users sg ON si.singer_id = sg.id
       WHERE RAWTOHEX(si.session_id) = :1
       ORDER BY si.sequence_order
     `, [id]);
@@ -1117,13 +1510,18 @@ class CacheService {
     };
   }
 
-  async createSession(name: string, description?: string): Promise<any> {
+  async createSession(name: string, description?: string, centerIds?: number[], createdBy?: string): Promise<any> {
     const db = await this.getDatabase();
     
+    // Prepare center_ids as JSON string
+    const centerIdsJson = centerIds && centerIds.length > 0 
+      ? JSON.stringify(centerIds) 
+      : null;
+    
     await db.query(`
-      INSERT INTO named_sessions (name, description)
-      VALUES (:1, :2)
-    `, [String(name), String(description || '')]);
+      INSERT INTO song_sessions (name, description, center_ids, created_by)
+      VALUES (:1, :2, :3, :4)
+    `, [String(name), String(description || ''), centerIdsJson, createdBy || null]);
 
     // Fetch the created session
     const sessions = await db.query(`
@@ -1131,19 +1529,32 @@ class CacheService {
         RAWTOHEX(id) as id,
         name,
         description,
+        center_ids,
+        created_by,
         created_at,
         updated_at
-      FROM named_sessions 
+      FROM song_sessions 
       WHERE name = :1
     `, [name]);
 
     if (sessions.length === 0) throw new Error('Failed to retrieve created session');
 
     const session = sessions[0];
+    let parsedCenterIds: number[] = [];
+    try {
+      if (session.CENTER_IDS) {
+        parsedCenterIds = JSON.parse(session.CENTER_IDS);
+      }
+    } catch (e) {
+      console.error('Error parsing center_ids:', e);
+    }
+    
     const mappedSession = {
       id: session.ID,
       name: session.NAME,
       description: session.DESCRIPTION,
+      center_ids: parsedCenterIds,
+      created_by: session.CREATED_BY,
       createdAt: session.CREATED_AT,
       updatedAt: session.UPDATED_AT,
     };
@@ -1160,7 +1571,7 @@ class CacheService {
     return mappedSession;
   }
 
-  async updateSession(id: string, updates: { name?: string; description?: string }): Promise<any> {
+  async updateSession(id: string, updates: { name?: string; description?: string; center_ids?: number[]; updated_by?: string }): Promise<any> {
     const db = await this.getDatabase();
     
     const updateParts: string[] = [];
@@ -1175,6 +1586,17 @@ class CacheService {
       updateParts.push(`description = :${paramIndex++}`);
       params.push(String(updates.description || ''));
     }
+    if (updates.center_ids !== undefined) {
+      updateParts.push(`center_ids = :${paramIndex++}`);
+      const centerIdsJson = updates.center_ids && updates.center_ids.length > 0 
+        ? JSON.stringify(updates.center_ids) 
+        : null;
+      params.push(centerIdsJson);
+    }
+    if (updates.updated_by !== undefined) {
+      updateParts.push(`updated_by = :${paramIndex++}`);
+      params.push(updates.updated_by);
+    }
 
     if (updateParts.length === 0) throw new Error('No fields to update');
 
@@ -1182,7 +1604,7 @@ class CacheService {
     params.push(id);
 
     await db.query(`
-      UPDATE named_sessions 
+      UPDATE song_sessions 
       SET ${updateParts.join(', ')} 
       WHERE RAWTOHEX(id) = :${paramIndex}
     `, params);
@@ -1193,19 +1615,30 @@ class CacheService {
         RAWTOHEX(id) as id,
         name,
         description,
+        center_ids,
         created_at,
         updated_at
-      FROM named_sessions 
+      FROM song_sessions 
       WHERE RAWTOHEX(id) = :1
     `, [id]);
 
     if (sessions.length === 0) return null;
 
     const session = sessions[0];
+    let parsedCenterIds: number[] = [];
+    try {
+      if (session.CENTER_IDS) {
+        parsedCenterIds = JSON.parse(session.CENTER_IDS);
+      }
+    } catch (e) {
+      console.error('Error parsing center_ids:', e);
+    }
+    
     const mappedSession = {
       id: session.ID,
       name: session.NAME,
       description: session.DESCRIPTION,
+      center_ids: parsedCenterIds,
       createdAt: session.CREATED_AT,
       updatedAt: session.UPDATED_AT,
     };
@@ -1224,7 +1657,7 @@ class CacheService {
 
   async deleteSession(id: string): Promise<void> {
     const db = await this.getDatabase();
-    await db.query(`DELETE FROM named_sessions WHERE RAWTOHEX(id) = :1`, [id]);
+    await db.query(`DELETE FROM song_sessions WHERE RAWTOHEX(id) = :1`, [id]);
     
     // Write-through cache: Remove from cached list
     const cached = this.get('sessions:all');
@@ -1240,7 +1673,7 @@ class CacheService {
     // Get original session
     const sessions = await db.query(`
       SELECT name, description 
-      FROM named_sessions 
+      FROM song_sessions 
       WHERE RAWTOHEX(id) = :1
     `, [id]);
 
@@ -1250,14 +1683,14 @@ class CacheService {
 
     // Create new session
     await db.query(`
-      INSERT INTO named_sessions (name, description)
+      INSERT INTO song_sessions (name, description)
       VALUES (:1, :2)
     `, [String(newName), String(originalSession.DESCRIPTION || '')]);
 
     // Get the new session ID
     const newSessions = await db.query(`
       SELECT RAWTOHEX(id) as id 
-      FROM named_sessions 
+      FROM song_sessions 
       WHERE name = :1
     `, [newName]);
 
@@ -1267,9 +1700,9 @@ class CacheService {
 
     // Copy items
     await db.query(`
-      INSERT INTO session_items (session_id, song_id, singer_id, pitch, sequence_order)
+      INSERT INTO song_session_items (session_id, song_id, singer_id, pitch, sequence_order)
       SELECT HEXTORAW(:1), song_id, singer_id, pitch, sequence_order
-      FROM session_items
+      FROM song_session_items
       WHERE RAWTOHEX(session_id) = :2
     `, [newSessionId, id]);
 
@@ -1281,7 +1714,7 @@ class CacheService {
         description,
         created_at,
         updated_at
-      FROM named_sessions 
+      FROM song_sessions 
       WHERE RAWTOHEX(id) = :1
     `, [newSessionId]);
 
@@ -1320,9 +1753,9 @@ class CacheService {
         si.updated_at,
         s.name as song_name,
         sg.name as singer_name
-      FROM session_items si
+      FROM song_session_items si
       JOIN songs s ON si.song_id = s.id
-      LEFT JOIN singers sg ON si.singer_id = sg.id
+      LEFT JOIN users sg ON si.singer_id = sg.id
       WHERE RAWTOHEX(si.session_id) = :1
       ORDER BY si.sequence_order
     `, [sessionId]);
@@ -1346,7 +1779,7 @@ class CacheService {
     const { songId, singerId, pitch, sequenceOrder } = itemData;
 
     await db.query(`
-      INSERT INTO session_items (session_id, song_id, singer_id, pitch, sequence_order)
+      INSERT INTO song_session_items (session_id, song_id, singer_id, pitch, sequence_order)
       VALUES (
         HEXTORAW(:1),
         HEXTORAW(:2),
@@ -1394,7 +1827,7 @@ class CacheService {
     params.push(id);
 
     await db.query(`
-      UPDATE session_items 
+      UPDATE song_session_items 
       SET ${updateParts.join(', ')} 
       WHERE RAWTOHEX(id) = :${paramIndex}
     `, params);
@@ -1405,7 +1838,7 @@ class CacheService {
 
   async deleteSessionItem(id: string): Promise<void> {
     const db = await this.getDatabase();
-    await db.query(`DELETE FROM session_items WHERE RAWTOHEX(id) = :1`, [id]);
+    await db.query(`DELETE FROM song_session_items WHERE RAWTOHEX(id) = :1`, [id]);
     
     // Session items don't have separate cache, just invalidate sessions
     this.invalidatePattern('sessions:');
@@ -1416,7 +1849,7 @@ class CacheService {
     
     for (let i = 0; i < itemIds.length; i++) {
       await db.query(`
-        UPDATE session_items 
+        UPDATE song_session_items 
         SET sequence_order = :1, updated_at = CURRENT_TIMESTAMP 
         WHERE RAWTOHEX(id) = :2 AND RAWTOHEX(session_id) = :3
       `, [i + 1, itemIds[i], sessionId]);
@@ -1431,7 +1864,7 @@ class CacheService {
     
     // Delete existing items
     await db.query(`
-      DELETE FROM session_items 
+      DELETE FROM song_session_items 
       WHERE RAWTOHEX(session_id) = :1
     `, [sessionId]);
 
@@ -1440,7 +1873,7 @@ class CacheService {
       const { songId, singerId, pitch } = items[i];
       
       await db.query(`
-        INSERT INTO session_items (session_id, song_id, singer_id, pitch, sequence_order)
+        INSERT INTO song_session_items (session_id, song_id, singer_id, pitch, sequence_order)
         VALUES (
           HEXTORAW(:1),
           HEXTORAW(:2),
@@ -1617,6 +2050,351 @@ class CacheService {
     const db = await this.getDatabase();
     await db.query(`DELETE FROM csv_pitch_mappings WHERE RAWTOHEX(id) = :1`, [id]);
   }
+
+  // ============================================================================
+  // CENTERS METHODS
+  // ============================================================================
+
+  async getAllCenters(): Promise<any[]> {
+    const cacheKey = 'centers:all';
+    const cached = this.get<any[]>(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+
+    const db = await this.getDatabase();
+    const centers = await db.query<any>(
+      `SELECT id, name, badge_text_color, created_at, updated_at 
+       FROM centers 
+       ORDER BY name ASC`
+    );
+
+    // Get all users with their editor_for arrays
+    const users = await db.query<any>(
+      `SELECT RAWTOHEX(id) as id, editor_for FROM users WHERE editor_for IS NOT NULL`
+    );
+
+    // Build a map of center_id -> user_ids who are editors
+    const centerEditors = new Map<number, string[]>();
+    for (const user of users) {
+      try {
+        const editorFor = user.EDITOR_FOR || user.editor_for;
+        if (editorFor) {
+          const centerIds = JSON.parse(editorFor);
+          for (const centerId of centerIds) {
+            if (!centerEditors.has(centerId)) {
+              centerEditors.set(centerId, []);
+            }
+            centerEditors.get(centerId)!.push(user.ID || user.id);
+          }
+        }
+      } catch {
+        // Skip invalid JSON
+      }
+    }
+
+    // Normalize Oracle uppercase column names to lowercase and add editor_ids
+    const normalizedCenters = centers.map(center => {
+      const id = center.ID || center.id;
+      return {
+        id,
+        name: center.NAME || center.name,
+        badge_text_color: center.BADGE_TEXT_COLOR || center.badge_text_color,
+        editor_ids: centerEditors.get(id) || [],
+        created_at: center.CREATED_AT || center.created_at,
+        updated_at: center.UPDATED_AT || center.updated_at,
+      };
+    });
+
+    this.set(cacheKey, normalizedCenters);
+    return normalizedCenters;
+  }
+
+  async getCenterById(id: string | number): Promise<any> {
+    const cacheKey = `centers:${id}`;
+    const cached = this.get<any>(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+
+    const db = await this.getDatabase();
+    const centers = await db.query<any>(
+      `SELECT id, name, badge_text_color, created_at, updated_at 
+       FROM centers 
+       WHERE id = :1`,
+      [id]
+    );
+
+    if (centers.length === 0) {
+      return null;
+    }
+
+    const center = centers[0];
+    
+    // Get all users who have this center in their editor_for array
+    const editors = await db.query<any>(
+      `SELECT RAWTOHEX(id) as id FROM users 
+       WHERE editor_for IS NOT NULL
+       AND EXISTS (
+         SELECT 1 FROM JSON_TABLE(editor_for, '$[*]'
+           COLUMNS (center_id NUMBER PATH '$')
+         ) jt
+         WHERE jt.center_id = :1
+       )`,
+      [id]
+    );
+    
+    const editor_ids = editors.map((e: any) => e.ID || e.id);
+    
+    const normalizedCenter = {
+      id: center.ID || center.id,
+      name: center.NAME || center.name,
+      badge_text_color: center.BADGE_TEXT_COLOR || center.badge_text_color,
+      editor_ids,
+      created_at: center.CREATED_AT || center.created_at,
+      updated_at: center.UPDATED_AT || center.updated_at,
+    };
+
+    this.set(cacheKey, normalizedCenter);
+    return normalizedCenter;
+  }
+
+  async createCenter(data: { name: string; badge_text_color: string; editor_ids?: number[]; created_by?: string }): Promise<any> {
+    const db = await this.getDatabase();
+    
+    // Insert center
+    await db.query(
+      `INSERT INTO centers (name, badge_text_color, created_by, created_at, updated_at) 
+       VALUES (:1, :2, :3, SYSTIMESTAMP, SYSTIMESTAMP)`,
+      [data.name, data.badge_text_color, data.created_by || null]
+    );
+
+    // Get the newly created center
+    const result = await db.query<any>(
+      `SELECT id, name, badge_text_color, created_at, updated_at 
+       FROM centers 
+       WHERE name = :1 
+       ORDER BY created_at DESC`,
+      [data.name]
+    );
+
+    // Invalidate center-related caches
+    this.invalidateCenterRelatedCaches();
+
+    if (result.length > 0) {
+      const center = result[0];
+      
+      return {
+        id: center.ID || center.id,
+        name: center.NAME || center.name,
+        badge_text_color: center.BADGE_TEXT_COLOR || center.badge_text_color,
+        created_at: center.CREATED_AT || center.created_at,
+        updated_at: center.UPDATED_AT || center.updated_at,
+      };
+    }
+
+    return null;
+  }
+
+  async updateCenter(id: string | number, data: { name?: string; badge_text_color?: string; editor_ids?: number[]; updated_by?: string }): Promise<any> {
+    const db = await this.getDatabase();
+    
+    const updates: string[] = [];
+    const params: any[] = [];
+    
+    if (data.name !== undefined) {
+      updates.push('name = :' + (params.length + 1));
+      params.push(data.name);
+    }
+    
+    if (data.badge_text_color !== undefined) {
+      updates.push('badge_text_color = :' + (params.length + 1));
+      params.push(data.badge_text_color);
+    }
+    
+    if (data.updated_by !== undefined) {
+      updates.push('updated_by = :' + (params.length + 1));
+      params.push(data.updated_by);
+    }
+    
+    updates.push('updated_at = SYSTIMESTAMP');
+    params.push(id);
+    
+    await db.query(
+      `UPDATE centers SET ${updates.join(', ')} WHERE id = :${params.length}`,
+      params
+    );
+
+    // Invalidate center-related caches
+    this.invalidateCenterRelatedCaches();
+
+    // Return updated center
+    return this.getCenterById(id);
+  }
+
+  async deleteCenter(id: string | number): Promise<void> {
+    const db = await this.getDatabase();
+    
+    await db.query(
+      `DELETE FROM centers WHERE id = :1`,
+      [id]
+    );
+
+    // Invalidate center-related caches
+    this.invalidateCenterRelatedCaches();
+  }
+
+  // ============================================================================
+  // FEEDBACK METHODS
+  // ============================================================================
+
+  async createFeedback(data: {
+    feedback: string;
+    category: string;
+    email: string;
+    userAgent?: string;
+    url?: string;
+    ipAddress?: string;
+  }): Promise<any> {
+    const db = await this.getDatabase();
+    
+    await db.query(
+      `INSERT INTO feedback (feedback, category, email, user_agent, url, ip_address, status, created_at, updated_at)
+       VALUES (:1, :2, :3, :4, :5, :6, 'new', SYSTIMESTAMP, SYSTIMESTAMP)`,
+      [
+        data.feedback,
+        data.category,
+        data.email,
+        data.userAgent || null,
+        data.url || null,
+        data.ipAddress || null
+      ]
+    );
+
+    // Invalidate feedback cache
+    this.invalidatePattern(/^feedback:/);
+
+    return { success: true };
+  }
+
+  async getAllFeedback(): Promise<any[]> {
+    const cacheKey = 'feedback:all';
+    const cached = this.get<any[]>(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+
+    const db = await this.getDatabase();
+    const feedback = await db.query<any>(
+      `SELECT id, feedback, category, email, user_agent, url, ip_address, 
+              status, admin_notes, created_at, updated_at
+       FROM feedback 
+       ORDER BY created_at DESC`
+    );
+
+    // Normalize Oracle uppercase column names
+    const normalizedFeedback = feedback.map(f => ({
+      id: f.ID || f.id,
+      feedback: f.FEEDBACK || f.feedback,
+      category: f.CATEGORY || f.category,
+      email: f.EMAIL || f.email,
+      user_agent: f.USER_AGENT || f.user_agent,
+      url: f.URL || f.url,
+      ip_address: f.IP_ADDRESS || f.ip_address,
+      status: f.STATUS || f.status,
+      admin_notes: f.ADMIN_NOTES || f.admin_notes,
+      created_at: f.CREATED_AT || f.created_at,
+      updated_at: f.UPDATED_AT || f.updated_at,
+    }));
+
+    this.set(cacheKey, normalizedFeedback);
+    return normalizedFeedback;
+  }
+
+  async getFeedbackById(id: string | number): Promise<any> {
+    const cacheKey = `feedback:${id}`;
+    const cached = this.get<any>(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+
+    const db = await this.getDatabase();
+    const feedback = await db.query<any>(
+      `SELECT id, feedback, category, email, user_agent, url, ip_address, 
+              status, admin_notes, created_at, updated_at
+       FROM feedback 
+       WHERE id = :1`,
+      [id]
+    );
+
+    if (feedback.length === 0) {
+      return null;
+    }
+
+    const f = feedback[0];
+    const normalizedFeedback = {
+      id: f.ID || f.id,
+      feedback: f.FEEDBACK || f.feedback,
+      category: f.CATEGORY || f.category,
+      email: f.EMAIL || f.email,
+      user_agent: f.USER_AGENT || f.user_agent,
+      url: f.URL || f.url,
+      ip_address: f.IP_ADDRESS || f.ip_address,
+      status: f.STATUS || f.status,
+      admin_notes: f.ADMIN_NOTES || f.admin_notes,
+      created_at: f.CREATED_AT || f.created_at,
+      updated_at: f.UPDATED_AT || f.updated_at,
+    };
+
+    this.set(cacheKey, normalizedFeedback);
+    return normalizedFeedback;
+  }
+
+  async updateFeedback(id: string | number, data: { status?: string; admin_notes?: string }): Promise<any> {
+    const db = await this.getDatabase();
+    
+    const updates: string[] = [];
+    const params: any[] = [];
+    
+    if (data.status !== undefined) {
+      updates.push('status = :' + (params.length + 1));
+      params.push(data.status);
+    }
+    
+    if (data.admin_notes !== undefined) {
+      updates.push('admin_notes = :' + (params.length + 1));
+      params.push(data.admin_notes);
+    }
+    
+    updates.push('updated_at = SYSTIMESTAMP');
+    params.push(id);
+    
+    await db.query(
+      `UPDATE feedback SET ${updates.join(', ')} WHERE id = :${params.length}`,
+      params
+    );
+
+    // Invalidate cache
+    this.invalidatePattern(/^feedback:/);
+
+    return this.getFeedbackById(id);
+  }
+
+  async deleteFeedback(id: string | number): Promise<void> {
+    const db = await this.getDatabase();
+    
+    await db.query(
+      `DELETE FROM feedback WHERE id = :1`,
+      [id]
+    );
+
+    // Invalidate cache
+    this.invalidatePattern(/^feedback:/);
+  }
 }
 
 // Export singleton instance
@@ -1661,6 +2439,7 @@ export async function warmupCache(): Promise<void> {
   // Track overall success
   let successCount = 0;
   let failureCount = 0;
+  const stats: { table: string; count: number }[] = [];
 
   try {
     const songs = await databaseService.query(`
@@ -1684,6 +2463,8 @@ export async function warmupCache(): Promise<void> {
       FROM songs
       ORDER BY name
     `);
+
+    stats.push({ table: 'songs', count: songs.length });
 
     // Map WITHOUT CLOB fields (lyrics, meaning, song_tags)
     const mappedSongs = songs.map((song: any) => ({
@@ -1725,13 +2506,39 @@ export async function warmupCache(): Promise<void> {
         RAWTOHEX(id) as id,
         name,
         gender,
+        email,
+        center_ids,
         created_at,
         updated_at
-      FROM singers
+      FROM users
       ORDER BY name
     `);
 
-    cacheService.set('singers:all', singers, CACHE_TTL);
+    stats.push({ table: 'users', count: singers.length });
+    
+    // Normalize and parse center_ids JSON
+    const normalizedSingers = singers.map((s: any) => {
+      let centerIds: number[] = [];
+      try {
+        if (s.CENTER_IDS || s.center_ids) {
+          centerIds = JSON.parse(s.CENTER_IDS || s.center_ids);
+        }
+      } catch (e) {
+        // Silently skip parse errors during warmup
+      }
+      
+      return {
+        id: s.id || s.ID,
+        name: s.name || s.NAME,
+        gender: s.gender || s.GENDER,
+        email: s.email || s.EMAIL,
+        center_ids: centerIds,
+        created_at: s.created_at || s.CREATED_AT,
+        updated_at: s.updated_at || s.UPDATED_AT,
+      };
+    });
+    
+    cacheService.set('singers:all', normalizedSingers, CACHE_TTL);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache singers:', error instanceof Error ? error.message : error);
@@ -1755,9 +2562,11 @@ export async function warmupCache(): Promise<void> {
         ssp.updated_at
       FROM song_singer_pitches ssp
       JOIN songs s ON ssp.song_id = s.id
-      JOIN singers si ON ssp.singer_id = si.id
-      ORDER BY s.name, si.name
+      JOIN users si ON ssp.singer_id = si.id
+      ORDER BY LTRIM(REGEXP_REPLACE(LOWER(s.name), '[^a-zA-Z0-9 ]', ''), '0123456789 '), LTRIM(REGEXP_REPLACE(LOWER(si.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ')
     `);
+
+    stats.push({ table: 'pitches', count: pitches.length });
 
     // Normalize field names (Oracle returns uppercase) for cache consistency
     const normalizedPitches = pitches.map((p: any) => ({
@@ -1789,9 +2598,11 @@ export async function warmupCache(): Promise<void> {
         description,
         created_at,
         updated_at
-      FROM named_sessions 
+      FROM song_sessions 
       ORDER BY name
     `);
+
+    stats.push({ table: 'sessions', count: sessions.length });
 
     const mappedSessions = sessions.map((row: any) => ({
       id: row.ID,
@@ -1824,6 +2635,8 @@ export async function warmupCache(): Promise<void> {
       FROM presentation_templates 
       ORDER BY is_default DESC, name ASC
     `);
+
+    stats.push({ table: 'templates', count: templates.length });
 
     const mappedTemplates = templates.map((row: any) => {
       let templateJson: any = {};
@@ -1903,8 +2716,77 @@ export async function warmupCache(): Promise<void> {
     failureCount++;
   }
 
+  // Small delay between queries to avoid overwhelming the pool
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  try {
+    const centers = await databaseService.query(`
+      SELECT id, name, badge_text_color, created_at, updated_at 
+      FROM centers 
+      ORDER BY name ASC
+    `);
+
+    stats.push({ table: 'centers', count: centers.length });
+
+    // Normalize Oracle uppercase column names
+    const normalizedCenters = centers.map((center: any) => ({
+      id: center.ID || center.id,
+      name: center.NAME || center.name,
+      badge_text_color: center.BADGE_TEXT_COLOR || center.badge_text_color,
+      created_at: center.CREATED_AT || center.created_at,
+      updated_at: center.UPDATED_AT || center.updated_at,
+    }));
+
+    cacheService.set('centers:all', normalizedCenters, CACHE_TTL);
+    successCount++;
+  } catch (error) {
+    console.error('  ✗ Failed to cache centers:', error instanceof Error ? error.message : error);
+    failureCount++;
+  }
+
+  // Small delay between queries to avoid overwhelming the pool
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  try {
+    const feedback = await databaseService.query(`
+      SELECT id, feedback, category, email, user_agent, url, ip_address, 
+             status, admin_notes, created_at, updated_at
+      FROM feedback 
+      ORDER BY created_at DESC
+    `);
+
+    stats.push({ table: 'feedback', count: feedback.length });
+
+    // Normalize Oracle uppercase column names
+    const normalizedFeedback = feedback.map((f: any) => ({
+      id: f.ID || f.id,
+      feedback: f.FEEDBACK || f.feedback,
+      category: f.CATEGORY || f.category,
+      email: f.EMAIL || f.email,
+      user_agent: f.USER_AGENT || f.user_agent,
+      url: f.URL || f.url,
+      ip_address: f.IP_ADDRESS || f.ip_address,
+      status: f.STATUS || f.status,
+      admin_notes: f.ADMIN_NOTES || f.admin_notes,
+      created_at: f.CREATED_AT || f.created_at,
+      updated_at: f.UPDATED_AT || f.updated_at,
+    }));
+
+    cacheService.set('feedback:all', normalizedFeedback, CACHE_TTL);
+    successCount++;
+  } catch (error) {
+    console.error('  ✗ Failed to cache feedback:', error instanceof Error ? error.message : error);
+    failureCount++;
+  }
+
   // Summary
   const total = successCount + failureCount;
+  
+  console.log('📊 Cache warmup statistics:');
+  stats.forEach(({ table, count }) => {
+    console.log(`   ${table.padEnd(15)}: ${count.toString().padStart(4)} rows`);
+  });
+  console.log(`   ${'Total tables'.padEnd(15)}: ${successCount}/${total} cached`);
   
   if (failureCount === total) {
     throw new Error('All cache warmup attempts failed - database may not be configured');

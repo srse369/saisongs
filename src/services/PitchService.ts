@@ -155,6 +155,15 @@ class PitchService {
     } catch (error: any) {
       console.error('Error creating pitch:', error);
       
+      // Check for permission errors
+      if (error.message && error.message.includes('Access denied')) {
+        throw new DatabaseError(
+          ErrorCode.QUERY_ERROR,
+          error.message,
+          error
+        );
+      }
+      
       // Check for unique constraint violation
       if (error.message && error.message.includes('unique')) {
         throw new DatabaseError(
@@ -195,6 +204,16 @@ class PitchService {
       return raw ? this.mapRowToPitch(raw as any) : null;
     } catch (error) {
       console.error('Error updating pitch:', error);
+      
+      // Preserve the original error message for permission errors
+      if (error instanceof Error && error.message.includes('Access denied')) {
+        throw new DatabaseError(
+          ErrorCode.QUERY_ERROR,
+          error.message,
+          error
+        );
+      }
+      
       throw new DatabaseError(
         ErrorCode.QUERY_ERROR,
         `Failed to update pitch association with ID: ${id}`,
@@ -206,16 +225,9 @@ class PitchService {
   /**
    * Deletes a pitch association by ID
    * @param id - Pitch association UUID
-   * @returns true if deleted, false if not found
    */
-  async deletePitch(id: string): Promise<boolean> {
-    try {
-      await apiClient.deletePitch(id);
-      return true;
-    } catch (error) {
-      console.error('Error deleting pitch:', error);
-      return false;
-    }
+  async deletePitch(id: string): Promise<void> {
+    await apiClient.deletePitch(id);
   }
 
   /**

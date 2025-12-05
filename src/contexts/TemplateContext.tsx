@@ -18,6 +18,7 @@ interface TemplateContextState {
   updateTemplate: (id: string, updates: Partial<PresentationTemplate>) => Promise<PresentationTemplate | null>;
   deleteTemplate: (id: string) => Promise<boolean>;
   setAsDefault: (id: string) => Promise<PresentationTemplate | null>;
+  duplicateTemplate: (id: string, name: string, centerIds: number[]) => Promise<PresentationTemplate | null>;
   validateYaml: (yamlContent: string) => Promise<{ valid: boolean; template?: Partial<PresentationTemplate>; error?: string }>;
   clearError: () => void;
 }
@@ -250,6 +251,34 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
     }
   }, [toast]);
 
+  const duplicateTemplate = useCallback(async (id: string, name: string, centerIds: number[]): Promise<PresentationTemplate | null> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const duplicated = await templateService.duplicateTemplate(id, name, centerIds);
+      if (duplicated) {
+        // Add to local state immediately for instant UI update
+        setTemplates(prev => [...prev, duplicated]);
+        // Clear localStorage cache so fresh data is fetched next time
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(TEMPLATES_CACHE_KEY);
+        }
+        toast.success(`Template duplicated as "${name}"`);
+      }
+      return duplicated;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to duplicate template';
+      setError({
+        code: 'UNKNOWN_ERROR',
+        message: errorMessage,
+      });
+      toast.error(errorMessage);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
   const validateYaml = useCallback(async (yamlContent: string): Promise<{ valid: boolean; template?: Partial<PresentationTemplate>; error?: string }> => {
     setError(null);
     try {
@@ -277,6 +306,7 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
     updateTemplate,
     deleteTemplate,
     setAsDefault,
+    duplicateTemplate,
     validateYaml,
     clearError,
   };

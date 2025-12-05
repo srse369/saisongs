@@ -108,6 +108,24 @@ class TemplateService {
   }
 
   /**
+   * Duplicate a template with a new name and center assignments
+   */
+  async duplicateTemplate(id: string, name: string, centerIds: number[]): Promise<PresentationTemplate> {
+    try {
+      console.log('📊 Duplicating template:', id);
+      const duplicated = await apiClient.post<PresentationTemplate>(
+        `/templates/${id}/duplicate`,
+        { name, center_ids: centerIds }
+      );
+      console.log('✅ Template duplicated successfully');
+      return duplicated;
+    } catch (error) {
+      console.error('❌ Error duplicating template:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Validate YAML content
    */
   async validateYaml(yamlContent: string): Promise<{ valid: boolean; template?: Partial<PresentationTemplate>; error?: string }> {

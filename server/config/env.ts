@@ -28,13 +28,19 @@ dotenv.config({ path: envLocalPath });
 dotenv.config({ path: envPath });
 
 console.log('🔐 Environment loaded:');
-console.log('   ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD ? 'SET' : 'NOT SET');
-console.log('   EDITOR_PASSWORD:', process.env.EDITOR_PASSWORD ? 'SET' : 'NOT SET');
-console.log('   VIEWER_PASSWORD:', process.env.VIEWER_PASSWORD ? 'SET' : 'NOT SET');
+console.log('   BREVO_API_KEY:', process.env.BREVO_API_KEY ? 'SET' : 'NOT SET');
+console.log('   BREVO_SENDER_EMAIL:', process.env.BREVO_SENDER_EMAIL ? 'SET' : 'NOT SET');
+console.log('   BREVO_SENDER_NAME:', process.env.BREVO_SENDER_NAME ? 'SET' : 'NOT SET');
+console.log('   SESSION_SECRET:', process.env.SESSION_SECRET ? 'SET' : 'NOT SET');
 
-// Validate that at least one password is set
-if (!process.env.ADMIN_PASSWORD && !process.env.EDITOR_PASSWORD && !process.env.VIEWER_PASSWORD) {
-  console.warn('⚠️  WARNING: No authentication passwords configured!');
-  console.warn('⚠️  Set ADMIN_PASSWORD, EDITOR_PASSWORD, or VIEWER_PASSWORD in your .env file');
+// Validate required environment variables
+if (!process.env.BREVO_API_KEY) {
+  console.warn('⚠️  WARNING: BREVO_API_KEY not configured!');
+  console.warn('⚠️  Email OTP authentication will not work without Brevo API key');
+}
+
+if (!process.env.SESSION_SECRET) {
+  console.warn('⚠️  WARNING: SESSION_SECRET not set! Using default (INSECURE)');
+  process.env.SESSION_SECRET = 'dev-session-secret-change-in-production';
 }
 

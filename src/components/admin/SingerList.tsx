@@ -4,6 +4,7 @@ import { Modal } from '../common/Modal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { MusicIcon } from '../common';
+import { CenterBadges } from '../common/CenterBadges';
 
 interface SingerListProps {
   singers: Singer[];
@@ -30,10 +31,10 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
     setIsDeleting(true);
     try {
       await onDelete(singerToDelete.id);
-      setDeleteModalOpen(false);
-      setSingerToDelete(null);
     } finally {
       setIsDeleting(false);
+      setDeleteModalOpen(false);
+      setSingerToDelete(null);
     }
   };
 
@@ -108,6 +109,16 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                 )}
               </div>
               
+              {/* Center Badges with Warning for Missing Centers */}
+              <div className="flex items-center gap-2">
+                <CenterBadges centerIds={singer.center_ids} showWarningIfEmpty={true} />
+                {(!singer.center_ids || singer.center_ids.length === 0) && (
+                  <span className="text-xs text-yellow-600 dark:text-yellow-400 italic">
+                    (Needs center assignment)
+                  </span>
+                )}
+              </div>
+              
               {/* Actions */}
               <div className="flex flex-wrap items-center justify-start gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
                   <button
@@ -130,7 +141,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                       <span className="text-sm font-medium whitespace-nowrap">Edit</span>
                     </button>
                   )}
-                  {isAdmin && (
+                  {isEditor && (
                     <button
                       onClick={() => handleDeleteClick(singer)}
                       title="Delete"
