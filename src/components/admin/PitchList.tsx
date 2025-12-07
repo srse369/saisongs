@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { SongSingerPitch, Song, Singer } from '../../types';
 import { Modal } from '../common/Modal';
 import { useNavigate } from 'react-router-dom';
@@ -66,16 +66,17 @@ export const PitchList: React.FC<PitchListProps> = ({
     fetchCenters();
   }, []);
 
-  const songMap = new Map(songs.map(song => [song.id, { 
+  // Memoize maps to prevent recreation on every render (performance optimization)
+  const songMap = useMemo(() => new Map(songs.map(song => [song.id, { 
     name: song.name, 
     externalSourceUrl: song.externalSourceUrl,
     referenceGentsPitch: song.referenceGentsPitch,
     referenceLadiesPitch: song.referenceLadiesPitch
-  }]));
-  const singerMap = new Map(singers.map(singer => [singer.id, { name: singer.name, gender: singer.gender, center_ids: singer.center_ids }]));
+  }])), [songs]);
+  const singerMap = useMemo(() => new Map(singers.map(singer => [singer.id, { name: singer.name, gender: singer.gender, center_ids: singer.center_ids }])), [singers]);
 
-  // Enrich pitches with song and singer names
-  const enrichedPitches: PitchWithDetails[] = pitches.map(pitch => ({
+  // Enrich pitches with song and singer names (memoized for performance)
+  const enrichedPitches: PitchWithDetails[] = useMemo(() => pitches.map(pitch => ({
     ...pitch,
     songName: songMap.get(pitch.songId)?.name || 'Unknown Song',
     singerName: singerMap.get(pitch.singerId)?.name || 'Unknown Singer',
@@ -83,8 +84,8 @@ export const PitchList: React.FC<PitchListProps> = ({
     singerCenterIds: singerMap.get(pitch.singerId)?.center_ids,
     externalSourceUrl: songMap.get(pitch.songId)?.externalSourceUrl,
     referenceGentsPitch: songMap.get(pitch.songId)?.referenceGentsPitch,
-    referenceLadiesPitch: songMap.get(pitch.songId)?.referenceLadiesPitch,
-  }));
+    referenceLadiesPitch: songMap.get(pitch.songId)?.referenceLadiesPitch
+  })), [pitches, songMap, singerMap]);
 
   const handleDeleteClick = (pitch: PitchWithDetails) => {
     setPitchToDelete(pitch);

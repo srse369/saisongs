@@ -1,177 +1,125 @@
 # Song Studio Documentation
 
-Welcome to the Song Studio documentation! This guide will help you deploy, configure, troubleshoot, and use Song Studio.
+Welcome to Song Studio! This documentation will help you get started, deploy, and use all features effectively.
 
-## 📚 Documentation
+## 📚 Documentation Structure
 
-### Core Documentation
+### Core Guides
 
-| Document | Description |
-|----------|-------------|
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | Complete deployment guide for all platforms |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Technical architecture and performance optimizations |
-| [FEATURES.md](./FEATURES.md) | User-facing features and functionality (includes presentation templates) |
-| [TEMPLATE_VISUAL_EDITOR.md](./TEMPLATE_VISUAL_EDITOR.md) | User-friendly visual editor for creating presentation templates |
-| [TEMPLATES.md](./TEMPLATES.md) | Presentation template system documentation |
-| [MULTI_TENANCY_MIGRATION.md](./MULTI_TENANCY_MIGRATION.md) | Multi-tenancy architecture migration guide |
-| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | Solutions to common problems |
+| Document | Purpose | Audience |
+|----------|---------|----------|
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Complete deployment guide | Developers, DevOps |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Technical architecture, performance, database | Developers, Architects |
+| [FEATURES.md](./FEATURES.md) | All user-facing features including templates | End Users, Admins |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | Common issues and solutions | Everyone |
 
-### Directory-Specific Documentation
+### Additional Resources
 
 | Document | Description |
 |----------|-------------|
-| [../config/README.md](../config/README.md) | Build configuration files (Vite, TypeScript, Tailwind, ESLint) |
-| [../database/README.md](../database/README.md) | Database schema and SQL scripts documentation |
-| [../deploy/README.md](../deploy/README.md) | Deployment scripts and procedures |
-| [../deploy/local/README.md](../deploy/local/README.md) | Local development environment setup |
-| [../deploy/remote/README.md](../deploy/remote/README.md) | Production deployment on VPS |
+| [../config/README.md](../config/README.md) | Build configuration (Vite, TypeScript, Tailwind, ESLint) |
+| [../database/README.md](../database/README.md) | Database schema and SQL scripts |
+| [../deploy/README.md](../deploy/README.md) | Deployment scripts reference |
+| [../deploy/local/README.md](../deploy/local/README.md) | Local development setup |
+| [../deploy/remote/README.md](../deploy/remote/README.md) | Production VPS deployment |
 
 ---
 
 ## Quick Start
 
-### For Developers
+### Local Development
 
 ```bash
-# Clone repository
+# Clone and setup
 git clone https://github.com/srse369/songstudio.git
 cd songstudio
-
-# Install dependencies
 npm install
 
-# Create environment file
+# Configure environment
 cp .env.example .env.local
-# Edit .env.local with your credentials
+# Edit .env.local with your Oracle DB credentials
 
-# Start development
+# Start development servers
 ./deploy/local/dev.sh start
 ```
 
-### Deploy to Production
+### Production Deployment
 
 ```bash
 ./deploy/remote/deploy.sh code
 ```
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
-
----
-
-### For Users
-
-**Accessing Song Studio:**
-- **Production:** https://YOUR_DOMAIN
-- **Login as admin:** Press `Ctrl+Shift+I` (Windows/Linux) or `Cmd+Shift+I` (Mac)
-
-**Basic usage:**
-1. Browse songs, singers, and pitches
-2. Add songs to live session
-3. Use presentation mode to display songs
-4. Save sessions for future use
-
-See [FEATURES.md](./FEATURES.md) for complete feature documentation.
-
----
-
-### For System Administrators
-
-**Check system health:**
-```bash
-./deploy/remote/deploy.sh status
-./deploy/remote/deploy.sh check
-./deploy/remote/deploy.sh logs 50
-```
-
-**Common maintenance:**
-```bash
-./deploy/remote/deploy.sh restart    # Restart backend
-./deploy/remote/deploy.sh logs -f    # Follow logs
-```
-
-See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for detailed procedures.
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete instructions.
 
 ---
 
 ## Common Tasks
 
-### Deploy Updates
+### Deployment
+
 ```bash
+# Full deployment
 ./deploy/remote/deploy.sh code
+
+# Backend only
 ./deploy/remote/deploy.sh code --backend-only
+
+# Frontend only
 ./deploy/remote/deploy.sh code --frontend-only
 ```
 
-### Fix Mobile "Load Failed" Errors
+### Monitoring
+
 ```bash
-echo "VITE_API_URL=/api" > .env.production
-npm run build:vps
-./deploy/remote/deploy.sh code
+# Check status
+./deploy/remote/deploy.sh status
+
+# View logs
+./deploy/remote/deploy.sh logs 50
+
+# Health check
+curl https://YOUR_DOMAIN/api/health
 ```
 
-### Restart Backend
+### Maintenance
+
 ```bash
+# Restart backend
 ./deploy/remote/deploy.sh restart
-```
 
-### Check Oracle Database Status
-Login to Oracle Cloud Console and check Performance Hub.
+# View real-time logs
+./deploy/remote/deploy.sh logs -f
+```
 
 ---
 
 ## Technology Stack
 
-**Frontend:**
-- React 18 + TypeScript
-- Vite
-- TailwindCSS
-- Context API for state management
+| Component | Technology |
+|-----------|-----------|
+| **Frontend** | React 18, TypeScript, Vite, TailwindCSS |
+| **Backend** | Node.js 20+, Express, TypeScript (ES modules) |
+| **Database** | Oracle Autonomous Database |
+| **Infrastructure** | Ubuntu 22.04, Nginx, PM2, Let's Encrypt SSL |
 
-**Backend:**
-- Node.js 20+ + Express
-- TypeScript with ES modules
-- Oracle Autonomous Database
-
-**Infrastructure:**
-- Ubuntu 22.04 LTS
-- Nginx reverse proxy
-- PM2 process manager
-- Let's Encrypt SSL
-
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
-
----
-
-## Important Links
-
-- **Production:** https://YOUR_DOMAIN
-- **Repository:** https://github.com/srse369/songstudio
-- **Oracle Cloud:** https://cloud.oracle.com
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed system design.
 
 ---
 
 ## Getting Help
 
-**Quick Health Check:**
-```bash
-curl https://YOUR_DOMAIN/api/health
-```
+| Problem | Solution |
+|---------|----------|
+| **Deployment fails** | See [DEPLOYMENT.md](./DEPLOYMENT.md) |
+| **How does X work?** | See [ARCHITECTURE.md](./ARCHITECTURE.md) |
+| **How to use feature Y?** | See [FEATURES.md](./FEATURES.md) |
+| **Something's broken** | See [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) |
 
-**View Logs:**
+**Emergency procedures:**
 ```bash
-./deploy/remote/deploy.sh logs 50
-```
-
-**Emergency Restart:**
-```bash
+# Quick restart
 ./deploy/remote/deploy.sh restart
+
+# Check what's wrong
+./deploy/remote/deploy.sh logs 100
 ```
-
----
-
-## Questions?
-
-- **Deployment issues?** → [DEPLOYMENT.md](./DEPLOYMENT.md)
-- **How does it work?** → [ARCHITECTURE.md](./ARCHITECTURE.md)
-- **How do I use X feature?** → [FEATURES.md](./FEATURES.md)
-- **Something's broken!** → [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
