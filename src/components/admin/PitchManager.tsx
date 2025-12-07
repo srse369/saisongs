@@ -89,7 +89,7 @@ export const PitchManager: React.FC = () => {
   }, [songFilterId, singerFilterId, songs, singers]);
 
   // Fetch songs, singers, and all existing pitch associations when needed.
-  // Force refresh when userId changes to get correct filtered data
+  // Use cached data when switching tabs for better performance
   // Parallelize fetches for better performance
   useEffect(() => {
     if (userId !== lastFetchedUserIdRef.current) {
@@ -97,9 +97,9 @@ export const PitchManager: React.FC = () => {
       
       // Fetch all data in parallel for faster loading
       Promise.all([
-        !songsLoading && fetchSongs(true),
-        !singersLoading && fetchSingers(true),
-        !pitchLoading && fetchAllPitches()
+        !songsLoading && fetchSongs(), // Use cached data
+        !singersLoading && fetchSingers(), // Use cached data
+        !pitchLoading && fetchAllPitches() // Use cached data
       ]).catch(error => {
         console.error('Error fetching data in parallel:', error);
       });

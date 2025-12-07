@@ -59,7 +59,7 @@ grep -r "localhost:3111" dist/
 # Should return: (nothing)
 
 # Test API directly
-curl https://saisongs.org/api/health
+curl https://YOUR_DOMAIN/api/health
 ```
 
 ---
@@ -69,7 +69,7 @@ curl https://saisongs.org/api/health
 ### Check Status
 
 ```bash
-ssh ubuntu@saisongs.org
+ssh ubuntu@YOUR_DOMAIN
 pm2 list
 pm2 logs songstudio --lines 50
 ```
@@ -165,7 +165,7 @@ pm2 save
 #### Immediate Fix
 
 ```bash
-ssh ubuntu@saisongs.org 'pm2 restart songstudio'
+ssh ubuntu@YOUR_DOMAIN 'pm2 restart songstudio'
 ```
 
 #### Long-term Solutions
@@ -270,7 +270,7 @@ const queryTimeout = setTimeout(() => {
 ### Monitoring Session Health
 
 ```bash
-ssh ubuntu@saisongs.org 'pm2 logs songstudio | grep -i "pool health"'
+ssh ubuntu@YOUR_DOMAIN 'pm2 logs songstudio | grep -i "pool health"'
 
 # Look for:
 # 🔍 Pool health: 1 open, 0 in use, 1 available, 0 tracked
@@ -305,12 +305,12 @@ If `session_count` keeps growing → Session leak still present.
 
 **Check SSH key permissions:**
 ```bash
-chmod 600 ~/Downloads/"SSH Key Nov 12 2025.key"
+chmod 600 /path/to/your/ssh-key.key
 ```
 
 **Test connection:**
 ```bash
-ssh -v -i ~/Downloads/"SSH Key Nov 12 2025.key" ubuntu@saisongs.org "echo 'Connected'"
+ssh -v -i /path/to/your/ssh-key.key ubuntu@YOUR_DOMAIN "echo 'Connected'"
 ```
 
 ### Nginx 502 Bad Gateway
@@ -361,7 +361,7 @@ npm run build:vps
 
 **Check server-side caching:**
 ```bash
-ssh ubuntu@saisongs.org 'pm2 logs songstudio | grep -i cache'
+ssh ubuntu@YOUR_DOMAIN 'pm2 logs songstudio | grep -i cache'
 
 # Should see:
 # ✅ Cache hit for key: songs:all (age: 45s)
@@ -450,7 +450,7 @@ Select "Cached images and files"
 ### Complete System Restart
 
 ```bash
-ssh ubuntu@saisongs.org
+ssh ubuntu@YOUR_DOMAIN
 
 # Stop everything
 pm2 stop songstudio
@@ -472,7 +472,7 @@ curl http://localhost:3111/api/health
 ### Reset to Last Known Good State
 
 ```bash
-ssh ubuntu@saisongs.org
+ssh ubuntu@YOUR_DOMAIN
 
 # List backups
 ls -la /var/www/songstudio.backup.*
@@ -488,7 +488,7 @@ pm2 restart songstudio
 
 **Server-side:**
 ```bash
-ssh ubuntu@saisongs.org 'pm2 restart songstudio'
+ssh ubuntu@YOUR_DOMAIN 'pm2 restart songstudio'
 ```
 
 **Frontend:**
@@ -507,22 +507,22 @@ location.reload();
 
 ```bash
 # API health
-curl https://saisongs.org/api/health
+curl https://YOUR_DOMAIN/api/health
 
 # Backend status
-ssh ubuntu@saisongs.org 'pm2 status'
+ssh ubuntu@YOUR_DOMAIN 'pm2 status'
 
 # Backend logs
-ssh ubuntu@saisongs.org 'pm2 logs songstudio --lines 20'
+ssh ubuntu@YOUR_DOMAIN 'pm2 logs songstudio --lines 20'
 
 # Nginx status
-ssh ubuntu@saisongs.org 'sudo systemctl status nginx'
+ssh ubuntu@YOUR_DOMAIN 'sudo systemctl status nginx'
 ```
 
 ### Full System Check
 
 ```bash
-ssh ubuntu@saisongs.org
+ssh ubuntu@YOUR_DOMAIN
 
 pm2 status
 curl http://localhost:3111/api/health
@@ -559,7 +559,7 @@ pm2 status > status.txt
 
 ```bash
 # SSH into server
-ssh ubuntu@saisongs.org
+ssh ubuntu@YOUR_DOMAIN
 
 # Check backend
 pm2 status

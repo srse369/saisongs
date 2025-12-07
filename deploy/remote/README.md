@@ -110,7 +110,8 @@ Run this ON the remote server for initial setup.
 |---------|-------------|
 | `ubuntu` | Initial setup for Ubuntu/Debian servers |
 | `oracle` | Initial setup for Oracle Linux servers |
-| `ssl <domain>` | Configure SSL with Let's Encrypt |
+| `ssl <domain>` | Configure SSL with Let's Encrypt (for domain names) |
+| `ssl-ip` | Generate self-signed SSL certificate (for IP address access) |
 
 ### Examples
 
@@ -125,10 +126,31 @@ bash /tmp/setup.sh ubuntu
 # Oracle Linux setup
 bash /tmp/setup.sh oracle
 
-# SSL setup (after basic setup)
+# SSL setup for domain name (after basic setup)
 bash /tmp/setup.sh ssl example.com
 bash /tmp/setup.sh ssl example.com admin@example.com
+
+# SSL setup for IP address access (self-signed certificate)
+bash /tmp/setup.sh ssl-ip
 ```
+
+### HTTPS Configuration
+
+**Two options for HTTPS:**
+
+1. **IP Address Access (Self-Signed Certificate)**
+   - Use when accessing via IP (e.g., https://129.153.85.24)
+   - Browsers will show security warning (click "Advanced" → "Proceed")
+   - Run: `./setup.sh ssl-ip`
+   - Automatically redirects HTTP → HTTPS
+
+2. **Domain Name Access (Let's Encrypt Certificate)**
+   - Use when you have a domain name (e.g., https://songstudio.example.com)
+   - No browser warnings - fully trusted certificate
+   - Run: `./setup.sh ssl yourdomain.com`
+   - Automatically redirects HTTP → HTTPS
+
+Both configurations ensure all HTTP traffic is automatically redirected to HTTPS.
 
 ### What Setup Installs
 

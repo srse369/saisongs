@@ -9,7 +9,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || (
   import.meta.env.DEV ? '/api' : 'http://localhost:3111/api'
 );
 
-class ApiClient {
+export class ApiClient {
   private baseUrl: string;
   private failureCount: Map<string, number> = new Map();
   private lastFailureTime: Map<string, number> = new Map();

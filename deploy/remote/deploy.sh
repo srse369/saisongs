@@ -89,6 +89,9 @@ usage() {
     echo "  code [opts]         Deploy application code to remote server"
     echo "  env                 Upload .env.local + .env.production to remote"
     echo "  wallet              Upload Oracle wallet to remote server"
+    echo "  nginx               Upload and update nginx configuration"
+    echo "  setup               Upload setup.sh script to remote server"
+    echo "  ssl-setup           Complete HTTPS setup (certificate + nginx)"
     echo "  check               Run health check on remote server"
     echo "  restart             Restart backend on remote server"
     echo "  logs [n]            View remote logs (default: 50 lines)"
@@ -107,6 +110,9 @@ usage() {
     echo "  $0 code --backend-only"
     echo "  $0 env"
     echo "  $0 wallet"
+    echo "  $0 nginx"
+    echo "  $0 setup"
+    echo "  $0 ssl-setup"
     echo "  $0 check"
     echo "  $0 restart"
     echo "  $0 logs 100"
@@ -268,14 +274,18 @@ ENDSSH
 
     echo "  → Testing API health..."
     if curl -f -s -k https://${REMOTE_IP}/api/health > /dev/null 2>&1; then
-        echo -e "  ${GREEN}✅ API health check passed${NC}"
+        echo -e "  ${GREEN}✅ API health check passed (HTTPS)${NC}"
+    elif curl -f -s http://${REMOTE_IP}/api/health > /dev/null 2>&1; then
+        echo -e "  ${YELLOW}⚠️  API responding on HTTP (HTTPS not configured)${NC}"
     else
         echo -e "  ${RED}❌ API health check failed${NC}"
     fi
 
     echo "  → Testing frontend..."
     if curl -f -s -k https://${REMOTE_IP}/ > /dev/null 2>&1; then
-        echo -e "  ${GREEN}✅ Frontend loading${NC}"
+        echo -e "  ${GREEN}✅ Frontend loading (HTTPS)${NC}"
+    elif curl -f -s http://${REMOTE_IP}/ > /dev/null 2>&1; then
+        echo -e "  ${YELLOW}⚠️  Frontend responding on HTTP (HTTPS not configured)${NC}"
     else
         echo -e "  ${RED}❌ Frontend not responding${NC}"
     fi
@@ -503,6 +513,81 @@ ENDSSH
 }
 
 # =============================================================================
+# NGINX Command - Upload and update nginx configuration
+# =============================================================================
+
+cmd_nginx() {
+    check_config
+
+    echo "🌐 Deploying Nginx Configuration"
+    echo "================================="
+    echo ""
+
+    # Check if nginx config file exists
+    NGINX_CONFIG="$PROJECT_ROOT/deploy/remote/nginx.conf"
+    if [ ! -f "$NGINX_CONFIG" ]; then
+        echo -e "${RED}❌ Error: nginx.conf not found at $NGINX_CONFIG${NC}"
+        exit 1
+    fi
+
+    # Upload nginx configuration
+    echo "📤 Uploading nginx configuration..."
+    if [ -n "$SSH_OPTS" ]; then
+        eval scp $SSH_OPTS "$NGINX_CONFIG" "${REMOTE_USER}@${REMOTE_IP}:/tmp/songstudio.nginx.conf"
+    else
+        scp "$NGINX_CONFIG" "${REMOTE_USER}@${REMOTE_IP}:/tmp/songstudio.nginx.conf"
+    fi
+
+    # Backup existing config and install new one
+    echo "🔧 Installing nginx configuration..."
+    ssh_exec << 'ENDSSH'
+# Backup existing config if it exists
+if [ -f /etc/nginx/sites-available/songstudio ]; then
+    echo "Creating backup of existing configuration..."
+    sudo cp /etc/nginx/sites-available/songstudio /etc/nginx/sites-available/songstudio.backup.$(date +%Y%m%d_%H%M%S)
+fi
+
+# Move uploaded config to nginx directory
+echo "Installing new configuration..."
+sudo mv /tmp/songstudio.nginx.conf /etc/nginx/sites-available/songstudio
+
+# Create symlink if it doesn't exist
+if [ ! -L /etc/nginx/sites-enabled/songstudio ]; then
+    echo "Creating symlink..."
+    sudo ln -s /etc/nginx/sites-available/songstudio /etc/nginx/sites-enabled/songstudio
+fi
+
+# Test nginx configuration
+echo ""
+echo "Testing nginx configuration..."
+if sudo nginx -t; then
+    echo ""
+    echo "Reloading nginx..."
+    sudo systemctl reload nginx
+    echo ""
+    echo "✅ Nginx configuration updated successfully!"
+else
+    echo ""
+    echo "❌ Nginx configuration test failed!"
+    echo "To restore previous configuration:"
+    echo "  sudo cp /etc/nginx/sites-available/songstudio.backup.* /etc/nginx/sites-available/songstudio"
+    echo "  sudo systemctl reload nginx"
+    exit 1
+fi
+ENDSSH
+
+    echo ""
+    echo -e "${GREEN}✅ Nginx configuration deployed successfully!${NC}"
+    echo ""
+    echo "ℹ️  Configuration details:"
+    echo "   - HTTP (port 80) redirects to HTTPS"
+    echo "   - HTTPS servers on port 443 (domain + IP)"
+    echo "   - Serving from: $REMOTE_PATH/dist"
+    echo "   - Proxying /api/ to: http://127.0.0.1:3111"
+    echo ""
+}
+
+# =============================================================================
 # CHECK Command
 # =============================================================================
 
@@ -680,6 +765,103 @@ cmd_status() {
 }
 
 # =============================================================================
+# SETUP Command - Upload setup.sh script to remote server
+# =============================================================================
+
+cmd_setup() {
+    check_config
+
+    echo "🛠️  Uploading Setup Script"
+    echo "=========================="
+    echo ""
+
+    # Check if setup script exists
+    SETUP_SCRIPT="$PROJECT_ROOT/deploy/remote/setup.sh"
+    if [ ! -f "$SETUP_SCRIPT" ]; then
+        echo -e "${RED}❌ Error: setup.sh not found at $SETUP_SCRIPT${NC}"
+        exit 1
+    fi
+
+    echo "📤 Uploading setup.sh to remote server..."
+    if [ -n "$SSH_OPTS" ]; then
+        eval scp $SSH_OPTS "$SETUP_SCRIPT" "${REMOTE_USER}@${REMOTE_IP}:/tmp/setup.sh"
+    else
+        scp "$SETUP_SCRIPT" "${REMOTE_USER}@${REMOTE_IP}:/tmp/setup.sh"
+    fi
+
+    # Make it executable
+    ssh_exec "chmod +x /tmp/setup.sh"
+
+    echo ""
+    echo -e "${GREEN}✅ Setup script uploaded successfully!${NC}"
+    echo ""
+    echo "Now SSH to the server and run:"
+    echo "   ssh ${REMOTE_USER}@${REMOTE_IP}"
+    echo "   /tmp/setup.sh ssl-ip    # For IP address HTTPS"
+    echo "   /tmp/setup.sh ssl yourdomain.com    # For domain HTTPS"
+}
+
+# =============================================================================
+# SSL-SETUP Command - Complete HTTPS setup (certificate + nginx)
+# =============================================================================
+
+cmd_ssl_setup() {
+    check_config
+
+    echo "🔒 Complete HTTPS Setup"
+    echo "======================="
+    echo ""
+    echo "This will:"
+    echo "  1. Upload setup.sh script"
+    echo "  2. Generate self-signed SSL certificate for IP: ${REMOTE_IP}"
+    echo "  3. Deploy nginx configuration"
+    echo "  4. Restart nginx"
+    echo ""
+    read -p "Continue? (y/N) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Cancelled."
+        exit 0
+    fi
+
+    echo ""
+    echo "Step 1/4: Uploading setup.sh script..."
+    cmd_setup
+
+    echo ""
+    echo "Step 2/4: Generating SSL certificate..."
+    ssh_exec "/tmp/setup.sh ssl-ip"
+
+    echo ""
+    echo "Step 3/4: Deploying nginx configuration..."
+    cmd_nginx
+
+    echo ""
+    echo "Step 4/4: Testing configuration..."
+    ssh_exec << 'ENDSSH'
+sudo nginx -t
+if [ $? -eq 0 ]; then
+    echo "✅ Nginx configuration is valid"
+    echo "Reloading nginx..."
+    sudo systemctl reload nginx
+    echo "✅ Nginx reloaded"
+else
+    echo "❌ Nginx configuration has errors"
+    exit 1
+fi
+ENDSSH
+
+    echo ""
+    echo -e "${GREEN}✅ HTTPS Setup Complete!${NC}"
+    echo ""
+    echo "🌐 Your site is now accessible at:"
+    echo "   https://${REMOTE_IP}"
+    echo ""
+    echo "⚠️  Note: You'll see a browser warning for self-signed certificate."
+    echo "   Click 'Advanced' → 'Proceed' to access the site."
+}
+
+# =============================================================================
 # Main Command Router
 # =============================================================================
 
@@ -695,6 +877,15 @@ case "$cmd" in
         ;;
     wallet)
         cmd_wallet
+        ;;
+    nginx)
+        cmd_nginx
+        ;;
+    setup)
+        cmd_setup
+        ;;
+    ssl-setup)
+        cmd_ssl_setup
         ;;
     check)
         cmd_check

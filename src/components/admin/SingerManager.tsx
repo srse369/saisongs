@@ -21,7 +21,7 @@ export const SingerManager: React.FC = () => {
     // Fetch singers when user changes to get correct filtered data
     if (userId !== lastFetchedUserIdRef.current) {
       lastFetchedUserIdRef.current = userId;
-      fetchSingers(true);
+      fetchSingers(); // Use cached data, only refresh if stale
     }
   }, [fetchSingers, userId]);
 

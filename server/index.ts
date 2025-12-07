@@ -22,9 +22,26 @@ import { emailService } from './services/EmailService.js';
 const app = express();
 const PORT = process.env.PORT || 3111;
 
+// Determine CORS origin based on environment
+const getFrontendOrigin = () => {
+  // If explicitly set, use that
+  if (process.env.FRONTEND_URL) {
+    return process.env.FRONTEND_URL;
+  }
+  
+  // In production with nginx reverse proxy, frontend and backend are on same origin
+  // Allow same-origin requests
+  if (process.env.NODE_ENV === 'production') {
+    return true; // Allow same-origin
+  }
+  
+  // Development default
+  return 'http://localhost:5111';
+};
+
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5111',
+  origin: getFrontendOrigin(),
   credentials: true, // Allow cookies/session
 }));
 
@@ -36,10 +53,13 @@ app.use(session({
   saveUninitialized: false,
   rolling: false, // Don't reset expiry on every request
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    // Only set secure:true if explicitly configured (for HTTPS)
+    // Don't auto-enable in production if using HTTP
+    secure: process.env.COOKIE_SECURE === 'true',
     httpOnly: true, // Prevent XSS
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    sameSite: 'lax',
+    sameSite: 'lax', // More permissive for production without HTTPS
+    domain: process.env.COOKIE_DOMAIN || undefined, // Allow setting cookie domain for production
   },
 }));
 
@@ -144,6 +164,13 @@ app.use('/api/import-mappings', requireAdmin, importMappingsRouter);  // Admin o
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);
+  
+  // Check if headers were already sent to avoid "Cannot set headers after they are sent" error
+  if (res.headersSent) {
+    console.error('[ERROR HANDLER] Headers already sent, cannot send error response');
+    return next(err);
+  }
+  
   res.status(500).json({
     error: 'Internal server error',
     message: err.message

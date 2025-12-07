@@ -31,12 +31,14 @@ usage() {
     echo "  ubuntu              Initial setup for Ubuntu/Debian servers"
     echo "  oracle              Initial setup for Oracle Linux servers"
     echo "  ssl <domain>        Configure SSL with Let's Encrypt"
+    echo "  ssl-ip              Generate self-signed certificate for IP access"
     echo ""
     echo "Examples:"
     echo "  $0 ubuntu"
     echo "  $0 oracle"
     echo "  $0 ssl example.com"
     echo "  $0 ssl example.com admin@example.com"
+    echo "  $0 ssl-ip"
     echo ""
     echo "NOTE: Run this script ON the remote server, not locally."
 }
@@ -501,6 +503,79 @@ EOF
 }
 
 # =============================================================================
+# SSL Setup for IP Address Command
+# =============================================================================
+
+cmd_ssl_ip() {
+    echo "🔒 Setting up self-signed SSL certificate for IP address access"
+    echo ""
+    
+    # Get server IP
+    SERVER_IP=$(curl -s ifconfig.me || hostname -I | awk '{print $1}')
+    echo "📍 Detected server IP: $SERVER_IP"
+    echo ""
+    
+    # Create certificate directory if it doesn't exist
+    sudo mkdir -p /etc/ssl/private /etc/ssl/certs
+    
+    # Create OpenSSL configuration file for SAN (Subject Alternative Name)
+    cat > /tmp/openssl-san.cnf <<EOF
+[req]
+default_bits = 2048
+prompt = no
+default_md = sha256
+distinguished_name = dn
+x509_extensions = v3_req
+
+[dn]
+C=US
+ST=State
+L=City
+O=Organization
+CN=$SERVER_IP
+
+[v3_req]
+subjectAltName = @alt_names
+
+[alt_names]
+IP.1 = $SERVER_IP
+EOF
+    
+    # Generate self-signed certificate valid for 10 years
+    echo "🔐 Generating self-signed certificate..."
+    sudo openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout /etc/ssl/private/songstudio-selfsigned.key \
+        -out /etc/ssl/certs/songstudio-selfsigned.crt \
+        -config /tmp/openssl-san.cnf \
+        -extensions v3_req
+    
+    # Clean up temp config file
+    rm -f /tmp/openssl-san.cnf
+    
+    echo "✅ Self-signed certificate created"
+    echo ""
+    
+    # Set proper permissions
+    sudo chmod 600 /etc/ssl/private/songstudio-selfsigned.key
+    sudo chmod 644 /etc/ssl/certs/songstudio-selfsigned.crt
+    
+    echo "⚙️  Certificate files created at:"
+    echo "   Certificate: /etc/ssl/certs/songstudio-selfsigned.crt"
+    echo "   Private Key: /etc/ssl/private/songstudio-selfsigned.key"
+    echo ""
+    echo "⚠️  NOTE: This is a self-signed certificate."
+    echo "   Browsers will show a security warning, which is expected."
+    echo "   Users need to click 'Advanced' -> 'Proceed' to access the site."
+    echo ""
+    echo "✅ Self-signed SSL setup complete!"
+    echo ""
+    echo "Next steps:"
+    echo "1. Deploy your nginx configuration with: cd /path/to/songstudio && ./deploy.sh code"
+    echo "2. Access your site at: https://$SERVER_IP"
+    echo "3. (Optional) Set up a domain name and use './setup.sh ssl <domain>' for a trusted certificate"
+}
+
+# =============================================================================
 # Main Command Router
 # =============================================================================
 
@@ -516,6 +591,9 @@ case "$cmd" in
         ;;
     ssl)
         cmd_ssl "$@"
+        ;;
+    ssl-ip)
+        cmd_ssl_ip
         ;;
     -h|--help|"")
         usage

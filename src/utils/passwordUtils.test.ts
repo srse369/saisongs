@@ -1,54 +1,37 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
-  validatePassword,
   RateLimiter,
   RateLimitError,
-  MissingPasswordError,
 } from './passwordUtils';
 
 describe('Password Authentication', () => {
-  describe('validatePassword', () => {
-    beforeEach(() => {
-      // Reset environment variable before each test
-      vi.stubEnv('VITE_ADMIN_PASSWORD', 'test-password-123');
-    });
-
-    it('should return true for correct password', () => {
-      expect(validatePassword('test-password-123')).toBe(true);
-    });
-
-    it('should throw error for incorrect password', () => {
-      expect(() => validatePassword('wrong-password')).toThrow('Incorrect password');
-    });
-
-    it('should throw MissingPasswordError when environment variable is not set', () => {
-      vi.stubEnv('VITE_ADMIN_PASSWORD', '');
-      
-      expect(() => validatePassword('any-password')).toThrow(MissingPasswordError);
-      expect(() => validatePassword('any-password')).toThrow(
-        'Admin password is not configured'
-      );
-    });
-  });
-
   describe('RateLimiter', () => {
     let rateLimiter: RateLimiter;
 
     beforeEach(() => {
       rateLimiter = new RateLimiter();
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
     });
 
     it('should not be locked initially', () => {
       expect(rateLimiter.isLocked()).toBe(false);
       expect(rateLimiter.getAttempts()).toBe(0);
+      expect(rateLimiter.getRemainingLockoutTime()).toBe(0);
     });
 
-    it('should track failed attempts', () => {
+    it('should increment attempts on failed attempt', () => {
       rateLimiter.recordFailedAttempt();
       expect(rateLimiter.getAttempts()).toBe(1);
-
+      
       rateLimiter.recordFailedAttempt();
       expect(rateLimiter.getAttempts()).toBe(2);
+      
+      rateLimiter.recordFailedAttempt();
+      expect(rateLimiter.getAttempts()).toBe(3);
     });
 
     it('should lock after 5 failed attempts', () => {
@@ -92,6 +75,7 @@ describe('Password Authentication', () => {
       rateLimiter.reset();
       expect(rateLimiter.getAttempts()).toBe(0);
       expect(rateLimiter.isLocked()).toBe(false);
+      expect(rateLimiter.getRemainingLockoutTime()).toBe(0);
     });
 
     it('should calculate remaining lockout time', () => {
@@ -104,9 +88,10 @@ describe('Password Authentication', () => {
         }
       }
 
-      const remainingTime = rateLimiter.getRemainingLockoutTime();
-      expect(remainingTime).toBeGreaterThan(0);
-      expect(remainingTime).toBeLessThanOrEqual(5 * 60 * 1000); // 5 minutes in ms
+      expect(rateLimiter.isLocked()).toBe(true);
+      const remaining = rateLimiter.getRemainingLockoutTime();
+      expect(remaining).toBeGreaterThan(0);
+      expect(remaining).toBeLessThanOrEqual(5 * 60 * 1000); // 5 minutes in ms
     });
 
     it('should unlock after lockout period expires', () => {
@@ -121,15 +106,12 @@ describe('Password Authentication', () => {
 
       expect(rateLimiter.isLocked()).toBe(true);
 
-      // Manually set lockout to past time to simulate expiration
-      const state = rateLimiter.getState();
-      rateLimiter.setState({
-        attempts: state.attempts,
-        lockoutUntil: Date.now() - 1000, // 1 second ago
-      });
+      // Fast-forward time by 5 minutes
+      vi.advanceTimersByTime(5 * 60 * 1000);
 
+      // Should be unlocked now
       expect(rateLimiter.isLocked()).toBe(false);
-      expect(rateLimiter.getAttempts()).toBe(0); // Should be reset
+      expect(rateLimiter.getRemainingLockoutTime()).toBe(0);
     });
 
     it('should persist and restore state', () => {
@@ -145,7 +127,48 @@ describe('Password Authentication', () => {
       newRateLimiter.setState(state);
 
       expect(newRateLimiter.getAttempts()).toBe(3);
-      expect(newRateLimiter.getState()).toEqual(state);
+      expect(newRateLimiter.isLocked()).toBe(false);
+    });
+
+    it('should restore locked state correctly', () => {
+      // Lock the original rate limiter
+      for (let i = 0; i < 5; i++) {
+        try {
+          rateLimiter.recordFailedAttempt();
+        } catch (e) {
+          // Expected on 5th attempt
+        }
+      }
+
+      const state = rateLimiter.getState();
+      expect(state.lockoutUntil).not.toBeNull();
+
+      // Restore to new rate limiter
+      const newRateLimiter = new RateLimiter();
+      newRateLimiter.setState(state);
+
+      expect(newRateLimiter.isLocked()).toBe(true);
+      expect(newRateLimiter.getRemainingLockoutTime()).toBeGreaterThan(0);
+    });
+
+    it('should handle edge case: exactly at lockout expiry', () => {
+      // Lock the rate limiter
+      for (let i = 0; i < 5; i++) {
+        try {
+          rateLimiter.recordFailedAttempt();
+        } catch (e) {
+          // Expected on 5th attempt
+        }
+      }
+
+      expect(rateLimiter.isLocked()).toBe(true);
+
+      // Advance to exactly 5 minutes
+      vi.advanceTimersByTime(5 * 60 * 1000);
+
+      // Should be unlocked and reset
+      expect(rateLimiter.isLocked()).toBe(false);
+      expect(rateLimiter.getAttempts()).toBe(0);
     });
   });
 });

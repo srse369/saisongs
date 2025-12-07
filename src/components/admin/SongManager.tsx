@@ -45,7 +45,7 @@ export const SongManager: React.FC = () => {
     // Fetch songs when user changes to get correct filtered data
     if (userId !== lastFetchedUserIdRef.current) {
       lastFetchedUserIdRef.current = userId;
-      fetchSongs(true);
+      fetchSongs(); // Use cached data, only refresh if stale
     }
   }, [fetchSongs, userId]);
 

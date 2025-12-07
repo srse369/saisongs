@@ -4,13 +4,27 @@ Welcome to the Song Studio documentation! This guide will help you deploy, confi
 
 ## 📚 Documentation
 
+### Core Documentation
+
 | Document | Description |
 |----------|-------------|
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | Complete deployment guide for all platforms |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Technical architecture and performance optimizations |
 | [FEATURES.md](./FEATURES.md) | User-facing features and functionality (includes presentation templates) |
 | [TEMPLATE_VISUAL_EDITOR.md](./TEMPLATE_VISUAL_EDITOR.md) | User-friendly visual editor for creating presentation templates |
+| [TEMPLATES.md](./TEMPLATES.md) | Presentation template system documentation |
+| [MULTI_TENANCY_MIGRATION.md](./MULTI_TENANCY_MIGRATION.md) | Multi-tenancy architecture migration guide |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | Solutions to common problems |
+
+### Directory-Specific Documentation
+
+| Document | Description |
+|----------|-------------|
+| [../config/README.md](../config/README.md) | Build configuration files (Vite, TypeScript, Tailwind, ESLint) |
+| [../database/README.md](../database/README.md) | Database schema and SQL scripts documentation |
+| [../deploy/README.md](../deploy/README.md) | Deployment scripts and procedures |
+| [../deploy/local/README.md](../deploy/local/README.md) | Local development environment setup |
+| [../deploy/remote/README.md](../deploy/remote/README.md) | Production deployment on VPS |
 
 ---
 
@@ -47,7 +61,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
 ### For Users
 
 **Accessing Song Studio:**
-- **Production:** https://saisongs.org
+- **Production:** https://YOUR_DOMAIN
 - **Login as admin:** Press `Ctrl+Shift+I` (Windows/Linux) or `Cmd+Shift+I` (Mac)
 
 **Basic usage:**
@@ -130,7 +144,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
 
 ## Important Links
 
-- **Production:** https://saisongs.org
+- **Production:** https://YOUR_DOMAIN
 - **Repository:** https://github.com/srse369/songstudio
 - **Oracle Cloud:** https://cloud.oracle.com
 
@@ -140,7 +154,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
 
 **Quick Health Check:**
 ```bash
-curl https://saisongs.org/api/health
+curl https://YOUR_DOMAIN/api/health
 ```
 
 **View Logs:**

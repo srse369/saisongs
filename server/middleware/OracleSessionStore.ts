@@ -118,37 +118,23 @@ export class OracleSessionStore extends Store {
         fetchedAt: Date.now(),
       });
 
-      // Try update first
-      const updateResult = await databaseService.query(
-        `UPDATE sessions SET sess = :1, expire = :2 WHERE sid = :3`,
-        [sess, expire, sid]
+      // Use MERGE to handle both insert and update atomically
+      // This prevents race conditions and unique constraint violations
+      await databaseService.query(
+        `MERGE INTO sessions s
+         USING (SELECT :1 as sid, :2 as sess, :3 as expire FROM dual) src
+         ON (s.sid = src.sid)
+         WHEN MATCHED THEN
+           UPDATE SET s.sess = src.sess, s.expire = src.expire
+         WHEN NOT MATCHED THEN
+           INSERT (sid, sess, expire) VALUES (src.sid, src.sess, src.expire)`,
+        [sid, sess, expire]
       );
-
-      // If no rows updated, insert new
-      if (!updateResult || updateResult.length === 0) {
-        await databaseService.query(
-          `INSERT INTO sessions (sid, sess, expire) VALUES (:1, :2, :3)`,
-          [sid, sess, expire]
-        );
-      }
 
       callback?.();
     } catch (error) {
-      // If update returned no info, try insert anyway
-      try {
-        const expire = session.cookie?.expires 
-          ? new Date(session.cookie.expires)
-          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-        const sess = JSON.stringify(session);
-        
-        await databaseService.query(
-          `INSERT INTO sessions (sid, sess, expire) VALUES (:1, :2, :3)`,
-          [sid, sess, expire]
-        );
-        callback?.();
-      } catch (insertError) {
-        callback?.(insertError);
-      }
+      console.error(`[SESSION STORE] Error setting session ${sid.substring(0, 8)}:`, error);
+      callback?.(error);
     }
   }
 

@@ -13,10 +13,10 @@ Complete deployment guide for Song Studio across different platforms.
 ## Production Deployment
 
 **Current Production Server:**
-- **URL:** https://saisongs.org
+- **URL:** https://YOUR_DOMAIN
 - **Server:** Ubuntu 22.04.5 LTS
-- **IP:** 129.153.85.24
-- **SSH:** `ssh -i ~/Downloads/"SSH Key Nov 12 2025.key" ubuntu@129.153.85.24`
+- **IP:** YOUR_SERVER_IP
+- **SSH:** `ssh -i /path/to/your/ssh-key.key ubuntu@YOUR_SERVER_IP`
 
 ### Quick Deploy
 
@@ -29,7 +29,7 @@ cd /Users/ssett2/Documents/github.com/srse369/songstudio
 
 **1. SSH into server:**
 ```bash
-ssh -i ~/Downloads/"SSH Key Nov 12 2025.key" ubuntu@129.153.85.24
+ssh -i /path/to/your/ssh-key.key ubuntu@YOUR_SERVER_IP
 ```
 
 **2. Run setup script:**
@@ -77,9 +77,9 @@ DB_POOL_MAX=2
 DB_POOL_INCREMENT=1
 
 # URLs
-APP_URL=https://saisongs.org
-API_URL=https://saisongs.org/api
-CORS_ORIGIN=https://saisongs.org
+APP_URL=https://YOUR_DOMAIN
+API_URL=https://YOUR_DOMAIN/api
+CORS_ORIGIN=https://YOUR_DOMAIN
 
 # Oracle Client
 LD_LIBRARY_PATH=/opt/oracle/instantclient_21_13
@@ -87,7 +87,7 @@ LD_LIBRARY_PATH=/opt/oracle/instantclient_21_13
 
 **5. Copy Oracle wallet to server:**
 ```bash
-scp -i ~/Downloads/"SSH Key Nov 12 2025.key" -r wallet ubuntu@129.153.85.24:/var/www/songstudio/
+scp -i /path/to/your/ssh-key.key -r wallet ubuntu@YOUR_SERVER_IP:/var/www/songstudio/
 ```
 
 **6. Deploy application:**
@@ -150,7 +150,7 @@ sudo nginx -t  # Test configuration
 sudo apt install certbot python3-certbot-nginx
 
 # Get SSL certificate
-sudo certbot --nginx -d saisongs.org
+sudo certbot --nginx -d YOUR_DOMAIN
 
 # Auto-renewal (already configured)
 sudo certbot renew --dry-run
@@ -187,11 +187,11 @@ REMOTE_USER="ubuntu"  # or "opc" for Oracle Linux
 For Oracle Linux servers, use the Oracle-specific setup script:
 
 ```bash
-scp -i ~/Downloads/"SSH Key Nov 12 2025.key" \
+scp -i /path/to/your/ssh-key.key \
     deploy/remote/server-setup-oracle.sh \
-    opc@141.148.149.54:/tmp/
+    opc@YOUR_ORACLE_CLOUD_IP:/tmp/
 
-ssh -i ~/Downloads/"SSH Key Nov 12 2025.key" opc@141.148.149.54
+ssh -i /path/to/your/ssh-key.key opc@YOUR_ORACLE_CLOUD_IP
 bash /tmp/server-setup-oracle.sh
 ```
 
@@ -368,7 +368,7 @@ grep -o 'src="[^"]*"' dist/index.html
 
 Automatic backups are created on each deployment:
 ```bash
-ssh ubuntu@129.153.85.24
+ssh ubuntu@YOUR_SERVER_IP
 ls -la /var/www/songstudio.backup.*
 sudo cp -r /var/www/songstudio.backup.20251119_120000/* /var/www/songstudio/
 pm2 restart songstudio
@@ -380,7 +380,7 @@ pm2 restart songstudio
 
 ```bash
 # API health
-curl https://saisongs.org/api/health
+curl https://YOUR_DOMAIN/api/health
 
 # Should return:
 # {"status":"ok","timestamp":"2025-11-19T..."}
