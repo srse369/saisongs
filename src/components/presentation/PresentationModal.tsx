@@ -409,75 +409,69 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
               {/* On-slide Navigation Buttons - Auto-hide after 2 seconds */}
               {slides.length > 1 && (
                 <div 
-                  className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
+                  className={`absolute inset-0 pointer-events-none transition-opacity duration-300 z-50 ${
                     showNavButtons ? 'opacity-100' : 'opacity-0'
                   }`}
                 >
                   {/* Previous Button */}
                   {currentSlideIndex > 0 && (
                     <div
-                      className="pointer-events-auto absolute left-0 top-0 bottom-0 w-24 md:w-32 flex items-center justify-start pl-4"
+                      className="pointer-events-auto absolute left-0 top-0 bottom-0 w-24 md:w-32 flex items-center justify-start pl-4 cursor-pointer"
                       onMouseEnter={resetNavButtonTimeout}
+                      onClick={() => {
+                        onSlideChange(currentSlideIndex - 1);
+                        resetNavButtonTimeout();
+                      }}
                     >
-                      <button
-                        onClick={() => {
-                          onSlideChange(currentSlideIndex - 1);
-                          resetNavButtonTimeout();
-                        }}
-                        className="bg-black/50 hover:bg-black/70 text-white rounded-full p-4 md:p-6 transition-all hover:scale-110 backdrop-blur-sm"
-                        aria-label="Previous slide"
-                      >
-                        <i className="fas fa-chevron-left text-2xl md:text-4xl"></i>
-                      </button>
+                      <div className="bg-black/50 hover:bg-black/70 text-white rounded-full p-6 md:p-8 lg:p-10 transition-all hover:scale-110 backdrop-blur-sm pointer-events-none">
+                        <i className="fas fa-chevron-left text-4xl md:text-5xl lg:text-6xl"></i>
+                      </div>
                     </div>
                   )}
                   
                   {/* Next Button */}
                   {currentSlideIndex < slides.length - 1 && (
                     <div
-                      className="pointer-events-auto absolute right-0 top-0 bottom-0 w-24 md:w-32 flex items-center justify-end pr-4"
+                      className="pointer-events-auto absolute right-0 top-0 bottom-0 w-24 md:w-32 flex items-center justify-end pr-4 cursor-pointer"
                       onMouseEnter={resetNavButtonTimeout}
+                      onClick={() => {
+                        onSlideChange(currentSlideIndex + 1);
+                        resetNavButtonTimeout();
+                      }}
                     >
-                      <button
-                        onClick={() => {
-                          onSlideChange(currentSlideIndex + 1);
-                          resetNavButtonTimeout();
-                        }}
-                        className="bg-black/50 hover:bg-black/70 text-white rounded-full p-4 md:p-6 transition-all hover:scale-110 backdrop-blur-sm"
-                        aria-label="Next slide"
-                      >
-                        <i className="fas fa-chevron-right text-2xl md:text-4xl"></i>
-                      </button>
+                      <div className="bg-black/50 hover:bg-black/70 text-white rounded-full p-6 md:p-8 lg:p-10 transition-all hover:scale-110 backdrop-blur-sm pointer-events-none">
+                        <i className="fas fa-chevron-right text-4xl md:text-5xl lg:text-6xl"></i>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Exit Hide Chrome Mode Button - Only visible in hide chrome mode */}
-              {cssFullscreenMode && (
-                <div 
-                  className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
-                    showNavButtons ? 'opacity-100' : 'opacity-0'
-                  }`}
+              {/* Close/Exit Button - Always visible like navigation buttons */}
+              <div 
+                className={`absolute inset-0 pointer-events-none transition-opacity duration-300 z-50 ${
+                  showNavButtons ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                <div
+                  className="pointer-events-auto absolute top-0 right-0 w-24 md:w-32 h-24 md:h-32 flex items-start justify-end pt-4 pr-4 cursor-pointer"
+                  onMouseEnter={resetNavButtonTimeout}
+                  onClick={() => {
+                    if (cssFullscreenMode) {
+                      setCssFullscreenMode(false);
+                    } else if (isFullscreen && document.fullscreenElement) {
+                      document.exitFullscreen();
+                    } else {
+                      onClose();
+                    }
+                    resetNavButtonTimeout();
+                  }}
                 >
-                  <div
-                    className="pointer-events-auto absolute top-0 right-0 w-24 md:w-32 h-24 md:h-32 flex items-start justify-end pt-4 pr-4"
-                    onMouseEnter={resetNavButtonTimeout}
-                  >
-                    <button
-                      onClick={() => {
-                        setCssFullscreenMode(false);
-                        resetNavButtonTimeout();
-                      }}
-                      className="bg-black/50 hover:bg-black/70 text-white rounded-full p-4 md:p-6 transition-all hover:scale-110 backdrop-blur-sm"
-                      aria-label="Exit hide chrome mode"
-                      title="Show controls"
-                    >
-                      <i className="fas fa-times text-2xl md:text-4xl"></i>
-                    </button>
+                  <div className="bg-black/50 hover:bg-black/70 text-white rounded-full p-6 md:p-8 lg:p-10 transition-all hover:scale-110 backdrop-blur-sm pointer-events-none">
+                    <i className="fas fa-times text-4xl md:text-5xl lg:text-6xl"></i>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
