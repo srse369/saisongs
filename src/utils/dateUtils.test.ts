@@ -14,7 +14,7 @@ describe('dateUtils', () => {
 
   describe('formatDate', () => {
     it('should format date in readable format', () => {
-      const date = new Date('2025-01-15');
+      const date = new Date('2025-01-15T12:00:00Z');
       const result = formatDate(date);
       expect(result).toContain('Jan');
       expect(result).toContain('15');
@@ -22,7 +22,7 @@ describe('dateUtils', () => {
     });
 
     it('should handle Date objects correctly', () => {
-      const date = new Date('2024-12-25T10:30:00');
+      const date = new Date('2024-12-25T10:30:00Z');
       const result = formatDate(date);
       expect(result).toContain('Dec');
       expect(result).toContain('25');
@@ -31,9 +31,9 @@ describe('dateUtils', () => {
 
     it('should handle different months', () => {
       const dates = [
-        { date: new Date('2025-01-01'), month: 'Jan' },
-        { date: new Date('2025-06-15'), month: 'Jun' },
-        { date: new Date('2025-12-31'), month: 'Dec' },
+        { date: new Date('2025-01-01T12:00:00Z'), month: 'Jan' },
+        { date: new Date('2025-06-15T12:00:00Z'), month: 'Jun' },
+        { date: new Date('2025-12-31T12:00:00Z'), month: 'Dec' },
       ];
 
       dates.forEach(({ date, month }) => {
@@ -121,7 +121,7 @@ describe('dateUtils', () => {
     });
 
     it('should handle leap years', () => {
-      const leapDay = new Date('2024-02-29');
+      const leapDay = new Date('2024-02-29T12:00:00Z');
       const result = formatDate(leapDay);
       expect(result).toContain('29');
       expect(result).toContain('2024');

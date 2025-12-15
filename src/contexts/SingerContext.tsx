@@ -84,13 +84,18 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
 
       // Persist to cache for subsequent loads
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(
-          SINGERS_CACHE_KEY,
-          JSON.stringify({
-            timestamp: Date.now(),
-            singers: fetchedSingers,
-          })
-        );
+        try {
+          window.localStorage.setItem(
+            SINGERS_CACHE_KEY,
+            JSON.stringify({
+              timestamp: Date.now(),
+              singers: fetchedSingers,
+            })
+          );
+        } catch (e) {
+          // Silently ignore storage errors (e.g., quota exceeded on iOS)
+          console.warn('Failed to cache singers to localStorage:', e);
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch singers';

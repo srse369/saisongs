@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import type { PresentationTemplate, BackgroundElement, ImageElement, VideoElement, TextElement, TemplateSlide } from '../../types';
+import { regenerateSlideElementIds } from '../../utils/templateUtils/idGenerator';
 
 interface TemplateVisualEditorProps {
   template: PresentationTemplate;
@@ -190,13 +191,9 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
 
   const handleDuplicateSlide = useCallback((index: number) => {
     const slideToCopy = slides[index];
-    const newSlide: TemplateSlide = {
-      background: slideToCopy.background ? { ...slideToCopy.background } : undefined,
-      images: slideToCopy.images ? slideToCopy.images.map(img => ({ ...img, id: `${img.id}-copy-${Date.now()}` })) : [],
-      videos: slideToCopy.videos ? slideToCopy.videos.map(vid => ({ ...vid, id: `${vid.id}-copy-${Date.now()}` })) : [],
-      text: slideToCopy.text ? slideToCopy.text.map(txt => ({ ...txt, id: `${txt.id}-copy-${Date.now()}` })) : [],
-    };
-    const newSlides = [...slides.slice(0, index + 1), newSlide, ...slides.slice(index + 1)];
+    const duplicatedSlide = regenerateSlideElementIds(slideToCopy);
+    
+    const newSlides = [...slides.slice(0, index + 1), duplicatedSlide, ...slides.slice(index + 1)];
     
     // Adjust reference index if inserted before it
     let newRefIndex = referenceSlideIndex;

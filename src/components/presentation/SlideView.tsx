@@ -2,7 +2,7 @@ import React from 'react';
 import type { Slide, PresentationTemplate, TemplateSlide, SongContentStyle } from '../../types';
 import { DEFAULT_SONG_TITLE_STYLE, DEFAULT_SONG_LYRICS_STYLE, DEFAULT_SONG_TRANSLATION_STYLE } from '../../types';
 import { formatPitch } from '../../utils/pitchUtils';
-import { getBackgroundStyles, getSlideBackgroundStyles, getReferenceSlide, TemplateBackground, TemplateImages, TemplateVideos, TemplateAudios, TemplateText, SlideBackground, SlideImages, SlideVideos, SlideAudios, SlideText } from '../../utils/templateUtils';
+import { getBackgroundStyles, getSlideBackgroundStyles, getReferenceSlide, TemplateBackground, TemplateImages, TemplateVideos, TemplateAudios, TemplateText, SlideBackground, SlideImages, SlideVideos, SlideAudios, SlideText, renderStyledText } from '../../utils/templateUtils';
 import { getFontFamily } from '../../utils/fonts';
 
 interface SlideViewProps {
@@ -135,6 +135,13 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
     return '100%';
   };
   
+  const getHeight = (style: SongContentStyle) => {
+    if (style.height !== undefined) {
+      return `${(style.height / slideHeight) * 100}%`;
+    }
+    return 'auto';
+  };
+  
   const hasTranslation = showTranslation && slide.translation;
   
   // Helper to scale font size
@@ -148,7 +155,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
     }
     return fontSize;
   };
-  
+
   // Calculate expanded lyrics area when scaling down (inversely proportional)
   // When scale is 0.7, lyrics area expands from 60% to ~85%
   const lyricsMaxHeight = contentScale < 1.0 
@@ -179,6 +186,34 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         <SlideVideos templateSlide={slide.templateSlide} />
         <SlideAudios templateSlide={slide.templateSlide} />
         <SlideText templateSlide={slide.templateSlide} />
+
+        {/* Next-song hint at bottom-right */}
+        {(() => {
+          const shouldRender = slide.nextSongName || slide.nextSlideTopCenterText;
+          return shouldRender;
+        })() && (
+          <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 text-right z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1">
+            <div className="text-[1.9rem] sm:text-[2rem] text-blue-50">
+              {slide.nextSlideTopCenterText ? (
+                // Show static slide's top-center text (prioritized)
+                <>Next: {renderStyledText(slide.nextSlideTopCenterText)}</>
+              ) : (
+                // Show next song info
+                <>
+                  {slide.nextIsContinuation ? (
+                    <>Next: {slide.nextSongName} (contd.)</>
+                  ) : (
+                    <>
+                      Next: {slide.nextSongName}
+                      {slide.nextSingerName && <> — {slide.nextSingerName}</>}
+                      {slide.nextPitch && <> — {slide.nextPitch}</>}
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -202,7 +237,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
       
       {/* Song number and slide position at top-left */}
       {(sessionSongIndex || (slide.songSlideCount && slide.songSlideCount > 1 && slide.songSlideNumber)) && (
-        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 text-[1.9rem] sm:text-[2rem] text-blue-100/80 bg-gray-800/25 rounded-lg px-2 py-1 z-[1000] opacity-50">
+        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 text-[1.9rem] sm:text-[2rem] text-blue-50 bg-gray-900/50 rounded-lg px-2 py-1 z-[1000] opacity-80">
           {sessionSongIndex && totalSongs && (
             <div>Song {sessionSongIndex}/{totalSongs}</div>
           )}
@@ -243,7 +278,8 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
           top: contentScale < 1.0 ? getScaledLyricsTopPosition() : getTopPosition(lyricsStyle),
           left: getLeftPosition(lyricsStyle),
           width: getWidth(lyricsStyle),
-          maxHeight: lyricsMaxHeight,
+          height: getHeight(lyricsStyle),
+          maxHeight: lyricsStyle.height !== undefined ? getHeight(lyricsStyle) : lyricsMaxHeight,
         }}
       >
         <p 
@@ -257,7 +293,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
             color: lyricsStyle.color,
           }}
         >
-          {slide.content}
+          {renderStyledText(slide.content)}
         </p>
       </div>
 
@@ -269,7 +305,8 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
             top: contentScale < 1.0 ? getScaledTranslationTopPosition() : getTopPosition(translationStyle),
             left: getLeftPosition(translationStyle),
             width: getWidth(translationStyle),
-            maxHeight: '25%',
+            height: getHeight(translationStyle),
+            maxHeight: translationStyle.height !== undefined ? getHeight(translationStyle) : '25%',
           }}
         >
           <div 
@@ -282,14 +319,15 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
               textAlign: translationStyle.textAlign || 'center',
               color: translationStyle.color,
             }}
-            dangerouslySetInnerHTML={{ __html: slide.translation }}
-          />
+          >
+            {renderStyledText(slide.translation)}
+          </div>
         </div>
       )}
 
       {/* Singer / pitch (when available) at bottom-left */}
       {(slide.singerName || slide.pitch) && (
-        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 text-[1.9rem] sm:text-[2rem] text-blue-100/70 z-[1000] opacity-50">
+        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 text-[1.9rem] sm:text-[2rem] text-blue-50 z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1">
           {slide.singerName && (
             <span>
               Singer: {slide.singerName}
@@ -310,16 +348,25 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
       )}
 
       {/* Next-song hint at bottom-right */}
-      {slide.nextSongName && (
-        <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 text-right z-[1000] opacity-50">
-          <div className="text-[1.9rem] sm:text-[2rem] text-blue-100/80">
-            {slide.nextIsContinuation ? (
-              <>Next: {slide.nextSongName} (contd.)</>
+      {/* Next slide info: either song name or static slide's top-center text */}
+      {(slide.nextSongName || slide.nextSlideTopCenterText) && (
+        <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 text-right z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1">
+          <div className="text-[1.9rem] sm:text-[2rem] text-blue-50">
+            {slide.nextSlideTopCenterText ? (
+              // Show static slide's top-center text (prioritized)
+              <>Next: {renderStyledText(slide.nextSlideTopCenterText)}</>
             ) : (
+              // Show next song info
               <>
-                Next: {slide.nextSongName}
-                {slide.nextSingerName && <> — {slide.nextSingerName}</>}
-                {slide.nextPitch && <> — {slide.nextPitch}</>}
+                {slide.nextIsContinuation ? (
+                  <>Next: {slide.nextSongName} (contd.)</>
+                ) : (
+                  <>
+                    Next: {slide.nextSongName}
+                    {slide.nextSingerName && <> — {slide.nextSingerName}</>}
+                    {slide.nextPitch && <> — {slide.nextPitch}</>}
+                  </>
+                )}
               </>
             )}
           </div>

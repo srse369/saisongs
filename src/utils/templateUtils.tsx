@@ -2,8 +2,106 @@
  * Template rendering utilities for applying templates to presentation slides
  */
 
+import React from 'react';
 import type { PresentationTemplate, TemplateSlide } from '../types';
 import { getFontFamily } from './fonts';
+
+// =============================================================================
+// Styled text rendering - supports HTML-like tags
+// =============================================================================
+
+/**
+ * Parse and render text with HTML-like styling tags.
+ * Supports: <b>bold</b>, <i>italic</i>, <c:RRGGBB>color</c:RRGGBB>, <br> for line breaks
+ * 
+ * @param text - The text content with optional HTML-like tags
+ * @returns React elements with appropriate styling applied
+ */
+export function renderStyledText(text: string): React.ReactNode {
+  if (!text) return null;
+  
+  const parts: (string | { type: string; content?: string })[] = [];
+  
+  // Parse tags: <b>...</b>, <i>...</i>, <c:RRGGBB>...</c:RRGGBB>, <br>
+  const boldRegex = /<b>(.*?)<\/b>/g;
+  const italicRegex = /<i>(.*?)<\/i>/g;
+  const colorRegex = /<c:([0-9a-fA-F]{6})>(.*?)<\/c:[0-9a-fA-F]{6}>/g;
+  const brRegex = /<br\s*\/?>/g;
+  
+  // Process all tags and store their positions
+  const tags: Array<{ start: number; end: number; type: string; content?: string }> = [];
+  
+  let match;
+  while ((match = boldRegex.exec(text)) !== null) {
+    tags.push({ start: match.index, end: match.index + match[0].length, type: 'bold', content: match[1] });
+  }
+  boldRegex.lastIndex = 0;
+  
+  while ((match = italicRegex.exec(text)) !== null) {
+    tags.push({ start: match.index, end: match.index + match[0].length, type: 'italic', content: match[1] });
+  }
+  italicRegex.lastIndex = 0;
+  
+  while ((match = colorRegex.exec(text)) !== null) {
+    const color = match[1];
+    tags.push({ start: match.index, end: match.index + match[0].length, type: `color:#${color}`, content: match[2] });
+  }
+  colorRegex.lastIndex = 0;
+  
+  while ((match = brRegex.exec(text)) !== null) {
+    tags.push({ start: match.index, end: match.index + match[0].length, type: 'br' });
+  }
+  brRegex.lastIndex = 0;
+  
+  // Sort tags by start position
+  tags.sort((a, b) => a.start - b.start);
+  
+  // Build parts array by processing text and tags
+  let lastPos = 0;
+  for (const tag of tags) {
+    // Add text before tag
+    if (lastPos < tag.start) {
+      parts.push(text.substring(lastPos, tag.start));
+    }
+    // Add tag
+    parts.push({ type: tag.type, content: tag.content });
+    lastPos = tag.end;
+  }
+  
+  // Add remaining text
+  if (lastPos < text.length) {
+    parts.push(text.substring(lastPos));
+  }
+
+  // If no tags found, just return the text
+  if (parts.length === 0) {
+    return <>{text}</>;
+  }
+
+  // Render parts with appropriate styling
+  return (
+    <>
+      {parts.map((part, idx) => {
+        if (typeof part === 'string') {
+          return <React.Fragment key={idx}>{part}</React.Fragment>;
+        }
+
+        if (part.type === 'bold') {
+          return <strong key={idx}>{part.content}</strong>;
+        } else if (part.type === 'italic') {
+          return <em key={idx}>{part.content}</em>;
+        } else if (part.type === 'br') {
+          return <br key={idx} />;
+        } else if (part.type.startsWith('color:')) {
+          const color = part.type.substring(6);
+          return <span key={idx} style={{ color }}>{part.content}</span>;
+        }
+
+        return <React.Fragment key={idx}>{part.content}</React.Fragment>;
+      })}
+    </>
+  );
+}
 
 // =============================================================================
 // Template helper functions
@@ -526,7 +624,7 @@ export const TemplateText: React.FC<{ template: PresentationTemplate | null }> =
             className={`absolute ${getPositionClasses(textElement.position)}`}
             style={boxStyles}
           >
-            {textElement.content}
+            {renderStyledText(textElement.content)}
           </div>
         );
       })}
@@ -878,7 +976,7 @@ export const SlideText: React.FC<{ templateSlide: TemplateSlide | null }> = ({ t
             className={`absolute ${getPositionClasses(textElement.position)}`}
             style={boxStyles}
           >
-            {textElement.content}
+            {renderStyledText(textElement.content)}
           </div>
         );
       })}

@@ -125,7 +125,7 @@ class SongService {
     this.validateSongInput(input, true);
 
     try {
-      await apiClient.updateSong(id, {
+      const updateData = {
         name: input.name?.trim(),
         external_source_url: input.externalSourceUrl?.trim(),
         lyrics: input.lyrics,
@@ -142,7 +142,8 @@ class SongService {
         golden_voice: input.goldenVoice ? 1 : 0,
         reference_gents_pitch: input.referenceGentsPitch,
         reference_ladies_pitch: input.referenceLadiesPitch,
-      });
+      };
+      await apiClient.updateSong(id, updateData);
       return this.getSongById(id);
     } catch (error) {
       console.error('Error updating song:', error);

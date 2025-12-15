@@ -331,7 +331,12 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
             setActiveTemplate(template);
             // Sync template selection to localStorage for the Live tab
             if (template.id) {
-              localStorage.setItem('selectedSessionTemplateId', template.id);
+              try {
+                localStorage.setItem('selectedSessionTemplateId', template.id);
+              } catch (e) {
+                // Silently ignore storage errors (e.g., quota exceeded on iOS)
+                console.warn('Failed to save template selection to localStorage:', e);
+              }
             }
           }}
           onExpandedChange={setTemplatePickerExpanded}

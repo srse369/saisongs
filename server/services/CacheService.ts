@@ -307,36 +307,97 @@ class CacheService {
 
   async createSong(songData: any): Promise<any> {
     const db = await this.getDatabase();
-    const params = [
-      String(songData.name || ''),
-      songData.external_source_url ? String(songData.external_source_url) : null,
-      String(songData.lyrics || ''),
-      String(songData.meaning || ''),
-      String(songData.language || ''),
-      String(songData.deity || ''),
-      songData.tempo ? String(songData.tempo) : null,
-      songData.beat ? String(songData.beat) : null,
-      songData.raga ? String(songData.raga) : null,
-      songData.level ? String(songData.level) : null,
-      songData.song_tags ? String(songData.song_tags) : null,
-      songData.audio_link ? String(songData.audio_link) : null,
-      songData.video_link ? String(songData.video_link) : null,
-      Number(songData.golden_voice || 0),
-      songData.reference_gents_pitch ? String(songData.reference_gents_pitch) : null,
-      songData.reference_ladies_pitch ? String(songData.reference_ladies_pitch) : null,
-      songData.created_by ? String(songData.created_by) : null
-    ];
+    
+    // Separate CLOB and non-CLOB fields
+    const clobFields = {
+      lyrics: String(songData.lyrics || ''),
+      meaning: String(songData.meaning || ''),
+      song_tags: String(songData.song_tags || '')
+    };
 
+    // Step 1: Insert with EMPTY_CLOB for CLOB fields using named bindings
     await db.query(`
       INSERT INTO songs (
-        name, external_source_url, lyrics, meaning,
+        name, external_source_url,
         "LANGUAGE", deity, tempo, beat, raga, "LEVEL",
-        song_tags, audio_link, video_link, golden_voice,
-        reference_gents_pitch, reference_ladies_pitch, created_by
+        audio_link, video_link, golden_voice,
+        reference_gents_pitch, reference_ladies_pitch, created_by,
+        lyrics, meaning, song_tags
       ) VALUES (
-        :1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11, :12, :13, :14, :15, :16, :17
+        :p_name, :p_external_source_url, :p_language, :p_deity, :p_tempo, :p_beat, :p_raga, :p_level,
+        :p_audio_link, :p_video_link, :p_golden_voice,
+        :p_reference_gents_pitch, :p_reference_ladies_pitch, :p_created_by,
+        EMPTY_CLOB(), EMPTY_CLOB(), EMPTY_CLOB()
       )
-    `, params);
+    `, {
+      p_name: String(songData.name || ''),
+      p_external_source_url: songData.external_source_url ? String(songData.external_source_url) : null,
+      p_language: String(songData.language || ''),
+      p_deity: String(songData.deity || ''),
+      p_tempo: songData.tempo ? String(songData.tempo) : null,
+      p_beat: songData.beat ? String(songData.beat) : null,
+      p_raga: songData.raga ? String(songData.raga) : null,
+      p_level: songData.level ? String(songData.level) : null,
+      p_audio_link: songData.audio_link ? String(songData.audio_link) : null,
+      p_video_link: songData.video_link ? String(songData.video_link) : null,
+      p_golden_voice: Number(songData.golden_voice || 0),
+      p_reference_gents_pitch: songData.reference_gents_pitch ? String(songData.reference_gents_pitch) : null,
+      p_reference_ladies_pitch: songData.reference_ladies_pitch ? String(songData.reference_ladies_pitch) : null,
+      p_created_by: songData.created_by ? String(songData.created_by) : null
+    }, {
+      autoCommit: false
+    });
+
+    // Get the newly inserted song's ID by querying the most recent song
+    const newSongsResult = await db.query(`
+      SELECT RAWTOHEX(id) as id FROM songs 
+      WHERE name = :p_name 
+      ORDER BY created_at DESC 
+      FETCH FIRST 1 ROWS ONLY
+    `, { p_name: String(songData.name || '') });
+    
+    if (newSongsResult.length === 0) {
+      throw new Error('Failed to retrieve newly created song ID');
+    }
+
+    const newId = newSongsResult[0].ID;
+
+    // Step 2: Write CLOB content using PL/SQL (simpler than LOB API)
+    if (clobFields.lyrics) {
+      await db.query(`
+        BEGIN
+          UPDATE songs SET lyrics = :p_lyrics WHERE RAWTOHEX(id) = :p_id;
+          COMMIT;
+        END;
+      `, {
+        p_lyrics: clobFields.lyrics,
+        p_id: newId
+      });
+    }
+
+    if (clobFields.meaning) {
+      await db.query(`
+        BEGIN
+          UPDATE songs SET meaning = :p_meaning WHERE RAWTOHEX(id) = :p_id;
+          COMMIT;
+        END;
+      `, {
+        p_meaning: clobFields.meaning,
+        p_id: newId
+      });
+    }
+
+    if (clobFields.song_tags) {
+      await db.query(`
+        BEGIN
+          UPDATE songs SET song_tags = :p_song_tags WHERE RAWTOHEX(id) = :p_id;
+          COMMIT;
+        END;
+      `, {
+        p_song_tags: clobFields.song_tags,
+        p_id: newId
+      });
+    }
 
     // Write-through cache: Fetch only the newly created song
     const newSongs = await db.query(`
@@ -361,10 +422,10 @@ class CacheService {
         created_at,
         updated_at
       FROM songs
-      WHERE name = :1
+      WHERE name = :name
       ORDER BY created_at DESC
       FETCH FIRST 1 ROWS ONLY
-    `, [songData.name]);
+    `, { name: songData.name });
 
     if (newSongs.length > 0) {
       const newSong = newSongs[0];
@@ -414,52 +475,93 @@ class CacheService {
 
   async updateSong(id: string, songData: any): Promise<any> {
     const db = await this.getDatabase();
-    const params = [
-      String(songData.name || ''),
-      songData.external_source_url ? String(songData.external_source_url) : null,
-      String(songData.lyrics || ''),
-      String(songData.meaning || ''),
-      String(songData.language || ''),
-      String(songData.deity || ''),
-      songData.tempo ? String(songData.tempo) : null,
-      songData.beat ? String(songData.beat) : null,
-      songData.raga ? String(songData.raga) : null,
-      songData.level ? String(songData.level) : null,
-      songData.song_tags ? String(songData.song_tags) : null,
-      songData.audio_link ? String(songData.audio_link) : null,
-      songData.video_link ? String(songData.video_link) : null,
-      Number(songData.golden_voice || 0),
-      songData.reference_gents_pitch ? String(songData.reference_gents_pitch) : null,
-      songData.reference_ladies_pitch ? String(songData.reference_ladies_pitch) : null,
-      String(id)
-    ];
-
-    // Add updated_by if provided
-    const updated_by = songData.updated_by ? String(songData.updated_by) : null;
-    params.push(updated_by);
-
+    
+    // Separate CLOB and non-CLOB fields
+    const clobFields = {
+      lyrics: String(songData.lyrics || ''),
+      meaning: String(songData.meaning || ''),
+      song_tags: String(songData.song_tags || '')
+    };
+    
+    // Step 1: Update non-CLOB fields with EMPTY_CLOB placeholders for CLOB fields
+    // Using named bindings to avoid mixing positional and output bindings
     await db.query(`
       UPDATE songs SET
-        name = :1,
-        external_source_url = :2,
-        lyrics = :3,
-        meaning = :4,
-        "LANGUAGE" = :5,
-        deity = :6,
-        tempo = :7,
-        beat = :8,
-        raga = :9,
-        "LEVEL" = :10,
-        song_tags = :11,
-        audio_link = :12,
-        video_link = :13,
-        golden_voice = :14,
-        reference_gents_pitch = :15,
-        reference_ladies_pitch = :16,
-        updated_by = :17,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE RAWTOHEX(id) = :18
-    `, params);
+        name = :p_name,
+        external_source_url = :p_external_source_url,
+        "LANGUAGE" = :p_language,
+        deity = :p_deity,
+        tempo = :p_tempo,
+        beat = :p_beat,
+        raga = :p_raga,
+        "LEVEL" = :p_level,
+        audio_link = :p_audio_link,
+        video_link = :p_video_link,
+        golden_voice = :p_golden_voice,
+        reference_gents_pitch = :p_reference_gents_pitch,
+        reference_ladies_pitch = :p_reference_ladies_pitch,
+        updated_by = :p_updated_by,
+        updated_at = CURRENT_TIMESTAMP,
+        lyrics = EMPTY_CLOB(),
+        meaning = EMPTY_CLOB(),
+        song_tags = EMPTY_CLOB()
+      WHERE RAWTOHEX(id) = :p_id
+    `, {
+      p_name: String(songData.name || ''),
+      p_external_source_url: songData.external_source_url ? String(songData.external_source_url) : null,
+      p_language: String(songData.language || ''),
+      p_deity: String(songData.deity || ''),
+      p_tempo: songData.tempo ? String(songData.tempo) : null,
+      p_beat: songData.beat ? String(songData.beat) : null,
+      p_raga: songData.raga ? String(songData.raga) : null,
+      p_level: songData.level ? String(songData.level) : null,
+      p_audio_link: songData.audio_link ? String(songData.audio_link) : null,
+      p_video_link: songData.video_link ? String(songData.video_link) : null,
+      p_golden_voice: Number(songData.golden_voice || 0),
+      p_reference_gents_pitch: songData.reference_gents_pitch ? String(songData.reference_gents_pitch) : null,
+      p_reference_ladies_pitch: songData.reference_ladies_pitch ? String(songData.reference_ladies_pitch) : null,
+      p_updated_by: songData.updated_by ? String(songData.updated_by) : null,
+      p_id: String(id)
+    }, {
+      autoCommit: false
+    });
+
+    // Step 2: Write CLOB content using PL/SQL (simpler than LOB API)
+    if (clobFields.lyrics) {
+      await db.query(`
+        BEGIN
+          UPDATE songs SET lyrics = :p_lyrics WHERE RAWTOHEX(id) = :p_id;
+          COMMIT;
+        END;
+      `, {
+        p_lyrics: clobFields.lyrics,
+        p_id: id
+      });
+    }
+
+    if (clobFields.meaning) {
+      await db.query(`
+        BEGIN
+          UPDATE songs SET meaning = :p_meaning WHERE RAWTOHEX(id) = :p_id;
+          COMMIT;
+        END;
+      `, {
+        p_meaning: clobFields.meaning,
+        p_id: id
+      });
+    }
+
+    if (clobFields.song_tags) {
+      await db.query(`
+        BEGIN
+          UPDATE songs SET song_tags = :p_song_tags WHERE RAWTOHEX(id) = :p_id;
+          COMMIT;
+        END;
+      `, {
+        p_song_tags: clobFields.song_tags,
+        p_id: id
+      });
+    }
 
     // Write-through cache: Fetch only the updated song
     const updatedSongs = await db.query(`
@@ -484,8 +586,8 @@ class CacheService {
         created_at,
         updated_at
       FROM songs
-      WHERE RAWTOHEX(id) = :1
-    `, [id]);
+      WHERE RAWTOHEX(id) = :id
+    `, { id: id });
 
     if (updatedSongs.length > 0) {
       const updatedSong = updatedSongs[0];

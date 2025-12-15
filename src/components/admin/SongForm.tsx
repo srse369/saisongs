@@ -102,8 +102,8 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
 
   useEffect(() => {
     if (song) {
-      setName(song.name);
-      setExternalSourceUrl(song.externalSourceUrl);
+      setName(song.name || '');
+      setExternalSourceUrl(song.externalSourceUrl || '');
       setLyrics(song.lyrics || '');
       setMeaning(song.meaning || '');
       setLanguage(song.language || '');
@@ -142,25 +142,32 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!name.trim()) {
+    // Ensure values are strings (defensive against null values)
+    const nameVal = name ?? '';
+    const languageVal = language ?? '';
+    const deityVal = deity ?? '';
+    const lyricsVal = lyrics ?? '';
+    const externalSourceUrlVal = externalSourceUrl ?? '';
+
+    if (!nameVal.trim()) {
       newErrors.name = 'Song name is required';
-    } else if (name.length > 255) {
+    } else if (nameVal.length > 255) {
       newErrors.name = 'Song name must be 255 characters or less';
     }
 
-    if (!language.trim()) {
+    if (!languageVal.trim()) {
       newErrors.language = 'Language is required';
     }
 
-    if (!deity.trim()) {
+    if (!deityVal.trim()) {
       newErrors.deity = 'Deity is required';
     }
 
-    if (!lyrics.trim()) {
+    if (!lyricsVal.trim()) {
       newErrors.lyrics = 'Lyrics are required';
     }
 
-    if (externalSourceUrl.trim() && !isValidUrl(externalSourceUrl.trim())) {
+    if (externalSourceUrlVal.trim() && !isValidUrl(externalSourceUrlVal.trim())) {
       newErrors.externalSourceUrl = 'Please enter a valid URL';
     }
 
@@ -186,7 +193,7 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
 
     setIsSubmitting(true);
     try {
-      await onSubmit({
+      const submitData = {
         name: name.trim(),
         externalSourceUrl: externalSourceUrl.trim(),
         lyrics: lyrics.trim() || undefined,
@@ -203,7 +210,8 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
         goldenVoice,
         referenceGentsPitch: referenceGentsPitch.trim() || undefined,
         referenceLadiesPitch: referenceLadiesPitch.trim() || undefined,
-      });
+      };
+      await onSubmit(submitData);
     } finally {
       setIsSubmitting(false);
     }

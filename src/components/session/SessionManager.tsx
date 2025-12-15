@@ -137,7 +137,12 @@ export const SessionManager: React.FC = () => {
     setSelectedTemplate(template);
     // Save selected template ID to localStorage for persistence
     if (template.id) {
-      localStorage.setItem('selectedSessionTemplateId', template.id);
+      try {
+        localStorage.setItem('selectedSessionTemplateId', template.id);
+      } catch (e) {
+        // Silently ignore storage errors (e.g., quota exceeded on iOS)
+        console.warn('Failed to save template selection to localStorage:', e);
+      }
     }
   };
 

@@ -258,25 +258,25 @@ function CsvImportPage() {
 function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <ToastProvider>
-          <SongProvider>
-            <SingerProvider>
-              <PitchProvider>
-                <TemplateProvider>
-                  <NamedSessionProvider>
-                    <SessionProvider>
-                      <BrowserRouter>
+      <BrowserRouter>
+        <AuthProvider>
+          <ToastProvider>
+            <SongProvider>
+              <SingerProvider>
+                <PitchProvider>
+                  <TemplateProvider>
+                    <NamedSessionProvider>
+                      <SessionProvider>
                         <AppContent />
-                      </BrowserRouter>
-                    </SessionProvider>
-                  </NamedSessionProvider>
-                </TemplateProvider>
-              </PitchProvider>
-            </SingerProvider>
-          </SongProvider>
-        </ToastProvider>
-      </AuthProvider>
+                      </SessionProvider>
+                    </NamedSessionProvider>
+                  </TemplateProvider>
+                </PitchProvider>
+              </SingerProvider>
+            </SongProvider>
+          </ToastProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }

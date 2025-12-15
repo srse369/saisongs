@@ -125,6 +125,7 @@ export const DEFAULT_SONG_TITLE_STYLE: SongContentStyle = {
   x: 40,
   y: 54, // ~5% of 1080
   width: 1840,
+  height: 100, // auto-size if not specified
   fontSize: '48px',
   fontWeight: 'bold',
   textAlign: 'center',
@@ -135,6 +136,7 @@ export const DEFAULT_SONG_LYRICS_STYLE: SongContentStyle = {
   x: 40,
   y: 216, // ~20% of 1080
   width: 1840,
+  height: 500, // ~46% of 1080
   fontSize: '36px',
   fontWeight: 'bold',
   textAlign: 'center',
@@ -145,6 +147,7 @@ export const DEFAULT_SONG_TRANSLATION_STYLE: SongContentStyle = {
   x: 40,
   y: 810, // ~75% of 1080
   width: 1840,
+  height: 200, // ~18% of 1080
   fontSize: '24px',
   fontWeight: 'normal',
   textAlign: 'center',
@@ -319,6 +322,8 @@ export interface Slide {
   slideType?: 'song' | 'static';
   /** For static slides, the template slide configuration to use */
   templateSlide?: TemplateSlide;
+  /** Text content from the top-center of the next slide (for layering preview) */
+  nextSlideTopCenterText?: string;
 }
 
 export interface SongWithPitches extends Song {

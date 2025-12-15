@@ -7,6 +7,7 @@ import type { PresentationTemplate, ImageElement, TextElement, VideoElement, Tem
 import { ASPECT_RATIO_DIMENSIONS } from '../../types';
 import { useSongs } from '../../contexts/SongContext';
 import { AVAILABLE_FONTS, getFontFamily, getFontsByCategory, FONT_CATEGORY_NAMES } from '../../utils/fonts';
+import { regenerateSlideElementIds } from '../../utils/templateUtils/idGenerator';
 
 // Preload Google Fonts for Konva canvas rendering
 const preloadFonts = async () => {
@@ -172,7 +173,7 @@ const detectImageAspectRatio = async (url: string): Promise<{ width: number; hei
 
 // Helper to parse position (using full slide dimensions) - outside component for performance
 function parsePosition(
-  value: string | undefined, 
+  value: string | number | undefined, 
   position: string | undefined, 
   axis: 'x' | 'y',
   slideSize: number,
@@ -180,11 +181,18 @@ function parsePosition(
   slideWidth: number,
   slideHeight: number
 ): number {
-  if (value) {
-    if (value.endsWith('%')) {
-      return (parseFloat(value) / 100) * slideSize;
+  if (value !== undefined && value !== null) {
+    // Handle numeric values
+    if (typeof value === 'number') {
+      return value;
     }
-    return parseFloat(value) || 0;
+    // Handle string values
+    if (typeof value === 'string') {
+      if (value.endsWith('%')) {
+        return (parseFloat(value) / 100) * slideSize;
+      }
+      return parseFloat(value) || 0;
+    }
   }
   
   // Use predefined position (based on full slide dimensions)
@@ -237,6 +245,174 @@ type CanvasElement = {
   volume?: number;
 };
 
+// Hook for detecting long-press on mobile devices (for Konva canvas elements)
+const useLongPress = (
+  onLongPress: (e: any) => void,
+  delay: number = 500
+) => {
+  const timerRef = useRef<number | null>(null);
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+  const longPressTriggered = useRef(false);
+
+  const handleTouchStart = (e: any) => {
+    // Get the native event - Konva wraps it in evt property
+    const nativeEvent = e.evt;
+    const touch = nativeEvent?.touches?.[0];
+    
+    if (touch) {
+      // Prevent default iOS context menu behavior
+      if (nativeEvent?.preventDefault) {
+        nativeEvent.preventDefault();
+      }
+      
+      longPressTriggered.current = false;
+      touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+      
+      timerRef.current = window.setTimeout(() => {
+        longPressTriggered.current = true;
+        onLongPress(e);
+      }, delay);
+    }
+  };
+
+  const handleTouchMove = (e: any) => {
+    const nativeEvent = e.evt;
+    const touch = nativeEvent?.touches?.[0];
+    
+    if (touch && touchStartPos.current) {
+      const dx = touch.clientX - touchStartPos.current.x;
+      const dy = touch.clientY - touchStartPos.current.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Cancel long-press if finger moved more than 10px
+      if (distance > 10 && timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+        longPressTriggered.current = false;
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: any) => {
+    // Clean up timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    // Prevent click event if long-press was triggered
+    if (longPressTriggered.current) {
+      const nativeEvent = e.evt;
+      if (nativeEvent?.preventDefault) {
+        nativeEvent.preventDefault();
+      }
+      if (nativeEvent?.stopPropagation) {
+        nativeEvent.stopPropagation();
+      }
+    }
+    
+    touchStartPos.current = null;
+    longPressTriggered.current = false;
+  };
+
+  return {
+    onTouchStart: handleTouchStart,
+    onTouchMove: handleTouchMove,
+    onTouchEnd: handleTouchEnd,
+  };
+};
+
+// Hook for detecting long-press on DOM elements (for slide thumbnails)
+const useLongPressDOM = (
+  onLongPress: (e: React.TouchEvent) => void,
+  delay: number = 500
+) => {
+  const timerRef = useRef<number | null>(null);
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+  const longPressTriggered = useRef(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches?.[0];
+    
+    if (touch) {
+      // Prevent default iOS context menu behavior
+      e.preventDefault();
+      
+      longPressTriggered.current = false;
+      touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+      
+      timerRef.current = window.setTimeout(() => {
+        longPressTriggered.current = true;
+        onLongPress(e);
+      }, delay);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches?.[0];
+    
+    if (touch && touchStartPos.current) {
+      const dx = touch.clientX - touchStartPos.current.x;
+      const dy = touch.clientY - touchStartPos.current.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Cancel long-press if finger moved more than 10px
+      if (distance > 10 && timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+        longPressTriggered.current = false;
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    // Clean up timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    // Prevent click event if long-press was triggered
+    if (longPressTriggered.current) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    touchStartPos.current = null;
+    longPressTriggered.current = false;
+  };
+
+  return {
+    onTouchStart: handleTouchStart,
+    onTouchMove: handleTouchMove,
+    onTouchEnd: handleTouchEnd,
+  };
+};
+
+// BackgroundImage component for slide background
+const BackgroundImage: React.FC<{
+  url: string;
+  width: number;
+  height: number;
+}> = ({ url, width, height }) => {
+  const [image] = useImage(url);
+
+  if (!image) {
+    return null;
+  }
+
+  return (
+    <KonvaImage
+      x={0}
+      y={0}
+      image={image}
+      width={width}
+      height={height}
+      listening={false}
+    />
+  );
+};
+
 // URLImage component for loading images
 // Try loading without CORS first, then fall back to anonymous mode
 const URLImage: React.FC<{
@@ -249,6 +425,7 @@ const URLImage: React.FC<{
   // Try loading without CORS mode first (works better with corporate proxies/firewalls)
   const [image, imageStatus] = useImage(element.url || '');
   const shapeRef = useRef<Konva.Image>(null);
+  const longPressHandlers = useLongPress(onContextMenu || (() => {}));
 
   // Show a placeholder rectangle if image fails to load or is loading
   if (!image || imageStatus === 'loading' || imageStatus === 'failed') {
@@ -261,6 +438,7 @@ const URLImage: React.FC<{
         onClick={onSelect}
         onTap={onSelect}
         onContextMenu={onContextMenu}
+        {...longPressHandlers}
         onDragEnd={(e) => {
           onChange({
             x: Math.round(e.target.x()),
@@ -315,6 +493,7 @@ const URLImage: React.FC<{
       onClick={onSelect}
       onTap={onSelect}
       onContextMenu={onContextMenu}
+      {...longPressHandlers}
       onDragEnd={(e) => {
         onChange({
           x: Math.round(e.target.x()),
@@ -353,6 +532,7 @@ const DraggableText: React.FC<{
 }> = ({ element, isSelected, onSelect, onChange, stageRef, scale, onContextMenu, onEditingChange }) => {
   const shapeRef = useRef<Konva.Text>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const longPressHandlers = useLongPress(onContextMenu || (() => {}));
 
   // Konva fontStyle combines bold and italic: "normal", "bold", "italic", "bold italic"
   const getFontStyle = () => {
@@ -476,6 +656,7 @@ const DraggableText: React.FC<{
       onClick={onSelect}
       onTap={onSelect}
       onContextMenu={onContextMenu}
+      {...longPressHandlers}
       onDblClick={handleDblClick}
       onDblTap={handleDblClick}
       onDragEnd={(e) => {
@@ -502,7 +683,6 @@ const DraggableText: React.FC<{
           y: Math.round(node.y()),
           width: newWidth,
           height: newHeight,
-          fontSize: Math.round(Math.max(8, (element.fontSize || 24) * scaleX)),
           rotation: Math.round(node.rotation()),
         });
       }}
@@ -519,6 +699,7 @@ const VideoPlaceholder: React.FC<{
   onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
 }> = ({ element, isSelected, onSelect, onChange, onContextMenu }) => {
   const groupRef = useRef<Konva.Group>(null);
+  const longPressHandlers = useLongPress(onContextMenu || (() => {}));
 
   return (
     <Group
@@ -531,6 +712,7 @@ const VideoPlaceholder: React.FC<{
       onClick={onSelect}
       onTap={onSelect}
       onContextMenu={onContextMenu}
+      {...longPressHandlers}
       onDragEnd={(e) => {
         onChange({
           x: Math.round(e.target.x()),
@@ -583,6 +765,7 @@ const AudioPlaceholder: React.FC<{
   onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
 }> = ({ element, isSelected, onSelect, onChange, onContextMenu }) => {
   const groupRef = useRef<Konva.Group>(null);
+  const longPressHandlers = useLongPress(onContextMenu || (() => {}));
 
   return (
     <Group
@@ -595,6 +778,7 @@ const AudioPlaceholder: React.FC<{
       onClick={onSelect}
       onTap={onSelect}
       onContextMenu={onContextMenu}
+      {...longPressHandlers}
       onDragEnd={(e) => {
         onChange({
           x: Math.round(e.target.x()),
@@ -775,7 +959,12 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         text: template.text || [],
       }];
   
-  const currentSlide = slides[selectedSlideIndex] || slides[0];
+  const currentSlide = slides[selectedSlideIndex] || slides[0] || {
+    images: [],
+    videos: [],
+    text: [],
+  };
+  
   const referenceSlideIndex = template.referenceSlideIndex ?? 0;
 
   // Track history for undo/redo (only when not triggered by undo/redo itself)
@@ -1610,7 +1799,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     setSelectedId(newText.id);
   };
 
-  // Import song content as text elements
+  // Import song content as slides using reference slide styling
   const handleImportSong = async (songFromList: Song) => {
     setImportingSong(true);
     
@@ -1624,78 +1813,145 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         return;
       }
       
-      const timestamp = Date.now();
-      const newTextElements: TextElement[] = [];
+      // Import the slide generation utility
+      const { generateSlides } = await import('../../utils/slideUtils');
       
-      // Add song title
-      newTextElements.push({
-        id: `text-title-${timestamp}`,
-        content: song.name || 'Song Title',
-        fontSize: '64px',
-        color: '#ffffff',
-        fontWeight: 'bold',
-        x: `${Math.round(SLIDE_WIDTH / 2 - 400)}px`,
-        y: '60px',
-        width: '800px',
-        textAlign: 'center',
-        opacity: 1,
-        zIndex: 2,
-      });
+      // Get reference slide to clone its styling
+      const refSlide = slides[referenceSlideIndex] || slides[0];
       
-      // Add lyrics - always add, use placeholder if not available
-      newTextElements.push({
-        id: `text-lyrics-${timestamp}`,
-        content: song.lyrics || '[Lyrics not available]',
-        fontSize: '48px',
-        color: '#ffffff',
-        x: `${Math.round(SLIDE_WIDTH / 2 - 500)}px`,
-        y: '180px',
-        width: '1000px',
-        textAlign: 'center',
-        opacity: 1,
-        zIndex: 2,
-      });
+      // Generate song slides (handles splitting into multiple slides if needed)
+      const generatedSlides = generateSlides(song);
       
-      // Add meaning/translation - always add, use placeholder if not available
-      newTextElements.push({
-        id: `text-meaning-${timestamp}`,
-        content: song.meaning || '[Translation not available]',
-        fontSize: '36px',
-        color: '#cccccc',
-        fontStyle: 'italic',
-        x: `${Math.round(SLIDE_WIDTH / 2 - 500)}px`,
-        y: `${Math.round(SLIDE_HEIGHT * 0.7)}px`,
-        width: '1000px',
-        textAlign: 'center',
-        opacity: 1,
-        zIndex: 2,
-      });
-      
-      // Add all text elements to the current slide
-      const newSlides = [...slides];
-      const slideToUpdate = { ...newSlides[selectedSlideIndex] };
-      slideToUpdate.text = [...(slideToUpdate.text || []), ...newTextElements];
-      newSlides[selectedSlideIndex] = slideToUpdate;
+      // Create template slides for each generated slide with lyrics as editable text elements
+      const newTemplateSlides: TemplateSlide[] = generatedSlides.map((genSlide, index) => {
+        // Get reference slide's song styles to use as template
+        const refTitleStyle = refSlide.songTitleStyle || {
+          x: 40,
+          y: 60,
+          width: 1840,
+          height: 120,
+          fontSize: '48px',
+          fontWeight: 'bold' as const,
+          textAlign: 'center' as const,
+          color: '#ffffff',
+        };
 
-      const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
+        const refLyricsStyle = refSlide.songLyricsStyle || {
+          x: 40,
+          y: 216,
+          width: 1840,
+          height: 500,
+          fontSize: '36px',
+          fontWeight: 'bold' as const,
+          textAlign: 'center' as const,
+          color: '#ffffff',
+        };
+
+        // Create text elements for title, lyrics and translation
+        const textElements: TextElement[] = [];
+        const timestamp = Date.now() + index;
+
+        // Add title as an editable text element (on all slides of multi-slide songs)
+        textElements.push({
+          id: `imported-title-${timestamp}`,
+          content: genSlide.songName || '[Title not available]',
+          fontSize: refTitleStyle.fontSize,
+          color: refTitleStyle.color,
+          fontWeight: refTitleStyle.fontWeight,
+          fontStyle: refTitleStyle.fontStyle,
+          fontFamily: refTitleStyle.fontFamily,
+          x: `${refTitleStyle.x}px`,
+          y: `${refTitleStyle.y}px`,
+          width: `${refTitleStyle.width}px`,
+          height: refTitleStyle.height ? `${refTitleStyle.height}px` : undefined,
+          textAlign: refTitleStyle.textAlign,
+          opacity: 1,
+          zIndex: 2,
+        });
+
+        // Add lyrics as an editable text element
+        // Store with HTML tags intact - they will be rendered properly in presentation mode
+        textElements.push({
+          id: `imported-lyrics-${timestamp}`,
+          content: genSlide.content || '[Lyrics not available]',
+          fontSize: refLyricsStyle.fontSize,
+          color: refLyricsStyle.color,
+          fontWeight: refLyricsStyle.fontWeight,
+          fontStyle: refLyricsStyle.fontStyle,
+          fontFamily: refLyricsStyle.fontFamily,
+          x: `${refLyricsStyle.x}px`,
+          y: `${refLyricsStyle.y}px`,
+          width: `${refLyricsStyle.width}px`,
+          height: refLyricsStyle.height ? `${refLyricsStyle.height}px` : undefined,
+          textAlign: refLyricsStyle.textAlign,
+          opacity: 1,
+          zIndex: 2,
+        });
+
+        // Add translation if available
+        if (genSlide.translation) {
+          const refTranslationStyle = refSlide.songTranslationStyle || {
+            x: 40,
+            y: 810,
+            width: 1840,
+            height: 200,
+            fontSize: '24px',
+            fontWeight: 'normal' as const,
+            textAlign: 'center' as const,
+            color: '#ffffff',
+          };
+
+          textElements.push({
+            id: `imported-translation-${timestamp}`,
+            content: genSlide.translation,
+            fontSize: refTranslationStyle.fontSize,
+            color: refTranslationStyle.color,
+            fontWeight: refTranslationStyle.fontWeight,
+            fontStyle: refTranslationStyle.fontStyle,
+            fontFamily: refTranslationStyle.fontFamily,
+            x: `${refTranslationStyle.x}px`,
+            y: `${refTranslationStyle.y}px`,
+            width: `${refTranslationStyle.width}px`,
+            height: refTranslationStyle.height ? `${refTranslationStyle.height}px` : undefined,
+            textAlign: refTranslationStyle.textAlign,
+            opacity: 1,
+            zIndex: 2,
+          });
+        }
+
+        return {
+          background: refSlide.background ? { ...refSlide.background } : undefined,
+          images: refSlide.images ? refSlide.images.map(img => ({ ...img })) : undefined,
+          videos: refSlide.videos ? refSlide.videos.map(vid => ({ ...vid })) : undefined,
+          audios: refSlide.audios ? refSlide.audios.map(aud => ({ ...aud })) : undefined,
+          text: [...(refSlide.text ? refSlide.text.map(txt => ({ ...txt })) : []), ...textElements],
+          songTitleStyle: refSlide.songTitleStyle ? { ...refSlide.songTitleStyle } : undefined,
+          songLyricsStyle: refSlide.songLyricsStyle ? { ...refSlide.songLyricsStyle } : undefined,
+          songTranslationStyle: refSlide.songTranslationStyle ? { ...refSlide.songTranslationStyle } : undefined,
+        };
+      });
+      
+      // Insert new slides after the selected slide
+      const newSlides = [
+        ...slides.slice(0, selectedSlideIndex + 1),
+        ...newTemplateSlides,
+        ...slides.slice(selectedSlideIndex + 1),
+      ];
+      
       onTemplateChange({
         ...template,
         slides: newSlides,
-        background: refSlide?.background,
-        images: refSlide?.images || [],
-        videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-        text: refSlide?.text || [],
       });
 
-      // Select the title element
-      if (newTextElements.length > 0) {
-        setSelectedId(newTextElements[0].id);
-      }
+      // Select the first imported slide
+      setSelectedSlideIndex(selectedSlideIndex + 1);
+      setSelectedId(null);
       
       // Close the picker
       setShowSongPicker(false);
       setSongSearchQuery('');
+      
+      console.log(`✅ Imported song "${song.name}" as ${newTemplateSlides.length} slide(s) after selected slide`);
     } finally {
       setImportingSong(false);
     }
@@ -1898,17 +2154,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
 
   const handleDuplicateSlide = (atIndex: number) => {
     const slideToDuplicate = slides[atIndex];
-    const duplicatedSlide: TemplateSlide = JSON.parse(JSON.stringify(slideToDuplicate));
-    // Generate new IDs for all elements
-    if (duplicatedSlide.images) {
-      duplicatedSlide.images = duplicatedSlide.images.map(img => ({ ...img, id: `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` }));
-    }
-    if (duplicatedSlide.videos) {
-      duplicatedSlide.videos = duplicatedSlide.videos.map(vid => ({ ...vid, id: `video-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` }));
-    }
-    if (duplicatedSlide.text) {
-      duplicatedSlide.text = duplicatedSlide.text.map(txt => ({ ...txt, id: `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` }));
-    }
+    const duplicatedSlide: TemplateSlide = regenerateSlideElementIds(slideToDuplicate);
     
     const newSlides = [...slides];
     newSlides.splice(atIndex + 1, 0, duplicatedSlide);
@@ -2123,8 +2369,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   };
 
   // Get background color/style
-  const bgColor = currentSlide.background?.type === 'color' 
-    ? currentSlide.background.value 
+  const bgColor = (!currentSlide.background?.type || currentSlide.background?.type === 'color')
+    ? (currentSlide.background?.value || '#1a1a2e')
     : '#1a1a2e';
 
   // Helper for thumbnail background color
@@ -2150,6 +2396,42 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
             const isReference = idx === referenceSlideIndex;
             const isStatic = slides.length > 1 && idx !== referenceSlideIndex;
             const isIntro = isStatic && idx < referenceSlideIndex;
+
+            // Long-press state for this slide
+            let longPressTimer: NodeJS.Timeout | null = null;
+            let startX = 0;
+            let startY = 0;
+
+            const handleTouchStart = (e: React.TouchEvent) => {
+              const touch = e.touches[0];
+              startX = touch.clientX;
+              startY = touch.clientY;
+              
+              longPressTimer = setTimeout(() => {
+                setContextMenu({ x: touch.clientX, y: touch.clientY, slideIndex: idx });
+                setSelectedSlideIndex(idx);
+              }, 500);
+            };
+
+            const handleTouchMove = (e: React.TouchEvent) => {
+              const touch = e.touches[0];
+              const deltaX = Math.abs(touch.clientX - startX);
+              const deltaY = Math.abs(touch.clientY - startY);
+              
+              if (deltaX > 10 || deltaY > 10) {
+                if (longPressTimer) {
+                  clearTimeout(longPressTimer);
+                  longPressTimer = null;
+                }
+              }
+            };
+
+            const handleTouchEnd = () => {
+              if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+              }
+            };
 
             return (
               <div
@@ -2192,6 +2474,10 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     setContextMenu({ x: e.clientX, y: e.clientY, slideIndex: idx });
                     setSelectedSlideIndex(idx);
                   }}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchCancel={handleTouchEnd}
                   onFocus={() => {
                     setSlideListHasFocus(true);
                     setCanvasHasFocus(false);
@@ -2382,34 +2668,65 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           })}
 
           {/* Context Menu */}
-          {contextMenu && (
-            <div
-              className="fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-1 z-[9999] min-w-[180px]"
-              style={{ left: contextMenu.x, top: contextMenu.y }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => handleInsertSlide(contextMenu.slideIndex)}
-                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
+          {contextMenu && (() => {
+            // Capture these values immediately in case contextMenu becomes null
+            const slideIndex = contextMenu.slideIndex;
+            const menuX = contextMenu.x;
+            const menuY = contextMenu.y;
+            
+            // Create wrapped handlers that capture slideIndex
+            const wrappedInsertSlide = () => {
+              handleInsertSlide(slideIndex);
+            };
+            
+            const wrappedDuplicateSlide = () => {
+              handleDuplicateSlide(slideIndex);
+            };
+            
+            const wrappedMoveSlideUp = () => {
+              handleMoveSlideUp(slideIndex);
+            };
+            
+            const wrappedMoveSlideDown = () => {
+              handleMoveSlideDown(slideIndex);
+            };
+            
+            const wrappedSetAsReference = () => {
+              handleSetAsReference(slideIndex);
+            };
+            
+            const wrappedDeleteSlide = () => {
+              handleDeleteSlide(slideIndex);
+            };
+            
+            return (
+              <div
+                className="fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-1 z-[9999] min-w-[180px]"
+                style={{ left: menuX, top: menuY }}
+                onClick={(e) => e.stopPropagation()}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Insert Slide After
-              </button>
-              <button
-                onClick={() => handleDuplicateSlide(contextMenu.slideIndex)}
-                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                Duplicate Slide
+                <button
+                  onClick={wrappedInsertSlide}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Insert Slide After
+                </button>
+                <button
+                  onClick={wrappedDuplicateSlide}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Duplicate Slide
               </button>
               <div className="border-t border-gray-600 my-1" />
               <button
-                onClick={() => handleMoveSlideUp(contextMenu.slideIndex)}
-                disabled={contextMenu.slideIndex === 0}
+                onClick={wrappedMoveSlideUp}
+                disabled={slideIndex === 0}
                 className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2418,8 +2735,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 Move Up
               </button>
               <button
-                onClick={() => handleMoveSlideDown(contextMenu.slideIndex)}
-                disabled={contextMenu.slideIndex === slides.length - 1}
+                onClick={wrappedMoveSlideDown}
+                disabled={slideIndex === slides.length - 1}
                 className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2428,9 +2745,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 Move Down
               </button>
               <div className="border-t border-gray-600 my-1" />
-              {contextMenu.slideIndex !== referenceSlideIndex && (
+              {slideIndex !== referenceSlideIndex && (
                 <button
-                  onClick={() => handleSetAsReference(contextMenu.slideIndex)}
+                  onClick={wrappedSetAsReference}
                   className="w-full px-4 py-2 text-left text-sm text-yellow-400 hover:bg-gray-700 flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -2440,7 +2757,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 </button>
               )}
               <button
-                onClick={() => handleDeleteSlide(contextMenu.slideIndex)}
+                onClick={wrappedDeleteSlide}
                 disabled={slides.length <= 1}
                 className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
@@ -2450,7 +2767,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 Delete Slide
               </button>
             </div>
-          )}
+            );
+          })()}
           
           {/* Element context menu */}
           {elementContextMenu && (
@@ -2642,14 +2960,22 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
             >
               <Layer>
                 {/* Background - full slide size */}
-                <Rect
-                  x={0}
-                  y={0}
-                  width={SLIDE_WIDTH}
-                  height={SLIDE_HEIGHT}
-                  fill={bgColor}
-                  listening={false}
-                />
+                {currentSlide.background?.type === 'image' && currentSlide.background.value ? (
+                  <BackgroundImage 
+                    url={currentSlide.background.value}
+                    width={SLIDE_WIDTH}
+                    height={SLIDE_HEIGHT}
+                  />
+                ) : (
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={SLIDE_WIDTH}
+                    height={SLIDE_HEIGHT}
+                    fill={bgColor}
+                    listening={false}
+                  />
+                )}
 
                 {/* Song content elements for reference slide - draggable/stylable but with fixed text */}
                 {selectedSlideIndex === referenceSlideIndex && (
@@ -2915,7 +3241,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 <option value="video">Video</option>
               </select>
             </div>
-            {currentSlide.background?.type === 'color' && (
+            {(!currentSlide.background?.type || currentSlide.background?.type === 'color') && (
               <div>
                 <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Color</label>
                 <div className="flex gap-2">
@@ -3422,6 +3748,19 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   value={Math.round(selectedSongContentStyle.width || (SLIDE_WIDTH - 80))}
                   onChange={(e) => handleSongContentStyleChange(selectedSongContentType, {
                     width: Number.isNaN(parseInt(e.target.value, 10)) ? 100 : parseInt(e.target.value, 10),
+                  })}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              
+              {/* Height */}
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Height</label>
+                <input
+                  type="number"
+                  value={Math.round(selectedSongContentStyle.height || 200)}
+                  onChange={(e) => handleSongContentStyleChange(selectedSongContentType, {
+                    height: Number.isNaN(parseInt(e.target.value, 10)) ? 100 : parseInt(e.target.value, 10),
                   })}
                   className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />

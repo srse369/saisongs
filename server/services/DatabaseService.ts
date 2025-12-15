@@ -156,10 +156,11 @@ class DatabaseService {
    * Executes a parameterized SQL query
    * @param sql - SQL query string with :1, :2, etc. placeholders for Oracle
    * @param params - Array of parameters to bind to the query
+   * @param options - Optional execute options (autoCommit, etc.)
    * @returns Query result rows
    * @throws Error if query execution fails
    */
-  async query<T = any>(sql: string, params: any[] | Record<string, any> = []): Promise<T[]> {
+  async query<T = any>(sql: string, params: any[] | Record<string, any> = [], options: any = {}): Promise<T[]> {
     await this.initPool();
 
     if (!this.pool) {
@@ -182,7 +183,8 @@ class DatabaseService {
       
       const result = await connection.execute(sql, params, {
         outFormat: oracledb.OUT_FORMAT_OBJECT,
-        autoCommit: true,
+        autoCommit: options.autoCommit !== false ? true : false,
+        ...options
       });
       
       return (result.rows || []) as T[];

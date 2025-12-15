@@ -5,3 +5,5 @@ export { default as singerService } from './SingerService';
 export { default as pitchService } from './PitchService';
 export { default as externalSongsScraperService } from './ExternalSongsScraperService';
 export { default as importService } from './ImportService';
+export { pptxParserService } from './PptxParserService';
+export { pptxImportService } from './PptxImportService';

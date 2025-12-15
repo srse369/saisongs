@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTemplates } from '../../contexts/TemplateContext';
 import { useAuth } from '../../contexts/AuthContext';
 import type { PresentationTemplate, Slide, TemplateSlide, AspectRatio } from '../../types';
@@ -7,6 +7,7 @@ import { RefreshIcon, Modal, CenterMultiSelect, CenterBadges } from '../common';
 import { PresentationModal } from '../presentation/PresentationModal';
 import { TemplateWysiwygEditor } from './TemplateWysiwygEditor';
 import { isMultiSlideTemplate } from '../../utils/templateUtils';
+import { pptxImportService } from '../../services/PptxImportService';
 
 /**
  * Format a dimension value (x, y, width, height) as an integer string
@@ -271,6 +272,9 @@ export const TemplateManager: React.FC = () => {
   const [editorSelectedSlideIndex, setEditorSelectedSlideIndex] = useState(0);
   const [editorMode, setEditorMode] = useState<'wysiwyg' | 'yaml'>('wysiwyg');
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  const [importingPptx, setImportingPptx] = useState(false);
+  const [importProgress, setImportProgress] = useState('');
+  const pptxInputRef = useRef<HTMLInputElement>(null);
   
   // Check if template has unsaved changes
   const hasUnsavedChanges = React.useMemo(() => {
@@ -433,6 +437,56 @@ export const TemplateManager: React.FC = () => {
     setYamlContent('');
     setValidationError('');
     setShowForm(true);
+  };
+
+  const handleImportPptx = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.name.endsWith('.pptx')) {
+      setValidationError('Please select a valid PowerPoint file (.pptx)');
+      return;
+    }
+
+    setImportingPptx(true);
+    setImportProgress('Reading PowerPoint file...');
+
+    try {
+      // Extract template name from filename
+      const templateName = file.name.replace('.pptx', '');
+      
+      setImportProgress('Parsing slides, images, and text...');
+      
+      // Import the PowerPoint file
+      const importedTemplate = await pptxImportService.importPptxFile(file, templateName);
+      
+      setImportProgress('Converting to template format...');
+      
+      // Set it as the editing template
+      setEditingTemplate(importedTemplate);
+      setOriginalTemplate(null); // Imported template has no original
+      setCenterIds([]);
+      setYamlContent('');
+      setValidationError('');
+      setShowForm(true);
+      
+      setSuccessMessage(`Successfully imported ${importedTemplate.slides?.length || 0} slides from PowerPoint!`);
+      setImportProgress('');
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error) {
+      console.error('Error importing PowerPoint:', error);
+      setValidationError(`Failed to import PowerPoint: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setImportProgress('');
+    } finally {
+      setImportingPptx(false);
+      // Reset the file input so the same file can be selected again
+      if (pptxInputRef.current) {
+        pptxInputRef.current.value = '';
+      }
+    }
   };
 
   const handleEditClick = (template: PresentationTemplate) => {
@@ -668,21 +722,56 @@ export const TemplateManager: React.FC = () => {
                 Refresh
               </button>
               {!showForm && (
-                <button
-                  onClick={handleCreateClick}
-                  disabled={loading}
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Create Template
-                </button>
+                <>
+                  <button
+                    onClick={handleCreateClick}
+                    disabled={loading}
+                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Create Template
+                  </button>
+                  
+                  {/* Import PowerPoint Button */}
+                  <button
+                    onClick={() => pptxInputRef.current?.click()}
+                    disabled={loading || importingPptx}
+                    className="w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                    title="Import PowerPoint (.pptx) file"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    {importingPptx ? 'Importing...' : 'Import PowerPoint'}
+                  </button>
+                  
+                  {/* Hidden file input for PowerPoint import */}
+                  <input
+                    ref={pptxInputRef}
+                    type="file"
+                    accept=".pptx"
+                    onChange={handleImportPptx}
+                    className="hidden"
+                  />
+                </>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Import Progress Message */}
+      {importProgress && (
+        <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 px-4 py-3 rounded-md flex items-center gap-3">
+          <svg className="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>{importProgress}</span>
+        </div>
+      )}
 
       {/* Success Message */}
       {successMessage && (

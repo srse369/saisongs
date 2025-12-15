@@ -1,5 +1,6 @@
 import type { Song, Slide, PresentationTemplate, TemplateSlide } from '../types';
 import { isMultiSlideTemplate } from './templateUtils';
+import { getTopCenterText } from './slideLayeringUtils';
 
 /**
  * Maximum number of lines per slide before splitting
@@ -24,6 +25,60 @@ function stripHtml(html: string): string {
   
   // Clean up extra whitespace
   return text.trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * Prepends song title to the first slide's lyrics if the title differs from the first line
+ * @param content - The first slide's lyrics content
+ * @param songName - The song's name/title
+ * @returns Modified content with title prepended if needed
+ */
+function prependTitleIfDifferent(content: string, songName: string): string {
+  if (!content || !songName) return content;
+  
+  const lines = content.split('\n').filter(line => line.trim().length > 0);
+  if (lines.length === 0) return content;
+  
+  // Get plain text version of first line for comparison (ignoring HTML tags)
+  const firstLinePlain = stripHtml(lines[0]);
+  const titlePlain = stripHtml(songName);
+  
+  // Compare plain text versions - if different, prepend title
+  if (firstLinePlain.toLowerCase().trim() !== titlePlain.toLowerCase().trim()) {
+    return `${songName}\n${content}`;
+  }
+  
+  return content;
+}
+
+/**
+ * Limits translation text to 4 lines maximum, preserving HTML tags
+ * @param translationText - The translation/meaning text that may contain HTML tags
+ * @returns Translation text truncated to 4 lines max
+ */
+function limitTranslationTo4Lines(translationText: string): string {
+  if (!translationText) return translationText;
+  
+  const translationStripped = stripHtml(translationText);
+  const translationLines = translationStripped.split('\n');
+  
+  if (translationLines.length > 4) {
+    const parts = translationText.split(/(<br\s*\/?>|\n)/i);
+    let lineCount = 0;
+    let result = '';
+    for (const part of parts) {
+      if (part.match(/(<br\s*\/?>|\n)/i)) {
+        lineCount++;
+        if (lineCount >= 4) break;
+        result += part;
+      } else {
+        result += part;
+      }
+    }
+    return result;
+  }
+  
+  return translationText;
 }
 
 /**
@@ -68,34 +123,12 @@ export function generateSlides(song: Song): Slide[] {
   
   // If total lines <= 10, ignore verse breaks and show everything in one slide
   if (totalLineCount <= 10) {
-    // Get first translation if exists
-    let translationText = translationVerses[0] || '';
-    
-    // Always limit translation to 4 lines maximum
-    if (translationText) {
-      const translationStripped = stripHtml(translationText);
-      const translationLines = translationStripped.split('\n');
-      if (translationLines.length > 4) {
-        const parts = translationText.split(/(<br\s*\/?>|\n)/i);
-        let lineCount = 0;
-        let result = '';
-        for (const part of parts) {
-          if (part.match(/(<br\s*\/?>|\n)/i)) {
-            lineCount++;
-            if (lineCount >= 4) break;
-            result += part;
-          } else {
-            result += part;
-          }
-        }
-        translationText = result;
-      }
-    }
+    let translationText = limitTranslationTo4Lines(translationVerses[0] || '');
     
     // Show all lyrics in one slide
     slides.push({
       index: 0,
-      content: allLines.join('\n'),
+      content: prependTitleIfDifferent(allLines.join('\n'), song.name),
       translation: translationText || undefined,
       songName: song.name,
     });
@@ -108,33 +141,16 @@ export function generateSlides(song: Song): Slide[] {
     
     verses.forEach((verse, verseIndex) => {
       // Get corresponding translation
-      let translationText = translationVerses[verseIndex] || '';
-      
-      // Always limit translation to 4 lines maximum
-      if (translationText) {
-        const translationStripped = stripHtml(translationText);
-        const translationLines = translationStripped.split('\n');
-        if (translationLines.length > 4) {
-          const parts = translationText.split(/(<br\s*\/?>|\n)/i);
-          let lineCount = 0;
-          let result = '';
-          for (const part of parts) {
-            if (part.match(/(<br\s*\/?>|\n)/i)) {
-              lineCount++;
-              if (lineCount >= 4) break;
-              result += part;
-            } else {
-              result += part;
-            }
-          }
-          translationText = result;
-        }
-      }
+      let translationText = limitTranslationTo4Lines(translationVerses[verseIndex] || '');
       
       // Create one slide per verse (entire section)
+      const verseContent = verseIndex === 0 
+        ? prependTitleIfDifferent(verse, song.name)
+        : verse;
+      
       slides.push({
         index: slides.length,
-        content: verse,
+        content: verseContent,
         translation: translationText || undefined,
         songName: song.name,
       });
@@ -143,37 +159,18 @@ export function generateSlides(song: Song): Slide[] {
     // Total lines > 10 but no verse structure - split into 10 lines per slide
     const maxLinesPerSlide = 10;
     
-    // Get first translation if exists
-    let translationText = translationVerses[0] || '';
-    
-    // Always limit translation to 4 lines maximum
-    if (translationText) {
-      const translationStripped = stripHtml(translationText);
-      const translationLines = translationStripped.split('\n');
-      if (translationLines.length > 4) {
-        const parts = translationText.split(/(<br\s*\/?>|\n)/i);
-        let lineCount = 0;
-        let result = '';
-        for (const part of parts) {
-          if (part.match(/(<br\s*\/?>|\n)/i)) {
-            lineCount++;
-            if (lineCount >= 4) break;
-            result += part;
-          } else {
-            result += part;
-          }
-        }
-        translationText = result;
-      }
-    }
+    let translationText = limitTranslationTo4Lines(translationVerses[0] || '');
     
     // Split into chunks of 10 lines
     for (let i = 0; i < allLines.length; i += maxLinesPerSlide) {
       const slideLines = allLines.slice(i, i + maxLinesPerSlide);
+      const slideContent = i === 0
+        ? prependTitleIfDifferent(slideLines.join('\n'), song.name)
+        : slideLines.join('\n');
       
       slides.push({
         index: slides.length,
-        content: slideLines.join('\n'),
+        content: slideContent,
         translation: i === 0 ? translationText : undefined, // Only show translation on first slide
         songName: song.name,
       });
@@ -267,35 +264,8 @@ export function generatePresentationSlides(
     });
   }
 
-  // Re-annotate with next slide info
-  return result.map((slide, index) => {
-    const next = result[index + 1];
-    if (!next) return slide;
-
-    if (next.slideType === 'static') {
-      return {
-        ...slide,
-        nextSongName: undefined,
-        nextIsContinuation: false,
-      };
-    }
-
-    if (next.songName === slide.songName) {
-      return {
-        ...slide,
-        nextSongName: slide.songName,
-        nextIsContinuation: true,
-      };
-    }
-
-    return {
-      ...slide,
-      nextSongName: next.songName,
-      nextSingerName: next.singerName,
-      nextPitch: next.pitch,
-      nextIsContinuation: false,
-    };
-  });
+  // Use the shared metadata annotation function that handles layering
+  return addNextSlideMetadata(result);
 }
 
 /**
@@ -353,6 +323,9 @@ export function generateSessionPresentationSlides(
           songName: song.name,
           slideType: 'static',
           templateSlide: templateSlides[i],
+          // Add session metadata so overlays display on intro slides too
+          sessionSongIndex: 1,
+          totalSongs: songs.length,
         });
       }
     }
@@ -400,28 +373,66 @@ function addNextSlideMetadata(slides: Slide[]): Slide[] {
     const next = slides[index + 1];
     if (!next) return slide;
 
+    // Helper function to find the next non-static slide
+    const findNextSongSlide = (startIndex: number) => {
+      for (let i = startIndex; i < slides.length; i++) {
+        if (slides[i].slideType !== 'static') {
+          return slides[i];
+        }
+      }
+      return null;
+    };
+
+    // Helper function to get layering text based on slide types
+    const getNextLayeringText = (currentIndex: number, nextSlide: Slide): string | undefined => {
+      // If next slide is static, show its top-center text
+      if (nextSlide.slideType === 'static') {
+        return getTopCenterText(nextSlide.templateSlide);
+      }
+      // For song slides, don't show top-center text preview
+      return undefined;
+    };
+
+    // For static slides (intro/outro)
+    if (slide.slideType === 'static') {
+      return {
+        ...slide,
+        nextSongName: next.songName,
+        nextSingerName: next.singerName,
+        nextPitch: next.pitch,
+        nextIsContinuation: false,
+        nextSlideTopCenterText: getNextLayeringText(index, next),
+      };
+    }
+
+    // For song slides where next slide is a continuation of the same song
+    if (next.songName === slide.songName) {
+      return {
+        ...slide,
+        nextSongName: slide.songName,
+        nextIsContinuation: true,
+        nextSlideTopCenterText: undefined, // Don't show preview for same song continuation
+      };
+    }
+
+    // For song slides where next is a different song or static slide
     if (next.slideType === 'static') {
       return {
         ...slide,
         nextSongName: undefined,
         nextIsContinuation: false,
+        nextSlideTopCenterText: getNextLayeringText(index, next),
       };
     }
 
-    if (next.songName === slide.songName && slide.slideType !== 'static') {
-      return {
-        ...slide,
-        nextSongName: slide.songName,
-        nextIsContinuation: true,
-      };
-    }
-
+    // For song slides transitioning to a different song
     return {
       ...slide,
       nextSongName: next.songName,
       nextSingerName: next.singerName,
       nextPitch: next.pitch,
       nextIsContinuation: false,
+      nextSlideTopCenterText: undefined, // Show song info instead of preview for new song
     };
   });
 }

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FilterInput } from './FilterInput';
 
 export interface SongSearchFilters {
   name?: string;
@@ -69,117 +70,54 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
       {isExpanded && (
         <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 animate-fade-in">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {/* Song Name */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Song Name
-              </label>
-              <input
-                type="text"
-                value={filters.name || ''}
-                onChange={(e) => handleFilterChange('name', e.target.value)}
-                placeholder="Search by name..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
-            {/* Deity */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Deity
-              </label>
-              <input
-                type="text"
-                value={filters.deity || ''}
-                onChange={(e) => handleFilterChange('deity', e.target.value)}
-                placeholder="Search by deity..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
-            {/* Language */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Language
-              </label>
-              <input
-                type="text"
-                value={filters.language || ''}
-                onChange={(e) => handleFilterChange('language', e.target.value)}
-                placeholder="Search by language..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
-            {/* Raga */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Raga
-              </label>
-              <input
-                type="text"
-                value={filters.raga || ''}
-                onChange={(e) => handleFilterChange('raga', e.target.value)}
-                placeholder="Search by raga..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
-            {/* Tempo */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tempo
-              </label>
-              <input
-                type="text"
-                value={filters.tempo || ''}
-                onChange={(e) => handleFilterChange('tempo', e.target.value)}
-                placeholder="Search by tempo..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
-            {/* Beat */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Beat
-              </label>
-              <input
-                type="text"
-                value={filters.beat || ''}
-                onChange={(e) => handleFilterChange('beat', e.target.value)}
-                placeholder="Search by beat..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
-            {/* Level */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Level
-              </label>
-              <input
-                type="text"
-                value={filters.level || ''}
-                onChange={(e) => handleFilterChange('level', e.target.value)}
-                placeholder="Search by level..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
-            {/* Tags */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tags
-              </label>
-              <input
-                type="text"
-                value={filters.songTags || ''}
-                onChange={(e) => handleFilterChange('songTags', e.target.value)}
-                placeholder="Search by tags..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
+            <FilterInput
+              label="Song Name"
+              value={filters.name || ''}
+              placeholder="Search by name..."
+              onChange={(value) => handleFilterChange('name', value)}
+            />
+            <FilterInput
+              label="Deity"
+              value={filters.deity || ''}
+              placeholder="Search by deity..."
+              onChange={(value) => handleFilterChange('deity', value)}
+            />
+            <FilterInput
+              label="Language"
+              value={filters.language || ''}
+              placeholder="Search by language..."
+              onChange={(value) => handleFilterChange('language', value)}
+            />
+            <FilterInput
+              label="Raga"
+              value={filters.raga || ''}
+              placeholder="Search by raga..."
+              onChange={(value) => handleFilterChange('raga', value)}
+            />
+            <FilterInput
+              label="Tempo"
+              value={filters.tempo || ''}
+              placeholder="Search by tempo..."
+              onChange={(value) => handleFilterChange('tempo', value)}
+            />
+            <FilterInput
+              label="Beat"
+              value={filters.beat || ''}
+              placeholder="Search by beat..."
+              onChange={(value) => handleFilterChange('beat', value)}
+            />
+            <FilterInput
+              label="Level"
+              value={filters.level || ''}
+              placeholder="Search by level..."
+              onChange={(value) => handleFilterChange('level', value)}
+            />
+            <FilterInput
+              label="Tags"
+              value={filters.songTags || ''}
+              placeholder="Search by tags..."
+              onChange={(value) => handleFilterChange('songTags', value)}
+            />
           </div>
 
           {/* Active Filters Summary */}

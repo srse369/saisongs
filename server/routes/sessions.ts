@@ -2,6 +2,7 @@ import express from 'express';
 import { cacheService } from '../services/CacheService.js';
 import { databaseService } from '../services/DatabaseService.js';
 import { requireAuth, requireEditor } from '../middleware/simpleAuth.js';
+import { handleSessionError } from '../utils/errorHandlers.js';
 
 const router = express.Router();
 
@@ -137,8 +138,9 @@ router.post('/', requireAuth, async (req, res) => {
     res.status(201).json(session);
   } catch (error: any) {
     console.error('Error creating session:', error);
-    if (error.message && error.message.includes('unique constraint')) {
-      return res.status(409).json({ error: 'Session name already exists' });
+    const dbError = handleSessionError(error);
+    if (dbError) {
+      return res.status(dbError.status).json(dbError.json);
     }
     res.status(500).json({ error: 'Failed to create session' });
   }
@@ -199,8 +201,9 @@ router.put('/:id', requireAuth, async (req, res) => {
     res.json(session);
   } catch (error: any) {
     console.error('Error updating session:', error);
-    if (error.message && error.message.includes('unique constraint')) {
-      return res.status(409).json({ error: 'Session name already exists' });
+    const dbError = handleSessionError(error);
+    if (dbError) {
+      return res.status(dbError.status).json(dbError.json);
     }
     res.status(500).json({ error: 'Failed to update session' });
   }
@@ -481,11 +484,9 @@ router.post('/:id/duplicate', requireAuth, async (req, res) => {
     res.status(201).json(session);
   } catch (error: any) {
     console.error('Error duplicating session:', error);
-    if (error.message && error.message.includes('unique constraint')) {
-      return res.status(409).json({ error: 'Session name already exists' });
-    }
-    if (error.message && error.message.includes('not found')) {
-      return res.status(404).json({ error: 'Session not found' });
+    const dbError = handleSessionError(error);
+    if (dbError) {
+      return res.status(dbError.status).json(dbError.json);
     }
     res.status(500).json({ error: 'Failed to duplicate session' });
   }

@@ -84,13 +84,18 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
 
       // Persist to cache for subsequent loads
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(
-          PITCHES_CACHE_KEY,
-          JSON.stringify({
-            timestamp: Date.now(),
-            pitches: fetchedPitches,
-          })
-        );
+        try {
+          window.localStorage.setItem(
+            PITCHES_CACHE_KEY,
+            JSON.stringify({
+              timestamp: Date.now(),
+              pitches: fetchedPitches,
+            })
+          );
+        } catch (e) {
+          // Silently ignore storage errors (e.g., quota exceeded on iOS)
+          console.warn('Failed to cache pitches to localStorage:', e);
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch pitches';
