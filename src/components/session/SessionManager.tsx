@@ -233,7 +233,6 @@ export const SessionManager: React.FC = () => {
     setSessionToLoad(sessionId);
     try {
       await loadSession(sessionId);
-      setShowLoadModal(false);
     } catch (error) {
       console.error('Error loading session:', error);
       // Check if it's an access denied error
@@ -242,9 +241,8 @@ export const SessionManager: React.FC = () => {
       } else {
         alert('Failed to load session. Please try again.');
       }
-    } finally {
-      setLoadingSession(false);
       setSessionToLoad(null);
+      setLoadingSession(false);
     }
   };
 
@@ -298,6 +296,8 @@ export const SessionManager: React.FC = () => {
       
       setShowLoadModal(false);
       setLoadingSession(false);
+      
+      // Clear after successful load
       setSessionToLoad(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

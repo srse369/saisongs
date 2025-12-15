@@ -9,10 +9,66 @@ const router = express.Router();
 // ============ Named Sessions ============
 
 // Get all sessions
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
-    const allSessions = await cacheService.getAllSessions();
+    // Bypass cache to always get fresh data (filtering is user-specific)
+    const db = await (cacheService as any).getDatabase();
+    const sessions = await db.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        name,
+        description,
+        center_ids,
+        created_by,
+        created_at,
+        updated_at
+      FROM song_sessions 
+      ORDER BY name
+    `);
+
+    console.log('[SESSIONS] Raw DB query returned', sessions.length, 'rows');
+    console.log('[SESSIONS] Raw sessions:', JSON.stringify(sessions.slice(0, 3), null, 2));
+
+    const mappedSessions = sessions.map((row: any) => {
+      let centerIds: number[] | undefined = undefined;
+      try {
+        if (row.CENTER_IDS) {
+          const parsed = JSON.parse(row.CENTER_IDS);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            centerIds = parsed;
+          }
+        }
+      } catch (e) {
+        console.error('[SESSIONS] Error parsing center_ids:', e);
+      }
+
+      return {
+        id: row.ID,
+        name: row.NAME,
+        description: row.DESCRIPTION,
+        center_ids: centerIds,
+        created_by: row.CREATED_BY,
+        createdAt: new Date(row.CREATED_AT).toISOString(),
+        updatedAt: new Date(row.UPDATED_AT).toISOString(),
+      };
+    });
+
+    const allSessions = mappedSessions;
     const user = req.user;
+    
+    console.log('[SESSIONS] After mapping:', allSessions.length, 'sessions');
+    console.log('[SESSIONS] User info:', {
+      email: user?.email,
+      role: user?.role,
+      centerIds: user?.centerIds,
+      editorFor: user?.editorFor,
+    });
+    console.log('[SESSIONS] All sessions:', allSessions.map(s => ({
+      id: s.id,
+      name: s.name,
+      center_ids: s.center_ids,
+      created_by: s.created_by,
+    })));
     
     // Filter sessions based on user role and centers
     let filteredSessions = allSessions;
@@ -44,6 +100,7 @@ router.get('/', async (req, res) => {
       });
     }
     
+    console.log('[SESSIONS] Filtered sessions count:', filteredSessions.length, 'from', allSessions.length);
     res.json(filteredSessions);
   } catch (error) {
     console.error('Error fetching sessions:', error);
@@ -62,7 +119,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get session by ID with items
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const session = await cacheService.getSession(id);

@@ -11,14 +11,32 @@ import { getFontFamily } from './fonts';
 // =============================================================================
 
 /**
- * Parse and render text with HTML-like styling tags.
- * Supports: <b>bold</b>, <i>italic</i>, <c:RRGGBB>color</c:RRGGBB>, <br> for line breaks
+ * Decode HTML entities (e.g., &nbsp;, &lt;, &quot;, etc.)
+ */
+function decodeHtmlEntities(text: string): string {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
+/**
+ * Parse and render text with HTML-like styling tags and standard HTML.
+ * Supports: <b>bold</b>, <i>italic</i>, <c:RRGGBB>color</c:RRGGBB>, <br>, <p>, </p>
+ * Also handles HTML entities like &nbsp;, &amp;, &lt;, &quot;, &apos;, etc.
  * 
- * @param text - The text content with optional HTML-like tags
+ * @param text - The text content with optional HTML-like tags and HTML
  * @returns React elements with appropriate styling applied
  */
 export function renderStyledText(text: string): React.ReactNode {
   if (!text) return null;
+  
+  // Decode HTML entities first (&nbsp;, &amp;, &lt;, &quot;, etc.)
+  let processedText = decodeHtmlEntities(text);
+  
+  // Handle standard HTML tags like <p>, <br>
+  // Replace <p> and </p> with line breaks to preserve structure
+  processedText = processedText.replace(/<p\s*>/gi, '');
+  processedText = processedText.replace(/<\/p\s*>/gi, '\n');
   
   const parts: (string | { type: string; content?: string })[] = [];
   
@@ -26,32 +44,38 @@ export function renderStyledText(text: string): React.ReactNode {
   const boldRegex = /<b>(.*?)<\/b>/g;
   const italicRegex = /<i>(.*?)<\/i>/g;
   const colorRegex = /<c:([0-9a-fA-F]{6})>(.*?)<\/c:[0-9a-fA-F]{6}>/g;
-  const brRegex = /<br\s*\/?>/g;
+  const brRegex = /<br\s*\/?>/gi;
+  const newlineRegex = /\n/g;
   
   // Process all tags and store their positions
   const tags: Array<{ start: number; end: number; type: string; content?: string }> = [];
   
   let match;
-  while ((match = boldRegex.exec(text)) !== null) {
+  while ((match = boldRegex.exec(processedText)) !== null) {
     tags.push({ start: match.index, end: match.index + match[0].length, type: 'bold', content: match[1] });
   }
   boldRegex.lastIndex = 0;
   
-  while ((match = italicRegex.exec(text)) !== null) {
+  while ((match = italicRegex.exec(processedText)) !== null) {
     tags.push({ start: match.index, end: match.index + match[0].length, type: 'italic', content: match[1] });
   }
   italicRegex.lastIndex = 0;
   
-  while ((match = colorRegex.exec(text)) !== null) {
+  while ((match = colorRegex.exec(processedText)) !== null) {
     const color = match[1];
     tags.push({ start: match.index, end: match.index + match[0].length, type: `color:#${color}`, content: match[2] });
   }
   colorRegex.lastIndex = 0;
   
-  while ((match = brRegex.exec(text)) !== null) {
+  while ((match = brRegex.exec(processedText)) !== null) {
     tags.push({ start: match.index, end: match.index + match[0].length, type: 'br' });
   }
   brRegex.lastIndex = 0;
+  
+  while ((match = newlineRegex.exec(processedText)) !== null) {
+    tags.push({ start: match.index, end: match.index + match[0].length, type: 'br' });
+  }
+  newlineRegex.lastIndex = 0;
   
   // Sort tags by start position
   tags.sort((a, b) => a.start - b.start);
@@ -61,7 +85,7 @@ export function renderStyledText(text: string): React.ReactNode {
   for (const tag of tags) {
     // Add text before tag
     if (lastPos < tag.start) {
-      parts.push(text.substring(lastPos, tag.start));
+      parts.push(processedText.substring(lastPos, tag.start));
     }
     // Add tag
     parts.push({ type: tag.type, content: tag.content });
@@ -69,13 +93,13 @@ export function renderStyledText(text: string): React.ReactNode {
   }
   
   // Add remaining text
-  if (lastPos < text.length) {
-    parts.push(text.substring(lastPos));
+  if (lastPos < processedText.length) {
+    parts.push(processedText.substring(lastPos));
   }
 
   // If no tags found, just return the text
   if (parts.length === 0) {
-    return <>{text}</>;
+    return <>{processedText}</>;
   }
 
   // Render parts with appropriate styling

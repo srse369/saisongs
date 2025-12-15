@@ -324,6 +324,8 @@ export interface Slide {
   templateSlide?: TemplateSlide;
   /** Text content from the top-center of the next slide (for layering preview) */
   nextSlideTopCenterText?: string;
+  /** True when the next slide is a static slide */
+  nextIsStatic?: boolean;
 }
 
 export interface SongWithPitches extends Song {

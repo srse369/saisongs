@@ -189,6 +189,10 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
 
         {/* Next-song hint at bottom-right */}
         {(() => {
+          // Don't show "next" if: next is static slide AND has no text
+          if (slide.nextIsStatic && !slide.nextSlideTopCenterText) {
+            return false;
+          }
           const shouldRender = slide.nextSongName || slide.nextSlideTopCenterText;
           return shouldRender;
         })() && (
@@ -349,7 +353,13 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
 
       {/* Next-song hint at bottom-right */}
       {/* Next slide info: either song name or static slide's top-center text */}
-      {(slide.nextSongName || slide.nextSlideTopCenterText) && (
+      {(() => {
+        // Don't show "next" if: next is static slide AND has no text
+        if (slide.nextIsStatic && !slide.nextSlideTopCenterText) {
+          return false;
+        }
+        return slide.nextSongName || slide.nextSlideTopCenterText;
+      })() && (
         <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 text-right z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1">
           <div className="text-[1.9rem] sm:text-[2rem] text-blue-50">
             {slide.nextSlideTopCenterText ? (

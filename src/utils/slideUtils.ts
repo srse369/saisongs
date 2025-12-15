@@ -401,6 +401,7 @@ function addNextSlideMetadata(slides: Slide[]): Slide[] {
         nextSingerName: next.singerName,
         nextPitch: next.pitch,
         nextIsContinuation: false,
+        nextIsStatic: next.slideType === 'static',
         nextSlideTopCenterText: getNextLayeringText(index, next),
       };
     }
@@ -411,6 +412,7 @@ function addNextSlideMetadata(slides: Slide[]): Slide[] {
         ...slide,
         nextSongName: slide.songName,
         nextIsContinuation: true,
+        nextIsStatic: next.slideType === 'static',
         nextSlideTopCenterText: undefined, // Don't show preview for same song continuation
       };
     }
@@ -421,6 +423,7 @@ function addNextSlideMetadata(slides: Slide[]): Slide[] {
         ...slide,
         nextSongName: undefined,
         nextIsContinuation: false,
+        nextIsStatic: true,
         nextSlideTopCenterText: getNextLayeringText(index, next),
       };
     }
@@ -432,6 +435,7 @@ function addNextSlideMetadata(slides: Slide[]): Slide[] {
       nextSingerName: next.singerName,
       nextPitch: next.pitch,
       nextIsContinuation: false,
+      nextIsStatic: false,
       nextSlideTopCenterText: undefined, // Show song info instead of preview for new song
     };
   });
