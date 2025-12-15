@@ -309,9 +309,7 @@ export const SongManager: React.FC = () => {
                   onClick={handleCreateClick}
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
+                  <i className="fas fa-plus text-lg"></i>
                   Create New Song
                 </button>
               )}
@@ -330,17 +328,7 @@ export const SongManager: React.FC = () => {
           <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg animate-fade-in">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center flex-1 min-w-0">
-                <svg
-                  className="w-5 h-5 text-red-600 dark:text-red-400 mr-2 flex-shrink-0"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                <i className="fas fa-times-circle text-lg text-red-600 dark:text-red-400 mr-2 flex-shrink-0"></i>
                 <p className="text-sm font-medium text-red-800 dark:text-red-300 truncate">{error.message}</p>
               </div>
               <button
@@ -348,13 +336,7 @@ export const SongManager: React.FC = () => {
                 className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 focus:outline-none flex-shrink-0"
                 aria-label="Dismiss error"
               >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                <i className="fas fa-times text-lg"></i>
               </button>
             </div>
           </div>

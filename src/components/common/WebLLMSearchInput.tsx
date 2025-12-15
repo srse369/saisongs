@@ -119,14 +119,7 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
       {/* Search Input with integrated AI Toggle */}
       <div className="relative flex items-center">
         {/* Search Icon */}
-        <svg
-          className={`w-4 h-4 absolute left-3 ${llmEnabled ? 'text-purple-500' : 'text-gray-400'}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+        <i className={`fas fa-search text-base absolute left-3 ${llmEnabled ? 'text-purple-500' : 'text-gray-400'}`}></i>
 
         {/* Search Input */}
         <input
@@ -155,9 +148,7 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               title="Clear"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <i className="fas fa-times text-base"></i>
             </button>
           )}
 
@@ -187,9 +178,7 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
               />
             </button>
             {llmEnabled && (
-              <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
+              <i className="fas fa-check-circle text-xs text-green-500"></i>
             )}
           </div>
         </div>
@@ -206,10 +195,7 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
       {isLoading && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 animate-fade-in">
           <div className="flex items-center gap-3 mb-2">
-            <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
+            <i className="fas fa-spinner fa-spin text-lg text-blue-600 dark:text-blue-400"></i>
             <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
               Loading AI Model... {Math.round(loadPercentage)}%
             </span>
@@ -230,9 +216,7 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
       {/* Success Message */}
       {successMessage && (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 flex items-start gap-2 animate-fade-in">
-          <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-          </svg>
+          <i className="fas fa-check-circle text-lg text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5"></i>
           <span className="text-sm text-green-800 dark:text-green-300">{successMessage}</span>
         </div>
       )}
@@ -240,9 +224,7 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start gap-2">
-          <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-          </svg>
+          <i className="fas fa-times-circle text-lg text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"></i>
           <span className="text-sm text-red-800 dark:text-red-300">{error}</span>
         </div>
       )}
@@ -256,17 +238,12 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
         >
           {isProcessing ? (
             <>
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
+              <i className="fas fa-spinner fa-spin text-base"></i>
               Processing...
             </>
           ) : (
             <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
+              <i className="fas fa-bolt text-base"></i>
               Ask AI (or press Enter)
             </>
           )}

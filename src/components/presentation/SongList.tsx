@@ -139,9 +139,7 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
       <div className="space-y-3 sm:space-y-4">
         {filteredSongs.length === 0 ? (
           <div className="text-center py-12 sm:py-16 text-gray-500 dark:text-gray-400">
-            <svg className="mx-auto h-12 w-12 sm:h-16 sm:w-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-            </svg>
+            <i className="fas fa-music text-5xl sm:text-6xl mb-4 inline-block"></i>
             <p className="text-base sm:text-lg font-medium">No songs found</p>
             <p className="text-sm mt-2">Try adjusting your search or filter</p>
           </div>
@@ -161,9 +159,7 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
                     {song.externalSourceUrl}
                   </p>
                 </div>
-                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400 dark:text-gray-500 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
+                <i className="fas fa-chevron-right text-lg text-gray-400 dark:text-gray-500 flex-shrink-0 mt-1"></i>
               </div>
             </button>
           ))

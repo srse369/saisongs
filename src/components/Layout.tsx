@@ -57,9 +57,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               {isAuthenticated && (
                 <>
                   <Link to="/admin/singers" className={getLinkClasses('/admin/singers')}>
-                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                    </svg>
+                    <i className="fas fa-users w-4 h-4 mr-1.5"></i>
                     Singers
                   </Link>
                   <Link to="/admin/pitches" className={getLinkClasses('/admin/pitches')}>
@@ -70,18 +68,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               )}
               
               <Link to="/session" className={getLinkClasses('/session')}>
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <i className="fas fa-play-circle w-4 h-4 mr-1.5"></i>
                 Live
               </Link>
               
               {(userRole === 'admin' || userRole === 'editor') && (
                 <Link to="/admin/templates" className={getLinkClasses('/admin/templates')}>
-                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4m0-21h10a2 2 0 012 2v14a2 2 0 01-2 2m-10-21v21m0-21H9m10 0h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m0-21v21m0-21H9" />
-                  </svg>
+                  <i className="fas fa-layer-group w-4 h-4 mr-1.5"></i>
                   Templates
                 </Link>
               )}
@@ -117,9 +110,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors"
                     title="Sign in"
                   >
-                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                    </svg>
+                    <i className="fas fa-sign-in-alt w-4 h-4 mr-1.5"></i>
                     Sign In
                   </button>
                 )}
@@ -134,13 +125,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 aria-label="Toggle menu"
               >
                 {isMobileMenuOpen ? (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <i className="fas fa-times text-2xl"></i>
                 ) : (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
+                  <i className="fas fa-bars text-2xl"></i>
                 )}
               </button>
             </div>
@@ -166,9 +153,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     className={`block ${getLinkClasses('/admin/singers')}`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                    </svg>
+                    <i className="fas fa-users w-5 h-5 mr-2 inline"></i>
                     Singers
                   </Link>
                   <Link
@@ -187,10 +172,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 className={`block ${getLinkClasses('/session')}`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <i className="fas fa-play-circle w-5 h-5 mr-2 inline"></i>
                 Live Session
               </Link>
               
@@ -200,9 +182,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   className={`block ${getLinkClasses('/admin/templates')}`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <svg className="w-5 h-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h4m0-21h10a2 2 0 012 2v14a2 2 0 01-2 2m-10-21v21m0-21H9m10 0h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m0-21v21m0-21H9" />
-                  </svg>
+                  <i className="fas fa-layer-group w-5 h-5 mr-2 inline"></i>
                   Templates
                 </Link>
               )}
@@ -213,16 +193,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <div className="flex items-center space-x-2">
                   {isConnected ? (
                     <>
-                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
+                      <i className="fas fa-check-circle w-5 h-5 text-green-600 dark:text-green-400"></i>
                       <span className="text-sm text-gray-700 dark:text-gray-300">Database Connected</span>
                     </>
                   ) : (
                     <>
-                      <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
+                      <i className="fas fa-times-circle w-5 h-5 text-red-600 dark:text-red-400"></i>
                       <button
                         onClick={resetConnection}
                         className="text-sm text-red-600 dark:text-red-400 hover:underline"
@@ -289,9 +265,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                             }}
                             className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
                           >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
+                            <i className="fas fa-building w-4 h-4 mr-2"></i>
                             Centers
                           </button>
                           <button
@@ -301,9 +275,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                             }}
                             className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
                           >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                            <i className="fas fa-chart-bar w-4 h-4 mr-2"></i>
                             Analytics
                           </button>
                           <button
@@ -313,9 +285,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                             }}
                             className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
                           >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                            </svg>
+                            <i className="fas fa-comment w-4 h-4 mr-2"></i>
                             Feedback
                           </button>
                         </div>
@@ -330,9 +300,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                         }}
                         className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-md transition-colors border border-gray-300 dark:border-gray-600"
                       >
-                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
+                        <i className="fas fa-sign-out-alt w-4 h-4 mr-1.5"></i>
                         Sign Out
                       </button>
                     </div>
@@ -352,9 +320,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     }}
                     className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors"
                   >
-                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                    </svg>
+                    <i className="fas fa-sign-in-alt w-4 h-4 mr-1.5"></i>
                     Sign In
                   </button>
                 )}
@@ -388,9 +354,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         title="Send feedback"
         aria-label="Send feedback"
       >
-        <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-        </svg>
+        <i className="fas fa-comment text-lg mx-auto"></i>
       </button>
 
       {/* Feedback Drawer */}

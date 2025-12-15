@@ -67,19 +67,7 @@ export const Modal: React.FC<ModalProps> = ({
             className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1 transition-colors"
             aria-label="Close modal"
           >
-            <svg
-              className="w-5 h-5 sm:w-6 sm:h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <i className="fas fa-times text-xl sm:text-2xl"></i>
           </button>
         </div>
         <div className="px-4 sm:px-6 py-4 overflow-y-auto">{children}</div>

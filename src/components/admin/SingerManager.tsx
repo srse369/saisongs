@@ -160,19 +160,7 @@ export const SingerManager: React.FC = () => {
                 autoFocus
                 className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
-              <svg
-                className="w-4 h-4 text-gray-400 absolute left-3 top-2.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-4.35-4.35M9.5 17a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
-                />
-              </svg>
+              <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
               <button
@@ -189,9 +177,7 @@ export const SingerManager: React.FC = () => {
                   onClick={handleCreateClick}
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
+                  <i className="fas fa-plus text-lg"></i>
                   Add Singer
                 </button>
               )}
@@ -203,19 +189,7 @@ export const SingerManager: React.FC = () => {
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
           <div className="flex">
-            <svg
-              className="h-5 w-5 text-red-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <i className="fas fa-exclamation-circle text-lg text-red-400 mr-3"></i>
             <p className="ml-3 text-sm font-medium text-red-800">{error.message}</p>
           </div>
         </div>

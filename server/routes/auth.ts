@@ -168,17 +168,6 @@ router.post('/verify-otp', async (req, res) => {
       [normalizedEmail, normalizedCode]
     );
 
-    console.log('[AUTH] OTP query result:', {
-      recordsFound: otpRecords.length,
-      records: otpRecords.map(r => ({
-        id: r.id || r.ID,
-        code: r.code || r.CODE,
-        email: r.email || r.EMAIL,
-        used: r.used || r.USED,
-        expires_at: r.expires_at || r.EXPIRES_AT
-      }))
-    });
-
     // Only take the most recent one
     const recentOtp = otpRecords.length > 0 ? [otpRecords[0]] : [];
 

@@ -170,11 +170,6 @@ class DatabaseService {
     let connection: oracledb.Connection | undefined;
     const connectionStartTime = Date.now();
     
-    // Log database access
-    const truncatedSql = sql.trim().replace(/\s+/g, ' ').substring(0, 100);
-    const paramCount = Array.isArray(params) ? params.length : Object.keys(params).length;
-    console.log(`[DB] ${truncatedSql}${sql.length > 100 ? '...' : ''}`, paramCount > 0 ? `[${paramCount} params]` : '');
-    
     try {
       connection = await this.pool.getConnection();
       
@@ -265,11 +260,7 @@ class DatabaseService {
    */
   async testConnection(): Promise<boolean> {
     try {
-      console.log('🔍 Testing database connection...');
-      const startTime = Date.now();
       await this.query('SELECT 1 FROM DUAL');
-      const duration = Date.now() - startTime;
-      console.log(`✅ Database connection test successful (${duration}ms)`);
       
       // Check Oracle session limits (useful for debugging ORA-00018 errors)
       try {

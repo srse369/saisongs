@@ -58,19 +58,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
   if (singers.length === 0) {
     return (
       <div className="text-center py-12">
-        <svg
-          className="mx-auto h-12 w-12 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-          />
-        </svg>
+        <i className="fas fa-user text-5xl text-gray-400 mb-3 block"></i>
         <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No singers</h3>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by creating a new singer.</p>
       </div>
@@ -135,9 +123,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                       title="Edit"
                       className="inline-flex items-center gap-2 p-2 rounded-md text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
+                      <i className="fas fa-edit text-lg"></i>
                       <span className="text-sm font-medium whitespace-nowrap">Edit</span>
                     </button>
                   )}
@@ -147,9 +133,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                       title="Delete"
                       className="inline-flex items-center gap-2 p-2 rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <i className="fas fa-trash text-lg"></i>
                       <span className="text-sm font-medium whitespace-nowrap">Delete</span>
                     </button>
                   )}

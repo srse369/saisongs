@@ -99,23 +99,14 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
           }`}
           title={isTemplateSelected ? 'Select presentation template' : 'Pick a template for presentation'}
         >
-          <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
-          </svg>
+          <i className="fas fa-layer-group text-lg"></i>
           <div className="flex flex-col items-start gap-0.5">
             <span className="text-xs font-bold opacity-90 tracking-wider">TEMPLATE</span>
             <span className="text-sm truncate max-w-xs">
               {isTemplateSelected ? selectedTemplate?.name : 'Select one'}
             </span>
           </div>
-          <svg 
-            className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ml-auto ${expanded ? 'rotate-180' : ''}`}
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-          </svg>
+          <i className={`fas fa-chevron-down text-base flex-shrink-0 transition-transform duration-200 ml-auto ${expanded ? 'rotate-180' : ''}`}></i>
         </button>
 
       {expanded && (
@@ -172,9 +163,7 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
                       </div>
                     </div>
                     {currentTemplateId === template.id && (
-                      <svg className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                      <i className="fas fa-check text-lg text-purple-600 flex-shrink-0 mt-0.5"></i>
                     )}
                   </div>
                 </button>

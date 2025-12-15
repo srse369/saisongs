@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSession } from '../../contexts/SessionContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
-import { PresentationModal } from '../presentation/PresentationModal';
+import { PresentationModal, type PresentationModalHandle } from '../presentation/PresentationModal';
 import TemplateSelector from '../presentation/TemplateSelector';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { generateSessionPresentationSlides } from '../../utils/slideUtils';
@@ -25,6 +25,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const { entries } = useSession();
   const { songs } = useSongs();
   const { singers } = useSingers();
+  const presentationModalRef = useRef<PresentationModalHandle>(null);
 
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -154,7 +155,12 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
           break;
         case 'Escape':
           e.preventDefault();
-          handleExitPresentation();
+          // If chrome is hidden, toggle it back on instead of exiting
+          if (presentationModalRef.current?.isChromeHidden) {
+            presentationModalRef.current?.exitChromeHideMode();
+          } else {
+            handleExitPresentation();
+          }
           break;
         case 'Home':
           e.preventDefault();
@@ -312,6 +318,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
 
   return (
     <PresentationModal
+      ref={presentationModalRef}
       isOpen={true}
       onClose={handleExitPresentation}
       title="Live Session Presentation"

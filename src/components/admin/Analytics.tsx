@@ -111,10 +111,7 @@ export const Analytics: React.FC = () => {
               <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{summary.totalVisits.toLocaleString()}</p>
             </div>
             <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-              <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
+              <i className="fas fa-eye text-2xl text-blue-600 dark:text-blue-400"></i>
             </div>
           </div>
         </div>
@@ -126,9 +123,7 @@ export const Analytics: React.FC = () => {
               <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{summary.uniqueVisitors.toLocaleString()}</p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
-              <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
+              <i className="fas fa-users text-2xl text-green-600 dark:text-green-400"></i>
             </div>
           </div>
         </div>
@@ -140,9 +135,7 @@ export const Analytics: React.FC = () => {
               <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{summary.countries.length}</p>
             </div>
             <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
-              <svg className="w-8 h-8 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <i className="fas fa-globe text-2xl text-purple-600 dark:text-purple-400"></i>
             </div>
           </div>
         </div>
@@ -156,10 +149,7 @@ export const Analytics: React.FC = () => {
               </p>
             </div>
             <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-full">
-              <svg className="w-8 h-8 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              <i className="fas fa-map-marker-alt text-2xl text-orange-600 dark:text-orange-400"></i>
             </div>
           </div>
         </div>

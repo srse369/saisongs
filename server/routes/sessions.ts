@@ -26,9 +26,6 @@ router.get('/', requireAuth, async (req, res) => {
       ORDER BY name
     `);
 
-    console.log('[SESSIONS] Raw DB query returned', sessions.length, 'rows');
-    console.log('[SESSIONS] Raw sessions:', JSON.stringify(sessions.slice(0, 3), null, 2));
-
     const mappedSessions = sessions.map((row: any) => {
       let centerIds: number[] | undefined = undefined;
       try {

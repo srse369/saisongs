@@ -449,9 +449,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
                 onClick={handleAddSlide}
                 className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium flex items-center justify-center gap-2"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
+                <i className="fas fa-plus text-lg"></i>
                 Add Slide
               </button>
 
@@ -520,9 +518,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
                         className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Move up"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                        </svg>
+                        <i className="fas fa-chevron-up text-base"></i>
                       </button>
                       
                       {/* Move Down */}
@@ -532,9 +528,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
                         className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Move down"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
+                        <i className="fas fa-chevron-down text-base"></i>
                       </button>
                       
                       {/* Set as Reference */}
@@ -547,9 +541,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
                         }`}
                         title={index === referenceSlideIndex ? 'Reference slide' : 'Set as reference slide'}
                       >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
+                        <i className="fas fa-star text-base"></i>
                       </button>
 
                       {/* Duplicate */}
@@ -558,9 +550,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
                         className="p-1.5 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
                         title="Duplicate slide"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
+                        <i className="fas fa-copy text-base"></i>
                       </button>
                       
                       {/* Edit */}
@@ -572,9 +562,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
                         className="p-1.5 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
                         title="Edit slide"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
+                        <i className="fas fa-edit text-base"></i>
                       </button>
                       
                       {/* Delete */}
@@ -584,9 +572,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
                         className="p-1.5 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
                         title="Delete slide"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                        <i className="fas fa-trash text-base"></i>
                       </button>
                     </div>
                   </div>
@@ -693,9 +679,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
               onClick={handleAddImage}
               className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium flex items-center justify-center gap-2"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <i className="fas fa-plus text-lg"></i>
               Add Image
             </button>
 
@@ -841,9 +825,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
               onClick={handleAddVideo}
               className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium flex items-center justify-center gap-2"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <i className="fas fa-plus text-lg"></i>
               Add Video
             </button>
 
@@ -1019,9 +1001,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
               onClick={handleAddText}
               className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium flex items-center justify-center gap-2"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <i className="fas fa-plus text-lg"></i>
               Add Text
             </button>
 
@@ -1169,9 +1149,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
                           }`}
                           title="Align Left"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h14" />
-                          </svg>
+                          <i className="fas fa-align-left text-base"></i>
                           Left
                         </button>
                         <button
@@ -1184,9 +1162,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
                           }`}
                           title="Align Center"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M7 12h10M5 18h14" />
-                          </svg>
+                          <i className="fas fa-align-center text-base"></i>
                           Center
                         </button>
                         <button
@@ -1199,9 +1175,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
                           }`}
                           title="Align Right"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M10 12h10M6 18h14" />
-                          </svg>
+                          <i className="fas fa-align-right text-base"></i>
                           Right
                         </button>
                       </div>
@@ -1249,10 +1223,7 @@ export const TemplateVisualEditor: React.FC<TemplateVisualEditorProps> = ({
             onClick={() => onPreview(template)}
             className="px-4 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors flex items-center gap-2"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
+            <i className="fas fa-eye text-lg"></i>
             Preview
           </button>
         </div>

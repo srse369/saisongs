@@ -394,9 +394,7 @@ export const SessionManager: React.FC = () => {
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
                       {singer && (
                         <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
+                          <i className="fas fa-user text-base"></i>
                           <span className={`font-medium ${
                             singer.gender?.toLowerCase() === 'male' 
                               ? 'text-blue-600 dark:text-blue-400' 
@@ -412,9 +410,7 @@ export const SessionManager: React.FC = () => {
                       )}
                       {entry.pitch && (
                         <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                          </svg>
+                          <i className="fas fa-music text-base"></i>
                           <span className="font-bold text-gray-700 dark:text-gray-200">{formatPitch(entry.pitch)}</span>
                           <span className="text-gray-500 dark:text-gray-400">({entry.pitch.replace('#', '♯')})</span>
                         </div>
@@ -454,19 +450,14 @@ export const SessionManager: React.FC = () => {
                     title="Preview"
                     className="p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
+                    <i className="fas fa-eye text-lg"></i>
                   </button>
                   <button
                     onClick={() => removeSong(entry.songId, entry.singerId)}
                     title="Remove"
                     className="flex items-center gap-2 p-2 rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <i className="fas fa-times text-lg"></i>
                     <span className="text-sm font-medium whitespace-nowrap">Remove</span>
                   </button>
                 </div>
@@ -580,19 +571,7 @@ export const SessionManager: React.FC = () => {
             title="Refresh sessions"
             aria-label="Refresh sessions"
           >
-            <svg
-              className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+            <i className={`fas fa-redo text-lg ${loading ? 'animate-spin' : ''}`}></i>
           </button>
         }
       >
@@ -648,14 +627,9 @@ export const SessionManager: React.FC = () => {
                       aria-label={`Delete ${session.name}`}
                     >
                       {deletingSessionId === session.id ? (
-                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
+                        <i className="fas fa-spinner text-lg animate-spin"></i>
                       ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                        <i className="fas fa-trash text-lg"></i>
                       )}
                     </button>
                   )}
