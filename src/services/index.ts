@@ -7,3 +7,5 @@ export { default as externalSongsScraperService } from './ExternalSongsScraperSe
 export { default as importService } from './ImportService';
 export { pptxParserService } from './PptxParserService';
 export { pptxImportService } from './PptxImportService';
+export { cloudStorageService } from './CloudStorageService';
+export type { CloudProvider, CloudStorageConfig, UploadResult } from './CloudStorageService';

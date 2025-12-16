@@ -8,8 +8,8 @@ const router = express.Router();
 
 // ============ Named Sessions ============
 
-// Get all sessions
-router.get('/', requireAuth, async (req, res) => {
+// Get all sessions - Public endpoint for presentation purposes
+router.get('/', async (req, res) => {
   try {
     // Bypass cache to always get fresh data (filtering is user-specific)
     const db = await (cacheService as any).getDatabase();
@@ -115,8 +115,8 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// Get session by ID with items
-router.get('/:id', requireAuth, async (req, res) => {
+// Get session by ID with items - Public endpoint for presentation purposes
+router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const session = await cacheService.getSession(id);

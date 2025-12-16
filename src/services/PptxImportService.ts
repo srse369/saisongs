@@ -1,4 +1,5 @@
 import { pptxParserService } from './PptxParserService';
+import { cloudStorageService, type CloudStorageConfig, type UploadResult } from './CloudStorageService';
 import type { 
   PresentationTemplate, 
   TemplateSlide, 
@@ -118,12 +119,31 @@ export class PptxImportService {
 
   /**
    * Import a PowerPoint file and convert it to our template format
+   * If cloudConfig is provided, media files will be uploaded to cloud storage
    */
-  async importPptxFile(file: File, templateName: string): Promise<PresentationTemplate> {
+  async importPptxFile(
+    file: File, 
+    templateName: string,
+    cloudConfig?: CloudStorageConfig,
+    onProgress?: (current: number, total: number, message: string) => void
+  ): Promise<PresentationTemplate> {
     // Parse the PowerPoint file
+    onProgress?.(0, 100, 'Parsing PowerPoint file...');
     const { slides: parsedSlides, dimensions } = await pptxParserService.parsePptxFile(file);
 
+    // Upload media files to cloud storage if configured
+    let mediaUrlMap: Map<string, string> = new Map();
+    if (cloudConfig) {
+      onProgress?.(10, 100, 'Uploading media files to cloud storage...');
+      mediaUrlMap = await this.uploadMediaFiles(cloudConfig, (uploaded, total) => {
+        const progress = 10 + Math.floor((uploaded / total) * 40);
+        onProgress?.(progress, 100, `Uploading media file ${uploaded} of ${total}...`);
+      });
+      onProgress?.(50, 100, 'Media files uploaded successfully');
+    }
+
     // Determine our slide dimensions based on aspect ratio
+    onProgress?.(60, 100, 'Converting slides...');
     const aspectRatio: AspectRatio = dimensions.aspectRatio;
     const targetDimensions = ASPECT_RATIO_DIMENSIONS[aspectRatio];
     const targetWidth = targetDimensions.width;
@@ -137,11 +157,13 @@ export class PptxImportService {
         dimensions.width,
         dimensions.height,
         targetWidth,
-        targetHeight
+        targetHeight,
+        mediaUrlMap
       );
     });
 
     // Try to extract background color from first imported slide
+    onProgress?.(80, 100, 'Processing backgrounds...');
     let referenceBackgroundColor = '#1a1a2e'; // Default dark background
     
     if (importedSlides.length > 0 && importedSlides[0].background) {
@@ -181,6 +203,8 @@ export class PptxImportService {
     // Combine: reference slide first, then imported slides
     const slides = [referenceSlide, ...importedSlides];
 
+    onProgress?.(90, 100, 'Creating template...');
+
     // Create the template
     const template: PresentationTemplate = {
       // Don't set an ID - let the database assign one when created
@@ -200,7 +224,47 @@ export class PptxImportService {
       updated_at: new Date().toISOString(),
     };
 
+    // Clear cached media files
+    pptxParserService.clearCache();
+    
+    onProgress?.(100, 100, 'Import complete!');
+
     return template;
+  }
+
+  /**
+   * Upload media files to cloud storage
+   */
+  private async uploadMediaFiles(
+    cloudConfig: CloudStorageConfig,
+    onProgress?: (uploaded: number, total: number) => void
+  ): Promise<Map<string, string>> {
+    const mediaBlobs = pptxParserService.getMediaBlobs();
+    const filesToUpload: Array<{ blob: Blob; filename: string }> = [];
+
+    // Prepare files for upload
+    for (const [filename, { blob }] of mediaBlobs.entries()) {
+      filesToUpload.push({ blob, filename });
+    }
+
+    if (filesToUpload.length === 0) {
+      return new Map();
+    }
+
+    // Upload files to cloud storage
+    const results: UploadResult[] = await cloudStorageService.uploadFiles(
+      filesToUpload,
+      cloudConfig,
+      onProgress
+    );
+
+    // Create a map of original filenames to cloud URLs
+    const urlMap = new Map<string, string>();
+    for (const result of results) {
+      urlMap.set(result.filename, result.url);
+    }
+
+    return urlMap;
   }
 
   /**
@@ -212,8 +276,19 @@ export class PptxImportService {
     sourceWidth: number,
     sourceHeight: number,
     targetWidth: number,
-    targetHeight: number
+    targetHeight: number,
+    mediaUrlMap: Map<string, string> = new Map()
   ): TemplateSlide {
+    console.log('Converting slide:', {
+      hasBackground: !!parsedSlide.background,
+      backgroundType: parsedSlide.background?.type,
+      backgroundFilename: parsedSlide.background?.filename,
+      imagesCount: parsedSlide.images?.length || 0,
+      imageFilenames: parsedSlide.images?.map((img: any) => img.filename),
+      mediaUrlMapSize: mediaUrlMap.size,
+      mediaUrlMapKeys: Array.from(mediaUrlMap.keys())
+    });
+
     const slide: TemplateSlide = {
       images: [],
       videos: [],
@@ -223,14 +298,16 @@ export class PptxImportService {
 
     // Convert background
     if (parsedSlide.background) {
-      slide.background = this.convertBackground(parsedSlide.background);
+      slide.background = this.convertBackground(parsedSlide.background, mediaUrlMap);
+      console.log('Converted background:', slide.background);
     }
 
     // Convert images
     if (parsedSlide.images && parsedSlide.images.length > 0) {
       slide.images = parsedSlide.images.map((img: any, idx: number) =>
-        this.convertImage(img, idx, sourceWidth, sourceHeight, targetWidth, targetHeight)
+        this.convertImage(img, idx, sourceWidth, sourceHeight, targetWidth, targetHeight, mediaUrlMap)
       );
+      console.log('Converted images:', slide.images.length, slide.images);
     }
 
     // Convert text boxes
@@ -243,8 +320,24 @@ export class PptxImportService {
     // Convert videos
     if (parsedSlide.videos && parsedSlide.videos.length > 0) {
       slide.videos = parsedSlide.videos.map((vid: any, idx: number) =>
-        this.convertVideo(vid, idx, sourceWidth, sourceHeight, targetWidth, targetHeight)
+        this.convertVideo(vid, idx, sourceWidth, sourceHeight, targetWidth, targetHeight, mediaUrlMap)
       );
+    }
+
+    // Convert audios with high z-index to appear on top
+    if (parsedSlide.audios && parsedSlide.audios.length > 0) {
+      // Calculate max z-index from all existing elements
+      const maxZIndex = Math.max(
+        0,
+        ...(slide.images?.map(img => img.zIndex || 0) || []),
+        ...(slide.videos?.map(vid => vid.zIndex || 0) || []),
+        ...(slide.text?.map(txt => txt.zIndex || 0) || [])
+      );
+      
+      slide.audios = parsedSlide.audios.map((aud: any, idx: number) =>
+        this.convertAudio(aud, idx, sourceWidth, sourceHeight, targetWidth, targetHeight, mediaUrlMap, maxZIndex + 10 + idx)
+      );
+      console.log('Converted audios:', slide.audios.length, slide.audios);
     }
 
     return slide;
@@ -253,16 +346,21 @@ export class PptxImportService {
   /**
    * Convert background from PowerPoint format to our format
    */
-  private convertBackground(parsedBackground: any): BackgroundElement {
+  private convertBackground(parsedBackground: any, mediaUrlMap: Map<string, string> = new Map()): BackgroundElement {
     if (parsedBackground.type === 'solid') {
       return {
         type: 'color',
         value: parsedBackground.value,
       };
     } else if (parsedBackground.type === 'image' && parsedBackground.imageData) {
+      // Check if we have a cloud URL for this image using the filename
+      const imageUrl = parsedBackground.filename && mediaUrlMap.has(parsedBackground.filename)
+        ? mediaUrlMap.get(parsedBackground.filename)
+        : parsedBackground.imageData;
+      
       return {
         type: 'image',
-        value: parsedBackground.imageData,
+        value: imageUrl || parsedBackground.imageData,
       };
     }
 
@@ -282,7 +380,8 @@ export class PptxImportService {
     sourceWidth: number,
     sourceHeight: number,
     targetWidth: number,
-    targetHeight: number
+    targetHeight: number,
+    mediaUrlMap: Map<string, string> = new Map()
   ): ImageElement {
     const scaledPosition = this.scalePosition(
       parsedImage.x,
@@ -295,15 +394,21 @@ export class PptxImportService {
       targetHeight
     );
 
+    // Check if we have a cloud URL for this image using the filename
+    const imageUrl = parsedImage.filename && mediaUrlMap.has(parsedImage.filename)
+      ? mediaUrlMap.get(parsedImage.filename)
+      : parsedImage.imageData;
+
     return {
       id: parsedImage.id || `imported-image-${index}`,
-      url: parsedImage.imageData,
+      url: imageUrl || parsedImage.imageData,
       x: `${scaledPosition.x}px`,
       y: `${scaledPosition.y}px`,
       width: `${scaledPosition.width}px`,
       height: `${scaledPosition.height}px`,
       rotation: parsedImage.rotation,
       opacity: 1,
+      zIndex: index, // Preserve PowerPoint layering order
     };
   }
 
@@ -329,12 +434,44 @@ export class PptxImportService {
       targetHeight
     );
 
-    // Scale font size proportionally
-    let fontSize = '16px';
-    if (parsedText.fontSize) {
-      const scaleFactor = targetHeight / sourceHeight;
+    // Scale font size proportionally to the slide height
+    // sourceHeight is in EMUs, targetHeight is in pixels
+    // Font size is already in pixels, so we scale by the ratio of pixel heights
+    let fontSize = '24px'; // Default fallback
+    if (parsedText.fontSize && parsedText.fontSize > 0) {
+      // Convert source EMU height to approximate pixels (for ratio calculation)
+      // PowerPoint slide is typically 720 pixels at 100% zoom for a 16:9 slide
+      // Standard 16:9 slide: 9144000 x 5143500 EMUs
+      const sourceHeightPixels = sourceHeight / 9525; // EMU to pixels conversion
+      const scaleFactor = targetHeight / sourceHeightPixels;
       const scaledFontSize = Math.round(parsedText.fontSize * scaleFactor);
       fontSize = `${scaledFontSize}px`;
+    }
+
+    console.log('Converting text box:', {
+      originalFontSize: parsedText.fontSize,
+      fontFamily: parsedText.fontFamily,
+      color: parsedText.color,
+      sourceHeight,
+      targetHeight,
+      scaledFontSize: fontSize,
+      content: parsedText.content?.substring(0, 30)
+    });
+
+    // Add font fallbacks for fonts that may not be available
+    let fontFamily = parsedText.fontFamily;
+    if (fontFamily) {
+      // Add appropriate fallbacks for specific fonts
+      const fontFallbacks: Record<string, string> = {
+        'Monotype Corsiva': 'Monotype Corsiva, Brush Script MT, cursive',
+        'Microsoft New Tai Lue': 'Microsoft New Tai Lue, Segoe UI, sans-serif',
+        'Palatino Linotype': 'Palatino Linotype, Palatino, Georgia, serif',
+        'Calibri': 'Calibri, Arial, sans-serif',
+        'Arial': 'Arial, Helvetica, sans-serif',
+        'Times New Roman': 'Times New Roman, Times, serif',
+      };
+      
+      fontFamily = fontFallbacks[parsedText.fontFamily] || parsedText.fontFamily;
     }
 
     return {
@@ -345,7 +482,7 @@ export class PptxImportService {
       width: `${scaledPosition.width}px`,
       height: `${scaledPosition.height}px`,
       fontSize,
-      fontFamily: parsedText.fontFamily,
+      fontFamily,
       color: parsedText.color || '#000000',
       fontWeight: parsedText.bold ? 'bold' : 'normal',
       fontStyle: parsedText.italic ? 'italic' : 'normal',
@@ -364,7 +501,8 @@ export class PptxImportService {
     sourceWidth: number,
     sourceHeight: number,
     targetWidth: number,
-    targetHeight: number
+    targetHeight: number,
+    mediaUrlMap: Map<string, string> = new Map()
   ): VideoElement {
     const scaledPosition = this.scalePosition(
       parsedVideo.x,
@@ -377,9 +515,14 @@ export class PptxImportService {
       targetHeight
     );
 
+    // Check if we have a cloud URL for this video using the filename
+    const videoUrl = parsedVideo.filename && mediaUrlMap.has(parsedVideo.filename)
+      ? mediaUrlMap.get(parsedVideo.filename)
+      : parsedVideo.videoData;
+
     return {
       id: parsedVideo.id || `imported-video-${index}`,
-      url: parsedVideo.videoData,
+      url: videoUrl || parsedVideo.videoData,
       x: `${scaledPosition.x}px`,
       y: `${scaledPosition.y}px`,
       width: `${scaledPosition.width}px`,
@@ -388,6 +531,52 @@ export class PptxImportService {
       loop: false,
       muted: true,
       opacity: 1,
+      zIndex: index, // Preserve PowerPoint layering order
+    };
+  }
+
+  /**
+   * Convert audio from PowerPoint format to our format
+   */
+  private convertAudio(
+    parsedAudio: any,
+    index: number,
+    sourceWidth: number,
+    sourceHeight: number,
+    targetWidth: number,
+    targetHeight: number,
+    mediaUrlMap: Map<string, string> = new Map(),
+    zIndex: number = 0
+  ): AudioElement {
+    const scaledPosition = this.scalePosition(
+      parsedAudio.x,
+      parsedAudio.y,
+      parsedAudio.width,
+      parsedAudio.height,
+      sourceWidth,
+      sourceHeight,
+      targetWidth,
+      targetHeight
+    );
+
+    // Check if we have a cloud URL for this audio using the filename
+    const audioUrl = parsedAudio.filename && mediaUrlMap.has(parsedAudio.filename)
+      ? mediaUrlMap.get(parsedAudio.filename)
+      : parsedAudio.audioData;
+
+    return {
+      id: parsedAudio.id || `imported-audio-${index}`,
+      url: audioUrl || parsedAudio.audioData,
+      x: `${scaledPosition.x}px`,
+      y: `${scaledPosition.y}px`,
+      width: `${scaledPosition.width}px`,
+      height: `${scaledPosition.height}px`,
+      autoPlay: false,
+      loop: false,
+      volume: 1,
+      opacity: 1,
+      zIndex: zIndex,
+      visualHidden: false,
     };
   }
 

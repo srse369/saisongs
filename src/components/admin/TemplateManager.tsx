@@ -6,8 +6,10 @@ import { ensureSongContentStyles } from '../../types';
 import { RefreshIcon, Modal, CenterMultiSelect, CenterBadges } from '../common';
 import { PresentationModal } from '../presentation/PresentationModal';
 import { TemplateWysiwygEditor } from './TemplateWysiwygEditor';
+import { MediaExportModal } from './MediaExportModal';
 import { isMultiSlideTemplate } from '../../utils/templateUtils';
 import { pptxImportService } from '../../services/PptxImportService';
+import type { CloudStorageConfig } from '../../services/CloudStorageService';
 
 /**
  * Format a dimension value (x, y, width, height) as an integer string
@@ -274,6 +276,8 @@ export const TemplateManager: React.FC = () => {
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [importingPptx, setImportingPptx] = useState(false);
   const [importProgress, setImportProgress] = useState('');
+  const [showMediaExportModal, setShowMediaExportModal] = useState(false);
+  const [pendingPptxFile, setPendingPptxFile] = useState<File | null>(null);
   const pptxInputRef = useRef<HTMLInputElement>(null);
   
   // Check if template has unsaved changes
@@ -449,6 +453,19 @@ export const TemplateManager: React.FC = () => {
       return;
     }
 
+    // Store the file and show media export configuration modal
+    setPendingPptxFile(file);
+    setShowMediaExportModal(true);
+  };
+
+  const handleMediaExportConfirm = async (cloudConfig: CloudStorageConfig | undefined) => {
+    setShowMediaExportModal(false);
+    
+    if (!pendingPptxFile) return;
+
+    const file = pendingPptxFile;
+    setPendingPptxFile(null);
+
     setImportingPptx(true);
     setImportProgress('Reading PowerPoint file...');
 
@@ -456,12 +473,15 @@ export const TemplateManager: React.FC = () => {
       // Extract template name from filename
       const templateName = file.name.replace('.pptx', '');
       
-      setImportProgress('Parsing slides, images, and text...');
-      
-      // Import the PowerPoint file
-      const importedTemplate = await pptxImportService.importPptxFile(file, templateName);
-      
-      setImportProgress('Converting to template format...');
+      // Import the PowerPoint file with optional cloud storage configuration
+      const importedTemplate = await pptxImportService.importPptxFile(
+        file, 
+        templateName,
+        cloudConfig,
+        (current, total, message) => {
+          setImportProgress(message);
+        }
+      );
       
       // Set it as the editing template
       setEditingTemplate(importedTemplate);
@@ -471,7 +491,10 @@ export const TemplateManager: React.FC = () => {
       setValidationError('');
       setShowForm(true);
       
-      setSuccessMessage(`Successfully imported ${importedTemplate.slides?.length || 0} slides from PowerPoint!`);
+      const mediaMessage = cloudConfig 
+        ? `Media files uploaded to ${cloudConfig.provider}` 
+        : 'Media embedded as data URLs';
+      setSuccessMessage(`Successfully imported ${importedTemplate.slides?.length || 0} slides from PowerPoint! ${mediaMessage}`);
       setImportProgress('');
       
       // Clear success message after 5 seconds
@@ -1057,6 +1080,61 @@ export const TemplateManager: React.FC = () => {
                 <option value="4:3">4:3 (1600×1200)</option>
               </select>
               </div>
+              
+              {/* Background Audio */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                  Background Audio (plays across all slides)
+                </label>
+                {editingTemplate?.backgroundAudio ? (
+                  <div className="flex items-center gap-2">
+                    <audio 
+                      src={editingTemplate.backgroundAudio.url} 
+                      controls 
+                      className="flex-1"
+                      style={{ height: '40px' }}
+                    />
+                    <button
+                      onClick={() => setEditingTemplate(editingTemplate ? { ...editingTemplate, backgroundAudio: undefined } : null)}
+                      className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                      title="Remove background audio"
+                    >
+                      <i className="fas fa-trash"></i>
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file && editingTemplate) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          const dataUrl = event.target?.result as string;
+                          setEditingTemplate({
+                            ...editingTemplate,
+                            backgroundAudio: {
+                              id: `bg-audio-${Date.now()}`,
+                              url: dataUrl,
+                              autoPlay: true,
+                              loop: true,
+                              volume: 0.5,
+                              visualHidden: true,
+                            },
+                          });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                      e.target.value = ''; // Reset input
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                )}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Upload an audio file that will play continuously across all slides
+                </p>
+              </div>
                 </div>
 
           {/* Center Assignment */}
@@ -1188,6 +1266,43 @@ export const TemplateManager: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Media Export Configuration Modal */}
+      <MediaExportModal
+        isOpen={showMediaExportModal}
+        onClose={() => {
+          setShowMediaExportModal(false);
+          setPendingPptxFile(null);
+          // Reset file input
+          if (pptxInputRef.current) {
+            pptxInputRef.current.value = '';
+          }
+        }}
+        onConfirm={handleMediaExportConfirm}
+      />
+
+      {/* PowerPoint Import Progress Modal */}
+      {importingPptx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
+            <div className="flex flex-col items-center gap-4">
+              <i className="fas fa-file-powerpoint text-6xl text-orange-500 animate-pulse"></i>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                Importing PowerPoint
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 text-center">
+                {importProgress || 'Processing...'}
+              </p>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                <div className="bg-blue-600 h-2.5 rounded-full animate-pulse" style={{ width: '100%' }}></div>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                Please wait while we process your presentation...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -80,9 +80,32 @@ export function renderStyledText(text: string): React.ReactNode {
   // Sort tags by start position
   tags.sort((a, b) => a.start - b.start);
   
+  // Remove tags that are completely nested inside other tags
+  const filteredTags: typeof tags = [];
+  for (let i = 0; i < tags.length; i++) {
+    const tag = tags[i];
+    let isNested = false;
+    
+    // Check if this tag is nested inside any other tag
+    for (let j = 0; j < tags.length; j++) {
+      if (i === j) continue;
+      const otherTag = tags[j];
+      
+      // Check if tag is completely inside otherTag
+      if (tag.start >= otherTag.start && tag.end <= otherTag.end && tag.start !== otherTag.start) {
+        isNested = true;
+        break;
+      }
+    }
+    
+    if (!isNested) {
+      filteredTags.push(tag);
+    }
+  }
+  
   // Build parts array by processing text and tags
   let lastPos = 0;
-  for (const tag of tags) {
+  for (const tag of filteredTags) {
     // Add text before tag
     if (lastPos < tag.start) {
       parts.push(processedText.substring(lastPos, tag.start));
@@ -111,14 +134,17 @@ export function renderStyledText(text: string): React.ReactNode {
         }
 
         if (part.type === 'bold') {
-          return <strong key={idx}>{part.content}</strong>;
+          // Recursively render nested content
+          return <strong key={idx}>{renderStyledText(part.content || '')}</strong>;
         } else if (part.type === 'italic') {
-          return <em key={idx}>{part.content}</em>;
+          // Recursively render nested content
+          return <em key={idx}>{renderStyledText(part.content || '')}</em>;
         } else if (part.type === 'br') {
           return <br key={idx} />;
         } else if (part.type.startsWith('color:')) {
           const color = part.type.substring(6);
-          return <span key={idx} style={{ color }}>{part.content}</span>;
+          // Recursively render nested content
+          return <span key={idx} style={{ color }}>{renderStyledText(part.content || '')}</span>;
         }
 
         return <React.Fragment key={idx}>{part.content}</React.Fragment>;
@@ -946,6 +972,24 @@ export const SlideAudios: React.FC<{ templateSlide: TemplateSlide | null }> = ({
  * Render text overlays (for individual TemplateSlide)
  */
 export const SlideText: React.FC<{ templateSlide: TemplateSlide | null }> = ({ templateSlide }) => {
+  console.log('SlideText rendering:', {
+    hasTemplateSlide: !!templateSlide,
+    hasText: !!templateSlide?.text,
+    textCount: templateSlide?.text?.length || 0,
+    textElements: templateSlide?.text?.map(t => ({
+      id: t.id,
+      content: t.content?.substring(0, 50),
+      x: t.x,
+      y: t.y,
+      width: t.width,
+      height: t.height,
+      fontSize: t.fontSize,
+      color: t.color,
+      opacity: t.opacity,
+      zIndex: t.zIndex
+    }))
+  });
+
   if (!templateSlide?.text || templateSlide.text.length === 0) {
     return null;
   }

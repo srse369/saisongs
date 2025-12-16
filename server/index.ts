@@ -4,6 +4,8 @@ import './config/env.js';
 import express from 'express';
 import session from 'express-session';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import songsRouter from './routes/songs.js';
 import singersRouter from './routes/singers.js';
 import pitchesRouter from './routes/pitches.js';
@@ -14,10 +16,15 @@ import centersRouter from './routes/centers.js';
 import analyticsRouter from './routes/analytics.js';
 import feedbackRouter from './routes/feedback.js';
 import templatesRouter from './routes/templates.js';
+import mediaRouter from './routes/media.js';
 import { requireAuth, requireEditor, requireAdmin } from './middleware/simpleAuth.js';
 import { warmupCache, cacheService } from './services/CacheService.js';
 import { OracleSessionStore } from './middleware/OracleSessionStore.js';
 import { emailService } from './services/EmailService.js';
+import { PPTX_MEDIA_DIR } from './config/env.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3111;
@@ -66,6 +73,10 @@ app.use(session({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Note: Analytics tracking is done client-side via /api/analytics/track endpoint
+
+// Serve PowerPoint media files statically
+console.log(`📁 Serving PowerPoint media from: ${PPTX_MEDIA_DIR}`);
+app.use('/pptx-media', express.static(PPTX_MEDIA_DIR));
 
 // Health check endpoint with optional database stats
 app.get('/api/health', async (req, res) => {
@@ -155,6 +166,7 @@ app.use('/api/analytics', analyticsRouter);  // Analytics (routes handle their o
 app.use('/api/feedback', feedbackRouter);  // Feedback is public
 app.use('/api/templates', templatesRouter);  // Templates public for presentation mode
 app.use('/api/centers', centersRouter);  // Centers GET is public for UI, but POST/PUT/DELETE require admin (enforced in routes)
+app.use('/api', mediaRouter);  // Media upload routes (handles own auth)
 
 // Protected routes - requireEditor enforced at route level for granular control
 app.use('/api/singers', singersRouter);  // Singer routes require editor/admin (enforced in route handlers)

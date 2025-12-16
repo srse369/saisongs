@@ -53,6 +53,10 @@ export interface AudioElement {
   loop?: boolean;
   volume?: number; // 0 to 1
   visualHidden?: boolean; // Hide visual placeholder, play audio only
+  
+  // Multi-slide audio support
+  startSlideIndex?: number; // 0-based index of first slide to play on (default: current slide)
+  endSlideIndex?: number;   // 0-based index of last slide to play on (default: current slide only)
 }
 
 export interface TextElement {
@@ -197,6 +201,9 @@ export interface PresentationTemplate {
   // Multi-slide structure (new format)
   slides?: TemplateSlide[];           // Array of slides in the template
   referenceSlideIndex?: number;       // 0-based index of the slide used for song content overlay
+  
+  // Background audio that plays across all slides
+  backgroundAudio?: AudioElement;     // Audio that continues playing when navigating between slides
   
   // Legacy single-slide fields (for backward compatibility)
   // These are used when slides array is not present

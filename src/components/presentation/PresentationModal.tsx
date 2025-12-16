@@ -55,6 +55,37 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
   const touchStartY = useRef<number | null>(null);
   const [showNavButtons, setShowNavButtons] = useState(true);
   const navButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+
+  // Control audio playback based on current slide
+  useEffect(() => {
+    if (!template?.slides) return;
+    
+    // Collect all audio elements with their original slide index
+    const allAudios: Array<{ audio: any; originalSlideIndex: number }> = [];
+    template.slides.forEach((slide, slideIndex) => {
+      (slide.audios || []).forEach((audio) => {
+        allAudios.push({ audio, originalSlideIndex: slideIndex });
+      });
+    });
+    
+    // Control playback for each audio based on current slide
+    allAudios.forEach(({ audio, originalSlideIndex }) => {
+      const startSlide = audio.startSlideIndex ?? originalSlideIndex;
+      const endSlide = audio.endSlideIndex ?? originalSlideIndex;
+      const shouldPlay = currentSlideIndex >= startSlide && currentSlideIndex <= endSlide;
+      
+      const audioElement = audioRefs.current.get(audio.id);
+      if (audioElement) {
+        if (shouldPlay && audioElement.paused) {
+          audioElement.play().catch(err => console.warn('Audio play failed:', err));
+        } else if (!shouldPlay && !audioElement.paused) {
+          audioElement.pause();
+          audioElement.currentTime = 0;
+        }
+      }
+    });
+  }, [currentSlideIndex, template?.slides]);
 
   // Expose the hide UI state to parent component
   useImperativeHandle(ref, () => ({
@@ -258,6 +289,38 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
         }
       }}
     >
+      {/* Background audio that plays across all slides */}
+      {template?.backgroundAudio && (
+        <audio
+          key={template.backgroundAudio.id}
+          src={template.backgroundAudio.url}
+          autoPlay={template.backgroundAudio.autoPlay ?? true}
+          loop={template.backgroundAudio.loop ?? true}
+          volume={template.backgroundAudio.volume ?? 0.5}
+          style={{ display: 'none' }}
+        />
+      )}
+      
+      {/* Multi-slide audio elements - render all, control playback via refs */}
+      {template?.slides && template.slides.flatMap((slide, slideIndex) => 
+        (slide.audios || []).map((audio) => (
+          <audio
+            key={audio.id}
+            ref={(el) => {
+              if (el) {
+                audioRefs.current.set(audio.id, el);
+              } else {
+                audioRefs.current.delete(audio.id);
+              }
+            }}
+            src={audio.url}
+            loop={audio.loop ?? false}
+            volume={audio.volume ?? 1}
+            style={{ display: 'none' }}
+          />
+        ))
+      )}
+      
       <div className={`bg-white dark:bg-gray-900 ${cssFullscreenMode ? 'w-screen h-screen' : 'rounded-lg shadow-2xl w-full h-full max-w-full max-h-screen'} flex flex-col`}>
         {/* Header - Hidden in fullscreen or CSS fullscreen mode */}
         {!isFullscreen && !cssFullscreenMode && (
@@ -344,6 +407,7 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
           className={`flex-1 overflow-hidden relative flex items-center justify-center bg-gray-900 ${isFullscreen ? 'p-0' : 'p-4'}`}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
+          onMouseMove={resetNavButtonTimeout}
         >
           {/* Wrapper that has the final scaled dimensions */}
           <div 
@@ -409,7 +473,7 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
               {/* On-slide Navigation Buttons - Auto-hide after 2 seconds */}
               {slides.length > 1 && (
                 <div 
-                  className={`absolute inset-0 pointer-events-none transition-opacity duration-300 z-50 ${
+                  className={`absolute inset-0 pointer-events-none transition-opacity duration-300 z-[9999] ${
                     showNavButtons ? 'opacity-100' : 'opacity-0'
                   }`}
                 >
@@ -423,8 +487,8 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
                         resetNavButtonTimeout();
                       }}
                     >
-                      <div className="bg-black/50 hover:bg-black/70 text-white rounded-full p-6 md:p-8 lg:p-10 transition-all hover:scale-110 backdrop-blur-sm pointer-events-none">
-                        <i className="fas fa-chevron-left text-4xl md:text-5xl lg:text-6xl"></i>
+                      <div className="bg-black/70 hover:bg-black/80 text-white rounded-full p-8 transition-all hover:scale-110 backdrop-blur-md pointer-events-none">
+                        <i className="fas fa-chevron-left text-5xl"></i>
                       </div>
                     </div>
                   )}
@@ -439,8 +503,8 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
                         resetNavButtonTimeout();
                       }}
                     >
-                      <div className="bg-black/50 hover:bg-black/70 text-white rounded-full p-6 md:p-8 lg:p-10 transition-all hover:scale-110 backdrop-blur-sm pointer-events-none">
-                        <i className="fas fa-chevron-right text-4xl md:text-5xl lg:text-6xl"></i>
+                      <div className="bg-black/70 hover:bg-black/80 text-white rounded-full p-8 transition-all hover:scale-110 backdrop-blur-md pointer-events-none">
+                        <i className="fas fa-chevron-right text-5xl"></i>
                       </div>
                     </div>
                   )}
@@ -449,7 +513,7 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
 
               {/* Close/Exit Button - Always visible like navigation buttons */}
               <div 
-                className={`absolute inset-0 pointer-events-none transition-opacity duration-300 z-50 ${
+                className={`absolute inset-0 pointer-events-none transition-opacity duration-300 z-[9999] ${
                   showNavButtons ? 'opacity-100' : 'opacity-0'
                 }`}
               >
@@ -467,8 +531,8 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
                     resetNavButtonTimeout();
                   }}
                 >
-                  <div className="bg-black/50 hover:bg-black/70 text-white rounded-full p-6 md:p-8 lg:p-10 transition-all hover:scale-110 backdrop-blur-sm pointer-events-none">
-                    <i className="fas fa-times text-4xl md:text-5xl lg:text-6xl"></i>
+                  <div className="bg-black/70 hover:bg-black/80 text-white rounded-full p-8 transition-all hover:scale-110 backdrop-blur-md pointer-events-none">
+                    <i className="fas fa-times text-5xl"></i>
                   </div>
                 </div>
               </div>

@@ -243,6 +243,9 @@ type CanvasElement = {
   hideAudio?: boolean;
   visualHidden?: boolean;
   volume?: number;
+  // Multi-slide audio
+  startSlideIndex?: number;
+  endSlideIndex?: number;
 };
 
 // Hook for detecting long-press on mobile devices (for Konva canvas elements)
@@ -1193,6 +1196,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           autoPlay: aud.autoPlay,
           visualHidden: aud.visualHidden,
           volume: aud.volume,
+          startSlideIndex: aud.startSlideIndex,
+          endSlideIndex: aud.endSlideIndex,
           rotation: aud.rotation,
         };
       }),
@@ -1381,6 +1386,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           autoPlay: updates.autoPlay ?? audios[audIndex].autoPlay,
           visualHidden: updates.visualHidden ?? audios[audIndex].visualHidden,
           volume: updates.volume ?? audios[audIndex].volume,
+          startSlideIndex: updates.startSlideIndex !== undefined ? updates.startSlideIndex : audios[audIndex].startSlideIndex,
+          endSlideIndex: updates.endSlideIndex !== undefined ? updates.endSlideIndex : audios[audIndex].endSlideIndex,
           zIndex: updates.zIndex !== undefined ? updates.zIndex : audios[audIndex].zIndex,
           rotation:
             updates.rotation !== undefined
@@ -2607,6 +2614,45 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                         );
                       })}
 
+                      {/* Audio elements */}
+                      {(slide.audios || []).map((aud) => {
+                        const audWidth = parseFloat(aud.width || '80') || 80;
+                        const audHeight = parseFloat(aud.height || '80') || 80;
+                        const x = parsePosition(
+                          aud.x as string | undefined,
+                          aud.position,
+                          'x',
+                          SLIDE_WIDTH,
+                          audWidth,
+                          SLIDE_WIDTH,
+                          SLIDE_HEIGHT
+                        );
+                        const y = parsePosition(
+                          aud.y as string | undefined,
+                          aud.position,
+                          'y',
+                          SLIDE_HEIGHT,
+                          audHeight,
+                          SLIDE_WIDTH,
+                          SLIDE_HEIGHT
+                        );
+
+                        return (
+                          <div
+                            key={aud.id}
+                            className="absolute rounded-full border border-blue-300/70 bg-black/60 flex items-center justify-center"
+                            style={{
+                              left: `${(x / SLIDE_WIDTH) * 100}%`,
+                              top: `${(y / SLIDE_HEIGHT) * 100}%`,
+                              width: `${(audWidth / SLIDE_WIDTH) * 100}%`,
+                              height: `${(audHeight / SLIDE_HEIGHT) * 100}%`,
+                            }}
+                          >
+                            <span className="text-[9px] text-blue-100">♪</span>
+                          </div>
+                        );
+                      })}
+
                       {/* Text elements */}
                       {(slide.text || []).map((txt) => {
                         const textBlockWidth = 600; // match main editor assumptions
@@ -3509,6 +3555,57 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       className="w-full"
                     />
                   </div>
+                  
+                  {/* Multi-slide audio range */}
+                  {(template?.slides?.length ?? 0) > 1 && (
+                    <>
+                      <div className="col-span-2 border-t border-gray-200 dark:border-gray-700 pt-3">
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Play audio across slides
+                        </label>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                          Start Slide (1-{template?.slides?.length ?? 1})
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max={template?.slides?.length ?? 1}
+                          value={(selectedElement.startSlideIndex ?? selectedSlideIndex) + 1}
+                          onChange={(e) => {
+                            const slideNum = parseInt(e.target.value);
+                            if (slideNum >= 1 && slideNum <= (template?.slides?.length ?? 1)) {
+                              updateElement(selectedElement.id, { startSlideIndex: slideNum - 1 });
+                            }
+                          }}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                          End Slide (1-{template?.slides?.length ?? 1})
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max={template?.slides?.length ?? 1}
+                          value={(selectedElement.endSlideIndex ?? selectedSlideIndex) + 1}
+                          onChange={(e) => {
+                            const slideNum = parseInt(e.target.value);
+                            if (slideNum >= 1 && slideNum <= (template?.slides?.length ?? 1)) {
+                              updateElement(selectedElement.id, { endSlideIndex: slideNum - 1 });
+                            }
+                          }}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Audio will play from slide {(selectedElement.startSlideIndex ?? selectedSlideIndex) + 1} to {(selectedElement.endSlideIndex ?? selectedSlideIndex) + 1}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  
                   <div>
                     <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Z-Index (layer order)</label>
                     <input

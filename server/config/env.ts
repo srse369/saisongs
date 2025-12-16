@@ -32,6 +32,7 @@ console.log('   BREVO_API_KEY:', process.env.BREVO_API_KEY ? 'SET' : 'NOT SET');
 console.log('   BREVO_SENDER_EMAIL:', process.env.BREVO_SENDER_EMAIL ? 'SET' : 'NOT SET');
 console.log('   BREVO_SENDER_NAME:', process.env.BREVO_SENDER_NAME ? 'SET' : 'NOT SET');
 console.log('   SESSION_SECRET:', process.env.SESSION_SECRET ? 'SET' : 'NOT SET');
+console.log('   PPTX_MEDIA_DIR:', process.env.PPTX_MEDIA_DIR || 'NOT SET (will use default)');
 
 // Validate required environment variables
 if (!process.env.BREVO_API_KEY) {
@@ -43,4 +44,12 @@ if (!process.env.SESSION_SECRET) {
   console.warn('⚠️  WARNING: SESSION_SECRET not set! Using default (INSECURE)');
   process.env.SESSION_SECRET = 'dev-session-secret-change-in-production';
 }
+
+// Set default PPTX media directory if not configured
+if (!process.env.PPTX_MEDIA_DIR) {
+  process.env.PPTX_MEDIA_DIR = path.join(projectRoot, 'public', 'pptx-media');
+  console.log('ℹ️  Using default PPTX media directory:', process.env.PPTX_MEDIA_DIR);
+}
+
+export const PPTX_MEDIA_DIR = process.env.PPTX_MEDIA_DIR;
 
