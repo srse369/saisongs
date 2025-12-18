@@ -53,20 +53,6 @@ router.get('/', async (req, res) => {
     const allSessions = mappedSessions;
     const user = req.user;
     
-    console.log('[SESSIONS] After mapping:', allSessions.length, 'sessions');
-    console.log('[SESSIONS] User info:', {
-      email: user?.email,
-      role: user?.role,
-      centerIds: user?.centerIds,
-      editorFor: user?.editorFor,
-    });
-    console.log('[SESSIONS] All sessions:', allSessions.map(s => ({
-      id: s.id,
-      name: s.name,
-      center_ids: s.center_ids,
-      created_by: s.created_by,
-    })));
-    
     // Filter sessions based on user role and centers
     let filteredSessions = allSessions;
     
@@ -97,7 +83,6 @@ router.get('/', async (req, res) => {
       });
     }
     
-    console.log('[SESSIONS] Filtered sessions count:', filteredSessions.length, 'from', allSessions.length);
     res.json(filteredSessions);
   } catch (error) {
     console.error('Error fetching sessions:', error);

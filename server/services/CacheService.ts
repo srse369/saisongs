@@ -904,17 +904,12 @@ class CacheService {
         updated_at: s.updated_at || s.UPDATED_AT,
       };
       
-      console.log('[CACHE] Updating singer in cache:', { id, name: normalizedSinger.name, center_ids: parsedCenterIds });
-      
       const cached = this.get('singers:all');
       if (cached && Array.isArray(cached)) {
         const updated = cached
           .map((singer: any) => singer.id === id ? normalizedSinger : singer)
           .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         this.set('singers:all', updated, 5 * 60 * 1000);
-        console.log('[CACHE] singers:all cache updated, total singers:', updated.length);
-      } else {
-        console.log('[CACHE] No singers:all cache found, skipping cache update');
       }
     }
     

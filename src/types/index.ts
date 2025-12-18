@@ -55,8 +55,13 @@ export interface AudioElement {
   visualHidden?: boolean; // Hide visual placeholder, play audio only
   
   // Multi-slide audio support
-  startSlideIndex?: number; // 0-based index of first slide to play on (default: current slide)
-  endSlideIndex?: number;   // 0-based index of last slide to play on (default: current slide only)
+  // Use 1-based slide numbers (preferred):
+  startSlide?: number; // 1-based slide number to start playing on (e.g., 10 for slide 10)
+  endSlide?: number;   // 1-based slide number to stop playing on (e.g., 13 for slide 13)
+  // Legacy 0-based indices (still supported for backwards compatibility):
+  startSlideIndex?: number; // 0-based index (deprecated, use startSlide instead)
+  endSlideIndex?: number;   // 0-based index (deprecated, use endSlide instead)
+  playAcrossAllSlides?: boolean; // When true, play continuously across all slides once started
 }
 
 export interface TextElement {

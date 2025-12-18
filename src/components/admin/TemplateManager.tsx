@@ -100,6 +100,8 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
       if (aud.loop !== undefined) lines.push(`${indent}    loop: ${aud.loop}`);
       if (aud.volume !== undefined) lines.push(`${indent}    volume: ${aud.volume}`);
       if (aud.visualHidden !== undefined) lines.push(`${indent}    visualHidden: ${aud.visualHidden}`);
+      if (aud.startSlideIndex !== undefined) lines.push(`${indent}    startSlideIndex: ${aud.startSlideIndex}`);
+      if (aud.endSlideIndex !== undefined) lines.push(`${indent}    endSlideIndex: ${aud.endSlideIndex}`);
       if (aud.rotation !== undefined) lines.push(`${indent}    rotation: ${Math.round(aud.rotation)}`);
     });
   } else {
@@ -977,6 +979,37 @@ export const TemplateManager: React.FC = () => {
                 template={editingTemplate}
                 onTemplateChange={setEditingTemplate}
                 onSlideIndexChange={setEditorSelectedSlideIndex}
+                onSwitchToYaml={(slideIndex) => {
+                  // Sync visual changes to YAML before switching
+                  const templateWithDefaults = applyDefaultSongContentStyles(editingTemplate);
+                  const newYaml = templateToYaml(templateWithDefaults);
+                  setYamlContent(newYaml);
+                  setEditorMode('yaml');
+                  
+                  // After switching, scroll to the slide in YAML
+                  // Find the line that starts with "  - # Slide X" (1-based)
+                  setTimeout(() => {
+                    const textarea = document.querySelector('textarea[value]') as HTMLTextAreaElement;
+                    if (textarea) {
+                      const slideMarker = `  - # Slide ${slideIndex + 1}`;
+                      const yamlLines = newYaml.split('\n');
+                      let lineNumber = 0;
+                      for (let i = 0; i < yamlLines.length; i++) {
+                        if (yamlLines[i].startsWith(slideMarker)) {
+                          lineNumber = i;
+                          break;
+                        }
+                      }
+                      // Scroll to approximately that line
+                      const lineHeight = 20; // approximate
+                      textarea.scrollTop = lineNumber * lineHeight - 100;
+                      // Also set cursor position
+                      const charPosition = yamlLines.slice(0, lineNumber).join('\n').length;
+                      textarea.setSelectionRange(charPosition, charPosition);
+                      textarea.focus();
+                    }
+                  }, 100);
+                }}
               />
               {validationError && (
                 <div className="p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 rounded text-sm">

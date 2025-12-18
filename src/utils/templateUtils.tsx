@@ -975,24 +975,6 @@ export const SlideAudios: React.FC<{ templateSlide: TemplateSlide | null }> = ({
  * Render text overlays (for individual TemplateSlide)
  */
 export const SlideText: React.FC<{ templateSlide: TemplateSlide | null }> = ({ templateSlide }) => {
-  console.log('SlideText rendering:', {
-    hasTemplateSlide: !!templateSlide,
-    hasText: !!templateSlide?.text,
-    textCount: templateSlide?.text?.length || 0,
-    textElements: templateSlide?.text?.map(t => ({
-      id: t.id,
-      content: t.content?.substring(0, 50),
-      x: t.x,
-      y: t.y,
-      width: t.width,
-      height: t.height,
-      fontSize: t.fontSize,
-      color: t.color,
-      opacity: t.opacity,
-      zIndex: t.zIndex
-    }))
-  });
-
   if (!templateSlide?.text || templateSlide.text.length === 0) {
     return null;
   }

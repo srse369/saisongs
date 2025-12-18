@@ -240,8 +240,8 @@ class DatabaseService {
         }
       }
       
-      // Log active connection count if it's concerning
-      if (this.activeConnections.size > 0) {
+      // Only log if connection count is unexpectedly high
+      if (this.activeConnections.size > 5) {
         console.warn(`⚠️  ${this.activeConnections.size} connections still active`);
       }
     }

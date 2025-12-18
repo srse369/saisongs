@@ -62,31 +62,69 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
     if (!template?.slides) return;
     
     // Collect all audio elements with their original slide index
-    const allAudios: Array<{ audio: any; originalSlideIndex: number }> = [];
+    // Use compound key (slideIndex_audioId) to handle duplicate IDs across slides
+    const allAudios: Array<{ audio: any; originalSlideIndex: number; uniqueKey: string }> = [];
     template.slides.forEach((slide, slideIndex) => {
       (slide.audios || []).forEach((audio) => {
-        allAudios.push({ audio, originalSlideIndex: slideIndex });
+        const uniqueKey = `${slideIndex}_${audio.id}`;
+        allAudios.push({ audio, originalSlideIndex: slideIndex, uniqueKey });
       });
     });
     
+    // Current slide as 1-based number for comparison
+    const currentSlideNumber = currentSlideIndex + 1;
+    
     // Control playback for each audio based on current slide
-    allAudios.forEach(({ audio, originalSlideIndex }) => {
-      const startSlide = audio.startSlideIndex ?? originalSlideIndex;
-      const endSlide = audio.endSlideIndex ?? originalSlideIndex;
-      const shouldPlay = currentSlideIndex >= startSlide && currentSlideIndex <= endSlide;
+    allAudios.forEach(({ audio, originalSlideIndex, uniqueKey }) => {
+      const audioElement = audioRefs.current.get(uniqueKey);
+      if (!audioElement) return;
       
-      const audioElement = audioRefs.current.get(audio.id);
-      if (audioElement) {
-        // Only auto-play if the audio has autoPlay enabled
-        if (shouldPlay && audioElement.paused && audio.autoPlay) {
+      // If playAcrossAllSlides is true, play on all slides (never stop based on slide index)
+      if (audio.playAcrossAllSlides) {
+        if (audioElement.paused && audio.autoPlay !== false) {
           audioElement.play().catch(err => console.warn('Audio play failed:', err));
-        } else if (!shouldPlay && !audioElement.paused) {
-          audioElement.pause();
-          audioElement.currentTime = 0;
         }
+        return; // Don't apply slide range logic
+      }
+      
+      // Support both 1-based (startSlide/endSlide) and legacy 0-based (startSlideIndex/endSlideIndex)
+      // Priority: 1-based names, then legacy 0-based names, then defaults
+      let startSlideNum: number;
+      let endSlideNum: number;
+      
+      if (audio.startSlide !== undefined) {
+        // 1-based slide number provided
+        startSlideNum = audio.startSlide;
+      } else if (audio.startSlideIndex !== undefined) {
+        // Legacy 0-based index, convert to 1-based
+        startSlideNum = audio.startSlideIndex + 1;
+      } else {
+        // Default: template slide position + 1 (1-based)
+        startSlideNum = originalSlideIndex + 1;
+      }
+      
+      if (audio.endSlide !== undefined) {
+        // 1-based slide number provided
+        endSlideNum = audio.endSlide;
+      } else if (audio.endSlideIndex !== undefined) {
+        // Legacy 0-based index, convert to 1-based
+        endSlideNum = audio.endSlideIndex + 1;
+      } else {
+        // Default: total slides (play to end)
+        endSlideNum = slides.length;
+      }
+      
+      const shouldPlay = currentSlideNumber >= startSlideNum && currentSlideNumber <= endSlideNum;
+      
+      // Only auto-play if the audio has autoPlay enabled
+      if (shouldPlay && audioElement.paused && audio.autoPlay !== false) {
+        audioElement.play().catch(err => console.warn('Audio play failed:', err));
+      } else if (!shouldPlay && !audioElement.paused) {
+        audioElement.pause();
+        audioElement.currentTime = 0;
       }
     });
-  }, [currentSlideIndex, template?.slides]);
+  }, [currentSlideIndex, template?.slides, slides.length]);
 
   // Expose the hide UI state to parent component
   useImperativeHandle(ref, () => ({
@@ -305,22 +343,25 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
       
       {/* Multi-slide audio elements - render all, control playback via refs */}
       {template?.slides && template.slides.flatMap((slide, slideIndex) => 
-        (slide.audios || []).map((audio) => (
-          <audio
-            key={audio.id}
-            ref={(el) => {
-              if (el) {
-                audioRefs.current.set(audio.id, el);
-              } else {
-                audioRefs.current.delete(audio.id);
-              }
-            }}
-            src={audio.url}
-            loop={audio.loop ?? false}
-            volume={audio.volume ?? 1}
-            style={{ display: 'none' }}
-          />
-        ))
+        (slide.audios || []).map((audio) => {
+          // Use compound key to handle duplicate IDs across slides
+          const uniqueKey = `${slideIndex}_${audio.id}`;
+          return (
+            <audio
+              key={uniqueKey}
+              ref={(el) => {
+                if (el) {
+                  audioRefs.current.set(uniqueKey, el);
+                } else {
+                  audioRefs.current.delete(uniqueKey);
+                }
+              }}
+              src={audio.url}
+              loop={audio.loop ?? false}
+              style={{ display: 'none' }}
+            />
+          );
+        })
       )}
       
       <div className={`bg-white dark:bg-gray-900 ${cssFullscreenMode ? 'w-screen h-screen' : 'rounded-lg shadow-2xl w-full h-full max-w-full max-h-screen'} flex flex-col`}>
@@ -436,6 +477,7 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
                   showTranslation={true}
                   template={template}
                   contentScale={contentScale}
+                  skipAudio={true}
                 />
               ) : isTemplateSlide(currentSlide) ? (
                 <div 

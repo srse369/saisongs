@@ -25,6 +25,8 @@ interface TemplateWysiwygEditorProps {
   onTemplateChange: (template: PresentationTemplate) => void;
   onEscape?: (hasChanges: boolean) => void;
   onSlideIndexChange?: (index: number) => void;
+  /** Callback to switch to YAML editor at the current slide */
+  onSwitchToYaml?: (slideIndex: number) => void;
 }
 
 // Get slide dimensions based on aspect ratio
@@ -1052,6 +1054,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   onTemplateChange,
   onEscape,
   onSlideIndexChange,
+  onSwitchToYaml,
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedSlideIndex, setSelectedSlideIndex] = useState(0);
@@ -1642,13 +1645,17 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     
     // Update template
     const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
+    
+    // If we're updating the selected slide and it's the reference slide, use the updated slide
+    const audiosForTemplate = selectedSlideIndex === referenceSlideIndex ? slideToUpdate.audios : refSlide?.audios;
+    
     onTemplateChange({
       ...template,
       slides: newSlides,
       background: refSlide?.background,
       images: refSlide?.images || [],
       videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
+      audios: audiosForTemplate || [],
       text: refSlide?.text || [],
     });
     
@@ -2305,18 +2312,6 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   const songLyricsStyle = mergeSongStyle(referenceSlide?.songLyricsStyle, defaultLyricsStyle);
   const songTranslationStyle = mergeSongStyle(referenceSlide?.songTranslationStyle, defaultTranslationStyle);
   
-  // Debug logging for song content styles
-  console.log('🎵 Song content styles:', {
-    referenceSlideIndex,
-    hasReferenceSlide: !!referenceSlide,
-    savedTitleStyle: referenceSlide?.songTitleStyle,
-    savedLyricsStyle: referenceSlide?.songLyricsStyle,
-    savedTranslationStyle: referenceSlide?.songTranslationStyle,
-    computedTitleStyle: songTitleStyle,
-    computedLyricsStyle: songLyricsStyle,
-    computedTranslationStyle: songTranslationStyle,
-  });
-  
   // Now we can resolve the selected song content style (after songTitleStyle etc are defined)
   const selectedSongContentStyle = selectedSongContentType ? 
     (selectedSongContentType === 'songTitleStyle' ? songTitleStyle :
@@ -2605,8 +2600,24 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       <div className="flex gap-4" style={{ height: '580px' }}>
         {/* Slide thumbnails list (left) */}
         <div
-          className="w-44 flex-shrink-0 bg-gray-900/40 dark:bg-gray-900/60 rounded-lg p-2 overflow-y-auto"
+          className="w-44 flex-shrink-0 bg-gray-900/40 dark:bg-gray-900/60 rounded-lg p-2 overflow-y-auto flex flex-col"
         >
+          {/* Toolbar with YAML button */}
+          {onSwitchToYaml && (
+            <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-700/50">
+              <span className="text-[11px] text-gray-400">{slides.length} slides</span>
+              <button
+                type="button"
+                onClick={() => onSwitchToYaml(selectedSlideIndex)}
+                className="px-2 py-1 text-[10px] font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                title={`Edit slide ${selectedSlideIndex + 1} in YAML (Ctrl+Y)`}
+              >
+                YAML →
+              </button>
+            </div>
+          )}
+          
+          <div className="flex-1 overflow-y-auto">
           {slides.map((slide, idx) => {
             const isSelected = idx === selectedSlideIndex;
             const isReference = idx === referenceSlideIndex;
@@ -2930,6 +2941,10 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       })}
                     </div>
                   </div>
+                  {/* Slide number overlay (bottom-left) */}
+                  <div className="absolute bottom-1 left-1 w-6 h-6 flex items-center justify-center rounded-full bg-black/70 text-white text-[11px] font-bold border border-white/30">
+                    {idx + 1}
+                  </div>
                   {isReference && (
                     <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-400 text-black">
                       Ref
@@ -2950,6 +2965,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               </div>
             );
           })}
+          </div>
 
           {/* Context Menu */}
           {contextMenu && (() => {

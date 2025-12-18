@@ -75,12 +75,10 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
             }
           })(),
           (async () => {
-        console.log('📥 Fetching full song details for presentation...');
-        const songPromises = entries.map(entry => 
-          ApiClient.get<Song>(`/songs/${entry.songId}`)
-        );
+            const songPromises = entries.map(entry => 
+              ApiClient.get<Song>(`/songs/${entry.songId}`)
+            );
             const songs = await Promise.all(songPromises);
-            console.log(`✅ Fetched ${songs.length} songs with lyrics for presentation`);
             return songs;
           })()
         ]);

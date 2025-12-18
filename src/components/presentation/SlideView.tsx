@@ -11,9 +11,11 @@ interface SlideViewProps {
   template?: PresentationTemplate | null;
   /** Scale factor for song content (title, lyrics, translation). Default is 1.0 */
   contentScale?: number;
+  /** When true, skip rendering audio elements (audio handled by parent for persistence). Default is false */
+  skipAudio?: boolean;
 }
 
-export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = true, template, contentScale = 1.0 }) => {
+export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = true, template, contentScale = 1.0, skipAudio = false }) => {
   const sessionSongIndex = (slide as any).sessionSongIndex;
   const totalSongs = (slide as any).totalSongs;
   
@@ -184,7 +186,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         {/* Static slide overlays */}
         <SlideImages templateSlide={slide.templateSlide} />
         <SlideVideos templateSlide={slide.templateSlide} />
-        <SlideAudios templateSlide={slide.templateSlide} />
+        {!skipAudio && <SlideAudios templateSlide={slide.templateSlide} />}
         <SlideText templateSlide={slide.templateSlide} />
 
         {/* Next-song hint at bottom-right */}
@@ -388,7 +390,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         <>
           <SlideImages templateSlide={effectiveSlide} />
           <SlideVideos templateSlide={effectiveSlide} />
-          <SlideAudios templateSlide={effectiveSlide} />
+          {!skipAudio && <SlideAudios templateSlide={effectiveSlide} />}
           <SlideText templateSlide={effectiveSlide} />
         </>
       ) : (
