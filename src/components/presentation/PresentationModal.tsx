@@ -77,7 +77,8 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
       
       const audioElement = audioRefs.current.get(audio.id);
       if (audioElement) {
-        if (shouldPlay && audioElement.paused) {
+        // Only auto-play if the audio has autoPlay enabled
+        if (shouldPlay && audioElement.paused && audio.autoPlay) {
           audioElement.play().catch(err => console.warn('Audio play failed:', err));
         } else if (!shouldPlay && !audioElement.paused) {
           audioElement.pause();

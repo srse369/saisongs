@@ -18,6 +18,10 @@ export default defineConfig(() => ({
       '/api': {
         target: 'http://localhost:3111',
         changeOrigin: true,
+      },
+      '/pptx-media': {
+        target: 'http://localhost:3111',
+        changeOrigin: true,
       }
     }
   },

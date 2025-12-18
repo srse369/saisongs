@@ -74,9 +74,14 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Note: Analytics tracking is done client-side via /api/analytics/track endpoint
 
-// Serve PowerPoint media files statically
+// Serve PowerPoint media files statically with CORS headers
 console.log(`📁 Serving PowerPoint media from: ${PPTX_MEDIA_DIR}`);
-app.use('/pptx-media', express.static(PPTX_MEDIA_DIR));
+app.use('/pptx-media', cors(), express.static(PPTX_MEDIA_DIR, {
+  setHeaders: (res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'public, max-age=31536000');
+  }
+}));
 
 // Health check endpoint with optional database stats
 app.get('/api/health', async (req, res) => {

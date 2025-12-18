@@ -13,6 +13,9 @@ export interface FontOption {
 export const AVAILABLE_FONTS: FontOption[] = [
   // Sans-serif fonts (modern, clean, highly readable)
   { name: 'Arial', family: 'Arial, sans-serif', category: 'sans-serif', isSystemFont: true },
+  { name: 'Calibri', family: 'Calibri, Arial, sans-serif', category: 'sans-serif', isSystemFont: true },
+  { name: 'Verdana', family: 'Verdana, sans-serif', category: 'sans-serif', isSystemFont: true },
+  { name: 'Trebuchet MS', family: 'Trebuchet MS, sans-serif', category: 'sans-serif', isSystemFont: true },
   { name: 'Inter', family: 'Inter, sans-serif', category: 'sans-serif' },
   { name: 'Roboto', family: 'Roboto, sans-serif', category: 'sans-serif' },
   { name: 'Open Sans', family: 'Open Sans, sans-serif', category: 'sans-serif' },
@@ -21,8 +24,11 @@ export const AVAILABLE_FONTS: FontOption[] = [
   { name: 'Poppins', family: 'Poppins, sans-serif', category: 'sans-serif' },
   
   // Serif fonts (traditional, elegant)
+  { name: 'Constantia', family: 'Constantia, Georgia, serif', category: 'serif', isSystemFont: true },
   { name: 'Georgia', family: 'Georgia, serif', category: 'serif', isSystemFont: true },
   { name: 'Times New Roman', family: 'Times New Roman, Times, serif', category: 'serif', isSystemFont: true },
+  { name: 'Palatino Linotype', family: 'Palatino Linotype, Palatino, Georgia, serif', category: 'serif', isSystemFont: true },
+  { name: 'Cambria', family: 'Cambria, Georgia, serif', category: 'serif', isSystemFont: true },
   { name: 'Playfair Display', family: 'Playfair Display, serif', category: 'serif' },
   { name: 'Merriweather', family: 'Merriweather, serif', category: 'serif' },
   { name: 'Lora', family: 'Lora, serif', category: 'serif' },
@@ -45,8 +51,15 @@ export const AVAILABLE_FONTS: FontOption[] = [
  */
 export function getFontFamily(fontName: string | undefined): string {
   if (!fontName) return 'Arial, sans-serif';
+  
+  // If fontName already looks like a CSS font-family value (contains comma), use it directly
+  if (fontName.includes(',')) {
+    return fontName;
+  }
+  
+  // Otherwise, look it up in the AVAILABLE_FONTS list
   const font = AVAILABLE_FONTS.find(f => f.name === fontName);
-  return font?.family || fontName;
+  return font?.family || `${fontName}, sans-serif`;
 }
 
 /**

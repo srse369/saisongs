@@ -3638,7 +3638,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       )}
                     </label>
                     <select
-                      value={selectedElement.fontFamily || 'Arial'}
+                      value={selectedElement.fontFamily?.split(',')[0].trim() || 'Arial'}
                       onChange={(e) => updateElement(selectedElement.id, { fontFamily: e.target.value })}
                       className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
@@ -3832,7 +3832,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   )}
                 </label>
                 <select
-                  value={selectedSongContentStyle.fontFamily || 'Arial'}
+                  value={selectedSongContentStyle.fontFamily?.split(',')[0].trim() || 'Arial'}
                   onChange={(e) => handleSongContentStyleChange(selectedSongContentType, { fontFamily: e.target.value })}
                   className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >

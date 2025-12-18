@@ -140,7 +140,10 @@ export function renderStyledText(text: string): React.ReactNode {
           // Recursively render nested content
           return <em key={idx}>{renderStyledText(part.content || '')}</em>;
         } else if (part.type === 'br') {
-          return <br key={idx} />;
+          // Add zero-width space before leading <br> tags to prevent browser collapsing
+          // Leading breaks (first element or after another break) need special handling
+          const isLeading = idx === 0 || (typeof parts[idx - 1] !== 'string' && parts[idx - 1].type === 'br');
+          return <React.Fragment key={idx}>{isLeading && '\u200B'}<br /></React.Fragment>;
         } else if (part.type.startsWith('color:')) {
           const color = part.type.substring(6);
           // Recursively render nested content

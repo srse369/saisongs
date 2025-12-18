@@ -1,5 +1,6 @@
 import { pptxParserService } from './PptxParserService';
 import { cloudStorageService, type CloudStorageConfig, type UploadResult } from './CloudStorageService';
+import { getFontSizeAdjustment, detectActualFont } from '../utils/fontMetrics';
 import type { 
   PresentationTemplate, 
   TemplateSlide, 
@@ -118,6 +119,21 @@ export class PptxImportService {
   }
 
   /**
+   * Generate a short hash from filename for directory organization
+   */
+  private generateFileHash(filename: string): string {
+    let hash = 0;
+    const str = filename.toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    // Convert to base36 and take first 8 characters
+    return Math.abs(hash).toString(36).substring(0, 8);
+  }
+
+  /**
    * Import a PowerPoint file and convert it to our template format
    * If cloudConfig is provided, media files will be uploaded to cloud storage
    */
@@ -134,12 +150,40 @@ export class PptxImportService {
     // Upload media files to cloud storage if configured
     let mediaUrlMap: Map<string, string> = new Map();
     if (cloudConfig) {
-      onProgress?.(10, 100, 'Uploading media files to cloud storage...');
-      mediaUrlMap = await this.uploadMediaFiles(cloudConfig, (uploaded, total) => {
-        const progress = 10 + Math.floor((uploaded / total) * 40);
-        onProgress?.(progress, 100, `Uploading media file ${uploaded} of ${total}...`);
-      });
-      onProgress?.(50, 100, 'Media files uploaded successfully');
+      // Generate directory hash from filename for organization
+      const fileHash = this.generateFileHash(file.name);
+      
+      // Check if we should skip upload and reuse existing media
+      const skipUpload = (cloudConfig as any).skipUpload;
+      
+      if (skipUpload) {
+        onProgress?.(10, 100, 'Reusing existing media files...');
+        
+        // Build URL map based on filenames without uploading
+        const mediaBlobs = pptxParserService.getMediaBlobs();
+        for (const [filename] of mediaBlobs.entries()) {
+          // Construct URL assuming files already exist in the hash directory
+          const url = `/pptx-media/${fileHash}/${filename}`;
+          mediaUrlMap.set(filename, url);
+        }
+        
+        onProgress?.(50, 100, 'Media files referenced successfully');
+      } else {
+        onProgress?.(10, 100, 'Uploading media files to cloud storage...');
+        
+        const cloudConfigWithPath = {
+          ...cloudConfig,
+          destinationPath: cloudConfig.provider === 'local' 
+            ? fileHash 
+            : (cloudConfig.destinationPath || fileHash)
+        };
+        
+        mediaUrlMap = await this.uploadMediaFiles(cloudConfigWithPath, (uploaded, total) => {
+          const progress = 10 + Math.floor((uploaded / total) * 40);
+          onProgress?.(progress, 100, `Uploading media file ${uploaded} of ${total}...`);
+        });
+        onProgress?.(50, 100, 'Media files uploaded successfully');
+      }
     }
 
     // Determine our slide dimensions based on aspect ratio
@@ -451,6 +495,7 @@ export class PptxImportService {
     console.log('Converting text box:', {
       originalFontSize: parsedText.fontSize,
       fontFamily: parsedText.fontFamily,
+      actualFont: parsedText.fontFamily ? detectActualFont(parsedText.fontFamily) : 'default',
       color: parsedText.color,
       sourceHeight,
       targetHeight,
@@ -459,19 +504,34 @@ export class PptxImportService {
     });
 
     // Add font fallbacks for fonts that may not be available
+    // Also adjust font size based on measured font heights
     let fontFamily = parsedText.fontFamily;
+    let fontSizeAdjustment = 1.0;
+    
     if (fontFamily) {
-      // Add appropriate fallbacks for specific fonts
+      // Font fallback mapping
       const fontFallbacks: Record<string, string> = {
+        'Constantia': 'Constantia, Georgia, serif',
         'Monotype Corsiva': 'Monotype Corsiva, Brush Script MT, cursive',
         'Microsoft New Tai Lue': 'Microsoft New Tai Lue, Segoe UI, sans-serif',
         'Palatino Linotype': 'Palatino Linotype, Palatino, Georgia, serif',
         'Calibri': 'Calibri, Arial, sans-serif',
         'Arial': 'Arial, Helvetica, sans-serif',
         'Times New Roman': 'Times New Roman, Times, serif',
+        'Georgia': 'Georgia, serif',
       };
       
       fontFamily = fontFallbacks[parsedText.fontFamily] || parsedText.fontFamily;
+      
+      // Get dynamic font size adjustment based on actual font metrics
+      fontSizeAdjustment = getFontSizeAdjustment(parsedText.fontFamily);
+    }
+    
+    // Apply font size adjustment if a ratio was specified
+    if (fontSizeAdjustment !== 1.0 && fontSize) {
+      const currentSize = parseFloat(fontSize);
+      const adjustedSize = Math.round(currentSize * fontSizeAdjustment);
+      fontSize = `${adjustedSize}px`;
     }
 
     return {

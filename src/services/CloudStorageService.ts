@@ -225,8 +225,9 @@ class CloudStorageService {
     config: CloudStorageConfig
   ): Promise<UploadResult> {
     const formData = new FormData();
-    formData.append('file', file, filename);
+    // IMPORTANT: Append destinationPath BEFORE file so multer can access it in destination callback
     formData.append('destinationPath', config.destinationPath || '');
+    formData.append('file', file, filename);
 
     const response = await fetch('/api/upload-media', {
       method: 'POST',

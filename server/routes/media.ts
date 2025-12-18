@@ -17,11 +17,18 @@ const storage = multer.diskStorage({
     const destinationPath = req.body.destinationPath || '';
     const fullPath = path.join(PPTX_MEDIA_DIR, destinationPath);
     
+    console.log('Multer destination:', {
+      destinationPath,
+      PPTX_MEDIA_DIR,
+      fullPath
+    });
+    
     try {
       // Create directory if it doesn't exist
       await fs.mkdir(fullPath, { recursive: true });
       cb(null, fullPath);
     } catch (error) {
+      console.error('Error creating destination directory:', error);
       cb(error as Error, fullPath);
     }
   },
@@ -50,17 +57,23 @@ router.post('/upload-media', upload.single('file'), async (req: Request, res: Re
 
     const destinationPath = req.body.destinationPath || '';
     
+    console.log('Upload complete:', {
+      filename: req.file.filename,
+      destinationPath,
+      filePath: req.file.path,
+      size: req.file.size
+    });
+    
     // Generate URL for accessing the file
     // Files should be served from /pptx-media/ route
     const relativePath = destinationPath 
       ? `${destinationPath}/${req.file.filename}`
       : req.file.filename;
     
-    // Construct full URL based on request
-    const protocol = req.protocol;
-    const host = req.get('host');
-    const baseUrl = `${protocol}://${host}`;
-    const url = `${baseUrl}/pptx-media/${relativePath.replace(/\\/g, '/')}`;
+    // Use relative URL so it works on any domain (localhost, production, etc.)
+    const url = `/pptx-media/${relativePath.replace(/\\/g, '/')}`;
+
+    console.log('Generated URL:', url);
 
     res.json({
       url,

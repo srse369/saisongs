@@ -15,6 +15,7 @@ export function MediaExportModal({ isOpen, onClose, onConfirm }: MediaExportModa
   const [accessToken, setAccessToken] = useState('');
   const [error, setError] = useState('');
   const [showAuthWindow, setShowAuthWindow] = useState(false);
+  const [skipUpload, setSkipUpload] = useState(false);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -24,6 +25,7 @@ export function MediaExportModal({ isOpen, onClose, onConfirm }: MediaExportModa
       setAccessToken('');
       setError('');
       setShowAuthWindow(false);
+      setSkipUpload(false);
     }
   }, [isOpen]);
 
@@ -93,12 +95,13 @@ export function MediaExportModal({ isOpen, onClose, onConfirm }: MediaExportModa
     }
   };
 
-  const handleSkipUpload = () => {
-    // User wants to import without uploading to cloud storage
-    onConfirm(undefined);
-  };
-
   const handleConfirm = () => {
+    // If skip upload is enabled, pass special config to indicate reuse
+    if (skipUpload) {
+      onConfirm({ provider: 'local', destinationPath: '', skipUpload: true } as any);
+      return;
+    }
+
     const config: CloudStorageConfig = {
       provider,
       destinationPath,
@@ -131,8 +134,28 @@ export function MediaExportModal({ isOpen, onClose, onConfirm }: MediaExportModa
         )}
 
         <div className="space-y-6">
+          {/* Skip Upload Option */}
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={skipUpload}
+                onChange={(e) => setSkipUpload(e.target.checked)}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                  Skip upload and reuse existing media files
+                </span>
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                  Check this if you've already uploaded this PowerPoint before. Media files will be referenced by filename hash instead of re-uploading. Saves bandwidth and time.
+                </p>
+              </div>
+            </label>
+          </div>
+
           {/* Storage Provider Selection */}
-          <div>
+          <div className={skipUpload ? 'opacity-50 pointer-events-none' : ''}>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Storage Provider
             </label>
@@ -161,7 +184,7 @@ export function MediaExportModal({ isOpen, onClose, onConfirm }: MediaExportModa
           </div>
 
           {/* Destination Path */}
-          <div>
+          <div className={skipUpload ? 'opacity-50 pointer-events-none' : ''}>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               {provider === 'local' ? 'Subdirectory (optional)' : 'Destination Folder'}
             </label>
@@ -185,7 +208,7 @@ export function MediaExportModal({ isOpen, onClose, onConfirm }: MediaExportModa
           </div>
 
           {/* Authentication for Cloud Providers */}
-          {requiresAuth && (
+          {requiresAuth && !skipUpload && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Authentication
@@ -234,20 +257,12 @@ export function MediaExportModal({ isOpen, onClose, onConfirm }: MediaExportModa
           </button>
           
           <button
-            onClick={handleSkipUpload}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            <i className="fas fa-forward mr-2"></i>
-            Skip Upload (Use Data URLs)
-          </button>
-          
-          <button
             onClick={handleConfirm}
-            disabled={!isAuthenticated}
+            disabled={!skipUpload && !isAuthenticated}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <i className="fas fa-cloud-upload-alt"></i>
-            Continue with Upload
+            <i className={skipUpload ? "fas fa-link" : "fas fa-cloud-upload-alt"}></i>
+            {skipUpload ? 'Continue (Reuse Existing)' : 'Continue with Upload'}
           </button>
         </div>
 
@@ -256,16 +271,13 @@ export function MediaExportModal({ isOpen, onClose, onConfirm }: MediaExportModa
           <div className="flex gap-2">
             <i className="fas fa-info-circle text-blue-600 dark:text-blue-400 mt-0.5"></i>
             <div className="text-sm text-blue-800 dark:text-blue-300">
-              <p className="font-medium mb-1">Why upload media files?</p>
+              <p className="font-medium mb-1">Media file storage options:</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>Reduces template file size by storing media separately</li>
-                <li>Enables media file reuse across multiple templates</li>
+                <li><strong>Upload:</strong> First time importing - media files are uploaded and stored separately</li>
+                <li><strong>Reuse:</strong> Subsequent imports of the same file - references existing media files by filename hash</li>
+                <li>Reduces template file size and enables media reuse across templates</li>
                 <li>Cloud storage makes media accessible from anywhere</li>
-                <li>Improves presentation loading performance</li>
               </ul>
-              <p className="mt-2 text-xs">
-                If you skip upload, media will be embedded as data URLs (works but increases template size).
-              </p>
             </div>
           </div>
         </div>

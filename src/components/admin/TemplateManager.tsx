@@ -491,7 +491,10 @@ export const TemplateManager: React.FC = () => {
       setValidationError('');
       setShowForm(true);
       
-      const mediaMessage = cloudConfig 
+      const skipUpload = (cloudConfig as any)?.skipUpload;
+      const mediaMessage = skipUpload
+        ? 'Media files reused from previous upload'
+        : cloudConfig 
         ? `Media files uploaded to ${cloudConfig.provider}` 
         : 'Media embedded as data URLs';
       setSuccessMessage(`Successfully imported ${importedTemplate.slides?.length || 0} slides from PowerPoint! ${mediaMessage}`);
