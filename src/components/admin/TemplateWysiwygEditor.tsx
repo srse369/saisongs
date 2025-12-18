@@ -241,13 +241,14 @@ type CanvasElement = {
   zIndex?: number;
   // For video/audio behavior
   autoPlay?: boolean;
+  loop?: boolean;
   hideVideo?: boolean;
   hideAudio?: boolean;
   visualHidden?: boolean;
   volume?: number;
-  // Multi-slide audio
-  startSlideIndex?: number;
-  endSlideIndex?: number;
+  // Multi-slide audio (1-based slide numbers)
+  startSlide?: number;
+  endSlide?: number;
 };
 
 // Hook for detecting long-press on mobile devices (for Konva canvas elements)
@@ -739,25 +740,159 @@ const DraggableText: React.FC<{
     colorInput.style.border = 'none';
     colorInput.style.cursor = 'pointer';
     
-    // Store selection before color picker opens
-    let savedSelection: Range | null = null;
-    colorInput.onfocus = () => {
+    // Track selection info for color picker
+    // Store as text content and offsets to survive focus changes
+    let savedSelectionInfo: { startOffset: number; endOffset: number; selectedText: string } | null = null;
+    let colorSpan: HTMLSpanElement | null = null;
+    let colorPickerOpen = false;
+    
+    // Get text offset within the editor
+    const getTextOffset = (node: Node, offset: number): number => {
+      let totalOffset = 0;
+      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+      let currentNode = walker.nextNode();
+      while (currentNode) {
+        if (currentNode === node) {
+          return totalOffset + offset;
+        }
+        totalOffset += currentNode.textContent?.length || 0;
+        currentNode = walker.nextNode();
+      }
+      return totalOffset + offset;
+    };
+    
+    // Save selection info before color picker opens
+    const saveSelectionInfo = () => {
       const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0) {
-        savedSelection = sel.getRangeAt(0).cloneRange();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        const range = sel.getRangeAt(0);
+        if (editor.contains(range.commonAncestorContainer)) {
+          const startOffset = getTextOffset(range.startContainer, range.startOffset);
+          const endOffset = getTextOffset(range.endContainer, range.endOffset);
+          const selectedText = range.toString();
+          if (selectedText.length > 0) {
+            savedSelectionInfo = { startOffset, endOffset, selectedText };
+          }
+        }
+      }
+    };
+    
+    // Apply color by wrapping selected text in a span
+    const applyColorToSelection = (color: string) => {
+      if (!savedSelectionInfo || savedSelectionInfo.selectedText.length === 0) return;
+      
+      // If we already created/found a color span this session, just update its color
+      if (colorSpan) {
+        colorSpan.style.color = color;
+        return;
+      }
+      
+      // Need to find and wrap the selected text
+      // Get all text content and find the selected portion
+      const fullText = editor.textContent || '';
+      const { startOffset, endOffset, selectedText } = savedSelectionInfo;
+      
+      // Verify the text at these offsets matches
+      const textAtOffsets = fullText.substring(startOffset, endOffset);
+      if (textAtOffsets !== selectedText) {
+        // Text has changed, can't apply color accurately
+        return;
+      }
+      
+      // Find the text node(s) containing the selection
+      let currentOffset = 0;
+      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
+      let currentNode = walker.nextNode();
+      
+      while (currentNode) {
+        const nodeLength = currentNode.textContent?.length || 0;
+        const nodeEnd = currentOffset + nodeLength;
+        
+        // Check if selection starts in this node
+        if (currentOffset <= startOffset && nodeEnd > startOffset) {
+          const textNode = currentNode as Text;
+          const relativeStart = startOffset - currentOffset;
+          const relativeEnd = Math.min(endOffset - currentOffset, nodeLength);
+          
+          // Check if this text node is already inside a color span
+          // and the entire selection is within that span
+          const parentSpan = textNode.parentElement;
+          if (parentSpan && parentSpan.tagName === 'SPAN' && parentSpan.style.color) {
+            // Check if the span contains exactly the selected text (or the selection is the whole span content)
+            const spanText = parentSpan.textContent || '';
+            if (spanText === selectedText || (relativeStart === 0 && relativeEnd === nodeLength)) {
+              // Just update the existing span's color
+              colorSpan = parentSpan as HTMLSpanElement;
+              colorSpan.style.color = color;
+              return;
+            }
+          }
+          
+          // Split the text node and wrap the middle part
+          if (relativeStart > 0) {
+            textNode.splitText(relativeStart);
+            currentNode = walker.nextNode();
+          }
+          
+          if (currentNode && relativeEnd - relativeStart < (currentNode.textContent?.length || 0)) {
+            (currentNode as Text).splitText(relativeEnd - relativeStart);
+          }
+          
+          // Check again if parent is a color span (after potential split)
+          const parent = currentNode?.parentElement;
+          if (parent && parent.tagName === 'SPAN' && parent.style.color) {
+            // The text is already in a span, update its color
+            colorSpan = parent as HTMLSpanElement;
+            colorSpan.style.color = color;
+            return;
+          }
+          
+          // Wrap the current node in a new span
+          if (currentNode) {
+            colorSpan = document.createElement('span');
+            colorSpan.style.color = color;
+            currentNode.parentNode?.insertBefore(colorSpan, currentNode);
+            colorSpan.appendChild(currentNode);
+          }
+          break;
+        }
+        
+        currentOffset = nodeEnd;
+        currentNode = walker.nextNode();
+      }
+    };
+    
+    // Track selection while editing
+    editor.addEventListener('mouseup', saveSelectionInfo);
+    editor.addEventListener('keyup', saveSelectionInfo);
+    
+    colorInput.onmousedown = () => {
+      if (!colorPickerOpen) {
+        saveSelectionInfo();
+        colorPickerOpen = true;
+        colorSpan = null; // Reset for new color operation
       }
     };
     
     colorInput.oninput = () => {
-      // Restore selection
-      if (savedSelection) {
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(savedSelection);
-      }
-      document.execCommand('foreColor', false, colorInput.value);
-      editor.focus();
+      applyColorToSelection(colorInput.value);
     };
+    
+    colorInput.onchange = () => {
+      applyColorToSelection(colorInput.value);
+      editor.focus();
+      colorPickerOpen = false;
+      colorSpan = null;
+      savedSelectionInfo = null;
+    };
+    
+    colorInput.onblur = () => {
+      // Small delay to allow onchange to fire first
+      setTimeout(() => {
+        colorPickerOpen = false;
+      }, 100);
+    };
+    
     toolbar.appendChild(colorInput);
     
     document.body.appendChild(toolbar);
@@ -777,11 +912,30 @@ const DraggableText: React.FC<{
     const convertToCustomFormat = (html: string): string => {
       let result = html;
       
+      // Helper to convert RGB to hex
+      const rgbToHex = (r: number, g: number, b: number): string => {
+        return [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+      };
+      
       // Convert <font color="#RRGGBB"> to <c:RRGGBB>
       result = result.replace(/<font color="#([0-9a-fA-F]{6})">(.*?)<\/font>/gi, '<c:$1>$2</c:$1>');
       
-      // Convert <span style="color:#RRGGBB"> to <c:RRGGBB>
-      result = result.replace(/<span style="color:\s*#([0-9a-fA-F]{6})">(.*?)<\/span>/gi, '<c:$1>$2</c:$1>');
+      // Convert <span style="color:#RRGGBB"> to <c:RRGGBB> (hex format, with optional semicolon)
+      result = result.replace(/<span style="color:\s*#([0-9a-fA-F]{6});?">(.*?)<\/span>/gi, '<c:$1>$2</c:$1>');
+      
+      // Convert <span style="color: rgb(r, g, b);"> to <c:RRGGBB> (RGB format, with optional semicolon)
+      result = result.replace(/<span style="color:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\);?">(.*?)<\/span>/gi, 
+        (match, r, g, b, content) => {
+          const hex = rgbToHex(parseInt(r), parseInt(g), parseInt(b));
+          return `<c:${hex}>${content}</c:${hex}>`;
+        });
+      
+      // Convert <font color="rgb(r, g, b)"> to <c:RRGGBB> (RGB format, some browsers use this)
+      result = result.replace(/<font color="rgb\((\d+),\s*(\d+),\s*(\d+)\);?">(.*?)<\/font>/gi, 
+        (match, r, g, b, content) => {
+          const hex = rgbToHex(parseInt(r), parseInt(g), parseInt(b));
+          return `<c:${hex}>${content}</c:${hex}>`;
+        });
       
       // Remove style attributes from b and i tags
       result = result.replace(/<b\s+[^>]*>/gi, '<b>');
@@ -1396,13 +1550,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           width,
           height,
           url: aud.url,
-          opacity: aud.opacity,
-          zIndex: aud.zIndex || 1,
-          autoPlay: aud.autoPlay,
-          visualHidden: aud.visualHidden,
-          volume: aud.volume,
-          startSlideIndex: aud.startSlideIndex,
-          endSlideIndex: aud.endSlideIndex,
+          opacity: aud.opacity ?? 1,
+          zIndex: aud.zIndex ?? 1,
+          autoPlay: aud.autoPlay ?? true,
+          visualHidden: aud.visualHidden ?? false,
+          volume: aud.volume ?? 1,
+          loop: aud.loop ?? false,
+          startSlide: aud.startSlide ?? (selectedSlideIndex + 1),  // Default to current slide (1-based)
+          endSlide: aud.endSlide ?? (selectedSlideIndex + 1),      // Default to current slide (1-based)
           rotation: aud.rotation,
         };
       }),
@@ -1580,20 +1735,22 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       const audios = [...(slideToUpdate.audios || [])];
       const audIndex = audios.findIndex(aud => aud.id === elementId);
       if (audIndex >= 0) {
+        const currentSlideNum = selectedSlideIndex + 1; // 1-based default
         audios[audIndex] = {
           ...audios[audIndex],
           x: updates.x !== undefined ? `${Math.round(updates.x)}px` : audios[audIndex].x,
           y: updates.y !== undefined ? `${Math.round(updates.y)}px` : audios[audIndex].y,
           width: updates.width !== undefined ? `${Math.round(updates.width)}px` : audios[audIndex].width,
           height: updates.height !== undefined ? `${Math.round(updates.height)}px` : audios[audIndex].height,
-          opacity: updates.opacity ?? audios[audIndex].opacity,
+          opacity: updates.opacity ?? audios[audIndex].opacity ?? 1,
           url: updates.url ?? audios[audIndex].url,
-          autoPlay: updates.autoPlay ?? audios[audIndex].autoPlay,
-          visualHidden: updates.visualHidden ?? audios[audIndex].visualHidden,
-          volume: updates.volume ?? audios[audIndex].volume,
-          startSlideIndex: updates.startSlideIndex !== undefined ? updates.startSlideIndex : audios[audIndex].startSlideIndex,
-          endSlideIndex: updates.endSlideIndex !== undefined ? updates.endSlideIndex : audios[audIndex].endSlideIndex,
-          zIndex: updates.zIndex !== undefined ? updates.zIndex : audios[audIndex].zIndex,
+          autoPlay: updates.autoPlay ?? audios[audIndex].autoPlay ?? false,
+          visualHidden: updates.visualHidden ?? audios[audIndex].visualHidden ?? false,
+          volume: updates.volume ?? audios[audIndex].volume ?? 1,
+          loop: audios[audIndex].loop ?? false,
+          startSlide: updates.startSlide !== undefined ? updates.startSlide : (audios[audIndex].startSlide ?? currentSlideNum),
+          endSlide: updates.endSlide !== undefined ? updates.endSlide : (audios[audIndex].endSlide ?? currentSlideNum),
+          zIndex: updates.zIndex !== undefined ? updates.zIndex : (audios[audIndex].zIndex ?? 1),
           rotation:
             updates.rotation !== undefined
               ? Math.round(updates.rotation)
@@ -1737,6 +1894,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   // Keyboard shortcuts for canvas (undo/redo/copy/paste/delete/move)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore when text is being edited (Konva text editor is open)
+      if (isTextEditing) {
+        return;
+      }
+      
       // Ignore when typing in inputs/textareas/selects
       const target = e.target as HTMLElement | null;
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
@@ -1881,7 +2043,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
 
     window.addEventListener('keydown', handleKeyDown, true); // Use capture phase to handle before Modal
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [canvasHasFocus, slideListHasFocus, selectedId, canvasElements, updateElement, handleDeleteSelected, handleUndo, handleRedo, handleCopy, handlePaste, selectedSlideIndex, slides.length]);
+  }, [isTextEditing, canvasHasFocus, slideListHasFocus, selectedId, canvasElements, updateElement, handleDeleteSelected, handleUndo, handleRedo, handleCopy, handlePaste, selectedSlideIndex, slides.length]);
 
   // Add new image (using full slide coordinates)
   const handleAddImage = () => {
@@ -1953,6 +2115,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
 
   // Add new audio (using full slide coordinates)
   const handleAddAudio = () => {
+    const currentSlideNum = selectedSlideIndex + 1; // 1-based
     const newAudio: AudioElement = {
       id: `audio-${Date.now()}`,
       url: '',
@@ -1965,6 +2128,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       autoPlay: false,
       loop: false,
       volume: 1,
+      visualHidden: false,
+      startSlide: currentSlideNum,  // Default to current slide (1-based)
+      endSlide: currentSlideNum,    // Default to current slide (1-based)
     };
 
     const newSlides = [...slides];
@@ -3825,11 +3991,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                           type="number"
                           min="1"
                           max={template?.slides?.length ?? 1}
-                          value={(selectedElement.startSlideIndex ?? selectedSlideIndex) + 1}
+                          value={selectedElement.startSlide ?? (selectedSlideIndex + 1)}
                           onChange={(e) => {
                             const slideNum = parseInt(e.target.value);
                             if (slideNum >= 1 && slideNum <= (template?.slides?.length ?? 1)) {
-                              updateElement(selectedElement.id, { startSlideIndex: slideNum - 1 });
+                              updateElement(selectedElement.id, { startSlide: slideNum });
                             }
                           }}
                           className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -3843,17 +4009,17 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                           type="number"
                           min="1"
                           max={template?.slides?.length ?? 1}
-                          value={(selectedElement.endSlideIndex ?? selectedSlideIndex) + 1}
+                          value={selectedElement.endSlide ?? (selectedSlideIndex + 1)}
                           onChange={(e) => {
                             const slideNum = parseInt(e.target.value);
                             if (slideNum >= 1 && slideNum <= (template?.slides?.length ?? 1)) {
-                              updateElement(selectedElement.id, { endSlideIndex: slideNum - 1 });
+                              updateElement(selectedElement.id, { endSlide: slideNum });
                             }
                           }}
                           className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         />
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Audio will play from slide {(selectedElement.startSlideIndex ?? selectedSlideIndex) + 1} to {(selectedElement.endSlideIndex ?? selectedSlideIndex) + 1}
+                          Audio will play from slide {selectedElement.startSlide ?? (selectedSlideIndex + 1)} to {selectedElement.endSlide ?? (selectedSlideIndex + 1)}
                         </p>
                       </div>
                     </>

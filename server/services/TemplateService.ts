@@ -43,6 +43,27 @@ export interface VideoElement {
   rotation?: number;
 }
 
+export interface AudioElement {
+  id: string;
+  url: string;
+  position?: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+  x?: number | string;
+  y?: number | string;
+  width?: string;
+  height?: string;
+  opacity?: number;
+  zIndex?: number;
+  autoPlay?: boolean;
+  loop?: boolean;
+  volume?: number;
+  visualHidden?: boolean;
+  // Multi-slide audio support (1-based slide numbers)
+  startSlide?: number;  // 1-based slide number to start playing on
+  endSlide?: number;    // 1-based slide number to stop playing on
+  playAcrossAllSlides?: boolean;
+  rotation?: number;
+}
+
 export interface TextElement {
   id: string;
   content: string;
@@ -86,6 +107,7 @@ export interface TemplateSlide {
   background?: BackgroundElement;
   images?: ImageElement[];
   videos?: VideoElement[];
+  audios?: AudioElement[];
   text?: TextElement[];
   
   // Song content styling (only used on reference slides)
@@ -173,6 +195,7 @@ export interface PresentationTemplate {
   background?: BackgroundElement;
   images?: ImageElement[];
   videos?: VideoElement[];
+  audios?: AudioElement[];
   text?: TextElement[];
   
   isDefault?: boolean;
@@ -260,6 +283,7 @@ function getReferenceSlide(template: PresentationTemplate): TemplateSlide {
     background: template.background,
     images: template.images,
     videos: template.videos,
+    audios: template.audios,
     text: template.text,
   };
 }
@@ -306,24 +330,25 @@ class TemplateService {
           template.background = refSlide?.background;
           template.images = refSlide?.images || [];
           template.videos = refSlide?.videos || [];
+          template.audios = refSlide?.audios || [];
           template.text = refSlide?.text || [];
         } else {
           // Legacy single-slide format
           template.background = templateJson.background;
           template.images = templateJson.images || [];
           template.videos = templateJson.videos || [];
+          template.audios = templateJson.audios || [];
           template.text = templateJson.text || [];
           // Auto-migrate to multi-slide format structure
           template.slides = [{
             background: template.background,
             images: template.images,
             videos: template.videos,
+            audios: template.audios,
             text: template.text,
           }];
           template.referenceSlideIndex = 0;
         }
-
-        console.log('📋 Final template:', row.NAME, 'slides:', template.slides?.length, 'refIndex:', template.referenceSlideIndex);
 
         // Ensure reference slide has song content styles with defaults
         if (template.slides && template.slides.length > 0) {
@@ -390,18 +415,21 @@ class TemplateService {
         template.background = refSlide?.background;
         template.images = refSlide?.images || [];
         template.videos = refSlide?.videos || [];
+        template.audios = refSlide?.audios || [];
         template.text = refSlide?.text || [];
       } else {
         // Legacy single-slide format
         template.background = templateJson.background;
         template.images = templateJson.images || [];
         template.videos = templateJson.videos || [];
+        template.audios = templateJson.audios || [];
         template.text = templateJson.text || [];
         // Auto-migrate to multi-slide format structure
         template.slides = [{
           background: template.background,
           images: template.images,
           videos: template.videos,
+          audios: template.audios,
           text: template.text,
         }];
         template.referenceSlideIndex = 0;
@@ -472,18 +500,21 @@ class TemplateService {
         template.background = refSlide?.background;
         template.images = refSlide?.images || [];
         template.videos = refSlide?.videos || [];
+        template.audios = refSlide?.audios || [];
         template.text = refSlide?.text || [];
       } else {
         // Legacy single-slide format
         template.background = templateJson.background;
         template.images = templateJson.images || [];
         template.videos = templateJson.videos || [];
+        template.audios = templateJson.audios || [];
         template.text = templateJson.text || [];
         // Auto-migrate to multi-slide format structure
         template.slides = [{
           background: template.background,
           images: template.images,
           videos: template.videos,
+          audios: template.audios,
           text: template.text,
         }];
         template.referenceSlideIndex = 0;
@@ -527,6 +558,7 @@ class TemplateService {
       background: template.background,
       images: template.images || [],
       videos: template.videos || [],
+      audios: template.audios || [],
       text: template.text || [],
     };
     
@@ -589,6 +621,7 @@ class TemplateService {
           background: result.background,
           images: result.images || [],
           videos: result.videos || [],
+          audios: result.audios || [],
           text: result.text || [],
         }];
         result.referenceSlideIndex = 0;
@@ -788,10 +821,11 @@ class TemplateService {
       description: template.description,
       aspectRatio: template.aspectRatio || '16:9',
       slides: [{
-      background: template.background,
-      images: template.images || [],
-      videos: template.videos || [],
-      text: template.text || [],
+        background: template.background,
+        images: template.images || [],
+        videos: template.videos || [],
+        audios: template.audios || [],
+        text: template.text || [],
       }],
       referenceSlideIndex: 0,
     });

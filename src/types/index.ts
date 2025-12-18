@@ -56,11 +56,9 @@ export interface AudioElement {
   
   // Multi-slide audio support
   // Use 1-based slide numbers (preferred):
+  // Multi-slide audio support (1-based slide numbers)
   startSlide?: number; // 1-based slide number to start playing on (e.g., 10 for slide 10)
   endSlide?: number;   // 1-based slide number to stop playing on (e.g., 13 for slide 13)
-  // Legacy 0-based indices (still supported for backwards compatibility):
-  startSlideIndex?: number; // 0-based index (deprecated, use startSlide instead)
-  endSlideIndex?: number;   // 0-based index (deprecated, use endSlide instead)
   playAcrossAllSlides?: boolean; // When true, play continuously across all slides once started
 }
 

@@ -26,8 +26,12 @@ function formatDimension(value: string | number | undefined): string {
 
 /**
  * Convert a single slide to YAML format
+ * @param slide The slide to convert
+ * @param indent Indentation prefix
+ * @param isReferenceSlide Whether this is the reference slide
+ * @param slideIndex 0-based index of this slide (used for audio defaults)
  */
-function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; text?: any[]; songTitleStyle?: any; songLyricsStyle?: any; songTranslationStyle?: any }, indent: string = '', isReferenceSlide: boolean = false): string[] {
+function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; audios?: any[]; text?: any[]; songTitleStyle?: any; songLyricsStyle?: any; songTranslationStyle?: any }, indent: string = '', isReferenceSlide: boolean = false, slideIndex: number = 0): string[] {
   const lines: string[] = [];
 
   // Background
@@ -83,9 +87,10 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
     lines.push(`${indent}  []`);
   }
 
-  // Audios
+  // Audios - always output key properties with defaults to ensure persistence
   lines.push(`${indent}audios:`);
   if (slide.audios && slide.audios.length > 0) {
+    const defaultSlideNum = slideIndex + 1; // 1-based slide number
     slide.audios.forEach((aud) => {
       lines.push(`${indent}  - id: ` + escapeYamlString(aud.id));
       lines.push(`${indent}    url: ${escapeYamlString(aud.url)}`);
@@ -94,14 +99,17 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
       if (aud.y !== undefined) lines.push(`${indent}    y: ${escapeYamlString(formatDimension(aud.y))}`);
       if (aud.width) lines.push(`${indent}    width: ${escapeYamlString(formatDimension(aud.width))}`);
       if (aud.height) lines.push(`${indent}    height: ${escapeYamlString(formatDimension(aud.height))}`);
-      if (aud.opacity !== undefined) lines.push(`${indent}    opacity: ${aud.opacity}`);
-      if (aud.zIndex !== undefined) lines.push(`${indent}    zIndex: ${aud.zIndex}`);
-      if (aud.autoPlay !== undefined) lines.push(`${indent}    autoPlay: ${aud.autoPlay}`);
-      if (aud.loop !== undefined) lines.push(`${indent}    loop: ${aud.loop}`);
-      if (aud.volume !== undefined) lines.push(`${indent}    volume: ${aud.volume}`);
-      if (aud.visualHidden !== undefined) lines.push(`${indent}    visualHidden: ${aud.visualHidden}`);
-      if (aud.startSlideIndex !== undefined) lines.push(`${indent}    startSlideIndex: ${aud.startSlideIndex}`);
-      if (aud.endSlideIndex !== undefined) lines.push(`${indent}    endSlideIndex: ${aud.endSlideIndex}`);
+      // Always output these with defaults
+      lines.push(`${indent}    opacity: ${aud.opacity ?? 1}`);
+      lines.push(`${indent}    zIndex: ${aud.zIndex ?? 1}`);
+      lines.push(`${indent}    autoPlay: ${aud.autoPlay ?? true}`);
+      lines.push(`${indent}    loop: ${aud.loop ?? false}`);
+      lines.push(`${indent}    volume: ${aud.volume ?? 1}`);
+      lines.push(`${indent}    visualHidden: ${aud.visualHidden ?? false}`);
+      // Always output slide range with defaults based on the slide where audio is defined
+      lines.push(`${indent}    startSlide: ${aud.startSlide ?? defaultSlideNum}`);
+      lines.push(`${indent}    endSlide: ${aud.endSlide ?? defaultSlideNum}`);
+      if (aud.playAcrossAllSlides !== undefined) lines.push(`${indent}    playAcrossAllSlides: ${aud.playAcrossAllSlides}`);
       if (aud.rotation !== undefined) lines.push(`${indent}    rotation: ${Math.round(aud.rotation)}`);
     });
   } else {
@@ -188,7 +196,7 @@ function templateToYaml(template: PresentationTemplate): string {
     template.slides.forEach((slide, index) => {
       const isReference = index === template.referenceSlideIndex;
       lines.push(`  - # Slide ${index + 1}${isReference ? ' (Reference)' : ''}`);
-      const slideLines = slideToYaml(slide, '    ', isReference);
+      const slideLines = slideToYaml(slide, '    ', isReference, index);
       lines.push(...slideLines);
     });
   } else {

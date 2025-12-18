@@ -87,32 +87,10 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
         return; // Don't apply slide range logic
       }
       
-      // Support both 1-based (startSlide/endSlide) and legacy 0-based (startSlideIndex/endSlideIndex)
-      // Priority: 1-based names, then legacy 0-based names, then defaults
-      let startSlideNum: number;
-      let endSlideNum: number;
-      
-      if (audio.startSlide !== undefined) {
-        // 1-based slide number provided
-        startSlideNum = audio.startSlide;
-      } else if (audio.startSlideIndex !== undefined) {
-        // Legacy 0-based index, convert to 1-based
-        startSlideNum = audio.startSlideIndex + 1;
-      } else {
-        // Default: template slide position + 1 (1-based)
-        startSlideNum = originalSlideIndex + 1;
-      }
-      
-      if (audio.endSlide !== undefined) {
-        // 1-based slide number provided
-        endSlideNum = audio.endSlide;
-      } else if (audio.endSlideIndex !== undefined) {
-        // Legacy 0-based index, convert to 1-based
-        endSlideNum = audio.endSlideIndex + 1;
-      } else {
-        // Default: total slides (play to end)
-        endSlideNum = slides.length;
-      }
+      // Use 1-based slide numbers (startSlide/endSlide)
+      // Default: start from template slide position, play to end of presentation
+      const startSlideNum = audio.startSlide ?? (originalSlideIndex + 1);
+      const endSlideNum = audio.endSlide ?? slides.length;
       
       const shouldPlay = currentSlideNumber >= startSlideNum && currentSlideNumber <= endSlideNum;
       
@@ -491,7 +469,7 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
                   <SlideBackground templateSlide={currentSlide as TemplateSlide} />
                   <SlideImages templateSlide={currentSlide as TemplateSlide} />
                   <SlideVideos templateSlide={currentSlide as TemplateSlide} />
-                  <SlideAudios templateSlide={currentSlide as TemplateSlide} />
+                  {/* Audio is handled by persistent audio refs at modal level, not here */}
                   <SlideText templateSlide={currentSlide as TemplateSlide} />
                 </div>
               ) : null}
