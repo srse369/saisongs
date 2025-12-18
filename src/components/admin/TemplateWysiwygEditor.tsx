@@ -2764,12 +2764,20 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     <div 
       className="flex flex-col gap-4"
       onClick={(e) => {
-        // Check if click was outside the stage area
         const target = e.target as HTMLElement;
-        const stageContainer = target.closest('.template-editor-stage');
         
-        if (!stageContainer) {
-          // Clicked outside the stage - deselect and return focus to slide list
+        // Don't shift focus if clicking on the stage
+        const stageContainer = target.closest('.template-editor-stage');
+        if (stageContainer) {
+          return;
+        }
+        
+        // Don't shift focus if clicking on any interactive element or property panels
+        const isFormElement = ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'LABEL'].includes(target.tagName);
+        const isInPropertyPanel = target.closest('.flex-shrink-0') !== null; // Property panel is in a flex-shrink-0 container
+        
+        if (!isFormElement && !isInPropertyPanel) {
+          // Clicked outside the stage and not on interactive elements - deselect and return focus to slide list
           setSelectedId(null);
           setSlideListHasFocus(true);
           setCanvasHasFocus(false);
