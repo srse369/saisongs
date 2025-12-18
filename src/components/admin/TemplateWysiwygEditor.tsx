@@ -2761,7 +2761,21 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   const slideDimensionsLabel = `${SLIDE_WIDTH}×${SLIDE_HEIGHT} → ${CANVAS_WIDTH}×${Math.round(CANVAS_HEIGHT)}`;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div 
+      className="flex flex-col gap-4"
+      onClick={(e) => {
+        // Check if click was outside the stage area
+        const target = e.target as HTMLElement;
+        const stageContainer = target.closest('.template-editor-stage');
+        
+        if (!stageContainer) {
+          // Clicked outside the stage - deselect and return focus to slide list
+          setSelectedId(null);
+          setSlideListHasFocus(true);
+          setCanvasHasFocus(false);
+        }
+      }}
+    >
       {/* Main editor area */}
       <div className="flex gap-4" style={{ height: '580px' }}>
         {/* Slide thumbnails list (left) */}

@@ -319,29 +319,6 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
         />
       )}
       
-      {/* Multi-slide audio elements - render all, control playback via refs */}
-      {template?.slides && template.slides.flatMap((slide, slideIndex) => 
-        (slide.audios || []).map((audio) => {
-          // Use compound key to handle duplicate IDs across slides
-          const uniqueKey = `${slideIndex}_${audio.id}`;
-          return (
-            <audio
-              key={uniqueKey}
-              ref={(el) => {
-                if (el) {
-                  audioRefs.current.set(uniqueKey, el);
-                } else {
-                  audioRefs.current.delete(uniqueKey);
-                }
-              }}
-              src={audio.url}
-              loop={audio.loop ?? false}
-              style={{ display: 'none' }}
-            />
-          );
-        })
-      )}
-      
       <div className={`bg-white dark:bg-gray-900 ${cssFullscreenMode ? 'w-screen h-screen' : 'rounded-lg shadow-2xl w-full h-full max-w-full max-h-screen'} flex flex-col`}>
         {/* Header - Hidden in fullscreen or CSS fullscreen mode */}
         {!isFullscreen && !cssFullscreenMode && (
@@ -473,6 +450,53 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
                   <SlideText templateSlide={currentSlide as TemplateSlide} />
                 </div>
               ) : null}
+              
+              {/* Multi-slide audio elements - overlaid on slide */}
+              {template?.slides && template.slides.flatMap((slide, slideIndex) => 
+                (slide.audios || []).map((audio) => {
+                  // Use compound key to handle duplicate IDs across slides
+                  const uniqueKey = `${slideIndex}_${audio.id}`;
+                  const visualHidden = audio.visualHidden ?? false;
+                  
+                  // Determine if this audio should be visible on current slide
+                  const currentSlideNumber = currentSlideIndex + 1;
+                  const startSlideNum = audio.startSlide ?? (slideIndex + 1);
+                  const endSlideNum = audio.endSlide ?? slides.length;
+                  const isActiveOnCurrentSlide = audio.playAcrossAllSlides || 
+                    (currentSlideNumber >= startSlideNum && currentSlideNumber <= endSlideNum);
+                  
+                  // Only show controls if not visualHidden AND audio is active on current slide
+                  const showControls = !visualHidden && isActiveOnCurrentSlide;
+                  
+                  return (
+                    <audio
+                      key={uniqueKey}
+                      data-audio-source="presentation-modal-multi-slide"
+                      data-unique-key={uniqueKey}
+                      ref={(el) => {
+                        if (el) {
+                          audioRefs.current.set(uniqueKey, el);
+                        } else {
+                          audioRefs.current.delete(uniqueKey);
+                        }
+                      }}
+                      src={audio.url}
+                      loop={audio.loop ?? false}
+                      controls={showControls}
+                      className="absolute"
+                      style={{
+                        display: showControls ? 'block' : 'none',
+                        zIndex: audio.zIndex || 10000,
+                        width: audio.width || `${Math.min(400, slideWidth * 0.3)}px`,
+                        maxWidth: '90%',
+                        bottom: '20px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                      }}
+                    />
+                  );
+                })
+              )}
               
               {/* Reference Slide Indicator Overlay */}
               {isReference && slides.length > 1 && (
