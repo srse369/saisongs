@@ -532,10 +532,93 @@ const DraggableText: React.FC<{
   scale: number;
   onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
   onEditingChange?: (isEditing: boolean) => void;
-}> = ({ element, isSelected, onSelect, onChange, stageRef, scale, onContextMenu, onEditingChange }) => {
+  showFormattedOverlay?: boolean;
+}> = ({ element, isSelected, onSelect, onChange, stageRef, scale, onContextMenu, onEditingChange, showFormattedOverlay = true }) => {
   const shapeRef = useRef<Konva.Text>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
   const longPressHandlers = useLongPress(onContextMenu || (() => {}));
+
+  // Create and position HTML overlay for rendered text
+  useEffect(() => {
+    if (!showFormattedOverlay || isEditing) {
+      // Remove overlay when not needed or when editing
+      if (overlayRef.current) {
+        document.body.removeChild(overlayRef.current);
+        overlayRef.current = null;
+      }
+      return;
+    }
+
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    // Create overlay div
+    const overlay = document.createElement('div');
+    overlayRef.current = overlay;
+    
+    // Convert custom tags to HTML
+    const htmlContent = (element.content || 'Text')
+      .replace(/<c:([0-9a-fA-F]{6})>(.*?)<\/c:[0-9a-fA-F]{6}>/g, '<span style="color:#$1">$2</span>')
+      .replace(/<br\s*\/?>/gi, '<br>');
+    
+    overlay.innerHTML = htmlContent;
+    
+    // Get stage container position
+    const stageBox = stage.container().getBoundingClientRect();
+    
+    // Position overlay
+    overlay.style.position = 'fixed';
+    overlay.style.left = `${stageBox.left + element.x * scale}px`;
+    overlay.style.top = `${stageBox.top + element.y * scale}px`;
+    overlay.style.width = `${(element.width || 200) * scale}px`;
+    overlay.style.fontSize = `${(element.fontSize || 24) * scale}px`;
+    overlay.style.fontFamily = getFontFamily(element.fontFamily);
+    overlay.style.fontWeight = element.fontWeight || 'normal';
+    overlay.style.fontStyle = element.fontStyle || 'normal';
+    overlay.style.textAlign = element.textAlign || 'center';
+    overlay.style.color = element.color || '#ffffff';
+    overlay.style.lineHeight = '1.4';
+    overlay.style.whiteSpace = 'pre-wrap';
+    overlay.style.wordWrap = 'break-word';
+    overlay.style.pointerEvents = 'none'; // Allow clicks to pass through to Konva
+    overlay.style.transformOrigin = 'left top';
+    overlay.style.zIndex = '1000';
+    overlay.className = 'wysiwyg-text-overlay'; // Add class for easy identification
+    
+    if (element.rotation) {
+      overlay.style.transform = `rotate(${element.rotation}deg)`;
+    }
+    
+    document.body.appendChild(overlay);
+
+    // Watch for PresentationModal opening and hide overlay
+    const checkForPresentationModal = () => {
+      // Look specifically for PresentationModal which has data-presentation-modal or specific structure
+      const hasPresentationModal = document.querySelector('.presentation-modal-backdrop, [data-presentation-modal="true"]') !== null;
+      if (hasPresentationModal && overlay.parentElement) {
+        overlay.style.display = 'none';
+      } else if (overlay.parentElement) {
+        overlay.style.display = 'block';
+      }
+    };
+
+    // Check immediately
+    checkForPresentationModal();
+
+    // Set up observer for modal changes
+    const observer = new MutationObserver(checkForPresentationModal);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Cleanup
+    return () => {
+      observer.disconnect();
+      if (overlayRef.current) {
+        document.body.removeChild(overlayRef.current);
+        overlayRef.current = null;
+      }
+    };
+  }, [element.content, element.x, element.y, element.width, element.fontSize, element.fontFamily, element.fontWeight, element.fontStyle, element.textAlign, element.color, element.rotation, scale, isEditing, showFormattedOverlay, stageRef]);
 
   // Konva fontStyle combines bold and italic: "normal", "bold", "italic", "bold italic"
   const getFontStyle = () => {
@@ -545,6 +628,12 @@ const DraggableText: React.FC<{
     if (isBold) return 'bold';
     if (isItalic) return 'italic';
     return 'normal';
+  };
+
+  // Strip HTML tags for plain text display
+  const getPlainText = () => {
+    return (element.content || 'Text')
+      .replace(/<[^>]+>/g, ''); // Remove all HTML tags
   };
 
   // Handle double-click to start inline editing
@@ -560,84 +649,188 @@ const DraggableText: React.FC<{
     const stageBox = stage.container().getBoundingClientRect();
     
     // Use element's x/y position (in slide coordinates) and multiply by scale
-    // The stage itself is scaled, so we need to position relative to the stage container
     const areaPosition = {
       x: stageBox.left + element.x * scale,
       y: stageBox.top + element.y * scale,
     };
 
-    // Create textarea for editing
-    const textarea = document.createElement('textarea');
-    document.body.appendChild(textarea);
+    // Create contentEditable div for rich text editing
+    const editor = document.createElement('div');
+    editor.contentEditable = 'true';
+    editor.spellcheck = false;
+    document.body.appendChild(editor);
 
-    textarea.value = element.content || '';
-    textarea.style.position = 'fixed';
-    textarea.style.top = `${areaPosition.y}px`;
-    textarea.style.left = `${areaPosition.x}px`;
-    textarea.style.width = `${(element.width || 200) * scale}px`;
-    textarea.style.minHeight = `${(element.fontSize || 24) * scale * 1.2}px`;
-    textarea.style.fontSize = `${(element.fontSize || 24) * scale}px`;
-    textarea.style.fontFamily = getFontFamily(element.fontFamily);
-    textarea.style.fontWeight = element.fontWeight || 'normal';
-    textarea.style.fontStyle = element.fontStyle || 'normal';
-    textarea.style.textAlign = element.textAlign || 'center';
-    textarea.style.color = element.color || '#ffffff';
-    textarea.style.background = 'rgba(0, 0, 0, 0.85)';
-    textarea.style.border = '2px solid #3b82f6';
-    textarea.style.borderRadius = '4px';
-    textarea.style.padding = '0';
-    textarea.style.margin = '0';
-    textarea.style.overflow = 'hidden';
-    textarea.style.outline = 'none';
-    textarea.style.resize = 'none';
-    textarea.style.lineHeight = '1';
-    textarea.style.transformOrigin = 'left top';
-    textarea.style.zIndex = '10000';
-    textarea.style.boxSizing = 'border-box';
+    // Convert our custom tags to HTML for editing
+    const htmlContent = (element.content || '')
+      .replace(/<c:([0-9a-fA-F]{6})>(.*?)<\/c:[0-9a-fA-F]{6}>/g, '<span style="color:#$1">$2</span>');
+    editor.innerHTML = htmlContent;
+    
+    editor.style.position = 'fixed';
+    editor.style.top = `${areaPosition.y}px`;
+    editor.style.left = `${areaPosition.x}px`;
+    editor.style.width = `${(element.width || 200) * scale}px`;
+    editor.style.minHeight = `${(element.fontSize || 24) * scale * 1.2}px`;
+    editor.style.fontSize = `${(element.fontSize || 24) * scale}px`;
+    editor.style.fontFamily = getFontFamily(element.fontFamily);
+    editor.style.fontWeight = element.fontWeight || 'normal';
+    editor.style.fontStyle = element.fontStyle || 'normal';
+    editor.style.textAlign = element.textAlign || 'center';
+    editor.style.color = element.color || '#ffffff';
+    editor.style.background = 'rgba(0, 0, 0, 0.85)';
+    editor.style.border = '2px solid #3b82f6';
+    editor.style.borderRadius = '4px';
+    editor.style.padding = '8px';
+    editor.style.margin = '0';
+    editor.style.overflow = 'auto';
+    editor.style.outline = 'none';
+    editor.style.lineHeight = '1.4';
+    editor.style.transformOrigin = 'left top';
+    editor.style.zIndex = '10000';
+    editor.style.boxSizing = 'border-box';
+    editor.style.whiteSpace = 'pre-wrap';
+    editor.style.wordWrap = 'break-word';
     
     // Handle rotation
     if (element.rotation) {
-      textarea.style.transform = `rotate(${element.rotation}deg)`;
+      editor.style.transform = `rotate(${element.rotation}deg)`;
     }
 
-    textarea.focus();
-    textarea.select();
+    // Create toolbar for formatting
+    const toolbar = document.createElement('div');
+    toolbar.style.position = 'fixed';
+    toolbar.style.top = `${areaPosition.y - 40}px`;
+    toolbar.style.left = `${areaPosition.x}px`;
+    toolbar.style.background = '#1f2937';
+    toolbar.style.border = '1px solid #3b82f6';
+    toolbar.style.borderRadius = '4px';
+    toolbar.style.padding = '4px';
+    toolbar.style.display = 'flex';
+    toolbar.style.gap = '4px';
+    toolbar.style.zIndex = '10001';
+    
+    const createButton = (label: string, command: string) => {
+      const btn = document.createElement('button');
+      btn.textContent = label;
+      btn.style.padding = '4px 8px';
+      btn.style.background = '#374151';
+      btn.style.color = '#fff';
+      btn.style.border = 'none';
+      btn.style.borderRadius = '3px';
+      btn.style.cursor = 'pointer';
+      btn.style.fontSize = '12px';
+      btn.onmousedown = (e) => {
+        e.preventDefault();
+        document.execCommand(command, false);
+        editor.focus();
+      };
+      return btn;
+    };
+
+    toolbar.appendChild(createButton('B', 'bold'));
+    toolbar.appendChild(createButton('I', 'italic'));
+    
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.value = element.color || '#ffffff';
+    colorInput.style.width = '30px';
+    colorInput.style.height = '24px';
+    colorInput.style.border = 'none';
+    colorInput.style.cursor = 'pointer';
+    
+    // Store selection before color picker opens
+    let savedSelection: Range | null = null;
+    colorInput.onfocus = () => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        savedSelection = sel.getRangeAt(0).cloneRange();
+      }
+    };
+    
+    colorInput.oninput = () => {
+      // Restore selection
+      if (savedSelection) {
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(savedSelection);
+      }
+      document.execCommand('foreColor', false, colorInput.value);
+      editor.focus();
+    };
+    toolbar.appendChild(colorInput);
+    
+    document.body.appendChild(toolbar);
+
+    editor.focus();
+    // Select all text
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    
     setIsEditing(true);
     onEditingChange?.(true);
 
-    // Auto-resize textarea height
-    const resizeTextarea = () => {
-      textarea.style.height = 'auto';
-      textarea.style.height = `${textarea.scrollHeight}px`;
+    // Convert HTML back to our custom format
+    const convertToCustomFormat = (html: string): string => {
+      let result = html;
+      
+      // Convert <font color="#RRGGBB"> to <c:RRGGBB>
+      result = result.replace(/<font color="#([0-9a-fA-F]{6})">(.*?)<\/font>/gi, '<c:$1>$2</c:$1>');
+      
+      // Convert <span style="color:#RRGGBB"> to <c:RRGGBB>
+      result = result.replace(/<span style="color:\s*#([0-9a-fA-F]{6})">(.*?)<\/span>/gi, '<c:$1>$2</c:$1>');
+      
+      // Remove style attributes from b and i tags
+      result = result.replace(/<b\s+[^>]*>/gi, '<b>');
+      result = result.replace(/<i\s+[^>]*>/gi, '<i>');
+      
+      // Keep <b> and <i> tags, remove other formatting
+      result = result.replace(/<strong>/gi, '<b>').replace(/<\/strong>/gi, '</b>');
+      result = result.replace(/<em>/gi, '<i>').replace(/<\/em>/gi, '</i>');
+      
+      // Remove <div> and <p> tags, replace with <br>
+      result = result.replace(/<div>/gi, '<br>').replace(/<\/div>/gi, '');
+      result = result.replace(/<p>/gi, '').replace(/<\/p>/gi, '<br>');
+      
+      // Clean up extra <br> at the end
+      result = result.replace(/(<br>)+$/gi, '');
+      
+      return result;
     };
-    textarea.addEventListener('input', resizeTextarea);
-    resizeTextarea();
 
     // Handle blur (finish editing)
-    const handleBlur = () => {
-      const newContent = textarea.value;
+    const handleBlur = (e: FocusEvent) => {
+      // Don't close if clicking on toolbar or color input
+      if (e.relatedTarget === toolbar || e.relatedTarget === colorInput || 
+          toolbar.contains(e.relatedTarget as Node)) {
+        return;
+      }
+      
+      const newContent = convertToCustomFormat(editor.innerHTML);
       onChange({ content: newContent });
-      document.body.removeChild(textarea);
+      document.body.removeChild(editor);
+      document.body.removeChild(toolbar);
       textNode.show();
       setIsEditing(false);
       onEditingChange?.(false);
     };
 
-    // Handle keydown (Enter without shift to finish, Escape to cancel)
+    // Handle keydown (Escape to cancel)
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
-        document.body.removeChild(textarea);
+        document.body.removeChild(editor);
+        document.body.removeChild(toolbar);
         textNode.show();
         setIsEditing(false);
         onEditingChange?.(false);
       }
-      // Allow Enter for newlines (shift+enter or just enter for multiline)
     };
 
-    textarea.addEventListener('blur', handleBlur);
-    textarea.addEventListener('keydown', handleKeyDown);
+    editor.addEventListener('blur', handleBlur);
+    editor.addEventListener('keydown', handleKeyDown);
   };
 
   return (
@@ -647,13 +840,13 @@ const DraggableText: React.FC<{
       x={element.x}
       y={element.y}
       width={element.width}
-      text={element.content || 'Text'}
+      text={getPlainText()}
       fontSize={element.fontSize || 24}
       fontFamily={getFontFamily(element.fontFamily)}
       fontStyle={getFontStyle()}
       align={element.textAlign || 'center'}
       fill={element.color || '#ffffff'}
-      opacity={element.opacity ?? 1}
+      opacity={showFormattedOverlay && !isEditing ? 0 : (element.opacity ?? 1)}
       rotation={element.rotation || 0}
       draggable={!isEditing}
       onClick={onSelect}
@@ -664,7 +857,6 @@ const DraggableText: React.FC<{
       onDblTap={handleDblClick}
       onDragEnd={(e) => {
         const node = shapeRef.current;
-        // Capture width/height on drag to ensure they're persisted
         onChange({
           x: Math.round(e.target.x()),
           y: Math.round(e.target.y()),
@@ -883,6 +1075,16 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     setSelectedId(null);
     setSlideListHasFocus(false);
     setCanvasHasFocus(true);
+    
+    // Focus the first thumbnail so keyboard shortcuts work immediately
+    setTimeout(() => {
+      const firstThumbnail = thumbnailRefs.current[0];
+      if (firstThumbnail) {
+        firstThumbnail.focus();
+        setSlideListHasFocus(true);
+        setCanvasHasFocus(false);
+      }
+    }, 100);
   }, []); // Run only once on mount
   
   // Notify parent when selected slide index changes
@@ -1534,6 +1736,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         return;
       }
 
+      // Don't handle shift+arrow if target is a slide thumbnail button - let it handle the event
+      if (target && target.hasAttribute('data-slide-thumbnail') && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        return;
+      }
+
       // Escape: Three-tier behavior - exit text edit → deselect element → close dialog
       if (e.key === 'Escape') {
         // Tier 1: If text is being edited, the textarea's handler will exit edit mode
@@ -1610,7 +1817,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       // The following shortcuts require canvas focus and a selected element
       if (!canvasHasFocus || !selectedId) {
         // Allow ArrowUp/ArrowDown to navigate slides when on canvas with no selection
-        if (canvasHasFocus && !selectedId) {
+        if (canvasHasFocus && !selectedId && !e.shiftKey) {
           if (e.key === 'ArrowUp') {
             e.preventDefault();
             const prevIndex = Math.max(0, selectedSlideIndex - 1);
@@ -1623,6 +1830,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
             return;
           }
         }
+        // Don't handle shift+arrow when slide list has focus - let the thumbnail handler deal with it
         return;
       }
 
@@ -1666,7 +1874,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
 
     window.addEventListener('keydown', handleKeyDown, true); // Use capture phase to handle before Modal
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [canvasHasFocus, selectedId, canvasElements, updateElement, handleDeleteSelected, handleUndo, handleRedo, handleCopy, handlePaste, selectedSlideIndex, slides.length]);
+  }, [canvasHasFocus, slideListHasFocus, selectedId, canvasElements, updateElement, handleDeleteSelected, handleUndo, handleRedo, handleCopy, handlePaste, selectedSlideIndex, slides.length]);
 
   // Add new image (using full slide coordinates)
   const handleAddImage = () => {
@@ -2468,6 +2676,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 )}
                 <button
                   type="button"
+                  data-slide-thumbnail="true"
                   ref={(el) => {
                     thumbnailRefs.current[idx] = el;
                   }}
@@ -2492,22 +2701,50 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      const prevIndex = Math.max(0, idx - 1);
-                      setSelectedSlideIndex(prevIndex);
-                      setSelectedId(null);
-                      const prevBtn = thumbnailRefs.current[prevIndex];
-                      if (prevBtn) {
-                        prevBtn.focus();
+                      if (e.shiftKey) {
+                        // Move slide up
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (idx > 0) {
+                          handleMoveSlideUp(idx);
+                          setTimeout(() => {
+                            const prevBtn = thumbnailRefs.current[idx - 1];
+                            if (prevBtn) prevBtn.focus();
+                          }, 50);
+                        }
+                      } else {
+                        // Navigate to previous slide
+                        e.preventDefault();
+                        const prevIndex = Math.max(0, idx - 1);
+                        setSelectedSlideIndex(prevIndex);
+                        setSelectedId(null);
+                        const prevBtn = thumbnailRefs.current[prevIndex];
+                        if (prevBtn) {
+                          prevBtn.focus();
+                        }
                       }
                     } else if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      const nextIndex = Math.min(slides.length - 1, idx + 1);
-                      setSelectedSlideIndex(nextIndex);
-                      setSelectedId(null);
-                      const nextBtn = thumbnailRefs.current[nextIndex];
-                      if (nextBtn) {
-                        nextBtn.focus();
+                      if (e.shiftKey) {
+                        // Move slide down
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (idx < slides.length - 1) {
+                          handleMoveSlideDown(idx);
+                          setTimeout(() => {
+                            const nextBtn = thumbnailRefs.current[idx + 1];
+                            if (nextBtn) nextBtn.focus();
+                          }, 50);
+                        }
+                      } else {
+                        // Navigate to next slide
+                        e.preventDefault();
+                        const nextIndex = Math.min(slides.length - 1, idx + 1);
+                        setSelectedSlideIndex(nextIndex);
+                        setSelectedId(null);
+                        const nextBtn = thumbnailRefs.current[nextIndex];
+                        if (nextBtn) {
+                          nextBtn.focus();
+                        }
                       }
                     }
                   }}
@@ -2935,7 +3172,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           </div>
           {/* Slide frame */}
           <div 
-            className={`relative bg-gray-900 rounded-lg shadow-2xl overflow-hidden ${
+            className={`template-editor-stage relative bg-gray-900 rounded-lg shadow-2xl overflow-hidden ${
               canvasHasFocus && !selectedId ? 'border-2 border-white' : 'border border-transparent'
             }`}
             style={{ 

@@ -1083,61 +1083,6 @@ export const TemplateManager: React.FC = () => {
                 <option value="4:3">4:3 (1600×1200)</option>
               </select>
               </div>
-              
-              {/* Background Audio */}
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
-                  Background Audio (plays across all slides)
-                </label>
-                {editingTemplate?.backgroundAudio ? (
-                  <div className="flex items-center gap-2">
-                    <audio 
-                      src={editingTemplate.backgroundAudio.url} 
-                      controls 
-                      className="flex-1"
-                      style={{ height: '40px' }}
-                    />
-                    <button
-                      onClick={() => setEditingTemplate(editingTemplate ? { ...editingTemplate, backgroundAudio: undefined } : null)}
-                      className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                      title="Remove background audio"
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
-                  </div>
-                ) : (
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file && editingTemplate) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          const dataUrl = event.target?.result as string;
-                          setEditingTemplate({
-                            ...editingTemplate,
-                            backgroundAudio: {
-                              id: `bg-audio-${Date.now()}`,
-                              url: dataUrl,
-                              autoPlay: true,
-                              loop: true,
-                              volume: 0.5,
-                              visualHidden: true,
-                            },
-                          });
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                      e.target.value = ''; // Reset input
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                )}
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Upload an audio file that will play continuously across all slides
-                </p>
-              </div>
                 </div>
 
           {/* Center Assignment */}

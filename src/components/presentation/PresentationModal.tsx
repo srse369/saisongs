@@ -282,6 +282,7 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
 
   return (
     <div 
+      data-presentation-modal="true"
       className={`${cssFullscreenMode ? 'fixed inset-0 z-50' : 'fixed inset-0 z-50 bg-black bg-opacity-75 flex items-center justify-center p-2'}`}
       onClick={(e) => {
         // Only close on backdrop click if not in hide UI mode and click is on backdrop itself
