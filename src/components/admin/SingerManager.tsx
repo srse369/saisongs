@@ -9,13 +9,14 @@ import { Modal } from '../common/Modal';
 import type { Singer, CreateSingerInput } from '../../types';
 
 export const SingerManager: React.FC = () => {
-  const { singers, loading, error, fetchSingers, createSinger, updateSinger, deleteSinger } = useSingers();
+  const { singers, loading, error, fetchSingers, createSinger, updateSinger, deleteSinger, mergeSingers } = useSingers();
   const { isEditor, userId } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSinger, setEditingSinger] = useState<Singer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const lastFetchedUserIdRef = useRef<number | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Fetch singers when user changes to get correct filtered data
@@ -100,6 +101,15 @@ export const SingerManager: React.FC = () => {
     await deleteSinger(id);
   };
 
+  const handleMerge = async (targetSingerId: string, singerIdsToMerge: string[]): Promise<boolean> => {
+    const success = await mergeSingers(targetSingerId, singerIdsToMerge);
+    if (success) {
+      // Refresh singers to get updated data
+      await fetchSingers(true);
+    }
+    return success;
+  };
+
   const filteredSingers = React.useMemo(() => {
     if (!searchTerm.trim()) return singers;
     
@@ -153,6 +163,7 @@ export const SingerManager: React.FC = () => {
           <div className="flex flex-col lg:flex-row gap-3 w-full">
             <div className="relative flex-1 lg:min-w-[300px]">
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchTerm}
                 onChange={handleSearchChange}
@@ -186,19 +197,12 @@ export const SingerManager: React.FC = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-          <div className="flex">
-            <i className="fas fa-exclamation-circle text-lg text-red-400 mr-3"></i>
-            <p className="ml-3 text-sm font-medium text-red-800">{error.message}</p>
-          </div>
-        </div>
-      )}
-
       <SingerList
         singers={filteredSingers}
         onEdit={handleEditClick}
         onDelete={handleDelete}
+        onMerge={handleMerge}
+        onStartSelection={() => searchInputRef.current?.focus()}
         loading={loading}
       />
 

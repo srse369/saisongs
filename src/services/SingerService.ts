@@ -174,6 +174,49 @@ class SingerService {
   async deleteSinger(id: string): Promise<void> {
     await apiClient.deleteSinger(id);
   }
+
+  /**
+   * Merges multiple singers into one target singer
+   * @param targetSingerId - The singer ID to keep
+   * @param singerIdsToMerge - Array of singer IDs to merge into the target
+   * @returns Result of the merge operation
+   */
+  async mergeSingers(targetSingerId: string, singerIdsToMerge: string[]): Promise<{ message: string; targetSingerId: string; mergedCount: number }> {
+    if (!targetSingerId || !singerIdsToMerge || singerIdsToMerge.length === 0) {
+      throw new ValidationError('Target singer and at least one singer to merge are required', 'merge');
+    }
+
+    if (singerIdsToMerge.includes(targetSingerId)) {
+      throw new ValidationError('Target singer cannot be in the list of singers to merge', 'merge');
+    }
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || (
+        import.meta.env.DEV ? '/api' : 'http://localhost:3111/api'
+      );
+
+      const response = await fetch(`${API_BASE_URL}/singers/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ targetSingerId, singerIdsToMerge }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to merge singers');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error merging singers:', error);
+      throw new DatabaseError(
+        ErrorCode.QUERY_ERROR,
+        error instanceof Error ? error.message : 'Failed to merge singers',
+        error
+      );
+    }
+  }
 }
 
 // Export singleton instance

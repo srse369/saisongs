@@ -570,7 +570,7 @@ const DraggableText: React.FC<{
     // Get stage container position
     const stageBox = stage.container().getBoundingClientRect();
     
-    // Position overlay
+    // Position overlay - use fixed positioning relative to viewport
     overlay.style.position = 'fixed';
     overlay.style.left = `${stageBox.left + element.x * scale}px`;
     overlay.style.top = `${stageBox.top + element.y * scale}px`;
@@ -595,6 +595,28 @@ const DraggableText: React.FC<{
     
     document.body.appendChild(overlay);
 
+    // Function to update overlay position
+    const updateOverlayPosition = () => {
+      const stage = stageRef.current;
+      if (!stage || !overlay.parentElement) return;
+      
+      const stageBox = stage.container().getBoundingClientRect();
+      overlay.style.left = `${stageBox.left + element.x * scale}px`;
+      overlay.style.top = `${stageBox.top + element.y * scale}px`;
+    };
+
+    // Find the scrollable container (modal body)
+    const scrollContainer = stage.container().closest('.overflow-y-auto, .overflow-auto, [style*="overflow"]');
+    
+    // Add scroll listener to update position
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', updateOverlayPosition);
+    }
+    
+    // Also listen for window scroll and resize
+    window.addEventListener('scroll', updateOverlayPosition, true);
+    window.addEventListener('resize', updateOverlayPosition);
+
     // Watch for PresentationModal opening and hide overlay
     const checkForPresentationModal = () => {
       // Look specifically for PresentationModal which has data-presentation-modal or specific structure
@@ -616,6 +638,14 @@ const DraggableText: React.FC<{
     // Cleanup
     return () => {
       observer.disconnect();
+      
+      // Remove scroll listeners
+      if (scrollContainer) {
+        scrollContainer.removeEventListener('scroll', updateOverlayPosition);
+      }
+      window.removeEventListener('scroll', updateOverlayPosition, true);
+      window.removeEventListener('resize', updateOverlayPosition);
+      
       if (overlayRef.current) {
         document.body.removeChild(overlayRef.current);
         overlayRef.current = null;

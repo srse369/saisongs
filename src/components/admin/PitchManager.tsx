@@ -479,6 +479,15 @@ export const PitchManager: React.FC = () => {
         </div>
       )}
 
+      {/* Pitch count status */}
+      {filteredPitches.length > 0 && (
+        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          {displayedPitches.length < filteredPitches.length
+            ? `Showing ${displayedPitches.length} of ${filteredPitches.length} pitches`
+            : `${filteredPitches.length} pitch${filteredPitches.length !== 1 ? 'es' : ''}`}
+        </div>
+      )}
+
       {/* List */}
       <PitchList
         pitches={displayedPitches}
@@ -493,17 +502,15 @@ export const PitchManager: React.FC = () => {
         loading={loading}
       />
 
-      {/* Lazy-load sentinel / status */}
-      <div
-        ref={loadMoreRef}
-        className="mt-4 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400"
-      >
-        {displayedPitches.length < filteredPitches.length
-          ? `Showing ${displayedPitches.length} of ${filteredPitches.length} pitches. Scroll to load more...`
-          : filteredPitches.length > 0
-          ? `All ${filteredPitches.length} pitches loaded`
-          : null}
-      </div>
+      {/* Lazy-load sentinel */}
+      {displayedPitches.length < filteredPitches.length && (
+        <div
+          ref={loadMoreRef}
+          className="mt-4 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400"
+        >
+          Scroll to load more...
+        </div>
+      )}
 
       {/* Pitch Form Modal */}
       {showForm && (

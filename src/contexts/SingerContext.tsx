@@ -17,6 +17,7 @@ interface SingerContextState {
   createSinger: (input: CreateSingerInput) => Promise<Singer | null>;
   updateSinger: (id: string, input: UpdateSingerInput) => Promise<Singer | null>;
   deleteSinger: (id: string) => Promise<void>;
+  mergeSingers: (targetSingerId: string, singerIdsToMerge: string[]) => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -216,6 +217,36 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
     }
   }, [toast]);
 
+  const mergeSingers = useCallback(async (targetSingerId: string, singerIdsToMerge: string[]): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await singerService.mergeSingers(targetSingerId, singerIdsToMerge);
+      
+      // Clear localStorage caches for singers and pitches
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(SINGERS_CACHE_KEY);
+        window.localStorage.removeItem('songStudio:pitchesCache');
+      }
+      
+      // Refresh singers list to get updated data
+      await fetchSingers(true);
+      
+      toast.success(`Successfully merged ${result.mergedCount} singer(s)`);
+      return true;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to merge singers';
+      setError({
+        code: 'UNKNOWN_ERROR',
+        message: errorMessage,
+      });
+      toast.error(errorMessage);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [toast, fetchSingers]);
+
   const value: SingerContextState = {
     singers,
     loading,
@@ -225,6 +256,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
     createSinger,
     updateSinger,
     deleteSinger,
+    mergeSingers,
     clearError,
   };
 

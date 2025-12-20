@@ -1,24 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Singer } from '../../types';
 import { Modal } from '../common/Modal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { MusicIcon } from '../common';
 import { CenterBadges } from '../common/CenterBadges';
+import { SingerMergeModal } from './SingerMergeModal';
 
 interface SingerListProps {
   singers: Singer[];
   onEdit: (singer: Singer) => void;
   onDelete: (id: string) => Promise<void>;
+  onMerge?: (targetSingerId: string, singerIdsToMerge: string[]) => Promise<boolean>;
+  onStartSelection?: () => void;
   loading?: boolean;
 }
 
-export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelete, loading = false }) => {
+export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelete, onMerge, onStartSelection, loading = false }) => {
   const navigate = useNavigate();
   const { isEditor, isAdmin } = useAuth();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [singerToDelete, setSingerToDelete] = useState<Singer | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedSingerIds, setSelectedSingerIds] = useState<string[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [mergeModalOpen, setMergeModalOpen] = useState(false);
+
+  const handleToggleSelection = (singerId: string) => {
+    setSelectedSingerIds(prev => 
+      prev.includes(singerId) 
+        ? prev.filter(id => id !== singerId)
+        : [...prev, singerId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedSingerIds.length === singers.length) {
+      setSelectedSingerIds([]);
+    } else {
+      setSelectedSingerIds(singers.map(s => s.id));
+    }
+  };
+
+  const handleStartSelection = () => {
+    setIsSelectionMode(true);
+    onStartSelection?.();
+  };
+
+  const handleCancelSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedSingerIds([]);
+  };
+
+  const handleOpenMergeModal = () => {
+    if (selectedSingerIds.length < 2) {
+      return;
+    }
+    setMergeModalOpen(true);
+  };
+
+  const handleConfirmMerge = async (targetSingerId: string, singerIdsToMerge: string[]) => {
+    if (onMerge) {
+      const success = await onMerge(targetSingerId, singerIdsToMerge);
+      if (success) {
+        setMergeModalOpen(false);
+        setIsSelectionMode(false);
+        setSelectedSingerIds([]);
+      }
+    }
+  };
+
+  const handleCloseMergeModal = () => {
+    setMergeModalOpen(false);
+  };
 
   const handleDeleteClick = (singer: Singer) => {
     setSingerToDelete(singer);
@@ -47,6 +101,18 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
     navigate(`/admin/pitches?singerId=${singer.id}`);
   };
 
+  // Handle Escape key to cancel selection mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isSelectionMode) {
+        handleCancelSelection();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSelectionMode]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -66,15 +132,74 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
   }
 
   return (
-    <>
+    <>      {/* Merge mode controls */}
+      {isEditor && onMerge && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          {!isSelectionMode ? (
+            <button
+              onClick={handleStartSelection}
+              className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <i className="fas fa-check-square mr-2"></i>
+              Select Singers to Merge
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <span className="font-semibold">{selectedSingerIds.length}</span>
+                <span>singer{selectedSingerIds.length !== 1 ? 's' : ''} selected</span>
+              </div>
+              {selectedSingerIds.length > 0 && (
+                <button
+                  onClick={() => setSelectedSingerIds([])}
+                  className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline"
+                >
+                  Deselect All
+                </button>
+              )}
+              <button
+                onClick={handleOpenMergeModal}
+                disabled={selectedSingerIds.length < 2}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <i className="fas fa-code-merge mr-2"></i>
+                Merge Selected
+              </button>
+              <button
+                onClick={handleCancelSelection}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {/* Card layout for all screen sizes - SAME AS SONGS */}
       <div className="space-y-3">
         {singers.map((singer) => (
           <div
             key={singer.id}
-            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-200"
+            className={`bg-white dark:bg-gray-800 border rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-200 ${
+              selectedSingerIds.includes(singer.id)
+                ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                : 'border-gray-200 dark:border-gray-700'
+            }`}
           >
-            <div className="flex flex-col gap-3">
+            <div className="flex gap-3">
+              {/* Checkbox for selection */}
+              {isEditor && onMerge && isSelectionMode && (
+                <div className="flex items-start pt-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedSingerIds.includes(singer.id)}
+                    onChange={() => handleToggleSelection(singer.id)}
+                    className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer"
+                  />
+                </div>
+              )}
+              
+              <div className="flex-1 flex flex-col gap-3">
               {/* Singer Name and Gender */}
               <div className="flex items-center gap-3">
                 <h3 className={`text-lg font-semibold ${
@@ -138,6 +263,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     </button>
                   )}
               </div>
+              </div>
             </div>
           </div>
         ))}
@@ -171,6 +297,14 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
           </div>
         </div>
       </Modal>
+
+      <SingerMergeModal
+        isOpen={mergeModalOpen}
+        singers={singers}
+        selectedSingerIds={selectedSingerIds}
+        onClose={handleCloseMergeModal}
+        onConfirm={handleConfirmMerge}
+      />
     </>
   );
 };

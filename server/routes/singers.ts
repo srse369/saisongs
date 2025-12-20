@@ -316,4 +316,168 @@ router.patch('/:id/editor-for', requireAdmin, async (req, res) => {
   }
 });
 
+// Merge multiple singers into one - requires editor or admin role
+router.post('/merge', requireEditor, async (req, res) => {
+  try {
+    const { targetSingerId, singerIdsToMerge } = req.body;
+    const user = req.user;
+    
+    // Validate input
+    if (!targetSingerId || !singerIdsToMerge || !Array.isArray(singerIdsToMerge)) {
+      return res.status(400).json({ 
+        error: 'targetSingerId and singerIdsToMerge array are required' 
+      });
+    }
+    
+    if (singerIdsToMerge.length === 0) {
+      return res.status(400).json({ 
+        error: 'singerIdsToMerge must contain at least one singer ID' 
+      });
+    }
+    
+    // Ensure target singer is not in the merge list
+    if (singerIdsToMerge.includes(targetSingerId)) {
+      return res.status(400).json({ 
+        error: 'Target singer cannot be in the list of singers to merge' 
+      });
+    }
+    
+    // Get all singers to validate they exist and check permissions
+    const targetSinger = await cacheService.getSinger(targetSingerId);
+    if (!targetSinger) {
+      return res.status(404).json({ error: 'Target singer not found' });
+    }
+    
+    const singersToMerge = await Promise.all(
+      singerIdsToMerge.map(async (id: string) => {
+        const singer = await cacheService.getSinger(id);
+        if (!singer) {
+          throw new Error(`Singer with ID ${id} not found`);
+        }
+        return singer;
+      })
+    );
+    
+    // For editors (non-admins), validate they have access to all singers
+    if (user?.role === 'editor') {
+      const editableCenterIds = user.editorFor || [];
+      
+      // Check target singer
+      const targetCenterIds = targetSinger.center_ids || [];
+      const hasAccessToTarget = targetCenterIds.some((centerId: number) => 
+        editableCenterIds.includes(centerId)
+      );
+      if (!hasAccessToTarget) {
+        return res.status(403).json({ 
+          error: 'You do not have editor access to the target singer' 
+        });
+      }
+      
+      // Check all singers to merge
+      for (const singer of singersToMerge) {
+        const singerCenterIds = singer.center_ids || [];
+        const hasAccess = singerCenterIds.some((centerId: number) => 
+          editableCenterIds.includes(centerId)
+        );
+        if (!hasAccess) {
+          return res.status(403).json({ 
+            error: `You do not have editor access to singer: ${singer.name}` 
+          });
+        }
+      }
+    }
+    
+    // Perform the merge in a transaction-like manner
+    try {
+      // Step 1: Get all pitches for target singer to identify conflicts
+      const targetPitchesQuery = `
+        SELECT RAWTOHEX(song_id) as song_id
+        FROM song_singer_pitches 
+        WHERE singer_id = HEXTORAW(:targetId)
+      `;
+      const targetPitchesResult = await databaseService.query(targetPitchesQuery, [targetSingerId]);
+      const targetSongIds = new Set(targetPitchesResult.map((row: any) => row.SONG_ID || row.song_id));
+      
+      // Step 2: For each singer being merged, handle their pitches
+      for (const singerId of singerIdsToMerge) {
+        // Get pitches for this singer
+        const mergePitchesQuery = `
+          SELECT RAWTOHEX(id) as id, RAWTOHEX(song_id) as song_id, pitch
+          FROM song_singer_pitches 
+          WHERE singer_id = HEXTORAW(:singerId)
+        `;
+        const mergePitches = await databaseService.query(mergePitchesQuery, [singerId]);
+        
+        // Process each pitch
+        for (const pitch of mergePitches) {
+          const songId = pitch.SONG_ID || pitch.song_id;
+          const pitchId = pitch.ID || pitch.id;
+          
+          if (targetSongIds.has(songId)) {
+            // Conflict: target singer already has this song - delete this pitch
+            const deleteQuery = `
+              DELETE FROM song_singer_pitches 
+              WHERE id = HEXTORAW(:pitchId)
+            `;
+            await databaseService.query(deleteQuery, [pitchId]);
+          } else {
+            // No conflict: check if we already transferred a pitch for this song
+            const checkQuery = `
+              SELECT COUNT(*) as count
+              FROM song_singer_pitches 
+              WHERE singer_id = HEXTORAW(:targetId) AND song_id = HEXTORAW(:songId)
+            `;
+            const checkResult = await databaseService.query(checkQuery, [targetSingerId, songId]);
+            const alreadyHasSong = (checkResult[0]?.COUNT || checkResult[0]?.count || 0) > 0;
+            
+            if (alreadyHasSong) {
+              // Another merged singer already had this song and we transferred it - delete this duplicate
+              const deleteQuery = `
+                DELETE FROM song_singer_pitches 
+                WHERE id = HEXTORAW(:pitchId)
+              `;
+              await databaseService.query(deleteQuery, [pitchId]);
+            } else {
+              // Transfer this pitch to target singer
+              const updateQuery = `
+                UPDATE song_singer_pitches 
+                SET singer_id = HEXTORAW(:targetId), updated_at = CURRENT_TIMESTAMP
+                WHERE id = HEXTORAW(:pitchId)
+              `;
+              await databaseService.query(updateQuery, [targetSingerId, pitchId]);
+              
+              // Add to target's song set so future duplicates are deleted
+              targetSongIds.add(songId);
+            }
+          }
+        }
+      }
+      
+      // Delete the merged singers
+      for (const singerId of singerIdsToMerge) {
+        await cacheService.deleteSinger(singerId);
+      }
+      
+      // Invalidate caches
+      cacheService.invalidate('pitches:all');
+      cacheService.invalidatePattern('singers:');
+      
+      res.json({ 
+        message: 'Singers merged successfully',
+        targetSingerId,
+        mergedCount: singerIdsToMerge.length 
+      });
+    } catch (error) {
+      console.error('Error during merge operation:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error merging singers:', error);
+    res.status(500).json({ 
+      error: 'Failed to merge singers',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;
