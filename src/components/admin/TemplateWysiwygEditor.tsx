@@ -1255,6 +1255,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const mouseDownOnStageRef = useRef<boolean>(false);
+  const propertiesPanelRef = useRef<HTMLDivElement>(null);
   
   // On mount, ensure first slide is selected and canvas has focus
   useEffect(() => {
@@ -1644,15 +1646,43 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     }
   }, [selectedId, canvasElements]);
 
+  // Track mousedown globally to prevent deselection when clicking starts outside canvas
+  useEffect(() => {
+    const handleGlobalMouseDown = (e: MouseEvent) => {
+      // Check if mousedown is on the properties panel
+      if (propertiesPanelRef.current && propertiesPanelRef.current.contains(e.target as Node)) {
+        mouseDownOnStageRef.current = false;
+        return;
+      }
+      // Check if mousedown is on the canvas
+      const canvas = stageRef.current?.container().querySelector('canvas');
+      if (canvas && canvas === e.target) {
+        mouseDownOnStageRef.current = true;
+      } else {
+        mouseDownOnStageRef.current = false;
+      }
+    };
+
+    document.addEventListener('mousedown', handleGlobalMouseDown);
+    return () => document.removeEventListener('mousedown', handleGlobalMouseDown);
+  }, []);
+
   // Handle canvas click (focus canvas, optionally deselect)
   const handleStageClick = (e: KonvaEventObject<MouseEvent>) => {
     // Any click on the stage should give focus to the canvas editor
     setCanvasHasFocus(true);
     setSlideListHasFocus(false);
 
-    if (e.target === e.target.getStage()) {
+    // Only deselect if BOTH mousedown and click happened on empty stage area
+    const clickedOnStage = e.target === e.target.getStage();
+    
+    // Check if mousedown originated from properties panel or outside stage
+    if (clickedOnStage && mouseDownOnStageRef.current) {
       setSelectedId(null);
     }
+    
+    // Always reset the flag after handling click
+    mouseDownOnStageRef.current = false;
   };
 
   // Update element in template
@@ -2834,7 +2864,10 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         const isFormElement = ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'LABEL'].includes(target.tagName);
         const isInPropertyPanel = target.closest('.flex-shrink-0') !== null; // Property panel is in a flex-shrink-0 container
         
-        if (!isFormElement && !isInPropertyPanel) {
+        // Don't deselect if mousedown started in property panel (even if mouseup is elsewhere)
+        const mouseDownWasInPropertyPanel = !mouseDownOnStageRef.current;
+        
+        if (!isFormElement && !isInPropertyPanel && !mouseDownWasInPropertyPanel) {
           // Clicked outside the stage and not on interactive elements - deselect and return focus to slide list
           setSelectedId(null);
           setSlideListHasFocus(true);
@@ -3807,6 +3840,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
 
         {/* Properties Panel */}
         <div
+          ref={propertiesPanelRef}
           className="w-72 flex-shrink-0 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-4 overflow-y-auto"
         >
           <h3 className="font-semibold text-gray-900 dark:text-white text-lg">Properties</h3>

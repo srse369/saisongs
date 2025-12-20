@@ -38,12 +38,6 @@ export const Modal: React.FC<ModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
-      onClose();
-    }
-  };
-
   const maxWidthClass = {
     'default': 'max-w-2xl',
     'large': 'max-w-5xl',
@@ -54,9 +48,11 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in"
-      onClick={handleBackdropClick}
     >
-      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl ${maxWidthClass} w-full max-h-[90vh] overflow-hidden flex flex-col animate-fade-in`}>
+      <div 
+        className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl ${maxWidthClass} w-full max-h-[90vh] overflow-hidden flex flex-col animate-fade-in`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">{title}</h2>

@@ -218,49 +218,41 @@ export const SongManager: React.FC = () => {
       return results;
     }
 
-    // Parse natural language query
-    const parsed = parseNaturalQuery(query);
-
-    // Apply parsed filters
-    if (parsed.deity) {
-      results = results.filter(s => s.deity?.toLowerCase().includes(parsed.deity!));
-    }
-    if (parsed.language) {
-      results = results.filter(s => s.language?.toLowerCase().includes(parsed.language!));
-    }
-    if (parsed.raga) {
-      results = results.filter(s => s.raga?.toLowerCase().includes(parsed.raga!));
-    }
-    if (parsed.tempo) {
-      results = results.filter(s => s.tempo?.toLowerCase().includes(parsed.tempo!));
-    }
-    if (parsed.level) {
-      results = results.filter(s => s.level?.toLowerCase().includes(parsed.level!));
-    }
-
-    // Use fuzzy search for remaining general terms
-    if (parsed.general || (!parsed.deity && !parsed.language && !parsed.raga && !parsed.tempo && !parsed.level)) {
-      const searchQuery = parsed.general || query;
-      const fuzzyResults = fuzzySearch.search(searchQuery);
+    // Direct substring search using the full query - this is the primary search
+    // Search across multiple fields to cast a wide net
+    const lowerQuery = query.toLowerCase();
+    const directMatches = results.filter(s => 
+      s.name.toLowerCase().includes(lowerQuery) ||
+      s.deity?.toLowerCase().includes(lowerQuery) ||
+      s.language?.toLowerCase().includes(lowerQuery) ||
+      s.raga?.toLowerCase().includes(lowerQuery) ||
+      s.songTags?.toLowerCase().includes(lowerQuery)
+    );
+    
+    // Use direct matches if found, otherwise fall back to fuzzy search
+    if (directMatches.length > 0) {
+      results = directMatches;
+    } else {
+      // Fuzzy search as last resort for typo tolerance
+      const fuzzyResults = fuzzySearch.search(query);
       const fuzzyIds = new Set(fuzzyResults.map(r => r.item.id));
       results = results.filter(s => fuzzyIds.has(s.id));
-      
-      // Sort results: prioritize songs that start with the search term
-      const lowerQuery = searchQuery.toLowerCase();
-      results = results.sort((a, b) => {
-        const aName = a.name.toLowerCase();
-        const bName = b.name.toLowerCase();
-        const aStartsWith = aName.startsWith(lowerQuery);
-        const bStartsWith = bName.startsWith(lowerQuery);
-        
-        // Prefix matches come first
-        if (aStartsWith && !bStartsWith) return -1;
-        if (!aStartsWith && bStartsWith) return 1;
-        
-        // If both start with query or neither does, sort alphabetically
-        return compareStringsIgnoringSpecialChars(a.name, b.name);
-      });
     }
+    
+    // Sort results: prioritize songs that start with the search term
+    results = results.sort((a, b) => {
+      const aName = a.name.toLowerCase();
+      const bName = b.name.toLowerCase();
+      const aStartsWith = aName.startsWith(lowerQuery);
+      const bStartsWith = bName.startsWith(lowerQuery);
+      
+      // Prefix matches come first
+      if (aStartsWith && !bStartsWith) return -1;
+      if (!aStartsWith && bStartsWith) return 1;
+      
+      // If both start with query or neither does, sort alphabetically
+      return compareStringsIgnoringSpecialChars(a.name, b.name);
+    });
 
     return results;
   }, [songs, searchTerm, advancedFilters, fuzzySearch]);

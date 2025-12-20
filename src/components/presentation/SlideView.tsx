@@ -22,11 +22,14 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
   // Check if this is a static slide (template-only, no song content)
   const isStaticSlide = slide.slideType === 'static';
   
-  // For static slides, use the templateSlide directly
+  // For static slides, use the templateSlide directly for background/elements
   // For song slides, use the reference slide from the template
   const effectiveSlide: TemplateSlide | undefined = isStaticSlide 
     ? slide.templateSlide 
     : (template ? getReferenceSlide(template) : undefined);
+  
+  // For bottom text styles, ALWAYS use reference slide (even for static slides)
+  const referenceSlide: TemplateSlide | undefined = template ? getReferenceSlide(template) : undefined;
   
   // Get song content styles from reference slide (merge with defaults to ensure all properties exist)
   // Only override defaults with defined template values
@@ -74,14 +77,14 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
   };
   const bottomLeftStyle: SongContentStyle = {
     ...defaultBottomLeftStyle,
-    ...(effectiveSlide?.bottomLeftTextStyle && Object.fromEntries(
-      Object.entries(effectiveSlide.bottomLeftTextStyle).filter(([_, v]) => v !== undefined)
+    ...(referenceSlide?.bottomLeftTextStyle && Object.fromEntries(
+      Object.entries(referenceSlide.bottomLeftTextStyle).filter(([_, v]) => v !== undefined)
     ))
   };
   const bottomRightStyle: SongContentStyle = {
     ...defaultBottomRightStyle,
-    ...(effectiveSlide?.bottomRightTextStyle && Object.fromEntries(
-      Object.entries(effectiveSlide.bottomRightTextStyle).filter(([_, v]) => v !== undefined)
+    ...(referenceSlide?.bottomRightTextStyle && Object.fromEntries(
+      Object.entries(referenceSlide.bottomRightTextStyle).filter(([_, v]) => v !== undefined)
     ))
   };
   
@@ -221,7 +224,7 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         {!skipAudio && <SlideAudios templateSlide={slide.templateSlide} />}
         <SlideText templateSlide={slide.templateSlide} />
 
-        {/* Next-song hint at bottom-right */}
+        {/* Next-song hint - positioned using template style from reference slide */}
         {(() => {
           // Don't show "next" if: next is static slide AND has no text
           if (slide.nextIsStatic && !slide.nextSlideTopCenterText) {
@@ -230,8 +233,28 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
           const shouldRender = slide.nextSongName || slide.nextSlideTopCenterText;
           return shouldRender;
         })() && (
-          <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 text-right z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1">
-            <div className="text-[1.9rem] sm:text-[2rem] text-blue-50">
+          <div 
+            className="absolute z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1 overflow-hidden inline-block"
+            style={{
+              top: getTopPosition(bottomRightStyle),
+              right: `${((slideWidth - bottomRightStyle.x - (bottomRightStyle.width || 0)) / slideWidth) * 100}%`,
+              maxWidth: getWidth(bottomRightStyle),
+              textAlign: (bottomRightStyle.textAlign || 'right') as any,
+            }}
+          >
+            <div
+              className="leading-tight"
+              style={{
+                fontSize: scaleFontSize(bottomRightStyle.fontSize),
+                fontWeight: bottomRightStyle.fontWeight,
+                fontStyle: bottomRightStyle.fontStyle || 'normal',
+                fontFamily: getFontFamily(bottomRightStyle.fontFamily),
+                color: bottomRightStyle.color,
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word',
+                hyphens: 'auto',
+              }}
+            >
               {slide.nextSlideTopCenterText ? (
                 // Show static slide's top-center text (prioritized)
                 <>Next: {renderStyledText(slide.nextSlideTopCenterText)}</>
@@ -243,8 +266,15 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
                   ) : (
                     <>
                       Next: {slide.nextSongName}
-                      {slide.nextSingerName && <> — {slide.nextSingerName}</>}
-                      {slide.nextPitch && <> — {slide.nextPitch}</>}
+                      {slide.nextSingerName && <> - {slide.nextSingerName}</>}
+                      {slide.nextPitch && (
+                        <> - <span className="font-bold">
+                          {slide.nextPitch.includes(' / ') 
+                            ? slide.nextPitch.split(' / ').map(p => formatPitch(p.trim())).join(' / ')
+                            : formatPitch(slide.nextPitch)
+                          } ({slide.nextPitch.replace('#', '♯')})
+                        </span></>
+                      )}
                     </>
                   )}
                 </>
