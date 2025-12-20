@@ -31,7 +31,7 @@ function formatDimension(value: string | number | undefined): string {
  * @param isReferenceSlide Whether this is the reference slide
  * @param slideIndex 0-based index of this slide (used for audio defaults)
  */
-function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; audios?: any[]; text?: any[]; songTitleStyle?: any; songLyricsStyle?: any; songTranslationStyle?: any }, indent: string = '', isReferenceSlide: boolean = false, slideIndex: number = 0): string[] {
+function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; audios?: any[]; text?: any[]; songTitleStyle?: any; songLyricsStyle?: any; songTranslationStyle?: any; bottomLeftTextStyle?: any; bottomRightTextStyle?: any }, indent: string = '', isReferenceSlide: boolean = false, slideIndex: number = 0): string[] {
   const lines: string[] = [];
 
   // Background
@@ -165,6 +165,8 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
     outputSongStyle('songTitleStyle', slide.songTitleStyle);
     outputSongStyle('songLyricsStyle', slide.songLyricsStyle);
     outputSongStyle('songTranslationStyle', slide.songTranslationStyle);
+    outputSongStyle('bottomLeftTextStyle', slide.bottomLeftTextStyle);
+    outputSongStyle('bottomRightTextStyle', slide.bottomRightTextStyle);
   }
 
   return lines;

@@ -216,6 +216,15 @@ export const PitchManager: React.FC = () => {
 
   // Memoize filtered pitches with debounced search for performance
   const filteredPitches = useMemo(() => {
+    // Helper function for case-sensitive comparison
+    const matches = (value: string | undefined, filter: string, caseSensitive: boolean) => {
+      if (!value) return false;
+      if (caseSensitive) {
+        return value.includes(filter);
+      }
+      return value.toLowerCase().includes(filter.toLowerCase());
+    };
+
     const filtered = pitches.filter((p) => {
       // If navigated here with a specific songId, only show pitches for that song
       if (songFilterId && p.songId !== songFilterId) {
@@ -230,23 +239,23 @@ export const PitchManager: React.FC = () => {
       const song = songMap.get(p.songId);
       const singer = singerMap.get(p.singerId);
 
-      // Apply advanced filters (field-specific)
-      if (advancedFilters.songName && !song?.name.toLowerCase().includes(advancedFilters.songName.toLowerCase())) {
+      // Apply advanced filters (field-specific) with case sensitivity
+      if (advancedFilters.songName && !matches(song?.name, advancedFilters.songName, advancedFilters.songNameCaseSensitive || false)) {
         return false;
       }
-      if (advancedFilters.singerName && !singer?.name.toLowerCase().includes(advancedFilters.singerName.toLowerCase())) {
+      if (advancedFilters.singerName && !matches(singer?.name, advancedFilters.singerName, advancedFilters.singerNameCaseSensitive || false)) {
         return false;
       }
-      if (advancedFilters.pitch && !p.pitch.toLowerCase().includes(advancedFilters.pitch.toLowerCase())) {
+      if (advancedFilters.pitch && !matches(p.pitch, advancedFilters.pitch, advancedFilters.pitchCaseSensitive || false)) {
         return false;
       }
-      if (advancedFilters.deity && !song?.deity?.toLowerCase().includes(advancedFilters.deity.toLowerCase())) {
+      if (advancedFilters.deity && !matches(song?.deity, advancedFilters.deity, advancedFilters.deityCaseSensitive || false)) {
         return false;
       }
-      if (advancedFilters.language && !song?.language?.toLowerCase().includes(advancedFilters.language.toLowerCase())) {
+      if (advancedFilters.language && !matches(song?.language, advancedFilters.language, advancedFilters.languageCaseSensitive || false)) {
         return false;
       }
-      if (advancedFilters.raga && !song?.raga?.toLowerCase().includes(advancedFilters.raga.toLowerCase())) {
+      if (advancedFilters.raga && !matches(song?.raga, advancedFilters.raga, advancedFilters.ragaCaseSensitive || false)) {
         return false;
       }
 
@@ -425,6 +434,8 @@ export const PitchManager: React.FC = () => {
           {/* Advanced Search */}
           <AdvancedPitchSearch
             filters={advancedFilters}
+            songs={songs}
+            singers={singers}
             onFiltersChange={(newFilters) => {
               // If user manually changes songName/singerName in advanced search,
               // clear the corresponding URL param to avoid confusion

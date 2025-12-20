@@ -1624,7 +1624,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   // Check if a song content element is selected (type only - style resolved later after songTitleStyle etc are defined)
   const selectedSongContentType = selectedId === 'song-title-element' ? 'songTitleStyle' as const :
     selectedId === 'song-lyrics-element' ? 'songLyricsStyle' as const :
-    selectedId === 'song-translation-element' ? 'songTranslationStyle' as const : null;
+    selectedId === 'song-translation-element' ? 'songTranslationStyle' as const :
+    selectedId === 'bottom-left-text-element' ? 'bottomLeftTextStyle' as const :
+    selectedId === 'bottom-right-text-element' ? 'bottomRightTextStyle' as const : null;
 
   // Update transformer when selection changes
   useEffect(() => {
@@ -2347,6 +2349,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           songTitleStyle: refSlide.songTitleStyle ? { ...refSlide.songTitleStyle } : undefined,
           songLyricsStyle: refSlide.songLyricsStyle ? { ...refSlide.songLyricsStyle } : undefined,
           songTranslationStyle: refSlide.songTranslationStyle ? { ...refSlide.songTranslationStyle } : undefined,
+          bottomLeftTextStyle: refSlide.bottomLeftTextStyle ? { ...refSlide.bottomLeftTextStyle } : undefined,
+          bottomRightTextStyle: refSlide.bottomRightTextStyle ? { ...refSlide.bottomRightTextStyle } : undefined,
         };
       });
       
@@ -2410,7 +2414,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
 
   // Update song content style (only for reference slide)
   const handleSongContentStyleChange = useCallback((
-    styleType: 'songTitleStyle' | 'songLyricsStyle' | 'songTranslationStyle',
+    styleType: 'songTitleStyle' | 'songLyricsStyle' | 'songTranslationStyle' | 'bottomLeftTextStyle' | 'bottomRightTextStyle',
     updates: Partial<SongContentStyle>
   ) => {
     const newSlides = [...slides];
@@ -2418,13 +2422,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     
     // Get current style or use defaults based on slide dimensions
     const getDefaultStyle = (type: string): SongContentStyle => ({
-      x: 40,
+      x: type === 'bottomLeftTextStyle' ? 40 : type === 'bottomRightTextStyle' ? Math.round(SLIDE_WIDTH * 0.5) : 40,
       y: type === 'songTitleStyle' ? Math.round(SLIDE_HEIGHT * 0.05) : 
          type === 'songLyricsStyle' ? Math.round(SLIDE_HEIGHT * 0.20) : 
+         type === 'bottomLeftTextStyle' || type === 'bottomRightTextStyle' ? Math.round(SLIDE_HEIGHT * 0.92) :
          Math.round(SLIDE_HEIGHT * 0.75),
-      width: SLIDE_WIDTH - 80,
-      fontSize: type === 'songTitleStyle' ? '48px' : type === 'songLyricsStyle' ? '36px' : '24px',
-      fontWeight: type === 'songTranslationStyle' ? 'normal' : 'bold',
+      width: type === 'bottomLeftTextStyle' || type === 'bottomRightTextStyle' ? Math.round((SLIDE_WIDTH - 120) / 2) : SLIDE_WIDTH - 80,
+      fontSize: type === 'songTitleStyle' ? '48px' : type === 'songLyricsStyle' ? '36px' : type === 'bottomLeftTextStyle' || type === 'bottomRightTextStyle' ? '20px' : '24px',
+      fontWeight: type === 'songTranslationStyle' || type === 'bottomLeftTextStyle' || type === 'bottomRightTextStyle' ? 'normal' : 'bold',
       textAlign: 'center',
       color: '#ffffff',
     });
@@ -2479,6 +2484,24 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     textAlign: 'center',
     color: '#ffffff',
   };
+  const defaultBottomLeftStyle: SongContentStyle = {
+    x: 40,
+    y: Math.round(SLIDE_HEIGHT * 0.92),
+    width: Math.round((SLIDE_WIDTH - 120) / 2),
+    fontSize: '20px',
+    fontWeight: 'normal',
+    textAlign: 'left',
+    color: '#ffffff',
+  };
+  const defaultBottomRightStyle: SongContentStyle = {
+    x: Math.round(SLIDE_WIDTH * 0.5),
+    y: Math.round(SLIDE_HEIGHT * 0.92),
+    width: Math.round((SLIDE_WIDTH - 120) / 2),
+    fontSize: '20px',
+    fontWeight: 'normal',
+    textAlign: 'right',
+    color: '#ffffff',
+  };
   
   // Merge with saved styles, converting legacy yPosition to y if needed
   // Also ensures all required properties have valid values
@@ -2507,11 +2530,16 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   const songTitleStyle = mergeSongStyle(referenceSlide?.songTitleStyle, defaultTitleStyle);
   const songLyricsStyle = mergeSongStyle(referenceSlide?.songLyricsStyle, defaultLyricsStyle);
   const songTranslationStyle = mergeSongStyle(referenceSlide?.songTranslationStyle, defaultTranslationStyle);
+  const bottomLeftTextStyle = mergeSongStyle(referenceSlide?.bottomLeftTextStyle, defaultBottomLeftStyle);
+  const bottomRightTextStyle = mergeSongStyle(referenceSlide?.bottomRightTextStyle, defaultBottomRightStyle);
   
   // Now we can resolve the selected song content style (after songTitleStyle etc are defined)
   const selectedSongContentStyle = selectedSongContentType ? 
     (selectedSongContentType === 'songTitleStyle' ? songTitleStyle :
-     selectedSongContentType === 'songLyricsStyle' ? songLyricsStyle : songTranslationStyle) : null;
+     selectedSongContentType === 'songLyricsStyle' ? songLyricsStyle :
+     selectedSongContentType === 'songTranslationStyle' ? songTranslationStyle :
+     selectedSongContentType === 'bottomLeftTextStyle' ? bottomLeftTextStyle :
+     selectedSongContentType === 'bottomRightTextStyle' ? bottomRightTextStyle : null) : null;
 
   // Close context menu when clicking elsewhere
   useEffect(() => {
@@ -3574,6 +3602,80 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                         });
                       }}
                     />
+                    {/* Bottom Left Text - Current Song Info */}
+                    <Text
+                      id="bottom-left-text-element"
+                      x={bottomLeftTextStyle.x}
+                      y={bottomLeftTextStyle.y}
+                      width={bottomLeftTextStyle.width}
+                      text="[Current Song]"
+                      fontSize={parseInt(bottomLeftTextStyle.fontSize) || 20}
+                      fontFamily={getFontFamily(bottomLeftTextStyle.fontFamily)}
+                      fontStyle={[
+                        bottomLeftTextStyle.fontWeight === 'bold' ? 'bold' : '',
+                        bottomLeftTextStyle.fontStyle === 'italic' ? 'italic' : ''
+                      ].filter(Boolean).join(' ') || 'normal'}
+                      fill={bottomLeftTextStyle.color}
+                      align={bottomLeftTextStyle.textAlign}
+                      draggable
+                      onClick={() => setSelectedId('bottom-left-text-element')}
+                      onTap={() => setSelectedId('bottom-left-text-element')}
+                      onDragEnd={(e) => {
+                        handleSongContentStyleChange('bottomLeftTextStyle', {
+                          x: Math.round(e.target.x()),
+                          y: Math.round(e.target.y()),
+                        });
+                      }}
+                      onTransformEnd={(e) => {
+                        const node = e.target as Konva.Text;
+                        const scaleX = node.scaleX();
+                        node.scaleX(1);
+                        node.scaleY(1);
+                        handleSongContentStyleChange('bottomLeftTextStyle', {
+                          x: Math.round(node.x()),
+                          y: Math.round(node.y()),
+                          width: Math.round(Math.max(100, node.width() * scaleX)),
+                          fontSize: `${Math.round(Math.max(12, (parseInt(bottomLeftTextStyle.fontSize) || 20) * scaleX))}px`,
+                        });
+                      }}
+                    />
+                    {/* Bottom Right Text - Next Song Info */}
+                    <Text
+                      id="bottom-right-text-element"
+                      x={bottomRightTextStyle.x}
+                      y={bottomRightTextStyle.y}
+                      width={bottomRightTextStyle.width}
+                      text="[Next Song]"
+                      fontSize={parseInt(bottomRightTextStyle.fontSize) || 20}
+                      fontFamily={getFontFamily(bottomRightTextStyle.fontFamily)}
+                      fontStyle={[
+                        bottomRightTextStyle.fontWeight === 'bold' ? 'bold' : '',
+                        bottomRightTextStyle.fontStyle === 'italic' ? 'italic' : ''
+                      ].filter(Boolean).join(' ') || 'normal'}
+                      fill={bottomRightTextStyle.color}
+                      align={bottomRightTextStyle.textAlign}
+                      draggable
+                      onClick={() => setSelectedId('bottom-right-text-element')}
+                      onTap={() => setSelectedId('bottom-right-text-element')}
+                      onDragEnd={(e) => {
+                        handleSongContentStyleChange('bottomRightTextStyle', {
+                          x: Math.round(e.target.x()),
+                          y: Math.round(e.target.y()),
+                        });
+                      }}
+                      onTransformEnd={(e) => {
+                        const node = e.target as Konva.Text;
+                        const scaleX = node.scaleX();
+                        node.scaleX(1);
+                        node.scaleY(1);
+                        handleSongContentStyleChange('bottomRightTextStyle', {
+                          x: Math.round(node.x()),
+                          y: Math.round(node.y()),
+                          width: Math.round(Math.max(100, node.width() * scaleX)),
+                          fontSize: `${Math.round(Math.max(12, (parseInt(bottomRightTextStyle.fontSize) || 20) * scaleX))}px`,
+                        });
+                      }}
+                    />
                   </Group>
                 )}
 
@@ -4236,10 +4338,15 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               <h4 className="font-medium text-gray-700 dark:text-gray-300 text-sm flex items-center gap-2">
                 <span className="text-yellow-500">🎵</span>
                 {selectedSongContentType === 'songTitleStyle' ? 'Song Title' :
-                 selectedSongContentType === 'songLyricsStyle' ? 'Song Lyrics' : 'Translation'}
+                 selectedSongContentType === 'songLyricsStyle' ? 'Song Lyrics' :
+                 selectedSongContentType === 'songTranslationStyle' ? 'Translation' :
+                 selectedSongContentType === 'bottomLeftTextStyle' ? 'Bottom Left (Current Song)' :
+                 'Bottom Right (Next Song)'}
               </h4>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Style for song content on reference slide. Text content is fixed.
+                {selectedSongContentType === 'bottomLeftTextStyle' || selectedSongContentType === 'bottomRightTextStyle'
+                  ? 'Style for song info text on reference slide.'
+                  : 'Style for song content on reference slide. Text content is fixed.'}
               </p>
               
               {/* Position */}

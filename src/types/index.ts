@@ -112,6 +112,8 @@ export interface TemplateSlide {
   songTitleStyle?: SongContentStyle;
   songLyricsStyle?: SongContentStyle;
   songTranslationStyle?: SongContentStyle;
+  bottomLeftTextStyle?: SongContentStyle;   // Current song info
+  bottomRightTextStyle?: SongContentStyle;  // Next song info
 }
 
 // Multi-slide presentation template
@@ -192,6 +194,8 @@ export function ensureSongContentStyles(slide: TemplateSlide, aspectRatio: Aspec
       y: Math.round(DEFAULT_SONG_TRANSLATION_STYLE.y * scaleY),
       width: Math.round(DEFAULT_SONG_TRANSLATION_STYLE.width * scaleX),
     },
+    bottomLeftTextStyle: slide.bottomLeftTextStyle,
+    bottomRightTextStyle: slide.bottomRightTextStyle,
   };
 }
 

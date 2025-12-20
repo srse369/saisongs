@@ -197,6 +197,13 @@ export const SingerManager: React.FC = () => {
         </div>
       </div>
 
+      {/* Singer count status */}
+      {filteredSingers.length > 0 && (
+        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          {filteredSingers.length} singer{filteredSingers.length !== 1 ? 's' : ''}
+        </div>
+      )}
+
       <SingerList
         singers={filteredSingers}
         onEdit={handleEditClick}

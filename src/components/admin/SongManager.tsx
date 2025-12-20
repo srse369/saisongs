@@ -143,51 +143,80 @@ export const SongManager: React.FC = () => {
   const filteredSongs = useMemo(() => {
     let results = songs;
 
+    // Helper function for case-sensitive comparison
+    const matches = (value: string | undefined, filter: string, caseSensitive: boolean) => {
+      if (!value) return false;
+      if (caseSensitive) {
+        return value.includes(filter);
+      }
+      return value.toLowerCase().includes(filter.toLowerCase());
+    };
+
     // Apply advanced filters first (field-specific)
     if (advancedFilters.name) {
       results = results.filter(song => 
-        song.name.toLowerCase().includes(advancedFilters.name!.toLowerCase())
+        matches(song.name, advancedFilters.name!, advancedFilters.nameCaseSensitive || false)
       );
     }
     if (advancedFilters.deity) {
       results = results.filter(song => 
-        song.deity?.toLowerCase().includes(advancedFilters.deity!.toLowerCase())
+        matches(song.deity, advancedFilters.deity!, advancedFilters.deityCaseSensitive || false)
       );
     }
     if (advancedFilters.language) {
       results = results.filter(song => 
-        song.language?.toLowerCase().includes(advancedFilters.language!.toLowerCase())
+        matches(song.language, advancedFilters.language!, advancedFilters.languageCaseSensitive || false)
       );
     }
     if (advancedFilters.raga) {
       results = results.filter(song => 
-        song.raga?.toLowerCase().includes(advancedFilters.raga!.toLowerCase())
+        matches(song.raga, advancedFilters.raga!, advancedFilters.ragaCaseSensitive || false)
       );
     }
     if (advancedFilters.tempo) {
       results = results.filter(song => 
-        song.tempo?.toLowerCase().includes(advancedFilters.tempo!.toLowerCase())
+        matches(song.tempo, advancedFilters.tempo!, advancedFilters.tempoCaseSensitive || false)
       );
     }
     if (advancedFilters.beat) {
       results = results.filter(song => 
-        song.beat?.toLowerCase().includes(advancedFilters.beat!.toLowerCase())
+        matches(song.beat, advancedFilters.beat!, advancedFilters.beatCaseSensitive || false)
       );
     }
     if (advancedFilters.level) {
       results = results.filter(song => 
-        song.level?.toLowerCase().includes(advancedFilters.level!.toLowerCase())
+        matches(song.level, advancedFilters.level!, advancedFilters.levelCaseSensitive || false)
       );
     }
     if (advancedFilters.songTags) {
       results = results.filter(song => 
-        song.songTags?.toLowerCase().includes(advancedFilters.songTags!.toLowerCase())
+        matches(song.songTags, advancedFilters.songTags!, advancedFilters.songTagsCaseSensitive || false)
       );
     }
 
     // Apply smart search with natural language parsing and fuzzy matching
     const query = searchTerm.trim();
-    if (!query) return results;
+    
+    if (!query) {
+      // If there's an advanced filter name, apply sorting to prioritize prefix matches
+      if (advancedFilters.name) {
+        const lowerQuery = advancedFilters.name.toLowerCase();
+        results = results.sort((a, b) => {
+          const aName = a.name.toLowerCase();
+          const bName = b.name.toLowerCase();
+          const aStartsWith = aName.startsWith(lowerQuery);
+          const bStartsWith = bName.startsWith(lowerQuery);
+          
+          // Prefix matches come first
+          if (aStartsWith && !bStartsWith) return -1;
+          if (!aStartsWith && bStartsWith) return 1;
+          
+          // If both start with query or neither does, sort alphabetically
+          return compareStringsIgnoringSpecialChars(a.name, b.name);
+        });
+      }
+      return results;
+    }
 
     // Parse natural language query
     const parsed = parseNaturalQuery(query);
@@ -321,6 +350,7 @@ export const SongManager: React.FC = () => {
             filters={advancedFilters}
             onFiltersChange={setAdvancedFilters}
             onClear={() => setAdvancedFilters({})}
+            songs={songs}
           />
         </div>
 
@@ -339,6 +369,15 @@ export const SongManager: React.FC = () => {
                 <i className="fas fa-times text-lg"></i>
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Song count status */}
+        {filteredSongs.length > 0 && (
+          <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+            {displayedSongs.length < filteredSongs.length
+              ? `Showing ${displayedSongs.length} of ${filteredSongs.length} songs`
+              : `${filteredSongs.length} song${filteredSongs.length !== 1 ? 's' : ''}`}
           </div>
         )}
       </div>

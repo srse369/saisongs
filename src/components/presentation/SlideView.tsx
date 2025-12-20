@@ -53,6 +53,38 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
   const slideWidth = template?.aspectRatio === '4:3' ? 1600 : 1920;
   const slideHeight = template?.aspectRatio === '4:3' ? 1200 : 1080;
   
+  // Bottom text styles with defaults (defined after slideWidth/slideHeight)
+  const defaultBottomLeftStyle: SongContentStyle = {
+    x: 40,
+    y: slideHeight * 0.92,
+    width: (slideWidth - 120) / 2,
+    fontSize: '20px',
+    fontWeight: 'normal',
+    textAlign: 'left',
+    color: '#ffffff',
+  };
+  const defaultBottomRightStyle: SongContentStyle = {
+    x: slideWidth * 0.5,
+    y: slideHeight * 0.92,
+    width: (slideWidth - 120) / 2,
+    fontSize: '20px',
+    fontWeight: 'normal',
+    textAlign: 'right',
+    color: '#ffffff',
+  };
+  const bottomLeftStyle: SongContentStyle = {
+    ...defaultBottomLeftStyle,
+    ...(effectiveSlide?.bottomLeftTextStyle && Object.fromEntries(
+      Object.entries(effectiveSlide.bottomLeftTextStyle).filter(([_, v]) => v !== undefined)
+    ))
+  };
+  const bottomRightStyle: SongContentStyle = {
+    ...defaultBottomRightStyle,
+    ...(effectiveSlide?.bottomRightTextStyle && Object.fromEntries(
+      Object.entries(effectiveSlide.bottomRightTextStyle).filter(([_, v]) => v !== undefined)
+    ))
+  };
+  
   // Helper to convert pixel position to percentage, with fallback to legacy yPosition
   const getTopPosition = (style: SongContentStyle) => {
     if (style.y !== undefined) {
@@ -331,29 +363,49 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         </div>
       )}
 
-      {/* Singer / pitch (when available) at bottom-left */}
+      {/* Singer / pitch (when available) - positioned using template style */}
       {(slide.singerName || slide.pitch) && (
-        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 text-[1.9rem] sm:text-[2rem] text-blue-50 z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1">
-          {slide.singerName && (
-            <span>
-              Singer: {slide.singerName}
-            </span>
-          )}
-          {slide.singerName && slide.pitch && <span className="mx-1">•</span>}
-          {slide.pitch && (
-            <span>
-              Pitch: <span className="font-bold">
-                {slide.pitch.includes(' / ') 
-                  ? slide.pitch.split(' / ').map(p => formatPitch(p.trim())).join(' / ')
-                  : formatPitch(slide.pitch)
-                }
-              </span> ({slide.pitch.replace('#', '♯')})
-            </span>
-          )}
+        <div 
+          className="absolute z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1 overflow-hidden inline-block"
+          style={{
+            top: getTopPosition(bottomLeftStyle),
+            left: getLeftPosition(bottomLeftStyle),
+            maxWidth: getWidth(bottomLeftStyle),
+            textAlign: (bottomLeftStyle.textAlign || 'left') as any,
+          }}
+        >
+          <div
+            className="leading-tight"
+            style={{
+              fontSize: scaleFontSize(bottomLeftStyle.fontSize),
+              fontWeight: bottomLeftStyle.fontWeight,
+              fontStyle: bottomLeftStyle.fontStyle || 'normal',
+              fontFamily: getFontFamily(bottomLeftStyle.fontFamily),
+              color: bottomLeftStyle.color,
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word',
+              hyphens: 'auto',
+            }}
+          >
+            {(slide.singerName || slide.pitch) && (
+              <>
+                Current: {slide.singerName}
+                {slide.singerName && slide.pitch && <> - </>}
+                {slide.pitch && (
+                  <span className="font-bold">
+                    {slide.pitch.includes(' / ') 
+                      ? slide.pitch.split(' / ').map(p => formatPitch(p.trim())).join(' / ')
+                      : formatPitch(slide.pitch)
+                    } ({slide.pitch.replace('#', '♯')})
+                  </span>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Next-song hint at bottom-right */}
+      {/* Next-song hint - positioned using template style */}
       {/* Next slide info: either song name or static slide's top-center text */}
       {(() => {
         // Don't show "next" if: next is static slide AND has no text
@@ -362,8 +414,28 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         }
         return slide.nextSongName || slide.nextSlideTopCenterText;
       })() && (
-        <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 text-right z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1">
-          <div className="text-[1.9rem] sm:text-[2rem] text-blue-50">
+        <div 
+          className="absolute z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1 overflow-hidden inline-block"
+          style={{
+            top: getTopPosition(bottomRightStyle),
+            right: `${((slideWidth - bottomRightStyle.x - (bottomRightStyle.width || 0)) / slideWidth) * 100}%`,
+            maxWidth: getWidth(bottomRightStyle),
+            textAlign: (bottomRightStyle.textAlign || 'right') as any,
+          }}
+        >
+          <div
+            className="leading-tight"
+            style={{
+              fontSize: scaleFontSize(bottomRightStyle.fontSize),
+              fontWeight: bottomRightStyle.fontWeight,
+              fontStyle: bottomRightStyle.fontStyle || 'normal',
+              fontFamily: getFontFamily(bottomRightStyle.fontFamily),
+              color: bottomRightStyle.color,
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word',
+              hyphens: 'auto',
+            }}
+          >
             {slide.nextSlideTopCenterText ? (
               // Show static slide's top-center text (prioritized)
               <>Next: {renderStyledText(slide.nextSlideTopCenterText)}</>
@@ -375,8 +447,15 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
                 ) : (
                   <>
                     Next: {slide.nextSongName}
-                    {slide.nextSingerName && <> — {slide.nextSingerName}</>}
-                    {slide.nextPitch && <> — {slide.nextPitch}</>}
+                    {slide.nextSingerName && <> - {slide.nextSingerName}</>}
+                    {slide.nextPitch && (
+                      <> - <span className="font-bold">
+                        {slide.nextPitch.includes(' / ') 
+                          ? slide.nextPitch.split(' / ').map(p => formatPitch(p.trim())).join(' / ')
+                          : formatPitch(slide.nextPitch)
+                        } ({slide.nextPitch.replace('#', '♯')})
+                      </span></>
+                    )}
                   </>
                 )}
               </>
