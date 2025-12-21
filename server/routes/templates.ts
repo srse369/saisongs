@@ -11,11 +11,14 @@ router.get('/', async (req, res) => {
   try {
     const allTemplates = await cacheService.getAllTemplates();
     
-    // Filter templates by center access if user is authenticated
-    let templates = allTemplates;
+    // Filter templates by center access for all users (authenticated and public)
+    let templates: PresentationTemplate[];
     if (req.user) {
       const accessibleCenterIds = [...(req.user.centerIds || []), ...(req.user.editorFor || [])];
       templates = cacheService.filterByCenterAccess(allTemplates, req.user.role, accessibleCenterIds);
+    } else {
+      // Public/unauthenticated users should only see templates with no center restrictions
+      templates = allTemplates.filter(t => !t.center_ids || t.center_ids.length === 0);
     }
     
     res.json(templates);
@@ -29,7 +32,19 @@ router.get('/', async (req, res) => {
 router.get('/default', async (req, res) => {
   try {
     const allTemplates = await cacheService.getAllTemplates();
-    const template = allTemplates.find(t => t.isDefault || t.is_default);
+    
+    // Filter templates based on user's center access
+    let accessibleTemplates: PresentationTemplate[];
+    if (req.user) {
+      const accessibleCenterIds = [...(req.user.centerIds || []), ...(req.user.editorFor || [])];
+      accessibleTemplates = cacheService.filterByCenterAccess(allTemplates, req.user.role, accessibleCenterIds);
+    } else {
+      // Public users only see templates with no center restrictions
+      accessibleTemplates = allTemplates.filter(t => !t.center_ids || t.center_ids.length === 0);
+    }
+    
+    // Find default template from accessible templates
+    const template = accessibleTemplates.find(t => t.isDefault);
     if (!template) {
       return res.status(404).json({ error: 'No default template found' });
     }
@@ -48,6 +63,26 @@ router.get('/:id', async (req, res) => {
     
     if (!template) {
       return res.status(404).json({ error: 'Template not found' });
+    }
+    
+    // Check if user has access to this template based on center restrictions
+    const templateCenterIds = template.center_ids || [];
+    
+    if (req.user) {
+      // Authenticated user: check if they have access via their centers
+      const accessibleCenterIds = [...(req.user.centerIds || []), ...(req.user.editorFor || [])];
+      const hasAccess = req.user.role === 'admin' || 
+                        templateCenterIds.length === 0 || 
+                        templateCenterIds.some(cid => accessibleCenterIds.includes(cid));
+      
+      if (!hasAccess) {
+        return res.status(403).json({ error: 'Access denied: You do not have permission to view this template' });
+      }
+    } else {
+      // Public user: only allow access to templates with no center restrictions
+      if (templateCenterIds.length > 0) {
+        return res.status(403).json({ error: 'Access denied: This template is restricted to specific centers' });
+      }
     }
     
     res.json(template);

@@ -27,6 +27,7 @@ const Analytics = lazy(() => import('./components/admin/Analytics'));
 const FeedbackManager = lazy(() => import('./components/admin/FeedbackManager'));
 const BulkImportUI = lazy(() => import('./components/admin/BulkImportUI'));
 const CsvImportManager = lazy(() => import('./components/admin/CsvImportManager'));
+const Help = lazy(() => import('./components/Help'));
 import './App.css';
 
 // Loading fallback component for lazy-loaded routes
@@ -103,6 +104,13 @@ function AppContent() {
       <Routes>
                   {/* Public Routes with Layout */}
                   <Route path="/" element={<Layout><HomePage /></Layout>} />
+                  <Route path="/help" element={
+                    <Layout>
+                      <Suspense fallback={<LoadingFallback />}>
+                        <Help />
+                      </Suspense>
+                    </Layout>
+                  } />
                   <Route path="/session" element={<Layout><SessionManager /></Layout>} />
                   <Route
                     path="/admin/import"

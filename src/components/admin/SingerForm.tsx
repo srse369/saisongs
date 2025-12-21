@@ -33,6 +33,18 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
     return originalCenterIds.filter(id => !editorFor.includes(id));
   }, [isAdmin, isEditMode, originalCenterIds, editorFor]);
   
+  // Check if user has any editor access to this singer's centers
+  const hasEditorAccess = useMemo(() => {
+    if (isAdmin) return true;
+    if (!isEditMode) return true; // Always allow creating new singers
+    const singerCenters = singer?.center_ids || [];
+    // User must have editor access to at least one of the singer's centers
+    return singerCenters.some(centerId => editorFor.includes(centerId));
+  }, [isAdmin, isEditMode, singer, editorFor]);
+  
+  // Determine if all fields should be disabled (no access at all)
+  const isFormDisabled = isEditMode && !hasEditorAccess;
+  
   // Track if form has unsaved changes
   const hasUnsavedChanges = useMemo(() => {
     if (singer) {
@@ -160,6 +172,13 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+      {isFormDisabled && (
+        <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            ⚠️ You do not have editor access to any of this singer's centers. All fields are read-only.
+          </p>
+        </div>
+      )}
       <div>
         <label htmlFor="singer-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Singer Name <span className="text-red-500 dark:text-red-400">*</span>
@@ -178,7 +197,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
             errors.name ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
           }`}
           placeholder="Enter singer name"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isFormDisabled}
         />
         {errors.name && (
           <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
@@ -201,7 +220,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ${
             errors.gender ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
           }`}
-          disabled={isSubmitting}
+          disabled={isSubmitting || isFormDisabled}
         >
           <option value="">Select gender</option>
           <option value="Male">Male</option>
@@ -233,7 +252,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
             errors.email ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
           }`}
           placeholder="singer@example.com"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isFormDisabled}
         />
         {errors.email && (
           <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
@@ -263,7 +282,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
                     type="checkbox"
                     checked={singerIsAdmin}
                     onChange={(e) => setSingerIsAdmin(e.target.checked)}
-                    disabled={isSubmitting || !email.trim()}
+                    disabled={isSubmitting || !email.trim() || isFormDisabled}
                     className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50"
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">
@@ -295,7 +314,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
             <CenterMultiSelect
               selectedCenterIds={editorForCenters}
               onChange={isAdmin ? setEditorForCenters : () => {}} 
-              disabled={!isAdmin || isSubmitting || !email.trim()}
+              disabled={!isAdmin || isSubmitting || !email.trim() || isFormDisabled}
               editableOnly={false}
               label=""
             />
@@ -320,7 +339,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
         <CenterMultiSelect
           selectedCenterIds={centerIds}
           onChange={setCenterIds}
-          disabled={isSubmitting}
+          disabled={isSubmitting || isFormDisabled}
           editableOnly={true}
           onCentersLoaded={handleCentersLoaded}
           readOnlyCenterIds={readOnlyCenterIds}
@@ -339,25 +358,27 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
       </div>
 
       <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <Tooltip content="Discard changes and close the form">
+        <Tooltip content={isFormDisabled ? "Close form" : "Discard changes and close the form"}>
           <button
             type="button"
             onClick={handleCancel}
             disabled={isSubmitting}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
           >
-            Cancel
+            {isFormDisabled ? 'Close' : 'Cancel'}
           </button>
         </Tooltip>
-        <Tooltip content={isEditMode ? "Save changes to this singer's profile" : "Create a new singer with these details"}>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
-          >
-            {isSubmitting ? 'Saving...' : isEditMode ? 'Update Singer' : 'Create Singer'}
-          </button>
-        </Tooltip>
+        {!isFormDisabled && (
+          <Tooltip content={isEditMode ? "Save changes to this singer's profile" : "Create a new singer with these details"}>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
+            >
+              {isSubmitting ? 'Saving...' : isEditMode ? 'Update Singer' : 'Create Singer'}
+            </button>
+          </Tooltip>
+        )}
       </div>
     </form>
   );

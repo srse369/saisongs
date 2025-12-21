@@ -79,8 +79,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </Link>
               )}
               
-              {/* Database connection indicator + Auth controls */}
+              {/* Help, Database connection indicator + Auth controls */}
               <div className="ml-2 flex items-center space-x-2">
+                <Tooltip content="Help & Documentation">
+                  <Link 
+                    to="/help" 
+                    className="p-2 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200"
+                  >
+                    <i className="fas fa-question-circle text-lg"></i>
+                  </Link>
+                </Tooltip>
+                
                 {/* Only show database status to authenticated users */}
                 {isAuthenticated && (
                   <DatabaseStatusDropdown 
@@ -186,6 +195,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   Templates
                 </Link>
               )}
+              
+              <Link
+                to="/help"
+                className={`block ${getLinkClasses('/help')}`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <i className="fas fa-question-circle w-5 h-5 mr-2 inline"></i>
+                Help
+              </Link>
               
               {/* Database status and Auth controls in mobile menu */}
               <div className="px-3 py-2 space-y-3 border-t border-gray-200 dark:border-gray-700 mt-2 pt-3">
