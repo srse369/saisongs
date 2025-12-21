@@ -1,4 +1,5 @@
 import React from 'react';
+import { Tooltip } from '../common';
 
 interface SlideNavigationProps {
   currentSlide: number;
@@ -29,22 +30,24 @@ export const SlideNavigation: React.FC<SlideNavigationProps> = ({
   return (
     <div className="flex items-center justify-center gap-6 p-4 bg-gray-800/25 rounded-lg">
       {/* Previous button */}
-      <button
-        onClick={handlePrevious}
-        disabled={isFirstSlide}
-        className={`
-          flex items-center justify-center w-12 h-12 rounded-full
-          transition-all duration-200
-          ${
-            isFirstSlide
-              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
-          }
-        `}
-        aria-label="Previous slide"
-      >
-        <i className="fas fa-chevron-left text-2xl"></i>
-      </button>
+      <Tooltip content={isFirstSlide ? "Already at first slide" : "Previous slide (← or ↑)"}>
+        <button
+          onClick={handlePrevious}
+          disabled={isFirstSlide}
+          className={`
+            flex items-center justify-center w-12 h-12 rounded-full
+            transition-all duration-200
+            ${
+              isFirstSlide
+                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
+            }
+          `}
+          aria-label="Previous slide"
+        >
+          <i className="fas fa-chevron-left text-2xl"></i>
+        </button>
+      </Tooltip>
 
       {/* Slide indicator */}
       <div className="flex items-center gap-2 text-white font-medium">
@@ -54,22 +57,24 @@ export const SlideNavigation: React.FC<SlideNavigationProps> = ({
       </div>
 
       {/* Next button */}
-      <button
-        onClick={handleNext}
-        disabled={isLastSlide}
-        className={`
-          flex items-center justify-center w-12 h-12 rounded-full
-          transition-all duration-200
-          ${
-            isLastSlide
-              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
-          }
-        `}
-        aria-label="Next slide"
-      >
-        <i className="fas fa-chevron-right text-2xl"></i>
-      </button>
+      <Tooltip content={isLastSlide ? "Already at last slide" : "Next slide (→, ↓, or Space)"}>
+        <button
+          onClick={handleNext}
+          disabled={isLastSlide}
+          className={`
+            flex items-center justify-center w-12 h-12 rounded-full
+            transition-all duration-200
+            ${
+              isLastSlide
+                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
+            }
+          `}
+          aria-label="Next slide"
+        >
+          <i className="fas fa-chevron-right text-2xl"></i>
+        </button>
+      </Tooltip>
     </div>
   );
 };

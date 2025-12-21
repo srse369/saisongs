@@ -63,6 +63,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
                 setSelectedTemplateId(templateId);
                 return t;
               } else {
+                // Always load default template if no template specified
                 const t = await templateService.getDefaultTemplate();
                 if (t) {
                   setSelectedTemplateId(t.id);
@@ -71,6 +72,16 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
               }
             } catch (error) {
               console.error('Error loading template:', error);
+              // If error loading template, try to fall back to default
+              try {
+                const defaultTemplate = await templateService.getDefaultTemplate();
+                if (defaultTemplate) {
+                  setSelectedTemplateId(defaultTemplate.id);
+                  return defaultTemplate;
+                }
+              } catch (e) {
+                console.error('Error loading default template:', e);
+              }
               return null;
             }
           })(),
@@ -84,8 +95,20 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         ]);
 
         setSongsData(fullSongs);
+        // Always ensure we have a template - use default if template is null
         if (template) {
           setActiveTemplate(template);
+        } else {
+          // If no template loaded, try one more time to get default
+          try {
+            const defaultTemplate = await templateService.getDefaultTemplate();
+            if (defaultTemplate) {
+              setActiveTemplate(defaultTemplate);
+              setSelectedTemplateId(defaultTemplate.id);
+            }
+          } catch (e) {
+            console.error('Failed to load default template as fallback:', e);
+          }
         }
       } catch (err) {
         console.error('Error fetching data for presentation:', err);

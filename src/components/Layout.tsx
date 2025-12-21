@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../contexts/AuthContext';
-import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, CenterBadges } from './common';
+import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, CenterBadges, Tooltip } from './common';
 import { FeedbackDrawer } from './common/FeedbackDrawer';
 
 interface LayoutProps {
@@ -348,14 +348,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </footer>
 
       {/* Feedback Button - Almost Hidden */}
-      <button
-        onClick={() => setIsFeedbackOpen(true)}
-        className="fixed bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-        title="Send feedback"
-        aria-label="Send feedback"
-      >
-        <i className="fas fa-comment text-lg mx-auto"></i>
-      </button>
+      <Tooltip content="Send feedback, report bugs, or request new features">
+        <button
+          onClick={() => setIsFeedbackOpen(true)}
+          className="fixed bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+          aria-label="Send feedback"
+        >
+          <i className="fas fa-comment text-lg mx-auto"></i>
+        </button>
+      </Tooltip>
 
       {/* Feedback Drawer */}
       <FeedbackDrawer isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />

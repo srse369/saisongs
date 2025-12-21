@@ -3,7 +3,8 @@ import type { Singer } from '../../types';
 import { Modal } from '../common/Modal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { MusicIcon } from '../common';
+import { useSingers } from '../../contexts/SingerContext';
+import { MusicIcon, Tooltip } from '../common';
 import { CenterBadges } from '../common/CenterBadges';
 import { SingerMergeModal } from './SingerMergeModal';
 
@@ -19,6 +20,7 @@ interface SingerListProps {
 export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelete, onMerge, onStartSelection, loading = false }) => {
   const navigate = useNavigate();
   const { isEditor, isAdmin } = useAuth();
+  const { singers: allSingers } = useSingers();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [singerToDelete, setSingerToDelete] = useState<Singer | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -136,13 +138,15 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
       {isEditor && onMerge && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
           {!isSelectionMode ? (
-            <button
-              onClick={handleStartSelection}
-              className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <i className="fas fa-check-square mr-2"></i>
-              Select Singers to Merge
-            </button>
+            <Tooltip content="Merge multiple singer profiles into one, combining all their pitch information">
+              <button
+                onClick={handleStartSelection}
+                className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <i className="fas fa-check-square mr-2"></i>
+                Select Singers to Merge
+              </button>
+            </Tooltip>
           ) : (
             <>
               <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -157,14 +161,16 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                   Deselect All
                 </button>
               )}
-              <button
-                onClick={handleOpenMergeModal}
-                disabled={selectedSingerIds.length < 2}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <i className="fas fa-code-merge mr-2"></i>
-                Merge Selected
-              </button>
+              <Tooltip content={selectedSingerIds.length < 2 ? "Select at least 2 singers to merge" : "Combine selected singers into one profile"}>
+                <button
+                  onClick={handleOpenMergeModal}
+                  disabled={selectedSingerIds.length < 2}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <i className="fas fa-code-merge mr-2"></i>
+                  Merge Selected
+                </button>
+              </Tooltip>
               <button
                 onClick={handleCancelSelection}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
@@ -300,7 +306,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
 
       <SingerMergeModal
         isOpen={mergeModalOpen}
-        singers={singers}
+        singers={allSingers}
         selectedSingerIds={selectedSingerIds}
         onClose={handleCloseMergeModal}
         onConfirm={handleConfirmMerge}

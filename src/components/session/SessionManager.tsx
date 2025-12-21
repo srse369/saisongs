@@ -13,6 +13,7 @@ import { SongDetails } from '../admin/SongDetails';
 import { formatPitch } from '../../utils/pitchUtils';
 import TemplateSelector from '../presentation/TemplateSelector';
 import templateService from '../../services/TemplateService';
+import { Tooltip } from '../common';
 
 export const SessionManager: React.FC = () => {
   const { entries, removeSong, clearSession, reorderSession, addSong } = useSession();
@@ -43,12 +44,24 @@ export const SessionManager: React.FC = () => {
           const template = await templateService.getTemplate(savedTemplateId);
           if (template) {
             setSelectedTemplate(template);
+            return;
           }
         } catch (error) {
           console.error('Error restoring template:', error);
           // Clear invalid template ID from storage
           localStorage.removeItem('selectedSessionTemplateId');
         }
+      }
+      
+      // If no saved template or error loading it, load default template
+      try {
+        const defaultTemplate = await templateService.getDefaultTemplate();
+        if (defaultTemplate) {
+          setSelectedTemplate(defaultTemplate);
+          localStorage.setItem('selectedSessionTemplateId', defaultTemplate.id);
+        }
+      } catch (error) {
+        console.error('Error loading default template:', error);
       }
     };
     restoreTemplate();
@@ -316,40 +329,48 @@ export const SessionManager: React.FC = () => {
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
+            <Tooltip content={sessionItems.length === 0 ? "Add songs to the session first" : "Start full-screen presentation with all songs in order"}>
+              <button
+                type="button"
+                onClick={handlePresentSession}
+                disabled={sessionItems.length === 0}
+                className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Present Session
+              </button>
+            </Tooltip>
+          </div>
+          <Tooltip content="Load a previously saved session into this list">
             <button
               type="button"
-              onClick={handlePresentSession}
-              disabled={sessionItems.length === 0}
-              className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              onClick={() => setShowLoadModal(true)}
+              className="px-4 py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors"
             >
-              Present Session
+              Load Session
             </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowLoadModal(true)}
-            className="px-4 py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors"
-          >
-            Load Session
-          </button>
+          </Tooltip>
           {sessionItems.length > 0 && (
             <>
               {isAuthenticated && (
+                <Tooltip content="Save the current session with all songs, singers, and pitches for later use">
+                  <button
+                    type="button"
+                    onClick={() => setShowSaveModal(true)}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  >
+                    Save Session
+                  </button>
+                </Tooltip>
+              )}
+              <Tooltip content="Remove all songs from the current session">
                 <button
                   type="button"
-                  onClick={() => setShowSaveModal(true)}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  onClick={clearSession}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                 >
-                  Save Session
+                  Clear Session
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={clearSession}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              >
-                Clear Session
-              </button>
+              </Tooltip>
             </>
           )}
         </div>

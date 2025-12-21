@@ -81,7 +81,7 @@ export const SmartSearchInput: React.FC<SmartSearchInputProps> = ({
             type="button"
             onClick={() => setShowExamplesPanel(!showExamplesPanel)}
             className="absolute right-3 top-1.5 p-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
-            title="Show search examples"
+            title="Show smart search examples - combine keywords naturally like 'sai songs in sanskrit'"
           >
             ?
           </button>

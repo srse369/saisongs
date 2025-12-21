@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSingers } from '../../contexts/SingerContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
-import { RefreshIcon } from '../common';
+import { RefreshIcon, Tooltip } from '../common';
 import { SingerForm } from './SingerForm';
 import { SingerList } from './SingerList';
 import { Modal } from '../common/Modal';
@@ -174,23 +174,27 @@ export const SingerManager: React.FC = () => {
               <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => fetchSingers(true)}
-                disabled={loading}
-                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-              >
-                <RefreshIcon className="w-4 h-4" />
-                Refresh
-              </button>
-              {isEditor && (
+              <Tooltip content="Reload singers from the database to see the latest changes">
                 <button
-                  onClick={handleCreateClick}
+                  type="button"
+                  onClick={() => fetchSingers(true)}
+                  disabled={loading}
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                 >
-                  <i className="fas fa-plus text-lg"></i>
-                  Add Singer
+                  <RefreshIcon className="w-4 h-4" />
+                  Refresh
                 </button>
+              </Tooltip>
+              {isEditor && (
+                <Tooltip content="Create a new singer profile with name, gender, and pitch information">
+                  <button
+                    onClick={handleCreateClick}
+                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                  >
+                    <i className="fas fa-plus text-lg"></i>
+                    Add Singer
+                  </button>
+                </Tooltip>
               )}
             </div>
           </div>

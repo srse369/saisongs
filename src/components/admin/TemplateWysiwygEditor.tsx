@@ -8,6 +8,7 @@ import { ASPECT_RATIO_DIMENSIONS } from '../../types';
 import { useSongs } from '../../contexts/SongContext';
 import { AVAILABLE_FONTS, getFontFamily, getFontsByCategory, FONT_CATEGORY_NAMES } from '../../utils/fonts';
 import { regenerateSlideElementIds } from '../../utils/templateUtils/idGenerator';
+import { Tooltip } from '../common';
 
 // Preload Google Fonts for Konva canvas rendering
 const preloadFonts = async () => {
@@ -3384,86 +3385,96 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
             {/* Undo/Redo buttons */}
             <div className="flex items-center gap-1 mr-2 pr-2 border-r border-gray-300 dark:border-gray-600">
-              <button
-                onClick={handleUndo}
-                disabled={historyIndex <= 0}
-                className="flex items-center gap-1 px-2 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-xs font-medium shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Undo (Ctrl+Z)"
-              >
-                <i className="fas fa-undo text-base"></i>
-              </button>
-              <button
-                onClick={handleRedo}
-                disabled={historyIndex >= history.length - 1}
-                className="flex items-center gap-1 px-2 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-xs font-medium shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Redo (Ctrl+Shift+Z)"
-              >
+              <Tooltip content="Undo last change (Ctrl+Z)">
+                <button
+                  onClick={handleUndo}
+                  disabled={historyIndex <= 0}
+                  className="flex items-center gap-1 px-2 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-xs font-medium shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <i className="fas fa-undo text-base"></i>
+                </button>
+              </Tooltip>
+              <Tooltip content="Redo last undone change (Ctrl+Shift+Z)">
+                <button
+                  onClick={handleRedo}
+                  disabled={historyIndex >= history.length - 1}
+                  className="flex items-center gap-1 px-2 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-xs font-medium shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
                 <i className="fas fa-redo text-base"></i>
               </button>
+            </Tooltip>
             </div>
-            <button
-              onClick={handleAddText}
-              className="flex items-center justify-center p-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 shadow-sm font-bold text-xs"
-              title="Add Text"
-            >
-              T
-            </button>
-            <button
-              onClick={handleAddImage}
-              className="flex items-center justify-center p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm"
-              title="Add Image"
+            <Tooltip content="Add text element to slide">
+              <button
+                onClick={handleAddText}
+                className="flex items-center justify-center p-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 shadow-sm font-bold text-xs"
+              >
+                T
+              </button>
+            </Tooltip>
+            <Tooltip content="Add image from URL">
+              <button
+                onClick={handleAddImage}
+                className="flex items-center justify-center p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm"
             >
               <i className="fas fa-image text-base"></i>
             </button>
-            <button
-              onClick={handleAddAudio}
-              className="flex items-center justify-center p-1.5 bg-violet-600 text-white rounded-md hover:bg-violet-700 shadow-sm"
-              title="Add Audio"
-            >
-              <i className="fas fa-volume-up text-base"></i>
-            </button>
-            <button
-              onClick={handleAddVideo}
-              className="flex items-center justify-center p-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 shadow-sm"
-              title="Add Video"
-            >
-              <i className="fas fa-video text-base"></i>
-            </button>
-            <button
-              onClick={() => {
-                setShowSongPicker(true);
-                fetchSongs();
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white rounded-md hover:bg-amber-700 text-xs font-medium shadow-sm"
-              title="Import Song"
-            >
-              <i className="fas fa-music text-base"></i>
-              Import Song
-            </button>
-            <button
-              onClick={handleCopy}
-              disabled={!selectedId}
-              className="flex items-center justify-center p-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Copy (Ctrl+C)"
-            >
-              <i className="fas fa-copy text-base"></i>
-            </button>
-            <button
-              onClick={handlePaste}
-              disabled={!clipboard}
-              className="flex items-center justify-center p-1.5 bg-teal-600 text-white rounded-md hover:bg-teal-700 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Paste (Ctrl+V)"
-            >
-              <i className="fas fa-paste text-base"></i>
-            </button>
-            <button
-              onClick={handleDeleteSelected}
-              disabled={!selectedId}
-              className="flex items-center justify-center p-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Delete (Del)"
-            >
-              <i className="fas fa-trash text-base"></i>
-            </button>
+            </Tooltip>
+            <Tooltip content="Add audio from URL (background music or narration)">
+              <button
+                onClick={handleAddAudio}
+                className="flex items-center justify-center p-1.5 bg-violet-600 text-white rounded-md hover:bg-violet-700 shadow-sm"
+              >
+                <i className="fas fa-volume-up text-base"></i>
+              </button>
+            </Tooltip>
+            <Tooltip content="Add video from URL (background or embedded)">
+              <button
+                onClick={handleAddVideo}
+                className="flex items-center justify-center p-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 shadow-sm"
+              >
+                <i className="fas fa-video text-base"></i>
+              </button>
+            </Tooltip>
+            <Tooltip content="Import song title, lyrics, and translation as text elements">
+              <button
+                onClick={() => {
+                  setShowSongPicker(true);
+                  fetchSongs();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white rounded-md hover:bg-amber-700 text-xs font-medium shadow-sm"
+              >
+                <i className="fas fa-music text-base"></i>
+                Import Song
+              </button>
+            </Tooltip>
+            <Tooltip content={!selectedId ? "Select an element first" : "Copy selected element (Ctrl+C)"}>
+              <button
+                onClick={handleCopy}
+                disabled={!selectedId}
+                className="flex items-center justify-center p-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <i className="fas fa-copy text-base"></i>
+              </button>
+            </Tooltip>
+            <Tooltip content={!clipboard ? "Copy an element first" : "Paste copied element (Ctrl+V)"}>
+              <button
+                onClick={handlePaste}
+                disabled={!clipboard}
+                className="flex items-center justify-center p-1.5 bg-teal-600 text-white rounded-md hover:bg-teal-700 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <i className="fas fa-paste text-base"></i>
+              </button>
+            </Tooltip>
+            <Tooltip content={!selectedId ? "Select an element first" : "Delete selected element (Del key)"}>
+              <button
+                onClick={handleDeleteSelected}
+                disabled={!selectedId}
+                className="flex items-center justify-center p-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <i className="fas fa-trash text-base"></i>
+              </button>
+            </Tooltip>
           </div>
           {/* Slide frame */}
           <div 
@@ -3849,7 +3860,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           <div className="space-y-3 pb-4 border-b border-gray-200 dark:border-gray-700">
             <h4 className="font-medium text-gray-700 dark:text-gray-300 text-sm">Background</h4>
             <div>
-              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Type</label>
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                Type
+                <Tooltip content="Choose between solid color, image, or video background">
+                  <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                    <i className="fas fa-info-circle text-xs"></i>
+                  </span>
+                </Tooltip>
+              </label>
               <select
                 value={currentSlide.background?.type || 'color'}
                 onChange={(e) => handleBackgroundChange({ type: e.target.value as 'color' | 'image' | 'video', value: e.target.value === 'color' ? '#1a1a2e' : '' })}
@@ -3881,7 +3899,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
             )}
             {(currentSlide.background?.type === 'image' || currentSlide.background?.type === 'video') && (
               <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">URL</label>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                  URL
+                  <Tooltip content={currentSlide.background?.type === 'image' ? "Direct URL to background image" : "Direct URL to background video"}>
+                    <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                      <i className="fas fa-info-circle text-xs"></i>
+                    </span>
+                  </Tooltip>
+                </label>
                 <input
                   type="url"
                   value={currentSlide.background?.value || ''}
@@ -3908,7 +3933,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               {/* Common properties first: Position */}
               <div className="grid grid-cols-2 gap-2">
                   <div>
-                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">X Position</label>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                    X Position
+                    <Tooltip content="Horizontal position from left edge (in pixels)">
+                      <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                        <i className="fas fa-info-circle text-xs"></i>
+                      </span>
+                    </Tooltip>
+                  </label>
                     <input
                     type="number"
                     value={Math.round(selectedElement.x)}
@@ -3921,7 +3953,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     />
                   </div>
                 <div>
-                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Y Position</label>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                    Y Position
+                    <Tooltip content="Vertical position from top edge (in pixels)">
+                      <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                        <i className="fas fa-info-circle text-xs"></i>
+                      </span>
+                    </Tooltip>
+                  </label>
                   <input
                     type="number"
                     value={Math.round(selectedElement.y)}
@@ -3937,7 +3976,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
 
               {/* Rotation */}
               <div>
-                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Rotation (°)</label>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                  Rotation (°)
+                  <Tooltip content="Rotate element clockwise (0-360 degrees)">
+                    <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                      <i className="fas fa-info-circle text-xs"></i>
+                    </span>
+                  </Tooltip>
+                </label>
                 <input
                   type="number"
                   value={Math.round(selectedElement.rotation ?? 0)}
@@ -3953,7 +3999,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               {/* Width & Height */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Width</label>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Width
+                        <Tooltip content="Element width in pixels">
+                          <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                            <i className="fas fa-info-circle text-xs"></i>
+                          </span>
+                        </Tooltip>
+                      </label>
                       <input
                         type="number"
                         value={Math.round(selectedElement.width)}
@@ -3968,7 +4021,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Height</label>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Height
+                        <Tooltip content="Element height in pixels">
+                          <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                            <i className="fas fa-info-circle text-xs"></i>
+                          </span>
+                        </Tooltip>
+                      </label>
                       <input
                         type="number"
                         value={Math.round(selectedElement.height)}
@@ -3988,6 +4048,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               <div>
                 <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
                   Opacity: {Math.round((selectedElement.opacity ?? 1) * 100)}%
+                  <Tooltip content="Transparency level - 0% is fully transparent, 100% is fully opaque">
+                    <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                      <i className="fas fa-info-circle text-xs"></i>
+                    </span>
+                  </Tooltip>
                 </label>
                 <input
                   type="range"
@@ -4004,7 +4069,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                     <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Image URL</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Image URL
+                      <Tooltip content="Direct URL to image file (JPG, PNG, GIF, etc.)">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
+                    </label>
                       <input
                       type="url"
                       value={selectedElement.url || ''}
@@ -4014,7 +4086,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Z-Index (layer order)</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Z-Index (layer order)
+                      <Tooltip content="Higher numbers appear on top of lower numbers (stacking order)">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
+                    </label>
                     <input
                       type="number"
                       value={selectedElement.zIndex || 0}
@@ -4027,7 +4106,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                     <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Video URL</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Video URL
+                      <Tooltip content="Direct URL to video file or YouTube/Vimeo link">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
+                    </label>
                       <input
                       type="url"
                       value={selectedElement.url || ''}
@@ -4049,10 +4135,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     </div>
                   )}
                   <div className="flex items-center justify-between mt-1">
-                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                      <input
-                        type="checkbox"
-                        checked={selectedElement.autoPlay ?? true}
+                    <Tooltip content="Automatically start playing when slide appears">
+                      <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                        <input
+                          type="checkbox"
+                          checked={selectedElement.autoPlay ?? true}
                         onChange={(e) =>
                           updateElement(selectedElement.id, { autoPlay: e.target.checked })
                         }
@@ -4060,9 +4147,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       />
                       <span>Auto play</span>
                     </label>
+                    </Tooltip>
                   </div>
                   <div className="flex items-center justify-between mt-1">
-                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                    <Tooltip content="Hide video controls - use as background video">
+                      <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                       <input
                         type="checkbox"
                         checked={selectedElement.hideVideo ?? false}
@@ -4073,9 +4162,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       />
                       <span>Hide Video player</span>
                     </label>
+                    </Tooltip>
                   </div>
                   <div className="flex items-center justify-between mt-1">
-                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                    <Tooltip content="Mute video audio - useful for background videos">
+                      <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                       <input
                         type="checkbox"
                         checked={selectedElement.hideAudio ?? false}
@@ -4086,9 +4177,17 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       />
                       <span>Hide Audio player</span>
                     </label>
+                    </Tooltip>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Z-Index (layer order)</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Z-Index (layer order)
+                      <Tooltip content="Higher numbers appear on top of lower numbers (stacking order)">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
+                    </label>
                     <input
                       type="number"
                       value={selectedElement.zIndex || 0}
@@ -4103,7 +4202,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                   <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Audio URL</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Audio URL
+                      <Tooltip content="Direct URL to audio file (MP3, WAV, etc.)">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
+                    </label>
                     <input
                       type="url"
                       value={selectedElement.url || ''}
@@ -4125,33 +4231,44 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     </div>
                   )}
                   <div className="flex items-center justify-between mt-1">
-                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                      <input
-                        type="checkbox"
-                        checked={selectedElement.autoPlay ?? false}
-                        onChange={(e) =>
-                          updateElement(selectedElement.id, { autoPlay: e.target.checked })
-                        }
-                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span>Auto play</span>
-                    </label>
+                    <Tooltip content="Automatically start playing when slide appears">
+                      <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                        <input
+                          type="checkbox"
+                          checked={selectedElement.autoPlay ?? false}
+                          onChange={(e) =>
+                            updateElement(selectedElement.id, { autoPlay: e.target.checked })
+                          }
+                          className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>Auto play</span>
+                      </label>
+                    </Tooltip>
                   </div>
                   <div className="flex items-center justify-between mt-1">
-                    <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                      <input
-                        type="checkbox"
-                        checked={selectedElement.visualHidden ?? false}
-                        onChange={(e) =>
-                          updateElement(selectedElement.id, { visualHidden: e.target.checked })
-                        }
-                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span>Hide Audio player</span>
-                    </label>
+                    <Tooltip content="Hide the audio player controls (audio still plays)">
+                      <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                        <input
+                          type="checkbox"
+                          checked={selectedElement.visualHidden ?? false}
+                          onChange={(e) =>
+                            updateElement(selectedElement.id, { visualHidden: e.target.checked })
+                          }
+                          className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>Hide Audio player</span>
+                      </label>
+                    </Tooltip>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Volume ({Math.round((selectedElement.volume ?? 1) * 100)}%)</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Volume ({Math.round((selectedElement.volume ?? 1) * 100)}%)
+                      <Tooltip content="Audio playback volume level">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
+                    </label>
                     <input
                       type="range"
                       min="0"
@@ -4174,6 +4291,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       <div>
                         <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
                           Start Slide (1-{template?.slides?.length ?? 1})
+                          <Tooltip content="First slide where this audio should start playing">
+                            <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                              <i className="fas fa-info-circle text-xs"></i>
+                            </span>
+                          </Tooltip>
                         </label>
                         <input
                           type="number"
@@ -4192,6 +4314,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       <div>
                         <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
                           End Slide (1-{template?.slides?.length ?? 1})
+                          <Tooltip content="Last slide where this audio should play - useful for background music">
+                            <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                              <i className="fas fa-info-circle text-xs"></i>
+                            </span>
+                          </Tooltip>
                         </label>
                         <input
                           type="number"
@@ -4214,7 +4341,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   )}
                   
                   <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Z-Index (layer order)</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Z-Index (layer order)
+                      <Tooltip content="Higher numbers appear on top of lower numbers (stacking order)">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
+                    </label>
                     <input
                       type="number"
                       value={selectedElement.zIndex || 0}
@@ -4229,7 +4363,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                   <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Text Content</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Text Content
+                      <Tooltip content="The actual text to display - supports line breaks">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
+                    </label>
                     <textarea
                       value={selectedElement.content || ''}
                       onChange={(e) => updateElement(selectedElement.id, { content: e.target.value })}
@@ -4240,6 +4381,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   <div>
                     <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
                       Font Family
+                      <Tooltip content="Choose from a wide selection of fonts including Indian language support">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
                       {!fontsLoaded && (
                         <span className="ml-1 text-yellow-500" title="Fonts are still loading...">⏳</span>
                       )}
@@ -4262,7 +4408,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Font Size</label>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Font Size
+                        <Tooltip content="Text size in pixels">
+                          <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                            <i className="fas fa-info-circle text-xs"></i>
+                          </span>
+                        </Tooltip>
+                      </label>
                       <input
                         type="number"
                         value={selectedElement.fontSize || 24}
@@ -4271,7 +4424,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Color</label>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        Color
+                        <Tooltip content="Text color - click to open color picker">
+                          <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                            <i className="fas fa-info-circle text-xs"></i>
+                          </span>
+                        </Tooltip>
+                      </label>
                       <input
                         type="color"
                         value={selectedElement.color || '#ffffff'}
@@ -4281,9 +4441,17 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Font Style</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Font Style
+                      <Tooltip content="Make text bold or italic">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
+                    </label>
                     <div className="flex gap-1">
-                      <button
+                      <Tooltip content="Toggle bold text">
+                        <button
                         type="button"
                         onClick={() => updateElement(selectedElement.id, { 
                           fontWeight: selectedElement.fontWeight === 'bold' ? 'normal' : 'bold' 
@@ -4297,7 +4465,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       >
                         B
                       </button>
-                      <button
+                      </Tooltip>
+                      <Tooltip content="Toggle italic text">
+                        <button
                         type="button"
                         onClick={() => updateElement(selectedElement.id, { 
                           fontStyle: selectedElement.fontStyle === 'italic' ? 'normal' : 'italic' 
@@ -4311,12 +4481,21 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       >
                         I
                       </button>
+                      </Tooltip>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Text Align</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Text Align
+                      <Tooltip content="Horizontal text alignment within the text box">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
+                    </label>
                     <div className="flex gap-1">
-                      <button
+                      <Tooltip content="Align text to the left">
+                        <button
                         type="button"
                         onClick={() => updateElement(selectedElement.id, { textAlign: 'left' })}
                         className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center ${
@@ -4328,7 +4507,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       >
                         <i className="fas fa-align-left text-base"></i>
                       </button>
-                      <button
+                      </Tooltip>
+                      <Tooltip content="Center align text">
+                        <button
                         type="button"
                         onClick={() => updateElement(selectedElement.id, { textAlign: 'center' })}
                         className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center ${
@@ -4340,7 +4521,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       >
                         <i className="fas fa-align-center text-base"></i>
                       </button>
-                      <button
+                      </Tooltip>
+                      <Tooltip content="Align text to the right">
+                        <button
                         type="button"
                         onClick={() => updateElement(selectedElement.id, { textAlign: 'right' })}
                         className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center ${
@@ -4352,10 +4535,18 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       >
                         <i className="fas fa-align-right text-base"></i>
                       </button>
+                      </Tooltip>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Z-Index (layer order)</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      Z-Index (layer order)
+                      <Tooltip content="Higher numbers appear on top of lower numbers (stacking order)">
+                        <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                          <i className="fas fa-info-circle text-xs"></i>
+                        </span>
+                      </Tooltip>
+                    </label>
                     <input
                       type="number"
                       value={selectedElement.zIndex || 0}

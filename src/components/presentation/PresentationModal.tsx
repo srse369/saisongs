@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, f
 import { SlideView } from './SlideView';
 import { getSlideBackgroundStyles, SlideBackground, SlideImages, SlideVideos, SlideAudios, SlideText } from '../../utils/templateUtils';
 import type { Slide, TemplateSlide, PresentationTemplate } from '../../types';
+import { Tooltip } from '../common';
 
 interface PresentationModalProps {
   isOpen: boolean;
@@ -358,8 +359,8 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
               <button
                 onClick={() => setCssFullscreenMode(!cssFullscreenMode)}
                 className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors flex-shrink-0"
-                aria-label={cssFullscreenMode ? "Show UI" : "Hide UI"}
-                title={cssFullscreenMode ? "Show UI (slide + controls)" : "Hide UI (slide only)"}
+                aria-label={cssFullscreenMode ? "Show Chrome" : "Hide Chrome"}
+                title={cssFullscreenMode ? "Show Chrome (slide + controls)" : "Hide Chrome (slide only)"}
               >
                 <i className="fas fa-crop text-base md:text-lg"></i>
               </button>
@@ -604,18 +605,21 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
               const isReferenceDot = referenceSlideIndex !== undefined && idx === referenceSlideIndex;
               
               return (
-                <button
+                <Tooltip
                   key={idx}
-                  onClick={() => onSlideChange(idx)}
-                  className={`w-3 h-3 rounded-full transition-colors ${
-                    idx === currentSlideIndex
-                      ? 'bg-blue-500'
-                      : isReferenceDot
-                        ? 'bg-yellow-400 hover:bg-yellow-500'
-                        : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
-                  }`}
-                  title={isReferenceDot ? `Slide ${idx + 1} (Reference)` : `Slide ${idx + 1}${slideTitle ? ` - ${slideTitle}` : ''}`}
-                />
+                  content={isReferenceDot ? `Slide ${idx + 1} (Reference) - Click to jump` : `Slide ${idx + 1}${slideTitle ? ` - ${slideTitle}` : ''} - Click to jump`}
+                >
+                  <button
+                    onClick={() => onSlideChange(idx)}
+                    className={`w-3 h-3 rounded-full transition-colors ${
+                      idx === currentSlideIndex
+                        ? 'bg-blue-500'
+                        : isReferenceDot
+                          ? 'bg-yellow-400 hover:bg-yellow-500'
+                          : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+                    }`}
+                  />
+                </Tooltip>
               );
             })}
           </div>

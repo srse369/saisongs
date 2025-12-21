@@ -8,7 +8,7 @@ import { SongDetails } from './SongDetails';
 import { Modal } from '../common/Modal';
 import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedSongSearch, type SongSearchFilters } from '../common/AdvancedSongSearch';
-import { RefreshIcon } from '../common';
+import { RefreshIcon, Tooltip } from '../common';
 import { createSongFuzzySearch, parseNaturalQuery } from '../../utils/smartSearch';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
 import songService from '../../services/SongService';
@@ -316,23 +316,27 @@ export const SongManager: React.FC = () => {
               placeholder='Ask AI: "Show me sai songs in sanskrit with fast tempo"...'
             />
             <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => fetchSongs(true)}
-                disabled={loading}
-                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-              >
-                <RefreshIcon className="w-4 h-4" />
-                Refresh
-              </button>
-              {isEditor && (
+              <Tooltip content="Reload songs from the database to see the latest updates">
                 <button
-                  onClick={handleCreateClick}
+                  type="button"
+                  onClick={() => fetchSongs(true)}
+                  disabled={loading}
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                 >
-                  <i className="fas fa-plus text-lg"></i>
-                  Create New Song
+                  <RefreshIcon className="w-4 h-4" />
+                  Refresh
                 </button>
+              </Tooltip>
+              {isEditor && (
+                <Tooltip content="Add a new song to the library with name, lyrics, translation, and metadata">
+                  <button
+                    onClick={handleCreateClick}
+                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                  >
+                    <i className="fas fa-plus text-lg"></i>
+                    Create New Song
+                  </button>
+                </Tooltip>
               )}
             </div>
           </div>
