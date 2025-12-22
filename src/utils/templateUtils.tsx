@@ -281,7 +281,26 @@ export const getPositionClasses = (
 /**
  * Get inline styles for positioned elements
  */
-export const getElementStyles = (element: any): React.CSSProperties => {
+/**
+ * Helper to convert pixel position to percentage for proper scaling
+ * Returns the value as-is if it's already a percentage string
+ */
+const getPositionPercentage = (value: string | number | undefined, slideSize: number): string | undefined => {
+  if (value === undefined) return undefined;
+  
+  // If it's already a percentage string, return as-is
+  if (typeof value === 'string' && value.endsWith('%')) {
+    return value;
+  }
+  
+  // Convert pixel value to percentage
+  const pixelValue = typeof value === 'number' ? value : parseFloat(value);
+  if (isNaN(pixelValue)) return undefined;
+  
+  return `${(pixelValue / slideSize) * 100}%`;
+};
+
+export const getElementStyles = (element: any, slideWidth: number = 1920, slideHeight: number = 1080): React.CSSProperties => {
   const styles: React.CSSProperties = {
     width: element.width,
     height: element.height,
@@ -289,12 +308,14 @@ export const getElementStyles = (element: any): React.CSSProperties => {
     zIndex: element.zIndex || 0,
   };
 
-  // Add custom x/y positioning if provided
+  // Add custom x/y positioning if provided - use percentage for proper scaling
   if (element.x !== undefined) {
-    styles.left = typeof element.x === 'number' ? `${element.x}px` : element.x;
+    const percentValue = getPositionPercentage(element.x, slideWidth);
+    styles.left = percentValue || (typeof element.x === 'number' ? `${element.x}px` : element.x);
   }
   if (element.y !== undefined) {
-    styles.top = typeof element.y === 'number' ? `${element.y}px` : element.y;
+    const percentValue = getPositionPercentage(element.y, slideHeight);
+    styles.top = percentValue || (typeof element.y === 'number' ? `${element.y}px` : element.y);
   }
 
    // Apply rotation for elements that use explicit x/y positioning (no predefined position classes)
@@ -754,7 +775,11 @@ export const SlideBackground: React.FC<{ templateSlide: TemplateSlide | null }> 
 /**
  * Render image overlays (for individual TemplateSlide)
  */
-export const SlideImages: React.FC<{ templateSlide: TemplateSlide | null }> = ({ templateSlide }) => {
+export const SlideImages: React.FC<{ templateSlide: TemplateSlide | null; slideWidth?: number; slideHeight?: number }> = ({ 
+  templateSlide,
+  slideWidth = 1920,
+  slideHeight = 1080
+}) => {
   if (!templateSlide?.images || templateSlide.images.length === 0) {
     return null;
   }
@@ -767,7 +792,7 @@ export const SlideImages: React.FC<{ templateSlide: TemplateSlide | null }> = ({
           src={image.url}
           alt={`overlay-${image.id}`}
           className={`absolute ${getPositionClasses(image.position)}`}
-          style={getElementStyles(image)}
+          style={getElementStyles(image, slideWidth, slideHeight)}
         />
       ))}
     </>
@@ -779,8 +804,10 @@ export const SlideImages: React.FC<{ templateSlide: TemplateSlide | null }> = ({
  * - HTML5 videos use <video>.
  * - YouTube URLs are rendered via an <iframe> embed.
  */
-export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({
+export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null; slideWidth?: number; slideHeight?: number }> = ({
   templateSlide,
+  slideWidth = 1920,
+  slideHeight = 1080
 }) => {
   if (!templateSlide?.videos || templateSlide.videos.length === 0) {
     return null;
@@ -790,7 +817,7 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({
     <>
       {templateSlide.videos.map((video) => {
         const autoPlay = video.autoPlay ?? true;
-        const baseStyles = getElementStyles(video);
+        const baseStyles = getElementStyles(video, slideWidth, slideHeight);
         const width = video.width || '320px';
         const height = video.height || '180px';
         const isYouTube = isYouTubeUrl(video.url);
@@ -931,7 +958,11 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null }> = ({
 /**
  * Render audio elements (for individual TemplateSlide)
  */
-export const SlideAudios: React.FC<{ templateSlide: TemplateSlide | null }> = ({ templateSlide }) => {
+export const SlideAudios: React.FC<{ templateSlide: TemplateSlide | null; slideWidth?: number; slideHeight?: number }> = ({ 
+  templateSlide,
+  slideWidth = 1920,
+  slideHeight = 1080
+}) => {
   if (!templateSlide?.audios || templateSlide.audios.length === 0) {
     return null;
   }
@@ -941,7 +972,7 @@ export const SlideAudios: React.FC<{ templateSlide: TemplateSlide | null }> = ({
       {templateSlide.audios.map((audio) => {
         const autoPlay = audio.autoPlay ?? true;
         const visualHidden = audio.visualHidden ?? false;
-        const baseStyles = getElementStyles(audio);
+        const baseStyles = getElementStyles(audio, slideWidth, slideHeight);
 
         return (
           <div
@@ -974,7 +1005,11 @@ export const SlideAudios: React.FC<{ templateSlide: TemplateSlide | null }> = ({
 /**
  * Render text overlays (for individual TemplateSlide)
  */
-export const SlideText: React.FC<{ templateSlide: TemplateSlide | null }> = ({ templateSlide }) => {
+export const SlideText: React.FC<{ templateSlide: TemplateSlide | null; slideWidth?: number; slideHeight?: number }> = ({ 
+  templateSlide,
+  slideWidth = 1920,
+  slideHeight = 1080
+}) => {
   if (!templateSlide?.text || templateSlide.text.length === 0) {
     return null;
   }
@@ -988,12 +1023,14 @@ export const SlideText: React.FC<{ templateSlide: TemplateSlide | null }> = ({ t
           zIndex: textElement.zIndex || 0,
         };
 
-        // Position: use explicit x/y if provided
+        // Position: use percentage for proper scaling with transform
         if (textElement.x !== undefined) {
-          boxStyles.left = typeof textElement.x === 'number' ? `${textElement.x}px` : textElement.x;
+          const percentValue = getPositionPercentage(textElement.x, slideWidth);
+          boxStyles.left = percentValue || (typeof textElement.x === 'number' ? `${textElement.x}px` : textElement.x);
         }
         if (textElement.y !== undefined) {
-          boxStyles.top = typeof textElement.y === 'number' ? `${textElement.y}px` : textElement.y;
+          const percentValue = getPositionPercentage(textElement.y, slideHeight);
+          boxStyles.top = percentValue || (typeof textElement.y === 'number' ? `${textElement.y}px` : textElement.y);
         }
 
         // Dimensions: width controls text wrapping, height is auto-sized like Konva

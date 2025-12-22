@@ -445,10 +445,10 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
                   }}
                 >
                   <SlideBackground templateSlide={currentSlide as TemplateSlide} />
-                  <SlideImages templateSlide={currentSlide as TemplateSlide} />
-                  <SlideVideos templateSlide={currentSlide as TemplateSlide} />
+                  <SlideImages templateSlide={currentSlide as TemplateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
+                  <SlideVideos templateSlide={currentSlide as TemplateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
                   {/* Audio is handled by persistent audio refs at modal level, not here */}
-                  <SlideText templateSlide={currentSlide as TemplateSlide} />
+                  <SlideText templateSlide={currentSlide as TemplateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
                 </div>
               ) : null}
               

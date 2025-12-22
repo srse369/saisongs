@@ -540,6 +540,7 @@ const DraggableText: React.FC<{
 }> = ({ element, isSelected, onSelect, onChange, stageRef, scale, onContextMenu, onEditingChange, showFormattedOverlay = true }) => {
   const shapeRef = useRef<Konva.Text>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const longPressHandlers = useLongPress(onContextMenu || (() => {}));
 
@@ -582,7 +583,7 @@ const DraggableText: React.FC<{
     overlay.style.fontStyle = element.fontStyle || 'normal';
     overlay.style.textAlign = element.textAlign || 'center';
     overlay.style.color = element.color || '#ffffff';
-    overlay.style.lineHeight = '1.4';
+    overlay.style.lineHeight = '1';
     overlay.style.whiteSpace = 'pre-wrap';
     overlay.style.wordWrap = 'break-word';
     overlay.style.pointerEvents = 'none'; // Allow clicks to pass through to Konva
@@ -667,7 +668,8 @@ const DraggableText: React.FC<{
   // Strip HTML tags for plain text display
   const getPlainText = () => {
     return (element.content || 'Text')
-      .replace(/<[^>]+>/g, ''); // Remove all HTML tags
+      .replace(/<br\s*\/?>/gi, '\n') // Convert <br> to newlines
+      .replace(/<[^>]+>/g, ''); // Remove all other HTML tags
   };
 
   // Handle double-click to start inline editing
@@ -692,6 +694,7 @@ const DraggableText: React.FC<{
     const editor = document.createElement('div');
     editor.contentEditable = 'true';
     editor.spellcheck = false;
+    editor.setAttribute('data-wysiwyg-text-editor', 'true');
     document.body.appendChild(editor);
 
     // Convert our custom tags to HTML for editing
@@ -703,7 +706,7 @@ const DraggableText: React.FC<{
     editor.style.top = `${areaPosition.y}px`;
     editor.style.left = `${areaPosition.x}px`;
     editor.style.width = `${(element.width || 200) * scale}px`;
-    editor.style.minHeight = `${(element.fontSize || 24) * scale * 1.2}px`;
+    editor.style.minHeight = `${(element.fontSize || 24) * scale}px`;
     editor.style.fontSize = `${(element.fontSize || 24) * scale}px`;
     editor.style.fontFamily = getFontFamily(element.fontFamily);
     editor.style.fontWeight = element.fontWeight || 'normal';
@@ -713,11 +716,11 @@ const DraggableText: React.FC<{
     editor.style.background = 'rgba(0, 0, 0, 0.85)';
     editor.style.border = '2px solid #3b82f6';
     editor.style.borderRadius = '4px';
-    editor.style.padding = '8px';
+    editor.style.padding = '0';
     editor.style.margin = '0';
     editor.style.overflow = 'auto';
     editor.style.outline = 'none';
-    editor.style.lineHeight = '1.4';
+    editor.style.lineHeight = '1';
     editor.style.transformOrigin = 'left top';
     editor.style.zIndex = '10000';
     editor.style.boxSizing = 'border-box';
@@ -986,6 +989,33 @@ const DraggableText: React.FC<{
       return result;
     };
 
+    // Handle keydown (Escape to cancel) - must be on window in capture phase to run before parent modal handler
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if this editor is the target
+      if (e.target !== editor) return;
+      
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        // Clean up editor and toolbar
+        try {
+          document.body.removeChild(editor);
+          document.body.removeChild(toolbar);
+        } catch (err) {
+          // Elements might already be removed
+        }
+        
+        textNode.show();
+        setIsEditing(false);
+        onEditingChange?.(false);
+        
+        // Remove this handler
+        window.removeEventListener('keydown', handleKeyDown, true);
+      }
+    };
+
     // Handle blur (finish editing)
     const handleBlur = (e: FocusEvent) => {
       // Don't close if clicking on toolbar or color input
@@ -996,28 +1026,28 @@ const DraggableText: React.FC<{
       
       const newContent = convertToCustomFormat(editor.innerHTML);
       onChange({ content: newContent });
-      document.body.removeChild(editor);
-      document.body.removeChild(toolbar);
+      
+      try {
+        document.body.removeChild(editor);
+        document.body.removeChild(toolbar);
+      } catch (err) {
+        // Elements might already be removed
+      }
+      
       textNode.show();
       setIsEditing(false);
       onEditingChange?.(false);
-    };
-
-    // Handle keydown (Escape to cancel)
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        document.body.removeChild(editor);
-        document.body.removeChild(toolbar);
-        textNode.show();
-        setIsEditing(false);
-        onEditingChange?.(false);
-      }
+      
+      // Remove keydown handler
+      window.removeEventListener('keydown', handleKeyDown, true);
     };
 
     editor.addEventListener('blur', handleBlur);
-    editor.addEventListener('keydown', handleKeyDown);
+    // Add to window in capture phase so it runs before parent modal's handler
+    window.addEventListener('keydown', handleKeyDown, true);
+    
+    // Focus the editor
+    editor.focus();
   };
 
   return (
@@ -1033,7 +1063,8 @@ const DraggableText: React.FC<{
       fontStyle={getFontStyle()}
       align={element.textAlign || 'center'}
       fill={element.color || '#ffffff'}
-      opacity={showFormattedOverlay && !isEditing ? 0 : (element.opacity ?? 1)}
+      lineHeight={1}
+      opacity={showFormattedOverlay && !isEditing && !isDragging ? 0 : (element.opacity ?? 1)}
       rotation={element.rotation || 0}
       draggable={!isEditing}
       onClick={onSelect}
@@ -1042,7 +1073,9 @@ const DraggableText: React.FC<{
       {...longPressHandlers}
       onDblClick={handleDblClick}
       onDblTap={handleDblClick}
+      onDragStart={() => setIsDragging(true)}
       onDragEnd={(e) => {
+        setIsDragging(false);
         const node = shapeRef.current;
         onChange({
           x: Math.round(e.target.x()),
@@ -1575,13 +1608,16 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       ...(currentSlide.audios || []).map((aud): CanvasElement => {
         const width = parseFloat(String(aud.width || '200')) || 200;
         const height = parseFloat(String(aud.height || '100')) || 100;
+        // Ensure minimum dimensions for proper transformer interaction
+        const finalWidth = Math.max(width, 80);
+        const finalHeight = Math.max(height, 80);
         return {
           id: aud.id,
           type: 'audio',
-          x: parsePosition(aud.x as string | undefined, aud.position, 'x', SLIDE_WIDTH, width, SLIDE_WIDTH, SLIDE_HEIGHT),
-          y: parsePosition(aud.y as string | undefined, aud.position, 'y', SLIDE_HEIGHT, height, SLIDE_WIDTH, SLIDE_HEIGHT),
-          width,
-          height,
+          x: parsePosition(aud.x as string | undefined, aud.position, 'x', SLIDE_WIDTH, finalWidth, SLIDE_WIDTH, SLIDE_HEIGHT),
+          y: parsePosition(aud.y as string | undefined, aud.position, 'y', SLIDE_HEIGHT, finalHeight, SLIDE_WIDTH, SLIDE_HEIGHT),
+          width: finalWidth,
+          height: finalHeight,
           url: aud.url,
           opacity: aud.opacity ?? 1,
           zIndex: aud.zIndex ?? 1,

@@ -315,7 +315,8 @@ describe('templateUtils', () => {
     it('should handle custom x position as number', () => {
       const element = { x: 100, width: '50px', height: '50px' };
       const styles = getElementStyles(element);
-      expect(styles.left).toBe('100px');
+      // Numbers are now converted to percentages for proper scaling
+      expect(styles.left).toBe('5.208333333333334%'); // 100/1920 * 100
     });
 
     it('should handle custom x position as string', () => {
@@ -327,7 +328,8 @@ describe('templateUtils', () => {
     it('should handle custom y position as number', () => {
       const element = { y: 200, width: '50px', height: '50px' };
       const styles = getElementStyles(element);
-      expect(styles.top).toBe('200px');
+      // Numbers are now converted to percentages for proper scaling
+      expect(styles.top).toBe('18.51851851851852%'); // 200/1080 * 100
     });
 
     it('should handle custom y position as string', () => {

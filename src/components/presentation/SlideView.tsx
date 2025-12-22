@@ -497,10 +497,10 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
       {/* Template overlays (from reference slide) */}
       {effectiveSlide ? (
         <>
-          <SlideImages templateSlide={effectiveSlide} />
-          <SlideVideos templateSlide={effectiveSlide} />
-          {!skipAudio && <SlideAudios templateSlide={effectiveSlide} />}
-          <SlideText templateSlide={effectiveSlide} />
+          <SlideImages templateSlide={effectiveSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
+          <SlideVideos templateSlide={effectiveSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
+          {!skipAudio && <SlideAudios templateSlide={effectiveSlide} slideWidth={slideWidth} slideHeight={slideHeight} />}
+          <SlideText templateSlide={effectiveSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
         </>
       ) : (
         <>

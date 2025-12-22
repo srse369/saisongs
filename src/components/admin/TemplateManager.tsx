@@ -353,6 +353,16 @@ export const TemplateManager: React.FC = () => {
   // Handle escape key to close preview modal, and arrow keys to navigate slides
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if WYSIWYG text editor is active (exists in DOM)
+      // This must be checked FIRST, before any other modal checks
+      if (event.key === 'Escape') {
+        const textEditor = document.querySelector('[data-wysiwyg-text-editor="true"]');
+        if (textEditor) {
+          // Text editor exists - let it handle the escape key
+          return;
+        }
+      }
+
       // Check if any modal is open
       const hasModalOpen = previewTemplate || showForm || showMediaExportModal || duplicatingTemplate;
       
