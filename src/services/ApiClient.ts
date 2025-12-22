@@ -118,7 +118,7 @@ export class ApiClient {
           this.recordFailure(endpoint);
         }
         
-        // Use message if available (more detailed), otherwise fall back to error field
+        // Prioritize message over error for more specific error details
         const errorMsg = error.message || error.error || `HTTP ${response.status}: ${response.statusText}`;
         throw new Error(errorMsg);
       }

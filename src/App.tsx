@@ -13,7 +13,7 @@ import { TemplateProvider, useTemplates } from './contexts/TemplateContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SessionProvider } from './contexts/SessionContext';
-import { NamedSessionProvider } from './contexts/NamedSessionContext';
+import { NamedSessionProvider, useNamedSessions } from './contexts/NamedSessionContext';
 import { useAdminShortcut } from './hooks';
 import { usePageTracking } from './hooks/usePageTracking';
 
@@ -51,6 +51,7 @@ function AppContent() {
   const { fetchSingers } = useSingers();
   const { fetchAllPitches } = usePitches();
   const { fetchTemplates } = useTemplates();
+  const { loadSessions } = useNamedSessions();
   const initialLoadDone = useRef(false);
   
   // Track page views for analytics
@@ -98,6 +99,13 @@ function AppContent() {
         onSuccess={(role, userId, userEmail, userName, centerIds, editorFor) => {
           setAuthenticatedUser(role, userId, userEmail, userName, centerIds, editorFor);
           closePasswordDialog();
+          
+          // Pre-populate caches with fresh data after login
+          fetchSongs();
+          fetchSingers();
+          fetchAllPitches();
+          fetchTemplates();
+          loadSessions();
         }}
       />
       

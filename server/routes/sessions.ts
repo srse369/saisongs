@@ -305,7 +305,12 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
   } catch (error) {
     console.error('Error deleting session:', error);
-    res.status(500).json({ error: 'Failed to delete session' });
+    console.error('Session ID:', req.params.id);
+    console.error('User:', req.user);
+    res.status(500).json({ 
+      error: 'Failed to delete session',
+      message: error instanceof Error ? error.message : 'An unexpected error occurred'
+    });
   }
 });
 

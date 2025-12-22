@@ -19,7 +19,7 @@ interface SingerListProps {
 
 export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelete, onMerge, onStartSelection, loading = false }) => {
   const navigate = useNavigate();
-  const { isEditor, isAdmin } = useAuth();
+  const { isEditor, isAdmin, userId } = useAuth();
   const { singers: allSingers } = useSingers();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [singerToDelete, setSingerToDelete] = useState<Singer | null>(null);
@@ -256,7 +256,8 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                       </span>
                     </button>
                   </Tooltip>
-                  {isEditor && (
+                  {/* Edit button - show for editors OR if viewing their own profile */}
+                  {(isEditor || singer.id === userId) && (
                     <Tooltip content="Edit singer profile (name, gender, centers)">
                       <button
                         onClick={() => onEdit(singer)}
@@ -267,6 +268,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                       </button>
                     </Tooltip>
                   )}
+                  {/* Delete button - only for editors/admins */}
                   {isEditor && (
                     <Tooltip content="Delete singer and all their pitch assignments">
                       <button

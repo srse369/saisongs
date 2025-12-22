@@ -17,7 +17,7 @@ interface SongListProps {
 
 export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onSync, onView, loading = false }) => {
   const navigate = useNavigate();
-  const { isEditor, isAdmin, isAuthenticated, userEmail } = useAuth();
+  const { isEditor, isAdmin, isAuthenticated, userEmail, userId } = useAuth();
   const { addSong, songIds } = useSession();
   const [syncingSongId, setSyncingSongId] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -227,7 +227,8 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                     )}
                   </button>
                 )}
-                {isEditor && (
+                {/* Delete button - show for admins OR editors who created the song */}
+                {(isAdmin || (isEditor && song.createdBy === userId)) && (
                   <button
                     onClick={() => handleDeleteClick(song)}
                     title="Delete"

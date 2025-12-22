@@ -214,7 +214,7 @@ export const FeedbackDrawer: React.FC<FeedbackDrawerProps> = ({ isOpen, onClose 
                 id="feedback"
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Tell us what you think, report issues, or suggest improvements..."
+                placeholder="Tell us what you think, report issues, or suggest improvements... please indicate the center you are from and as many details as possible"
                 className="w-full h-32 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white bg-white dark:bg-gray-700 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent resize-none"
               />
             </div>

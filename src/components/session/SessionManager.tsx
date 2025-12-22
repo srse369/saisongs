@@ -320,7 +320,16 @@ export const SessionManager: React.FC = () => {
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
       <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Session</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Session</h1>
+            <a
+              href="/help#live"
+              className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+              title="View help documentation for this tab"
+            >
+              <i className="fas fa-question-circle text-xl"></i>
+            </a>
+          </div>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Build a set of songs to present together. Add songs from the Songs or Pitches tabs, then
             present them as a continuous slideshow.
@@ -574,6 +583,7 @@ export const SessionManager: React.FC = () => {
               onChange={setSessionCenterIds}
               label="Restrict to Centers (optional)"
               disabled={saving}
+              editableOnly={true}
             />
           </div>
 

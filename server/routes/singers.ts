@@ -37,9 +37,13 @@ router.get('/', requireAuth, async (req, res) => {
       });
     }
     
-    // For viewers, strip sensitive information (email)
+    // For viewers, strip sensitive information (email) except for their own record
     if (user?.role === 'viewer') {
       const sanitizedSingers = singers.map(singer => {
+        // Allow viewers to see their own email
+        if (singer.id === user.id) {
+          return singer;
+        }
         const { email, ...rest } = singer;
         return rest;
       });
@@ -63,10 +67,30 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// Get singer by ID - requires editor or admin role (viewers cannot view details)
-router.get('/:id', requireEditor, async (req, res) => {
+// Get singer by ID - requires editor/admin role OR viewing own record
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const user = req.user;
+    
+    // Check if user is viewing their own record
+    const isOwnRecord = user?.id === id;
+    
+    // Viewers can only view their own record
+    if (user?.role === 'viewer' && !isOwnRecord) {
+      return res.status(403).json({ 
+        error: 'This action requires editor or administrator privileges',
+        message: 'You can only view your own singer profile'
+      });
+    }
+    
+    // Editors and admins can view any record
+    if (!isOwnRecord && user?.role !== 'editor' && user?.role !== 'admin') {
+      return res.status(403).json({ 
+        error: 'This action requires editor or administrator privileges'
+      });
+    }
+    
     const singer = await cacheService.getSinger(id);
     
     if (!singer) {
@@ -160,12 +184,30 @@ router.post('/', requireEditor, async (req, res) => {
   }
 });
 
-// Update singer - requires editor or admin role
-router.put('/:id', requireEditor, async (req, res) => {
+// Update singer - requires editor/admin role OR updating own record
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, gender, email, center_ids } = req.body;
     const user = req.user;
+    
+    // Check if user is updating their own record
+    const isOwnRecord = user?.id === id;
+    
+    // Viewers can only update their own record
+    if (user?.role === 'viewer' && !isOwnRecord) {
+      return res.status(403).json({ 
+        error: 'This action requires editor or administrator privileges',
+        message: 'You can only edit your own singer profile'
+      });
+    }
+    
+    // Editors and admins can update any record
+    if (!isOwnRecord && user?.role !== 'editor' && user?.role !== 'admin') {
+      return res.status(403).json({ 
+        error: 'This action requires editor or administrator privileges'
+      });
+    }
     
     // Validate that at least one center is selected
     if (center_ids !== undefined && (!center_ids || center_ids.length === 0)) {
@@ -220,11 +262,29 @@ router.put('/:id', requireEditor, async (req, res) => {
   }
 });
 
-// Delete singer - requires editor or admin role
-router.delete('/:id', requireEditor, async (req, res) => {
+// Delete singer - requires editor/admin role OR deleting own record
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const user = req.user;
+    
+    // Check if user is deleting their own record
+    const isOwnRecord = user?.id === id;
+    
+    // Viewers can only delete their own record
+    if (user?.role === 'viewer' && !isOwnRecord) {
+      return res.status(403).json({ 
+        error: 'This action requires editor or administrator privileges',
+        message: 'You can only delete your own singer profile'
+      });
+    }
+    
+    // Editors and admins can delete any record (with center restrictions for editors)
+    if (!isOwnRecord && user?.role !== 'editor' && user?.role !== 'admin') {
+      return res.status(403).json({ 
+        error: 'This action requires editor or administrator privileges'
+      });
+    }
     
     // Get the singer to check center assignment
     const singer = await cacheService.getSinger(id);
@@ -247,8 +307,8 @@ router.delete('/:id', requireEditor, async (req, res) => {
       });
     }
     
-    // For editors (non-admins), validate they can only delete singers from their centers
-    if (user?.role === 'editor') {
+    // For editors (non-admins) deleting someone else's record, validate they can only delete singers from their centers
+    if (user?.role === 'editor' && !isOwnRecord) {
       const singerCenterIds = singer.center_ids || [];
       const editableCenterIds = user.editorFor || [];
       

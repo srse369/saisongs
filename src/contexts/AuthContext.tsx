@@ -88,8 +88,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const setAuthenticatedUser = useCallback((role: UserRole, id: number, email: string, name?: string, centersIds?: number[], editorsFor?: number[]) => {
-    // Clear localStorage cache on login
-    localStorage.clear();
+    // Clear all app-specific localStorage caches on login to ensure fresh data
+    const cacheKeys = [
+      'songStudio:songsCache',
+      'songStudio:singersCache',
+      'songStudio:pitchesCache',
+      'songStudio:templatesCache',
+      'songStudio:centersCache',
+      'selectedSessionTemplateId'
+    ];
+    
+    cacheKeys.forEach(key => {
+      window.localStorage.removeItem(key);
+    });
     
     // Use flushSync to ensure state is updated synchronously
     flushSync(() => {

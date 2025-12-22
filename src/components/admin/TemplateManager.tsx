@@ -291,6 +291,7 @@ export const TemplateManager: React.FC = () => {
   const [showMediaExportModal, setShowMediaExportModal] = useState(false);
   const [pendingPptxFile, setPendingPptxFile] = useState<File | null>(null);
   const pptxInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Check if template has unsaved changes
   const hasUnsavedChanges = React.useMemo(() => {
@@ -352,9 +353,19 @@ export const TemplateManager: React.FC = () => {
   // Handle escape key to close preview modal, and arrow keys to navigate slides
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!previewTemplate) return;
+      // Check if any modal is open
+      const hasModalOpen = previewTemplate || showForm || showMediaExportModal || duplicatingTemplate;
+      
+      if (!hasModalOpen) {
+        // When no modal is open, Escape focuses the search bar
+        if (event.key === 'Escape' && searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+        return;
+      }
 
-      if (event.key === 'Escape') {
+      // If preview template is open, handle its escape logic
+      if (previewTemplate && event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         
@@ -381,8 +392,9 @@ export const TemplateManager: React.FC = () => {
         return;
       }
 
-      // Handle arrow keys for slide navigation in multi-slide templates
-      switch (event.key) {
+      // Handle arrow keys for slide navigation in multi-slide templates (only when preview is open)
+      if (previewTemplate) {
+        switch (event.key) {
         case 'ArrowLeft':
         case 'ArrowUp':
           event.preventDefault();
@@ -403,12 +415,13 @@ export const TemplateManager: React.FC = () => {
           break;
         default:
           break;
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [previewTemplate, previewSlides.length]);
+  }, [previewTemplate, previewSlides.length, showForm, showMediaExportModal, duplicatingTemplate]);
 
   // Filter and sort templates by name
   const filteredTemplates = useMemo(() => {
@@ -737,7 +750,18 @@ export const TemplateManager: React.FC = () => {
       <div className="mb-4 sm:mb-8">
         <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Presentation Templates</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Presentation Templates</h1>
+              <Tooltip content="View help documentation for this tab">
+                <a
+                  href="/help#templates"
+                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                  title="Help"
+                >
+                  <i className="fas fa-question-circle text-xl"></i>
+                </a>
+              </Tooltip>
+            </div>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               Manage presentation templates for slide shows
             </p>
@@ -746,6 +770,7 @@ export const TemplateManager: React.FC = () => {
           {/* Controls */}
           <div className="flex flex-col lg:flex-row gap-3 w-full">
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search templates..."
               value={searchTerm}
@@ -911,18 +936,18 @@ export const TemplateManager: React.FC = () => {
                       </button>
                     </Tooltip>
                   )}
-                  {isEditor && (
-                    <Tooltip content="Create a copy of this template that you can modify">
-                      <button
-                        onClick={() => handleDuplicateClick(template)}
-                        className="flex items-center gap-2 p-2 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
-                      >
-                        <i className="fas fa-copy text-lg"></i>
-                        <span className="text-sm font-medium whitespace-nowrap">Duplicate</span>
-                      </button>
-                    </Tooltip>
-                  )}
-                  {canEditTemplate(template) && !template.isDefault && (
+                  {/* Anyone can duplicate a template */}
+                  <Tooltip content="Create a copy of this template that you can modify">
+                    <button
+                      onClick={() => handleDuplicateClick(template)}
+                      className="flex items-center gap-2 p-2 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                    >
+                      <i className="fas fa-copy text-lg"></i>
+                      <span className="text-sm font-medium whitespace-nowrap">Duplicate</span>
+                    </button>
+                  </Tooltip>
+                  {/* Set Default - only for admins */}
+                  {isAdmin && canEditTemplate(template) && !template.isDefault && (
                     <Tooltip content="Make this the default template for new presentations">
                       <button
                         onClick={() => handleSetDefault(template.id!)}

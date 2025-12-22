@@ -58,6 +58,7 @@ export const PitchManager: React.FC = () => {
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastFetchedUserIdRef = useRef<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Check if the logged-in user has a singer profile (can manage own pitches)
   // userId is now a hex string matching singer.id format
@@ -124,6 +125,18 @@ export const PitchManager: React.FC = () => {
     singersLoading,
     pitchLoading,
   ]);
+
+  // Focus search bar on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleCreateClick = () => {
     setEditingPitch(null);
@@ -362,7 +375,18 @@ export const PitchManager: React.FC = () => {
       <div className="mb-4 sm:mb-8">
         <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Pitch Management</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Pitch Management</h1>
+              <Tooltip content="View help documentation for this tab">
+                <a
+                  href="/help#pitches"
+                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                  title="Help"
+                >
+                  <i className="fas fa-question-circle text-xl"></i>
+                </a>
+              </Tooltip>
+            </div>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               Associate singers with songs and their pitch information
             </p>
@@ -405,6 +429,7 @@ export const PitchManager: React.FC = () => {
           </div>
           <div className="flex flex-col lg:flex-row gap-3 w-full">
             <WebLLMSearchInput
+              ref={searchInputRef}
               value={searchTerm}
               onChange={(value) => setSearchTerm(value)}
               onFiltersExtracted={(filters) => {

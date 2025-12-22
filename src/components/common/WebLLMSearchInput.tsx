@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, forwardRef } from 'react';
 import { getWebLLMService, checkWebGPUSupport, type LLMSearchResult, type SearchType } from '../../services/WebLLMService';
 import type { InitProgressReport } from '@mlc-ai/web-llm';
 import type { SongSearchFilters } from './AdvancedSongSearch';
@@ -12,13 +12,13 @@ interface WebLLMSearchInputProps {
   placeholder?: string;
 }
 
-export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
+export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputProps>(({
   value,
   onChange,
   onFiltersExtracted,
   searchType,
   placeholder = 'Ask me: "Show me sai songs in sanskrit with fast tempo"...',
-}) => {
+}, ref) => {
   const [llmEnabled, setLlmEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadProgress, setLoadProgress] = useState<string>('');
@@ -123,6 +123,7 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
 
         {/* Search Input */}
         <input
+          ref={ref}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -275,5 +276,7 @@ export const WebLLMSearchInput: React.FC<WebLLMSearchInputProps> = ({
       )}
     </div>
   );
-};
+});
+
+WebLLMSearchInput.displayName = 'WebLLMSearchInput';
 

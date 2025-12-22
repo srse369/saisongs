@@ -12,7 +12,7 @@ interface SingerFormProps {
 }
 
 export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCancel, onUnsavedChangesRef }) => {
-  const { isAdmin, editorFor } = useAuth();
+  const { isAdmin, isEditor, editorFor, userId } = useAuth();
   const [name, setName] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Boy' | 'Girl' | 'Other' | ''>('');
   const [email, setEmail] = useState('');
@@ -37,10 +37,12 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
   const hasEditorAccess = useMemo(() => {
     if (isAdmin) return true;
     if (!isEditMode) return true; // Always allow creating new singers
+    // Allow users to edit their own profile
+    if (singer?.id === userId) return true;
     const singerCenters = singer?.center_ids || [];
     // User must have editor access to at least one of the singer's centers
     return singerCenters.some(centerId => editorFor.includes(centerId));
-  }, [isAdmin, isEditMode, singer, editorFor]);
+  }, [isAdmin, isEditMode, singer, editorFor, userId]);
   
   // Determine if all fields should be disabled (no access at all)
   const isFormDisabled = isEditMode && !hasEditorAccess;
@@ -86,6 +88,20 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
     if (singer) {
       console.log('Singer data:', singer);
       console.log('Editor for:', singer.editor_for);
+      
+      // If user is not admin/editor and trying to view someone else's profile, show blank form
+      if (!isAdmin && !isEditor && singer.id !== userId) {
+        setName('');
+        setGender('');
+        setEmail('');
+        setCenterIds([]);
+        setOriginalCenterIds([]);
+        setSingerIsAdmin(false);
+        setEditorForCenters([]);
+        setAutoSelectApplied(true);
+        return;
+      }
+      
       setName(singer.name);
       setGender(singer.gender || '');
       setEmail(singer.email || '');
@@ -106,7 +122,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
       setAutoSelectApplied(false); // Reset for new singer
     }
     setErrors({});
-  }, [singer]);
+  }, [singer, isAdmin, isEditor, userId]);
 
   // Handle centers loaded callback - no auto-selection
   const handleCentersLoaded = (loadedCenters: Array<{id: number; name: string}>) => {

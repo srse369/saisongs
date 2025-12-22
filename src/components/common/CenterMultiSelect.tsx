@@ -129,7 +129,7 @@ export const CenterMultiSelect: React.FC<CenterMultiSelectProps> = ({
       <div className="mb-2 flex flex-wrap gap-2 min-h-[32px]">
         {selectedCenters.length === 0 ? (
           <span className="text-sm text-gray-400 dark:text-gray-500 italic">
-            No centers selected (accessible to all)
+            No centers selected
           </span>
         ) : (
           selectedCenters.map(center => {
@@ -172,7 +172,7 @@ export const CenterMultiSelect: React.FC<CenterMultiSelectProps> = ({
         className="w-full px-4 py-2 text-left bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span className="text-sm text-gray-700 dark:text-gray-300">
-          {loading ? 'Loading centers...' : error ? 'Error loading centers' : `Select centers (${selectedCenterIds.length} selected)`}
+          {loading ? 'Loading centers...' : error ? 'Error loading centers' : `Select centers (${selectedCenters.length} selected)`}
         </span>
       </button>
 

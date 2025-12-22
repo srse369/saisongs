@@ -6,7 +6,7 @@ import type { NamedSession } from '../../types';
 interface NamedSessionListProps {
   sessions: NamedSession[];
   onEdit: (session: NamedSession) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => Promise<boolean>;
   onDuplicate: (id: string) => void;
   onManageItems: (session: NamedSession) => void;
   onLoadSession: (session: NamedSession) => void;
@@ -30,8 +30,15 @@ export const NamedSessionList: React.FC<NamedSessionListProps> = ({
     if (window.confirm(`Are you sure you want to delete session "${name}"?`)) {
       setDeletingId(id);
       try {
-        await onDelete(id);
-      } finally {
+        const success = await onDelete(id);
+        // Only clear deleting state if successful
+        // Error toast is already shown by the context
+        if (success) {
+          setDeletingId(null);
+        } else {
+          setDeletingId(null);
+        }
+      } catch (error) {
         setDeletingId(null);
       }
     }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface HelpSubsection {
   title: string;
@@ -22,9 +23,28 @@ interface HelpSection {
 
 export const Help: React.FC = () => {
   const { isAuthenticated, userRole, isAdmin, isEditor } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<string>('overview');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedImage, setExpandedImage] = useState<{ src: string; alt: string; caption?: string } | null>(null);
+
+  // Handle hash navigation - read from URL hash on mount and when hash changes
+  useEffect(() => {
+    const hash = location.hash.replace('#', '');
+    if (hash) {
+      setActiveSection(hash);
+    }
+  }, [location.hash]);
+
+  // Update URL hash when activeSection changes
+  useEffect(() => {
+    if (activeSection && activeSection !== 'overview') {
+      navigate(`#${activeSection}`, { replace: true });
+    } else if (activeSection === 'overview' && location.hash) {
+      navigate('/help', { replace: true });
+    }
+  }, [activeSection, navigate, location.hash]);
 
   // Handle ESC key to close expanded image
   useEffect(() => {

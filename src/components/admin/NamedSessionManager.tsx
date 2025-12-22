@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNamedSessions } from '../../contexts/NamedSessionContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
@@ -43,9 +43,22 @@ export const NamedSessionManager: React.FC = () => {
   const [managingSession, setManagingSession] = useState<NamedSession | null>(null);
   const [sessionItems, setLocalSessionItems] = useState<SessionItemEdit[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Editor and admin can create/modify sessions
   const canEdit = userRole === 'editor' || userRole === 'admin';
+
+  // Focus search bar on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Filter sessions by search query
   const filteredSessions = sessions.filter(session =>
@@ -70,7 +83,9 @@ export const NamedSessionManager: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteSession(id);
+    const success = await deleteSession(id);
+    // deleteSession already shows error toast if it fails
+    return success;
   };
 
   const handleDuplicate = async (id: string) => {
@@ -156,9 +171,18 @@ export const NamedSessionManager: React.FC = () => {
         <div className="flex flex-col gap-4 mb-4 sm:mb-6">
           {/* Header */}
           <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-1">
-              Named Sessions
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-1">
+                Named Sessions
+              </h1>
+              <a
+                href="/help#live"
+                className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                title="View help documentation for sessions"
+              >
+                <i className="fas fa-question-circle text-xl"></i>
+              </a>
+            </div>
             <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
               Manage saved session configurations
             </p>
@@ -168,6 +192,7 @@ export const NamedSessionManager: React.FC = () => {
           <div className="flex flex-col lg:flex-row gap-3 w-full">
             <div className="relative flex-1 lg:min-w-[300px]">
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

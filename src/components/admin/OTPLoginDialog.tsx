@@ -144,11 +144,19 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
     setCountdown(0);
   }, []);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onClose();
-    }
-  }, [onClose]);
+  // Handle Escape key globally when dialog is open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -164,17 +172,16 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
       onClick={onClose}
     >
       <div 
-        className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}
       >
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
             {step === 'email' ? 'Sign In' : 'Enter OTP'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none"
             aria-label="Close"
           >
             ×
@@ -184,7 +191,7 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
         {step === 'email' ? (
           <form onSubmit={handleRequestOTP} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Email Address
               </label>
               <input
@@ -193,7 +200,7 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your.email@example.com"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                 required
                 autoFocus
                 disabled={loading}
@@ -201,7 +208,7 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
             </div>
 
             {error && (
-              <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+              <div className="text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/30 p-3 rounded-lg">
                 {error}
               </div>
             )}
@@ -209,25 +216,30 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
             <button
               type="submit"
               disabled={loading || !email.trim()}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors font-medium"
             >
               {loading ? 'Sending...' : 'Send OTP'}
             </button>
 
-            <p className="text-sm text-gray-500 text-center">
-              We'll send a 6-digit code to your email
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+              We'll send a 6-digit code to your email. Please check your inbox or junk/spam folder.
             </p>
+
+            <div className="text-xs text-gray-800 dark:text-gray-200 text-center bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg border border-yellow-200 dark:border-yellow-700">
+              <i className="fas fa-info-circle mr-1"></i>
+              <strong>Note:</strong> Your email must be registered in the system. For registration, please contact your center admin. <br/><br/>If you are not sure, send feedback by clicking the feedback button that is at the bottom right of the screen after you close this popup.
+            </div>
           </form>
         ) : (
           <form onSubmit={handleVerifyOTP} className="space-y-4">
             <div>
-              <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="otp" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Enter 6-digit code
               </label>
-              <div className="text-sm text-gray-600 mb-2">
+              <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                 Sent to: <span className="font-medium">{email}</span>
               </div>
-              <div className="text-xs text-gray-500 mb-3 bg-blue-50 p-2 rounded border border-blue-200">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-3 bg-blue-50 dark:bg-blue-900/30 p-2 rounded border border-blue-200 dark:border-blue-800">
                 💡 Didn't receive the code? Check your spam/junk folder
               </div>
               <input
@@ -236,21 +248,21 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl tracking-widest font-mono"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl tracking-widest font-mono bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                 required
                 autoFocus
                 disabled={loading}
                 maxLength={6}
               />
               {countdown > 0 && (
-                <div className="text-sm text-gray-500 mt-2 text-center">
+                <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
                   Code expires in {formatCountdown(countdown)}
                 </div>
               )}
             </div>
 
             {error && (
-              <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+              <div className="text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/30 p-3 rounded-lg">
                 {error}
               </div>
             )}
@@ -259,7 +271,7 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
               <button
                 type="submit"
                 disabled={loading || otp.length !== 6}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors font-medium"
               >
                 {loading ? 'Verifying...' : 'Verify'}
               </button>

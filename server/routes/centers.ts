@@ -236,6 +236,24 @@ router.delete('/:id', requireAdmin, async (req, res) => {
       });
     }
 
+    // Check if center is in editor_for for any singers (using cache)
+    const singersAsEditors = allSingers.filter(singer => 
+      singer.editorFor && singer.editorFor.includes(centerId)
+    );
+
+    if (singersAsEditors.length > 0) {
+      const editorsList = singersAsEditors.map(singer => singer.name);
+      
+      return res.status(409).json({ 
+        error: `Cannot delete center. ${singersAsEditors.length} user(s) are editors for this center.`,
+        editorsCount: singersAsEditors.length,
+        dependencies: {
+          type: 'editors',
+          items: editorsList
+        }
+      });
+    }
+
     // Check if center is tagged in any templates (using cache)
     const allTemplates = await cacheService.getAllTemplates();
     const templatesWithCenter = allTemplates.filter(template =>

@@ -26,6 +26,18 @@ export const SingerManager: React.FC = () => {
     }
   }, [fetchSingers, userId]);
 
+  // Focus search bar on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleCreateClick = () => {
     setEditingSinger(null);
     setIsFormOpen(true);
@@ -158,7 +170,18 @@ export const SingerManager: React.FC = () => {
       <div className="mb-4 sm:mb-6">
         <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Singer Management</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Singer Management</h1>
+              <Tooltip content="View help documentation for this tab">
+                <a
+                  href="/help#singers"
+                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                  title="Help"
+                >
+                  <i className="fas fa-question-circle text-xl"></i>
+                </a>
+              </Tooltip>
+            </div>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               Manage singers and their profiles
             </p>

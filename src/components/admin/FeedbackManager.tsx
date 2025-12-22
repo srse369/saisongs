@@ -113,7 +113,16 @@ export const FeedbackManager: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Feedback</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Feedback</h1>
+            <a
+              href="/help#overview"
+              className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+              title="View help documentation"
+            >
+              <i className="fas fa-question-circle text-xl"></i>
+            </a>
+          </div>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {total} total submission{total !== 1 ? 's' : ''}
           </p>

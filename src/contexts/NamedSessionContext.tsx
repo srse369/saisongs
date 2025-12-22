@@ -55,7 +55,7 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load sessions';
       setError(message);
-      showToast(message, 'error');
+      showToast('error', message);
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load session';
       setError(message);
-      showToast(message, 'error');
+      showToast('error', message);
     } finally {
       setLoading(false);
     }
@@ -84,12 +84,12 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       const newSession = await NamedSessionService.createSession(input);
       setSessions(prev => [...prev, newSession]);
-      showToast('Session created successfully', 'success');
+      showToast('success', 'Session created successfully');
       return newSession;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create session';
       setError(message);
-      showToast(message, 'error');
+      showToast('error', message);
       return null;
     } finally {
       setLoading(false);
@@ -106,12 +106,12 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (currentSession && currentSession.id === id) {
         setCurrentSession({ ...currentSession, ...updatedSession });
       }
-      showToast('Session updated successfully', 'success');
+      showToast('success', 'Session updated successfully');
       return updatedSession;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update session';
       setError(message);
-      showToast(message, 'error');
+      showToast('error', message);
       return null;
     } finally {
       setLoading(false);
@@ -128,12 +128,12 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (currentSession && currentSession.id === id) {
         setCurrentSession(null);
       }
-      showToast('Session deleted successfully', 'success');
+      showToast('success', 'Session deleted successfully');
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to delete session';
       setError(message);
-      showToast(message, 'error');
+      showToast('error', message);
       return false;
     } finally {
       setLoading(false);
@@ -147,12 +147,12 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       const newSession = await NamedSessionService.duplicateSession(id, newName);
       setSessions(prev => [...prev, newSession]);
-      showToast('Session duplicated successfully', 'success');
+      showToast('success', 'Session duplicated successfully');
       return newSession;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to duplicate session';
       setError(message);
-      showToast(message, 'error');
+      showToast('error', message);
       return null;
     } finally {
       setLoading(false);
@@ -176,7 +176,7 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update session items';
       setError(message);
-      showToast(message, 'error');
+      showToast('error', message);
       return null;
     } finally {
       setLoading(false);
@@ -193,12 +193,12 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (currentSession && currentSession.id === sessionId) {
         await loadSession(sessionId);
       }
-      showToast('Session items reordered successfully', 'success');
+      showToast('success', 'Session items reordered successfully');
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to reorder session items';
       setError(message);
-      showToast(message, 'error');
+      showToast('error', message);
       return false;
     } finally {
       setLoading(false);

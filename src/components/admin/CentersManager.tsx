@@ -247,7 +247,18 @@ export const CentersManager: React.FC = () => {
     <div className="max-w-6xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Centers</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Centers</h1>
+            <Tooltip content="View help documentation for this tab">
+              <a
+                href="/help#centers"
+                className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                title="Help"
+              >
+                <i className="fas fa-question-circle text-xl"></i>
+              </a>
+            </Tooltip>
+          </div>
           {!loading && centers.length > 0 && (
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {centers.length} center{centers.length !== 1 ? 's' : ''}

@@ -85,7 +85,16 @@ export const Analytics: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Analytics</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Analytics</h1>
+            <a
+              href="/help#overview"
+              className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+              title="View help documentation"
+            >
+              <i className="fas fa-question-circle text-xl"></i>
+            </a>
+          </div>
           <p className="text-gray-600 dark:text-gray-400 mt-1">Visitor statistics and global reach</p>
         </div>
         
