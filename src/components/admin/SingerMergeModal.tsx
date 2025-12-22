@@ -187,7 +187,7 @@ export const SingerMergeModal: React.FC<SingerMergeModalProps> = ({
                   disabled={isMerging}
                 />
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className={`font-semibold ${
                       singer.gender?.toLowerCase() === 'male' 
                         ? 'text-blue-600 dark:text-blue-400' 
@@ -206,6 +206,9 @@ export const SingerMergeModal: React.FC<SingerMergeModalProps> = ({
                         {singer.gender}
                       </span>
                     )}
+                    <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-blue-600 dark:bg-blue-500 rounded-full" title={`${singer.pitch_count ?? 0} pitch assignments`}>
+                      {singer.pitch_count ?? 0}
+                    </span>
                   </div>
                   {singer.email && (
                     <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
@@ -251,6 +254,9 @@ export const SingerMergeModal: React.FC<SingerMergeModalProps> = ({
                         <i className="fas fa-times text-xs"></i>
                         {singer.name}
                         {singer.gender && ` (${singer.gender})`}
+                        <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-blue-600 dark:bg-blue-500 rounded-full ml-auto" title={`${singer.pitch_count ?? 0} pitches`}>
+                          {singer.pitch_count ?? 0}
+                        </span>
                       </li>
                     ))}
                 </ul>
@@ -307,20 +313,29 @@ export const SingerMergeModal: React.FC<SingerMergeModalProps> = ({
                 </div>
               )}
 
-              {/* Pitches to delete summary */}
+              {/* Pitches to delete details */}
               {pitchAnalysis.toDelete.length > 0 && (
                 <div className="p-3 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 rounded-md">
                   <h4 className="font-semibold text-sm text-gray-800 dark:text-gray-200 mb-2">
                     <i className="fas fa-trash mr-2"></i>
-                    Total pitches to be deleted ({pitchAnalysis.toDelete.length}):
+                    Pitches to be deleted ({pitchAnalysis.toDelete.length}):
                   </h4>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">
-                    {pitchAnalysis.conflicts.length > 0 && (
-                      <p>{pitchAnalysis.conflicts.reduce((sum, c) => sum + c.deleted.length, 0)} due to conflicts with target singer</p>
-                    )}
-                    {pitchAnalysis.toDelete.length > pitchAnalysis.conflicts.reduce((sum, c) => sum + c.deleted.length, 0) && (
-                      <p>{pitchAnalysis.toDelete.length - pitchAnalysis.conflicts.reduce((sum, c) => sum + c.deleted.length, 0)} duplicate pitches</p>
-                    )}
+                  <div className="text-sm text-gray-700 dark:text-gray-300 space-y-1 max-h-60 overflow-y-auto">
+                    {pitchAnalysis.toDelete.map((pitch, idx) => (
+                      <div key={idx} className="flex items-start gap-2 py-1">
+                        <i className="fas fa-times text-red-600 dark:text-red-400 text-xs mt-1"></i>
+                        <div className="flex-1">
+                          <div className="font-medium">{pitch.songName}</div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            {formatPitchWithName(pitch.pitch)}
+                            {pitch.singerName && ` (from ${pitch.singerName})`}
+                            {pitch.reason && (
+                              <span className="italic text-gray-500 dark:text-gray-500"> - {pitch.reason}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

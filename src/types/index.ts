@@ -270,6 +270,7 @@ export interface Singer {
   center_ids?: number[];               // Centers that have access to this singer (empty = all centers)
   editor_for?: number[];               // Centers this user can edit (if they have editor permissions)
   is_admin?: boolean;                  // Whether this user is an admin
+  pitch_count?: number;                // Number of pitch assignments this singer has
   createdAt: Date;
   updatedAt: Date;
 }

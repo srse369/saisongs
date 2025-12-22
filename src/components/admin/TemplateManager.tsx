@@ -829,6 +829,15 @@ export const TemplateManager: React.FC = () => {
         </div>
       )}
 
+      {/* Template count status */}
+      {!loading && filteredTemplates.length > 0 && (
+        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          {searchTerm.trim() && filteredTemplates.length !== templates.length
+            ? `Showing ${filteredTemplates.length} of ${templates.length} templates`
+            : `${filteredTemplates.length} template${filteredTemplates.length !== 1 ? 's' : ''}`}
+        </div>
+      )}
+
       {/* Templates List */}
       <div className="space-y-3">
         {loading ? (

@@ -86,7 +86,7 @@ describe('SongService', () => {
       const result = await songService.getSongById('1');
 
       expect(result).toEqual(mockSong);
-      expect(apiClient.getSong).toHaveBeenCalledWith('1');
+      expect(apiClient.getSong).toHaveBeenCalledWith('1', false);
     });
 
     it('should return null when song not found (404)', async () => {
@@ -334,7 +334,8 @@ describe('SongService', () => {
 
       expect(result).toEqual(mockUpdatedSong);
       expect(apiClient.updateSong).toHaveBeenCalledWith('1', expect.any(Object));
-      expect(apiClient.getSong).toHaveBeenCalledWith('1');
+      // After update, getSong is called with nocache=true to get fresh data
+      expect(apiClient.getSong).toHaveBeenCalledWith('1', true);
     });
 
     it('should not require all fields for update', async () => {

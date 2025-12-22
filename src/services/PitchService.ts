@@ -191,8 +191,8 @@ class PitchService {
     this.validatePitchInput(input, true);
 
     if (input.pitch === undefined) {
-      // No fields to update, fetch and return existing pitch
-      const raw = await apiClient.getPitch(id);
+      // No fields to update, fetch and return existing pitch (no cache-busting needed)
+      const raw = await apiClient.getPitch(id, false);
       return raw ? this.mapRowToPitch(raw as any) : null;
     }
 
@@ -200,7 +200,8 @@ class PitchService {
       await apiClient.updatePitch(id, {
         pitch: input.pitch.trim(),
       });
-      const raw = await apiClient.getPitch(id);
+      // Use nocache=true to ensure we get fresh data after the update
+      const raw = await apiClient.getPitch(id, true);
       return raw ? this.mapRowToPitch(raw as any) : null;
     } catch (error) {
       console.error('Error updating pitch:', error);

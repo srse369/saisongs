@@ -67,9 +67,9 @@ class SongService {
   /**
    * Retrieves a single song by ID
    */
-  async getSongById(id: string): Promise<Song | null> {
+  async getSongById(id: string, nocache: boolean = false): Promise<Song | null> {
     try {
-      return await apiClient.getSong(id);
+      return await apiClient.getSong(id, nocache);
     } catch (error) {
       console.error('Error fetching song by ID:', error);
       if (error instanceof Error && error.message.includes('404')) {
@@ -144,7 +144,8 @@ class SongService {
         reference_ladies_pitch: input.referenceLadiesPitch,
       };
       await apiClient.updateSong(id, updateData);
-      return this.getSongById(id);
+      // Use nocache=true to ensure we get fresh data after the update
+      return this.getSongById(id, true);
     } catch (error) {
       console.error('Error updating song:', error);
       throw new DatabaseError(

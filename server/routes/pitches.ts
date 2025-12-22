@@ -34,6 +34,10 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Pitch association not found' });
     }
     
+    // Prevent browser caching to ensure fresh data after updates
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json(pitch);
   } catch (error) {
     console.error('Error fetching pitch:', error);
@@ -78,7 +82,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Check permissions: user must have editor access to the singer's centers
+    // Check permissions: user must have editor access to the singer's centers OR be creating for themselves
     const user = req.user;
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -90,16 +94,27 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: 'Singer not found' });
     }
 
-    const singerCenterIds = singer.center_ids || [];
+    // Allow if user is creating a pitch for themselves (viewer can edit own pitches)
+    const isOwnPitch = user.id === singerId;
     
-    // For editors, check if they have access to any of the singer's centers
-    if (user.role === 'editor') {
-      const editableCenterIds = user.editorFor || [];
-      const hasAccess = singerCenterIds.some(cid => editableCenterIds.includes(cid));
+    if (!isOwnPitch) {
+      // If not creating for themselves, check editor permissions
+      const singerCenterIds = singer.center_ids || [];
       
-      if (!hasAccess) {
+      // For editors, check if they have access to any of the singer's centers
+      if (user.role === 'editor') {
+        const editableCenterIds = user.editorFor || [];
+        const hasAccess = singerCenterIds.some(cid => editableCenterIds.includes(cid));
+        
+        if (!hasAccess) {
+          return res.status(403).json({ 
+            error: 'You can only create pitches for singers from centers you manage' 
+          });
+        }
+      } else if (user.role === 'viewer') {
+        // Viewers can only create pitches for themselves
         return res.status(403).json({ 
-          error: 'You can only create pitches for singers from centers you manage' 
+          error: 'You can only create pitches for yourself. Contact an editor to create pitches for other singers.' 
         });
       }
     }
@@ -172,14 +187,24 @@ router.put('/:id', async (req, res) => {
 
     const singerCenterIds = singer.center_ids || [];
     
-    // For editors, check if they have access to any of the singer's centers
-    if (user.role === 'editor') {
-      const editableCenterIds = user.editorFor || [];
-      const hasAccess = singerCenterIds.some(cid => editableCenterIds.includes(cid));
-      
-      if (!hasAccess) {
+    // Allow if user is updating their own pitch (viewer can edit own pitches)
+    const isOwnPitch = user.id === existingPitch.singer_id;
+    
+    if (!isOwnPitch) {
+      // If not updating their own pitch, check editor permissions
+      if (user.role === 'editor') {
+        const editableCenterIds = user.editorFor || [];
+        const hasAccess = singerCenterIds.some(cid => editableCenterIds.includes(cid));
+        
+        if (!hasAccess) {
+          return res.status(403).json({ 
+            error: 'Access denied: You do not have editor access to this singer\'s centers' 
+          });
+        }
+      } else if (user.role === 'viewer') {
+        // Viewers can only update their own pitches
         return res.status(403).json({ 
-          error: 'Access denied: You do not have editor access to this singer\'s centers' 
+          error: 'You can only update your own pitches. Contact an editor to update pitches for other singers.' 
         });
       }
     }
@@ -233,14 +258,24 @@ router.delete('/:id', async (req, res) => {
 
     const singerCenterIds = singer.center_ids || [];
     
-    // For editors, check if they have access to any of the singer's centers
-    if (user.role === 'editor') {
-      const editableCenterIds = user.editorFor || [];
-      const hasAccess = singerCenterIds.some(cid => editableCenterIds.includes(cid));
-      
-      if (!hasAccess) {
+    // Allow if user is deleting their own pitch (viewer can delete own pitches)
+    const isOwnPitch = user.id === existingPitch.singer_id;
+    
+    if (!isOwnPitch) {
+      // If not deleting their own pitch, check editor permissions
+      if (user.role === 'editor') {
+        const editableCenterIds = user.editorFor || [];
+        const hasAccess = singerCenterIds.some(cid => editableCenterIds.includes(cid));
+        
+        if (!hasAccess) {
+          return res.status(403).json({ 
+            error: 'You can only delete pitches for singers from centers you manage' 
+          });
+        }
+      } else if (user.role === 'viewer') {
+        // Viewers can only delete their own pitches
         return res.status(403).json({ 
-          error: 'You can only delete pitches for singers from centers you manage' 
+          error: 'You can only delete your own pitches. Contact an editor to delete pitches for other singers.' 
         });
       }
     }

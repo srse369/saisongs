@@ -169,9 +169,11 @@ describe('ApiClient', () => {
   });
 
   describe('Error handling', () => {
-    it.skip('should handle 4xx client errors without triggering backoff', async () => {
-      const testClient = new ApiClient('http://test-api.com');
+    it('should handle 4xx client errors without triggering backoff', async () => {
+      // Create a completely fresh client for this test
+      const testClient = new ApiClient('http://test-4xx.com');
       
+      // First request: 404 error (should NOT trigger backoff)
       fetchMock.mockResolvedValueOnce({
         ok: false,
         status: 404,
@@ -179,31 +181,34 @@ describe('ApiClient', () => {
         json: async () => ({ error: 'Resource not found' }),
       });
 
-      await expect(testClient.get('/test')).rejects.toThrow('Resource not found');
+      await expect(testClient.get('/resource')).rejects.toThrow('Resource not found');
       
-      // Should allow immediate retry for 4xx errors
+      // Second request: Should succeed immediately (no backoff for 4xx)
       fetchMock.mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({ success: true }),
       });
       
-      const result = await testClient.get('/test');
+      // This should work - 4xx errors don't trigger backoff
+      const result = await testClient.get('/resource');
       expect(result).toEqual({ success: true });
     });
 
-    it.skip('should handle 5xx server errors with backoff', async () => {
+    it('should handle 5xx server errors with backoff', async () => {
+      const testClient = new ApiClient('http://test-5xx.com');
+      
+      // First 500 error - records failure (count = 1)
       fetchMock.mockResolvedValueOnce({
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
-        json: async () => ({ error: 'Server error' }),
+        json: async () => ({ error: 'Server error 1' }),
       });
-
-      await expect(client.get('/test')).rejects.toThrow('Server error');
+      await expect(testClient.get('/test-5xx')).rejects.toThrow('Server error 1');
       
-      // Next request should throw backoff error
-      await expect(client.get('/test')).rejects.toThrow(/Retrying in \d+s/);
+      // Immediate retry should be blocked (3 second backoff after first failure)
+      await expect(testClient.get('/test-5xx')).rejects.toThrow(/Retrying in \d+s/);
     });
 
     it('should use error message over error field when available', async () => {
@@ -244,7 +249,7 @@ describe('ApiClient', () => {
       vi.useRealTimers();
     });
 
-    it.skip('should allow immediate retry on first failure', async () => {
+    it('should allow retry after backoff period expires', async () => {
       const testClient = new ApiClient('http://test-api.com');
       
       // First request fails
@@ -256,7 +261,12 @@ describe('ApiClient', () => {
 
       await expect(testClient.get('/test-immediate')).rejects.toThrow('Error 1');
       
-      // Second request should succeed (backoff delay is 0 for first failure)
+      // Immediate retry should be blocked (3s backoff)
+      await expect(testClient.get('/test-immediate')).rejects.toThrow(/Retrying in \d+s/);
+      
+      // After 3 seconds, should allow retry
+      vi.advanceTimersByTime(3000);
+      
       fetchMock.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -267,7 +277,7 @@ describe('ApiClient', () => {
       expect(result).toEqual({ success: true });
     });
 
-    it.skip('should enforce backoff after multiple failures', async () => {
+    it('should enforce backoff after multiple failures', async () => {
       const testClient = new ApiClient('http://test-api.com');
       
       // First failure
@@ -278,10 +288,10 @@ describe('ApiClient', () => {
       });
       await expect(testClient.get('/backoff-test')).rejects.toThrow('Error 1');
 
-      // Advance time past first backoff
-      vi.advanceTimersByTime(1000);
+      // Advance time past first backoff (3 seconds)
+      vi.advanceTimersByTime(3000);
 
-      // Second failure (immediate retry allowed)
+      // Second failure 
       fetchMock.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -289,14 +299,14 @@ describe('ApiClient', () => {
       });
       await expect(testClient.get('/backoff-test')).rejects.toThrow('Error 2');
 
-      // Third attempt should be blocked by backoff (within 3 second window)
+      // Third attempt should be blocked by backoff (10 second window after 2 failures)
       await expect(testClient.get('/backoff-test')).rejects.toThrow(/Retrying in \d+s/);
     });
 
-    it.skip('should block requests after max retries exceeded', async () => {
+    it('should block requests after max retries exceeded', async () => {
       const testClient = new ApiClient('http://test-api.com');
       
-      // First failure
+      // First failure (failures = 1)
       fetchMock.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -304,8 +314,10 @@ describe('ApiClient', () => {
       });
       await testClient.get('/max-retry-test').catch(() => {});
 
-      // Second failure
-      vi.advanceTimersByTime(1000);
+      // Wait for backoff (3s after first failure)
+      vi.advanceTimersByTime(3000);
+      
+      // Second failure (failures = 2)
       fetchMock.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -313,8 +325,10 @@ describe('ApiClient', () => {
       });
       await testClient.get('/max-retry-test').catch(() => {});
 
-      // Third failure
-      vi.advanceTimersByTime(3000);
+      // Wait for backoff (10s after second failure)
+      vi.advanceTimersByTime(10000);
+      
+      // Third failure (failures = 3)
       fetchMock.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -322,11 +336,22 @@ describe('ApiClient', () => {
       });
       await testClient.get('/max-retry-test').catch(() => {});
 
-      // After max retries, should throw permanent error
+      // Wait for backoff
+      vi.advanceTimersByTime(10000);
+      
+      // Fourth failure (failures = 4, exceeds MAX_RETRIES = 3)
+      fetchMock.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ error: 'Error 4' }),
+      });
+      await testClient.get('/max-retry-test').catch(() => {});
+
+      // After max retries exceeded (failures > 3), should throw permanent error
       await expect(testClient.get('/max-retry-test')).rejects.toThrow(/Connection failed after \d+ attempts/);
     });
 
-    it.skip('should reset success state after successful request', async () => {
+    it('should reset success state after successful request', async () => {
       const testClient = new ApiClient('http://test-api.com');
       
       // First request fails
@@ -337,7 +362,10 @@ describe('ApiClient', () => {
       });
       await expect(testClient.get('/success-test')).rejects.toThrow();
 
-      // Second request succeeds
+      // Wait for backoff period
+      vi.advanceTimersByTime(3000);
+
+      // Second request succeeds - this resets the backoff state
       fetchMock.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -345,7 +373,7 @@ describe('ApiClient', () => {
       });
       await testClient.get('/success-test');
 
-      // Third request should work normally (no backoff)
+      // Third request should work immediately (no backoff since success cleared state)
       fetchMock.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -357,10 +385,10 @@ describe('ApiClient', () => {
   });
 
   describe('resetBackoff', () => {
-    it.skip('should reset backoff for specific endpoint', async () => {
+    it('should reset backoff for specific endpoint', async () => {
       const testClient = new ApiClient('http://test-api.com');
       
-      // Cause first failure
+      // Cause failure (sets backoff)
       fetchMock.mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -370,20 +398,13 @@ describe('ApiClient', () => {
         await testClient.get('/reset-test');
       } catch {}
 
-      // Second failure
-      fetchMock.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        json: async () => ({ error: 'Error' }),
-      });
-      try {
-        await testClient.get('/reset-test');
-      } catch {}
+      // Verify backoff is active - immediate retry should be blocked
+      await expect(testClient.get('/reset-test')).rejects.toThrow(/Retrying in \d+s/);
 
-      // Reset backoff
+      // Reset backoff for this specific endpoint
       testClient.resetBackoff('/reset-test');
 
-      // Should allow request immediately
+      // Should allow request immediately after reset
       fetchMock.mockResolvedValueOnce({
         ok: true,
         status: 200,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { SongSingerPitch, Song, Singer } from '../../types';
-import { Modal } from '../common/Modal';
+import { Modal, Tooltip } from '../common';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -24,6 +24,7 @@ interface PitchListProps {
   onDelete: (id: string) => Promise<void>;
   onViewSong: (songId: string) => void;
   loading?: boolean;
+  userSingerId?: string; // Current user's singer ID if they have a profile
 }
 
 export const PitchList: React.FC<PitchListProps> = ({ 
@@ -33,7 +34,8 @@ export const PitchList: React.FC<PitchListProps> = ({
   onEdit, 
   onDelete, 
   onViewSong,
-  loading = false 
+  loading = false,
+  userSingerId
 }) => {
   const navigate = useNavigate();
   const { addSong, songIds, entries } = useSession();
@@ -163,16 +165,17 @@ export const PitchList: React.FC<PitchListProps> = ({
                     {pitch.songName}
                   </button>
                   {pitch.externalSourceUrl && (
-                    <a
-                      href={pitch.externalSourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-shrink-0 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
-                      title="View on external source"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <i className="fas fa-external-link-alt text-base"></i>
-                    </a>
+                    <Tooltip content="View song on external source (YouTube, etc.)">
+                      <a
+                        href={pitch.externalSourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <i className="fas fa-external-link-alt text-base"></i>
+                      </a>
+                    </Tooltip>
                   )}
                 </div>
                 
@@ -219,46 +222,50 @@ export const PitchList: React.FC<PitchListProps> = ({
               
               {/* Actions */}
               <div className="flex flex-wrap items-center justify-start gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <button
-                      onClick={() => handlePresent(pitch)}
-                      title="Preview"
-                      className="p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
-                    >
-                      <i className="fas fa-eye text-lg"></i>
-                    </button>
-                    <button
-                      onClick={() => addSong(pitch.songId, pitch.singerId, pitch.pitch)}
-                      disabled={isInLiveSession(pitch.songId, pitch.singerId)}
-                      title={isInLiveSession(pitch.songId, pitch.singerId) ? 'In Live' : 'Add to Live'}
-                      className="flex items-center gap-2 p-2 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isInLiveSession(pitch.songId, pitch.singerId) ? (
-                        <i className="fas fa-check text-lg"></i>
-                      ) : (
-                        <i className="fas fa-plus text-lg"></i>
-                      )}
-                      <span className="text-sm font-medium whitespace-nowrap">Add to Session</span>
-                    </button>
-                    {isEditor && (
-                      <button
-                        onClick={() => onEdit(pitch)}
-                        title="Edit"
-                        className="flex items-center gap-2 p-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                      >
-                        <i className="fas fa-edit text-lg"></i>
-                        <span className="text-sm font-medium whitespace-nowrap">Edit</span>
-                      </button>
+                <Tooltip content="Preview song presentation with this singer's pitch">
+                  <button
+                    onClick={() => handlePresent(pitch)}
+                    className="p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                  >
+                    <i className="fas fa-eye text-lg"></i>
+                  </button>
+                </Tooltip>
+                <Tooltip content={isInLiveSession(pitch.songId, pitch.singerId) ? 'Already in live session' : 'Add this song with singer and pitch to the live session'}>
+                  <button
+                    onClick={() => addSong(pitch.songId, pitch.singerId, pitch.pitch)}
+                    disabled={isInLiveSession(pitch.songId, pitch.singerId)}
+                    className="flex items-center gap-2 p-2 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isInLiveSession(pitch.songId, pitch.singerId) ? (
+                      <i className="fas fa-check text-lg"></i>
+                    ) : (
+                      <i className="fas fa-plus text-lg"></i>
                     )}
-                    {isEditor && (
-                      <button
-                        onClick={() => handleDeleteClick(pitch)}
-                        title="Delete"
-                        className="flex items-center gap-2 p-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
-                      >
-                        <i className="fas fa-trash text-lg"></i>
-                        <span className="text-sm font-medium whitespace-nowrap">Delete</span>
-                      </button>
-                    )}
+                    <span className="text-sm font-medium whitespace-nowrap">Add to Session</span>
+                  </button>
+                </Tooltip>
+                {(isEditor || pitch.singerId === userSingerId) && (
+                  <Tooltip content="Edit the pitch/key for this singer's performance">
+                    <button
+                      onClick={() => onEdit(pitch)}
+                      className="flex items-center gap-2 p-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    >
+                      <i className="fas fa-edit text-lg"></i>
+                      <span className="text-sm font-medium whitespace-nowrap">Edit</span>
+                    </button>
+                  </Tooltip>
+                )}
+                {(isEditor || pitch.singerId === userSingerId) && (
+                  <Tooltip content="Remove this pitch association permanently">
+                    <button
+                      onClick={() => handleDeleteClick(pitch)}
+                      className="flex items-center gap-2 p-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                    >
+                      <i className="fas fa-trash text-lg"></i>
+                      <span className="text-sm font-medium whitespace-nowrap">Delete</span>
+                    </button>
+                  </Tooltip>
+                )}
               </div>
             </div>
           </div>

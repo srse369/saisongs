@@ -88,6 +88,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const setAuthenticatedUser = useCallback((role: UserRole, id: number, email: string, name?: string, centersIds?: number[], editorsFor?: number[]) => {
+    // Clear localStorage cache on login
+    localStorage.clear();
+    
     // Use flushSync to ensure state is updated synchronously
     flushSync(() => {
       setUserRole(role);

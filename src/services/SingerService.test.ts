@@ -132,7 +132,7 @@ describe('SingerService', () => {
       expect(result).not.toBeNull();
       expect(result?.name).toBe('John Doe');
       expect(result?.gender).toBe('Male');
-      expect(apiClient.getSinger).toHaveBeenCalledWith('1');
+      expect(apiClient.getSinger).toHaveBeenCalledWith('1', false);
     });
 
     it('should return null when singer not found', async () => {
@@ -329,7 +329,8 @@ describe('SingerService', () => {
         gender: undefined,
         center_ids: undefined,
       });
-      expect(apiClient.getSinger).toHaveBeenCalledWith('1');
+      // After update, getSinger is called with nocache=true to get fresh data
+      expect(apiClient.getSinger).toHaveBeenCalledWith('1', true);
     });
 
     it('should trim whitespace from name', async () => {

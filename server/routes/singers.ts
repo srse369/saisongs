@@ -8,6 +8,11 @@ const router = express.Router();
 // Get all singers - all authenticated users can view, but filtered by center access
 router.get('/', requireAuth, async (req, res) => {
   try {
+    // Force cache invalidation if requested
+    if (req.query.nocache === 'true') {
+      cacheService.invalidate('singers:all');
+    }
+    
     const allSingers = await cacheService.getAllSingers();
     
     // Filter singers by center access
@@ -68,6 +73,10 @@ router.get('/:id', requireEditor, async (req, res) => {
       return res.status(404).json({ error: 'Singer not found' });
     }
     
+    // Prevent browser caching to ensure fresh data after updates
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json(singer);
   } catch (error) {
     console.error('Error fetching singer:', error);
@@ -200,6 +209,10 @@ router.put('/:id', requireEditor, async (req, res) => {
     }
     
     await cacheService.updateSinger(id, name, gender, email, center_ids, user.email);
+    
+    // Also invalidate the singers:all cache to ensure list views get fresh data
+    cacheService.invalidate('singers:all');
+    
     res.json({ message: 'Singer updated successfully' });
   } catch (error) {
     console.error('Error updating singer:', error);

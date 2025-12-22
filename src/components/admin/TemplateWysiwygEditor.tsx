@@ -4452,35 +4452,33 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     <div className="flex gap-1">
                       <Tooltip content="Toggle bold text">
                         <button
-                        type="button"
-                        onClick={() => updateElement(selectedElement.id, { 
-                          fontWeight: selectedElement.fontWeight === 'bold' ? 'normal' : 'bold' 
-                        })}
-                        className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center font-bold ${
-                          selectedElement.fontWeight === 'bold'
-                            ? 'bg-blue-500 text-white border-blue-500'
-                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
-                        }`}
-                        title="Bold"
-                      >
-                        B
-                      </button>
+                          type="button"
+                          onClick={() => updateElement(selectedElement.id, { 
+                            fontWeight: selectedElement.fontWeight === 'bold' ? 'normal' : 'bold' 
+                          })}
+                          className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center font-bold ${
+                            selectedElement.fontWeight === 'bold'
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          B
+                        </button>
                       </Tooltip>
                       <Tooltip content="Toggle italic text">
                         <button
-                        type="button"
-                        onClick={() => updateElement(selectedElement.id, { 
-                          fontStyle: selectedElement.fontStyle === 'italic' ? 'normal' : 'italic' 
-                        })}
-                        className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center italic ${
-                          selectedElement.fontStyle === 'italic'
-                            ? 'bg-blue-500 text-white border-blue-500'
-                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
-                        }`}
-                        title="Italic"
-                      >
-                        I
-                      </button>
+                          type="button"
+                          onClick={() => updateElement(selectedElement.id, { 
+                            fontStyle: selectedElement.fontStyle === 'italic' ? 'normal' : 'italic' 
+                          })}
+                          className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center italic ${
+                            selectedElement.fontStyle === 'italic'
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          I
+                        </button>
                       </Tooltip>
                     </div>
                   </div>
@@ -4496,45 +4494,42 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     <div className="flex gap-1">
                       <Tooltip content="Align text to the left">
                         <button
-                        type="button"
-                        onClick={() => updateElement(selectedElement.id, { textAlign: 'left' })}
-                        className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center ${
-                          selectedElement.textAlign === 'left'
-                            ? 'bg-blue-500 text-white border-blue-500'
-                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
-                        }`}
-                        title="Align Left"
-                      >
-                        <i className="fas fa-align-left text-base"></i>
-                      </button>
+                          type="button"
+                          onClick={() => updateElement(selectedElement.id, { textAlign: 'left' })}
+                          className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center ${
+                            selectedElement.textAlign === 'left'
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          <i className="fas fa-align-left text-base"></i>
+                        </button>
                       </Tooltip>
                       <Tooltip content="Center align text">
                         <button
-                        type="button"
-                        onClick={() => updateElement(selectedElement.id, { textAlign: 'center' })}
-                        className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center ${
-                          (selectedElement.textAlign || 'center') === 'center'
-                            ? 'bg-blue-500 text-white border-blue-500'
-                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
-                        }`}
-                        title="Align Center"
-                      >
-                        <i className="fas fa-align-center text-base"></i>
-                      </button>
+                          type="button"
+                          onClick={() => updateElement(selectedElement.id, { textAlign: 'center' })}
+                          className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center ${
+                            (selectedElement.textAlign || 'center') === 'center'
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          <i className="fas fa-align-center text-base"></i>
+                        </button>
                       </Tooltip>
                       <Tooltip content="Align text to the right">
                         <button
-                        type="button"
-                        onClick={() => updateElement(selectedElement.id, { textAlign: 'right' })}
-                        className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center ${
-                          selectedElement.textAlign === 'right'
-                            ? 'bg-blue-500 text-white border-blue-500'
-                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
-                        }`}
-                        title="Align Right"
-                      >
-                        <i className="fas fa-align-right text-base"></i>
-                      </button>
+                          type="button"
+                          onClick={() => updateElement(selectedElement.id, { textAlign: 'right' })}
+                          className={`flex-1 px-2 py-1.5 text-sm border rounded flex items-center justify-center ${
+                            selectedElement.textAlign === 'right'
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          <i className="fas fa-align-right text-base"></i>
+                        </button>
                       </Tooltip>
                     </div>
                   </div>
@@ -4668,34 +4663,36 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               <div>
                 <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Font Style</label>
                 <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleSongContentStyleChange(selectedSongContentType, {
-                      fontWeight: selectedSongContentStyle.fontWeight === 'bold' ? 'normal' : 'bold'
-                    })}
-                    className={`flex-1 px-2 py-1.5 text-sm border rounded font-bold ${
-                      selectedSongContentStyle.fontWeight === 'bold'
-                        ? 'bg-blue-500 text-white border-blue-500'
-                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
-                    }`}
-                    title="Bold"
-                  >
-                    B
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSongContentStyleChange(selectedSongContentType, {
-                      fontStyle: selectedSongContentStyle.fontStyle === 'italic' ? 'normal' : 'italic'
-                    })}
-                    className={`flex-1 px-2 py-1.5 text-sm border rounded italic ${
-                      selectedSongContentStyle.fontStyle === 'italic'
-                        ? 'bg-blue-500 text-white border-blue-500'
-                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
-                    }`}
-                    title="Italic"
-                  >
-                    I
-                  </button>
+                  <Tooltip content="Toggle bold text">
+                    <button
+                      type="button"
+                      onClick={() => handleSongContentStyleChange(selectedSongContentType, {
+                        fontWeight: selectedSongContentStyle.fontWeight === 'bold' ? 'normal' : 'bold'
+                      })}
+                      className={`flex-1 px-2 py-1.5 text-sm border rounded font-bold ${
+                        selectedSongContentStyle.fontWeight === 'bold'
+                          ? 'bg-blue-500 text-white border-blue-500'
+                          : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      B
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="Toggle italic text">
+                    <button
+                      type="button"
+                      onClick={() => handleSongContentStyleChange(selectedSongContentType, {
+                        fontStyle: selectedSongContentStyle.fontStyle === 'italic' ? 'normal' : 'italic'
+                      })}
+                      className={`flex-1 px-2 py-1.5 text-sm border rounded italic ${
+                        selectedSongContentStyle.fontStyle === 'italic'
+                          ? 'bg-blue-500 text-white border-blue-500'
+                          : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      I
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
               

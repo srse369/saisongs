@@ -81,6 +81,35 @@ export const requireEditor = (req: Request, res: Response, next: NextFunction) =
   next();
 };
 
+/**
+ * Optional authentication middleware
+ * Populates req.user if session exists, but doesn't require authentication
+ * Useful for public routes that need to show different content for authenticated users
+ */
+export const optionalAuth = (req: Request, res: Response, next: NextFunction) => {
+  // If there's a valid session with a user, populate req.user
+  if (req.session && req.session.userId && req.session.userRole) {
+    const userRole = req.session.userRole;
+    
+    // Only populate if role is valid
+    if (userRole === 'admin' || userRole === 'editor' || userRole === 'viewer') {
+      (req as any).user = {
+        id: req.session.userId,
+        email: req.session.userEmail,
+        name: req.session.userName,
+        role: userRole,
+        centerIds: req.session.centerIds || [],
+        editorFor: req.session.editorFor || []
+      };
+      (req as any).userRole = userRole;
+      (req as any).userId = req.session.userId;
+    }
+  }
+  
+  // Always proceed regardless of authentication status
+  next();
+};
+
 export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.session || !req.session.userId) {
     return res.status(401).json({ 

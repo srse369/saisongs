@@ -392,7 +392,8 @@ describe('PitchService', () => {
 
       expect(result?.pitch).toBe('G');
       expect(apiClient.updatePitch).toHaveBeenCalledWith('1', { pitch: 'G' });
-      expect(apiClient.getPitch).toHaveBeenCalledWith('1');
+      // After update, getPitch is called with nocache=true to get fresh data
+      expect(apiClient.getPitch).toHaveBeenCalledWith('1', true);
     });
 
     it('should trim whitespace from pitch', async () => {
@@ -426,7 +427,8 @@ describe('PitchService', () => {
 
       expect(result?.pitch).toBe('C');
       expect(apiClient.updatePitch).not.toHaveBeenCalled();
-      expect(apiClient.getPitch).toHaveBeenCalledWith('1');
+      // No update was made, so getPitch is called without nocache (defaults to false)
+      expect(apiClient.getPitch).toHaveBeenCalledWith('1', false);
     });
 
     it('should return null when pitch not found', async () => {

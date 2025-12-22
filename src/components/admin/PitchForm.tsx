@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { SongSingerPitch, CreatePitchInput, Song, Singer } from '../../types';
 import { ALL_PITCH_OPTIONS, formatPitchWithName } from '../../utils/pitchUtils';
 import { Tooltip } from '../common';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PitchFormProps {
   pitch?: SongSingerPitch | null;
@@ -10,6 +11,7 @@ interface PitchFormProps {
   onSubmit: (input: CreatePitchInput) => Promise<void>;
   onCancel: () => void;
   onUnsavedChangesRef?: React.MutableRefObject<(() => boolean) | null>;
+  userSingerId?: string; // Current user's singer ID if they have a profile
 }
 
 export const PitchForm: React.FC<PitchFormProps> = ({ 
@@ -18,14 +20,20 @@ export const PitchForm: React.FC<PitchFormProps> = ({
   singers, 
   onSubmit, 
   onCancel,
-  onUnsavedChangesRef
+  onUnsavedChangesRef,
+  userSingerId
 }) => {
+  const { isEditor } = useAuth();
   const [songId, setSongId] = useState('');
   const [singerId, setSingerId] = useState('');
   const [pitchValue, setPitchValue] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [centers, setCenters] = useState<Array<{id: number; name: string}>>([]);
+  
+  // Check if user is editing mode or creating for themselves
+  const isEditMode = !!pitch;
+  const isViewerCreatingForSelf = !isEditor && !!userSingerId && !isEditMode;
 
   // Fetch centers for display
   useEffect(() => {
@@ -43,7 +51,17 @@ export const PitchForm: React.FC<PitchFormProps> = ({
     fetchCenters();
   }, []);
 
-  const isEditMode = !!pitch;
+  // Initialize form with pitch data (edit mode) or pre-select user's singer (viewer creating for self)
+  useEffect(() => {
+    if (pitch) {
+      setSongId(pitch.songId);
+      setSingerId(pitch.singerId);
+      setPitchValue(pitch.pitch);
+    } else if (isViewerCreatingForSelf && userSingerId) {
+      // Pre-select viewer's own singer profile
+      setSingerId(userSingerId);
+    }
+  }, [pitch, isViewerCreatingForSelf, userSingerId]);
   
   // Track if form has unsaved changes
   const hasUnsavedChanges = useMemo(() => {
@@ -178,7 +196,7 @@ export const PitchForm: React.FC<PitchFormProps> = ({
           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ${
             errors.singerId ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
           }`}
-          disabled={isSubmitting || isEditMode}
+          disabled={isSubmitting || isEditMode || isViewerCreatingForSelf}
         >
           <option value="">Select a singer</option>
           {singers.map((singer) => {
@@ -194,6 +212,12 @@ export const PitchForm: React.FC<PitchFormProps> = ({
         </select>
         {errors.singerId && (
           <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.singerId}</p>
+        )}
+        {isViewerCreatingForSelf && (
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 italic">
+            <i className="fas fa-info-circle mr-1"></i>
+            You can only create pitches for yourself
+          </p>
         )}
       </div>
 

@@ -132,6 +132,7 @@ describe('PasswordDialog Component', () => {
   });
 
   describe('Password Validation - Correct Password', () => {
+    // Skip: AuthContext doesn't have a login function - PasswordDialog code is broken
     it.skip('should grant access with correct password', async () => {
       renderWithAuth(
         <PasswordDialog

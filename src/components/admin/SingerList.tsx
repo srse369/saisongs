@@ -207,7 +207,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
               
               <div className="flex-1 flex flex-col gap-3">
               {/* Singer Name and Gender */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <h3 className={`text-lg font-semibold ${
                   singer.gender?.toLowerCase() === 'male' 
                     ? 'text-blue-600 dark:text-blue-400' 
@@ -226,6 +226,15 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     {singer.gender}
                   </span>
                 )}
+                <div className="inline-flex items-center gap-1.5">
+                  <MusicIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Pitches:
+                  </span>
+                  <span className="inline-flex items-center justify-center w-8 h-8 text-sm font-bold text-white bg-blue-600 dark:bg-blue-500 rounded-full">
+                    {singer.pitch_count ?? 0}
+                  </span>
+                </div>
               </div>
               
               {/* Center Badges with Warning for Missing Centers */}
@@ -240,33 +249,36 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
               
               {/* Actions */}
               <div className="flex flex-wrap items-center justify-start gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
-                  <button
-                    onClick={() => handleViewPitches(singer)}
-                    title="View Pitches"
-                    className="inline-flex items-center gap-2 p-2 rounded-md text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                  >
-                    <MusicIcon className="w-5 h-5" />
-                    <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
-                  </button>
-                  {isEditor && (
+                  <Tooltip content={`View ${singer.pitch_count ?? 0} pitch assignment${(singer.pitch_count ?? 0) !== 1 ? 's' : ''}`}>
                     <button
-                      onClick={() => onEdit(singer)}
-                      title="Edit"
-                      className="inline-flex items-center gap-2 p-2 rounded-md text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onClick={() => handleViewPitches(singer)}
+                      className="inline-flex items-center gap-2 p-2 rounded-md text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
                     >
-                      <i className="fas fa-edit text-lg"></i>
-                      <span className="text-sm font-medium whitespace-nowrap">Edit</span>
+                      <MusicIcon className="w-5 h-5" />
+                      <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
                     </button>
+                  </Tooltip>
+                  {isEditor && (
+                    <Tooltip content="Edit singer profile (name, gender, centers)">
+                      <button
+                        onClick={() => onEdit(singer)}
+                        className="inline-flex items-center gap-2 p-2 rounded-md text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <i className="fas fa-edit text-lg"></i>
+                        <span className="text-sm font-medium whitespace-nowrap">Edit</span>
+                      </button>
+                    </Tooltip>
                   )}
                   {isEditor && (
-                    <button
-                      onClick={() => handleDeleteClick(singer)}
-                      title="Delete"
-                      className="inline-flex items-center gap-2 p-2 rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500"
-                    >
-                      <i className="fas fa-trash text-lg"></i>
-                      <span className="text-sm font-medium whitespace-nowrap">Delete</span>
-                    </button>
+                    <Tooltip content="Delete singer and all their pitch assignments">
+                      <button
+                        onClick={() => handleDeleteClick(singer)}
+                        className="inline-flex items-center gap-2 p-2 rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      >
+                        <i className="fas fa-trash text-lg"></i>
+                        <span className="text-sm font-medium whitespace-nowrap">Delete</span>
+                      </button>
+                    </Tooltip>
                   )}
               </div>
               </div>

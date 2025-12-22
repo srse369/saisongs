@@ -16,6 +16,15 @@ interface CenterBadgesProps {
 let centersCache: Center[] | null = null;
 let centersFetchPromise: Promise<Center[]> | null = null;
 
+/**
+ * Clears the centers cache so the next fetch gets fresh data.
+ * Call this after centers are created, updated, or deleted.
+ */
+export const clearCentersCache = (): void => {
+  centersCache = null;
+  centersFetchPromise = null;
+};
+
 const fetchCentersOnce = async (): Promise<Center[]> => {
   // Return cached data if available
   if (centersCache) {

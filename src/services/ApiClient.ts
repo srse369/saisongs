@@ -133,7 +133,17 @@ export class ApiClient {
       this.recordSuccess(endpoint);
       return data;
     } catch (error) {
-      this.recordFailure(endpoint);
+      // Only record failure for genuine network/fetch errors
+      // HTTP errors (including 4xx and 5xx) are re-thrown from above - 
+      // 5xx already called recordFailure(), 4xx intentionally skipped it
+      // We can detect HTTP errors because they don't have the 'name' property set to 'TypeError'
+      // which is what fetch() throws on network failure
+      const isNetworkError = error instanceof TypeError ||
+        (error instanceof Error && error.message.includes('fetch'));
+      
+      if (isNetworkError) {
+        this.recordFailure(endpoint);
+      }
       console.error(`API request failed: ${endpoint}`, error);
       throw error;
     }
@@ -174,8 +184,10 @@ export class ApiClient {
     return this.request('/songs');
   }
 
-  async getSong(id: string) {
-    return this.request(`/songs/${id}`);
+  async getSong(id: string, nocache: boolean = false) {
+    // Add cache-busting parameter to ensure fresh data after updates
+    const url = nocache ? `/songs/${id}?nocache=true&t=${Date.now()}` : `/songs/${id}`;
+    return this.request(url);
   }
 
   async createSong(song: any) {
@@ -199,12 +211,15 @@ export class ApiClient {
   }
 
   // Singers API
-  async getSingers() {
-    return this.request('/singers');
+  async getSingers(nocache: boolean = false) {
+    const url = nocache ? '/singers?nocache=true' : '/singers';
+    return this.request(url);
   }
 
-  async getSinger(id: string) {
-    return this.request(`/singers/${id}`);
+  async getSinger(id: string, nocache: boolean = false) {
+    // Add cache-busting parameter to ensure fresh data after updates
+    const url = nocache ? `/singers/${id}?nocache=true&t=${Date.now()}` : `/singers/${id}`;
+    return this.request(url);
   }
 
   async createSinger(singer: any) {
@@ -232,8 +247,10 @@ export class ApiClient {
     return this.request('/pitches');
   }
 
-  async getPitch(id: string) {
-    return this.request(`/pitches/${id}`);
+  async getPitch(id: string, nocache: boolean = false) {
+    // Add cache-busting parameter to ensure fresh data after updates
+    const url = nocache ? `/pitches/${id}?nocache=true&t=${Date.now()}` : `/pitches/${id}`;
+    return this.request(url);
   }
 
   async getSongPitches(songId: string) {

@@ -23,6 +23,11 @@ router.get('/:id', async (req, res) => {
     const { id } = req.params;
     const song = await cacheService.getSong(id);
     if (!song) return res.status(404).json({ error: 'Song not found' });
+    
+    // Prevent browser caching to ensure fresh data after updates
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json(song);
   } catch (error) {
     console.error('Error fetching song:', error);

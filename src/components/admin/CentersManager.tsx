@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserMultiSelect } from '../common/UserMultiSelect';
+import { clearCentersCache } from '../common/CenterBadges';
 
 interface Center {
   id: number;
@@ -169,8 +170,10 @@ export const CentersManager: React.FC = () => {
 
       await fetchCenters();
       
-      // Clear singers cache since center editors may have changed user permissions
-      window.localStorage.removeItem('songStudio:singersCache');
+      // Clear caches since centers data has changed
+      clearCentersCache(); // Clear the CenterBadges module-level cache
+      window.localStorage.removeItem('songStudio:singersCache'); // Singers may have changed permissions
+      window.localStorage.removeItem('songStudio:centersCache'); // Clear any localStorage centers cache
       
       setError('');
       handleCloseForm(true); // Force close without unsaved changes check
@@ -217,6 +220,12 @@ export const CentersManager: React.FC = () => {
       }
 
       await fetchCenters();
+      
+      // Clear caches since centers data has changed
+      clearCentersCache();
+      window.localStorage.removeItem('songStudio:singersCache');
+      window.localStorage.removeItem('songStudio:centersCache');
+      
       setError('');
     } catch (err: any) {
       console.error('Error deleting center:', err);
@@ -248,6 +257,13 @@ export const CentersManager: React.FC = () => {
       {error && (
         <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <p className="text-red-700 dark:text-red-300">{error}</p>
+        </div>
+      )}
+
+      {/* Center count */}
+      {!loading && centers.length > 0 && (
+        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          {centers.length} center{centers.length !== 1 ? 's' : ''}
         </div>
       )}
 

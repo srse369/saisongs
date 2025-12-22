@@ -376,6 +376,13 @@ export const SessionManager: React.FC = () => {
         </div>
       </div>
 
+      {/* Session song count */}
+      {sessionItems.length > 0 && (
+        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          {sessionItems.length} song{sessionItems.length !== 1 ? 's' : ''} in session
+        </div>
+      )}
+
       {sessionItems.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
@@ -600,6 +607,13 @@ export const SessionManager: React.FC = () => {
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Select a saved session to load into your current live session. This will replace any songs currently in the live session.
           </p>
+
+          {/* Session count */}
+          {sessions.length > 0 && (
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              {sessions.length} saved session{sessions.length !== 1 ? 's' : ''}
+            </div>
+          )}
 
           {sessions.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">

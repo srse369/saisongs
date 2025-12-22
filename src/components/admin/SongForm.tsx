@@ -540,6 +540,11 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
               disabled={isSubmitting}
             />
             <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Golden Voice</span>
+            <Tooltip content="Mark as 'Golden Voice' if this song has a professional-quality recording from an ideal singer">
+              <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
+            </Tooltip>
           </label>
         </div>
 

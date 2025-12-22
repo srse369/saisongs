@@ -79,7 +79,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       }
 
       // Fallback: fetch from backend
-      const fetchedSingers = await singerService.getAllSingers();
+      const fetchedSingers = await singerService.getAllSingers(forceRefresh);
       setSingers(fetchedSingers);
       setHasFetched(true);
 

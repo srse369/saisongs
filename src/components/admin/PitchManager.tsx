@@ -15,7 +15,7 @@ import { Modal } from '../common/Modal';
 import { SongDetails } from './SongDetails';
 
 export const PitchManager: React.FC = () => {
-  const { isEditor, userId } = useAuth();
+  const { isEditor, userId, isAuthenticated } = useAuth();
   const { 
     pitches, 
     loading: pitchLoading, 
@@ -57,6 +57,15 @@ export const PitchManager: React.FC = () => {
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastFetchedUserIdRef = useRef<number | null>(null);
+
+  // Check if the logged-in user has a singer profile (can manage own pitches)
+  const userSinger = useMemo(() => {
+    if (!userId || !isAuthenticated) return null;
+    return singers.find(s => s.id === userId);
+  }, [userId, singers, isAuthenticated]);
+  
+  // User can create pitches if they're an editor OR if they have a singer profile
+  const canCreatePitch = isEditor || !!userSinger;
 
   // Sync advanced filters with URL parameters (when navigating from Songs/Singers tab)
   useEffect(() => {
@@ -420,8 +429,8 @@ export const PitchManager: React.FC = () => {
                   Refresh
                 </button>
               </Tooltip>
-              {!showForm && isEditor && (
-                <Tooltip content={songs.length === 0 || singers.length === 0 ? "Load songs and singers first" : "Assign a pitch/key to a singer for a specific song"}>
+              {!showForm && canCreatePitch && (
+                <Tooltip content={songs.length === 0 || singers.length === 0 ? "Load songs and singers first" : userSinger && !isEditor ? "Assign pitches to yourself" : "Assign a pitch/key to a singer for a specific song"}>
                   <button
                     onClick={handleCreateClick}
                     disabled={loading || songs.length === 0 || singers.length === 0}
@@ -515,6 +524,7 @@ export const PitchManager: React.FC = () => {
           setViewingSong(song);
         }}
         loading={loading}
+        userSingerId={userSinger?.id}
       />
 
       {/* Lazy-load sentinel */}
@@ -540,8 +550,7 @@ export const PitchManager: React.FC = () => {
             singers={singers}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
-            onUnsavedChangesRef={checkUnsavedChangesRef}
-          />
+            onUnsavedChangesRef={checkUnsavedChangesRef}            userSingerId={userSinger?.id}          />
         </Modal>
       )}
 

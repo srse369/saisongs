@@ -671,18 +671,19 @@ class CacheService {
     const db = await this.getDatabase();
     const singers = await db.query(`
       SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        gender,
-        email,
-        is_admin,
-        center_ids,
-        editor_for,
-        created_at,
-        updated_at
-      FROM users
-      WHERE name IS NOT NULL
-      ORDER BY name
+        RAWTOHEX(u.id) as id,
+        u.name,
+        u.gender,
+        u.email,
+        u.is_admin,
+        u.center_ids,
+        u.editor_for,
+        u.created_at,
+        u.updated_at,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
+      FROM users u
+      WHERE u.name IS NOT NULL
+      ORDER BY u.name
     `);
 
     // Normalize field names (Oracle returns uppercase: ID, NAME, GENDER, CENTER_IDS, EDITOR_FOR, CREATED_AT, UPDATED_AT)
@@ -716,6 +717,7 @@ class CacheService {
         editor_for: editorFor,
         created_at: s.created_at || s.CREATED_AT,
         updated_at: s.updated_at || s.UPDATED_AT,
+        pitch_count: parseInt(s.pitch_count || s.PITCH_COUNT || '0', 10),
       };
     }).filter((s: any) => s.name); // Filter out any singers with no name
 
@@ -727,17 +729,18 @@ class CacheService {
     const db = await this.getDatabase();
     const singers = await db.query(`
       SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        gender,
-        email,
-        is_admin,
-        center_ids,
-        editor_for,
-        created_at,
-        updated_at
-      FROM users
-      WHERE RAWTOHEX(id) = :1
+        RAWTOHEX(u.id) as id,
+        u.name,
+        u.gender,
+        u.email,
+        u.is_admin,
+        u.center_ids,
+        u.editor_for,
+        u.created_at,
+        u.updated_at,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
+      FROM users u
+      WHERE RAWTOHEX(u.id) = :1
     `, [id]);
     
     if (singers.length === 0) return null;
@@ -772,6 +775,7 @@ class CacheService {
       editor_for: editorFor,
       created_at: s.created_at || s.CREATED_AT,
       updated_at: s.updated_at || s.UPDATED_AT,
+      pitch_count: parseInt(s.pitch_count || s.PITCH_COUNT || '0', 10),
     };
   }
 
@@ -815,6 +819,7 @@ class CacheService {
         }
         
         // Normalize field names to lowercase (Oracle might return uppercase)
+        // New singer always has pitch_count = 0
         const normalizedSinger = {
           id: rawSinger.id || rawSinger.ID,
           name: rawSinger.name || rawSinger.NAME,
@@ -823,6 +828,7 @@ class CacheService {
           center_ids: parsedCenterIds,
           created_at: rawSinger.created_at || rawSinger.CREATED_AT,
           updated_at: rawSinger.updated_at || rawSinger.UPDATED_AT,
+          pitch_count: 0,
         };
         
         // Write-through cache: Add to cache or create minimal cache with new singer
@@ -869,23 +875,27 @@ class CacheService {
       WHERE RAWTOHEX(id) = :6
     `, [name, gender || null, email || null, centerIdsJson, updated_by || null, id]);
     
-    // Write-through cache: Fetch only the updated singer
+    // Write-through cache: Fetch the complete updated singer with all fields including pitch_count
     const updatedSingers = await db.query(`
       SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        gender,
-        email,
-        center_ids,
-        created_at,
-        updated_at
-      FROM users
-      WHERE RAWTOHEX(id) = :1
+        RAWTOHEX(u.id) as id,
+        u.name,
+        u.gender,
+        u.email,
+        u.is_admin,
+        u.center_ids,
+        u.editor_for,
+        u.created_at,
+        u.updated_at,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
+      FROM users u
+      WHERE RAWTOHEX(u.id) = :1
     `, [id]);
     
     if (updatedSingers.length > 0) {
       const s = updatedSingers[0];
       let parsedCenterIds: number[] = [];
+      let parsedEditorFor: number[] = [];
       try {
         if (s.CENTER_IDS || s.center_ids) {
           parsedCenterIds = JSON.parse(s.CENTER_IDS || s.center_ids);
@@ -893,21 +903,37 @@ class CacheService {
       } catch (e) {
         console.error('Error parsing center_ids:', e);
       }
+      try {
+        if (s.EDITOR_FOR || s.editor_for) {
+          parsedEditorFor = JSON.parse(s.EDITOR_FOR || s.editor_for);
+        }
+      } catch (e) {
+        console.error('Error parsing editor_for:', e);
+      }
       
       const normalizedSinger = {
         id: s.id || s.ID,
         name: s.name || s.NAME,
         gender: s.gender || s.GENDER,
         email: s.email || s.EMAIL,
+        is_admin: (s.is_admin || s.IS_ADMIN) === 1,
         center_ids: parsedCenterIds,
+        editor_for: parsedEditorFor,
         created_at: s.created_at || s.CREATED_AT,
         updated_at: s.updated_at || s.UPDATED_AT,
+        pitch_count: parseInt(s.pitch_count || s.PITCH_COUNT || '0', 10),
       };
       
       const cached = this.get('singers:all');
       if (cached && Array.isArray(cached)) {
+        // Update the cached singer with the fresh data from database
         const updated = cached
-          .map((singer: any) => singer.id === id ? normalizedSinger : singer)
+          .map((singer: any) => {
+            if (singer.id === id) {
+              return normalizedSinger;
+            }
+            return singer;
+          })
           .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         this.set('singers:all', updated, 5 * 60 * 1000);
       }
@@ -2412,7 +2438,7 @@ class CacheService {
 
     const db = await this.getDatabase();
     const feedback = await db.query<any>(
-      `SELECT id, feedback, category, email, user_agent, url, ip_address, 
+      `SELECT RAWTOHEX(id) as id, feedback, category, email, user_agent, url, ip_address, 
               status, admin_notes, created_at, updated_at
        FROM feedback 
        ORDER BY created_at DESC`
@@ -2447,10 +2473,10 @@ class CacheService {
 
     const db = await this.getDatabase();
     const feedback = await db.query<any>(
-      `SELECT id, feedback, category, email, user_agent, url, ip_address, 
+      `SELECT RAWTOHEX(id) as id, feedback, category, email, user_agent, url, ip_address, 
               status, admin_notes, created_at, updated_at
        FROM feedback 
-       WHERE id = :1`,
+       WHERE RAWTOHEX(id) = :1`,
       [id]
     );
 
@@ -2497,7 +2523,7 @@ class CacheService {
     params.push(id);
     
     await db.query(
-      `UPDATE feedback SET ${updates.join(', ')} WHERE id = :${params.length}`,
+      `UPDATE feedback SET ${updates.join(', ')} WHERE RAWTOHEX(id) = :${params.length}`,
       params
     );
 
@@ -2511,7 +2537,7 @@ class CacheService {
     const db = await this.getDatabase();
     
     await db.query(
-      `DELETE FROM feedback WHERE id = :1`,
+      `DELETE FROM feedback WHERE RAWTOHEX(id) = :1`,
       [id]
     );
 

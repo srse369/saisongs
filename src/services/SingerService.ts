@@ -26,6 +26,7 @@ class SingerService {
     const centerIds = row.center_ids ?? row.CENTER_IDS;
     const editorFor = row.editor_for ?? row.EDITOR_FOR;
     const isAdmin = row.is_admin ?? row.IS_ADMIN;
+    const pitchCount = row.pitch_count ?? row.PITCH_COUNT;
     const createdRaw = row.createdAt ?? row.created_at ?? row.CREATED_AT;
     const updatedRaw = row.updatedAt ?? row.updated_at ?? row.UPDATED_AT;
 
@@ -37,6 +38,7 @@ class SingerService {
       center_ids: centerIds,
       editor_for: editorFor,
       is_admin: isAdmin,
+      pitch_count: pitchCount !== undefined ? Number(pitchCount) : undefined,
       createdAt: createdRaw ? new Date(createdRaw) : new Date(),
       updatedAt: updatedRaw ? new Date(updatedRaw) : new Date(),
     };
@@ -73,9 +75,9 @@ class SingerService {
    * Retrieves all singers from the database
    * @returns Array of all singers
    */
-  async getAllSingers(): Promise<Singer[]> {
+  async getAllSingers(nocache: boolean = false): Promise<Singer[]> {
     try {
-      const raw = await apiClient.getSingers();
+      const raw = await apiClient.getSingers(nocache);
       return (raw as any[]).map((row) => this.mapApiSinger(row));
     } catch (error) {
       console.error('Error fetching all singers:', error);
@@ -92,9 +94,9 @@ class SingerService {
    * @param id - Singer UUID
    * @returns Singer object or null if not found
    */
-  async getSingerById(id: string): Promise<Singer | null> {
+  async getSingerById(id: string, nocache: boolean = false): Promise<Singer | null> {
     try {
-      const raw = await apiClient.getSinger(id);
+      const raw = await apiClient.getSinger(id, nocache);
       if (!raw) return null;
       return this.mapApiSinger(raw as any);
     } catch (error) {
@@ -155,7 +157,8 @@ class SingerService {
         email: input.email,
         center_ids: input.center_ids,
       });
-      return this.getSingerById(id);
+      // Use nocache=true to ensure we get fresh data after the update
+      return this.getSingerById(id, true);
     } catch (error) {
       console.error('Error updating singer:', error);
       throw new DatabaseError(

@@ -1,13 +1,14 @@
 import express from 'express';
 import templateService from '../services/TemplateService.js';
 import cacheService from '../services/CacheService.js';
-import { requireAuth, requireEditor } from '../middleware/simpleAuth.js';
+import { requireAuth, requireEditor, optionalAuth } from '../middleware/simpleAuth.js';
 import type { PresentationTemplate } from '../services/TemplateService.js';
 
 const router = express.Router();
 
 // Get all templates (uses cache)
-router.get('/', async (req, res) => {
+// Uses optionalAuth to populate req.user if session exists, but doesn't require authentication
+router.get('/', optionalAuth, async (req, res) => {
   try {
     const allTemplates = await cacheService.getAllTemplates();
     
@@ -29,7 +30,8 @@ router.get('/', async (req, res) => {
 });
 
 // Get default template
-router.get('/default', async (req, res) => {
+// Uses optionalAuth to populate req.user if session exists
+router.get('/default', optionalAuth, async (req, res) => {
   try {
     const allTemplates = await cacheService.getAllTemplates();
     
@@ -56,7 +58,8 @@ router.get('/default', async (req, res) => {
 });
 
 // Get template by ID
-router.get('/:id', async (req, res) => {
+// Uses optionalAuth to populate req.user if session exists
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const template = await cacheService.getTemplate(id);
