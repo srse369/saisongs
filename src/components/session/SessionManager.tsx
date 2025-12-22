@@ -327,30 +327,31 @@ export const SessionManager: React.FC = () => {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-            <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
-            <Tooltip content={sessionItems.length === 0 ? "Add songs to the session first" : "Start full-screen presentation with all songs in order"}>
+          {/* When session is empty, only show Load Session */}
+          {sessionItems.length === 0 ? (
+            <Tooltip content="Load a previously saved session into this list">
               <button
                 type="button"
-                onClick={handlePresentSession}
-                disabled={sessionItems.length === 0}
-                className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                onClick={() => setShowLoadModal(true)}
+                className="px-4 py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center leading-tight"
               >
-                Present Session
+                Load<br />Session
               </button>
             </Tooltip>
-          </div>
-          <Tooltip content="Load a previously saved session into this list">
-            <button
-              type="button"
-              onClick={() => setShowLoadModal(true)}
-              className="px-4 py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors"
-            >
-              Load Session
-            </button>
-          </Tooltip>
-          {sessionItems.length > 0 && (
+          ) : (
             <>
+              {/* Load Session */}
+              <Tooltip content="Load a previously saved session into this list">
+                <button
+                  type="button"
+                  onClick={() => setShowLoadModal(true)}
+                  className="px-4 py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center leading-tight"
+                >
+                  Load<br />Session
+                </button>
+              </Tooltip>
+              
+              {/* Save Session (only for authenticated users) */}
               {isAuthenticated && (
                 <Tooltip content="Save the current session with all songs, singers, and pitches for later use">
                   <button
@@ -362,6 +363,8 @@ export const SessionManager: React.FC = () => {
                   </button>
                 </Tooltip>
               )}
+              
+              {/* Clear Session */}
               <Tooltip content="Remove all songs from the current session">
                 <button
                   type="button"
@@ -369,6 +372,20 @@ export const SessionManager: React.FC = () => {
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                 >
                   Clear Session
+                </button>
+              </Tooltip>
+              
+              {/* Template */}
+              <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
+              
+              {/* Present Session */}
+              <Tooltip content="Start full-screen presentation with all songs in order">
+                <button
+                  type="button"
+                  onClick={handlePresentSession}
+                  className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+                >
+                  Present Session
                 </button>
               </Tooltip>
             </>

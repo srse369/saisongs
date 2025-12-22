@@ -4,7 +4,7 @@ import type { UserRole } from '../../contexts/AuthContext';
 interface OTPLoginDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (role: UserRole, userId: number, email: string, name?: string, centerIds?: number[], editorFor?: number[]) => void;
+  onSuccess: (role: UserRole, userId: string, email: string, name?: string, centerIds?: number[], editorFor?: number[]) => void;
 }
 
 type Step = 'email' | 'otp';
@@ -117,7 +117,7 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
 
       if (response.ok) {
         const role = data.role as UserRole;
-        const userId = data.user?.id || 0;
+        const userId = data.user?.id || '';
         const userEmail = data.user?.email || email.trim().toLowerCase();
         const userName = data.user?.name;
         const centerIds = data.user?.centerIds || [];

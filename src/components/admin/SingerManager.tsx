@@ -15,7 +15,7 @@ export const SingerManager: React.FC = () => {
   const [editingSinger, setEditingSinger] = useState<Singer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
-  const lastFetchedUserIdRef = useRef<number | null>(null);
+  const lastFetchedUserIdRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

@@ -202,8 +202,9 @@ router.post('/verify-otp', async (req, res) => {
     );
 
     // Get user details including editor_for and center_ids
+    // Use RAWTOHEX to get consistent hex string ID format (matches singer IDs)
     const users = await db.query<any>(
-      'SELECT id, name, email, is_admin, editor_for, center_ids FROM users WHERE LOWER(email) = LOWER(:1)',
+      'SELECT RAWTOHEX(id) as id, name, email, is_admin, editor_for, center_ids FROM users WHERE LOWER(email) = LOWER(:1)',
       [normalizedEmail]
     );
 
@@ -213,21 +214,8 @@ router.post('/verify-otp', async (req, res) => {
 
     const user = users[0];
 
-    // Convert user ID for comparison
-    const userIdValue = user.id || user.ID;
-    let userId: number;
-    
-    if (Buffer.isBuffer(userIdValue)) {
-      if (userIdValue.length >= 8) {
-        userId = Number(userIdValue.readBigUInt64LE(0));
-      } else if (userIdValue.length >= 4) {
-        userId = userIdValue.readUInt32LE(0);
-      } else {
-        userId = parseInt(userIdValue.toString('utf8'));
-      }
-    } else {
-      userId = userIdValue;
-    }
+    // User ID is now a hex string from RAWTOHEX (consistent with singer IDs)
+    const userId: string = user.id || user.ID;
 
     // Determine user role based on simplified system:
     // 1. Admin: is_admin = 1 (full system access)
@@ -345,8 +333,9 @@ router.get('/session', async (req, res) => {
   if (req.session && req.session.userId && req.session.userEmail) {
     try {
       // Fetch fresh user data including centerIds and editorFor
+      // Use RAWTOHEX for consistent hex string ID format
       const users = await db.query<any>(
-        'SELECT id, name, email, is_admin, editor_for, center_ids FROM users WHERE LOWER(email) = LOWER(:1)',
+        'SELECT RAWTOHEX(id) as id, name, email, is_admin, editor_for, center_ids FROM users WHERE LOWER(email) = LOWER(:1)',
         [req.session.userEmail]
       );
 

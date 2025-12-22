@@ -58,7 +58,7 @@ describe('slideUtils', () => {
       });
     });
 
-    describe('short lyrics (≤10 lines)', () => {
+    describe('short lyrics (≤12 lines)', () => {
       it('should create single slide for 5 lines', () => {
         const song: Song = {
           id: '1',
@@ -74,8 +74,8 @@ describe('slideUtils', () => {
         expect(slides[0].songSlideCount).toBe(1);
       });
 
-      it('should create single slide for exactly 10 lines', () => {
-        const lyrics = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}`).join('\n');
+      it('should create single slide for exactly 12 lines', () => {
+        const lyrics = Array.from({ length: 12 }, (_, i) => `Line ${i + 1}`).join('\n');
         const song: Song = {
           id: '1',
           name: 'Ten Lines',
@@ -116,12 +116,12 @@ describe('slideUtils', () => {
       });
     });
 
-    describe('long lyrics with verse structure (>10 lines with \\n\\n)', () => {
+    describe('long lyrics with verse structure (>12 lines with \\n\\n)', () => {
       it('should create one slide per verse', () => {
         const song: Song = {
           id: '1',
           name: 'Song with Verses',
-          lyrics: 'Verse 1 Line 1\nVerse 1 Line 2\nVerse 1 Line 3\nVerse 1 Line 4\nVerse 1 Line 5\nVerse 1 Line 6\n\nVerse 2 Line 1\nVerse 2 Line 2\nVerse 2 Line 3\nVerse 2 Line 4\nVerse 2 Line 5\nVerse 2 Line 6',
+          lyrics: 'Verse 1 Line 1\nVerse 1 Line 2\nVerse 1 Line 3\nVerse 1 Line 4\nVerse 1 Line 5\nVerse 1 Line 6\nVerse 1 Line 7\n\nVerse 2 Line 1\nVerse 2 Line 2\nVerse 2 Line 3\nVerse 2 Line 4\nVerse 2 Line 5\nVerse 2 Line 6\nVerse 2 Line 7',
         } as Song;
 
         const slides = generateSlides(song);
@@ -139,7 +139,7 @@ describe('slideUtils', () => {
         const song: Song = {
           id: '1',
           name: 'Three Verses',
-          lyrics: 'V1L1\nV1L2\nV1L3\nV1L4\n\nV2L1\nV2L2\nV2L3\nV2L4\n\nV3L1\nV3L2\nV3L3\nV3L4',
+          lyrics: 'V1L1\nV1L2\nV1L3\nV1L4\nV1L5\n\nV2L1\nV2L2\nV2L3\nV2L4\nV2L5\n\nV3L1\nV3L2\nV3L3\nV3L4\nV3L5',
         } as Song;
 
         const slides = generateSlides(song);
@@ -153,7 +153,7 @@ describe('slideUtils', () => {
         const song: Song = {
           id: '1',
           name: 'With Verse Translations',
-          lyrics: 'V1L1\nV1L2\nV1L3\nV1L4\nV1L5\nV1L6\n\nV2L1\nV2L2\nV2L3\nV2L4\nV2L5\nV2L6',
+          lyrics: 'V1L1\nV1L2\nV1L3\nV1L4\nV1L5\nV1L6\nV1L7\n\nV2L1\nV2L2\nV2L3\nV2L4\nV2L5\nV2L6\nV2L7',
           meaning: 'Translation V1\n\nTranslation V2',
         } as Song;
 
@@ -179,8 +179,8 @@ describe('slideUtils', () => {
       });
     });
 
-    describe('long lyrics without verse structure (>10 lines, no \\n\\n)', () => {
-      it('should split into 10-line chunks', () => {
+    describe('long lyrics without verse structure (no \\n\\n)', () => {
+      it('should put all lines in one slide when no double line breaks', () => {
         const lyrics = Array.from({ length: 25 }, (_, i) => `Line ${i + 1}`).join('\n');
         const song: Song = {
           id: '1',
@@ -190,13 +190,12 @@ describe('slideUtils', () => {
 
         const slides = generateSlides(song);
 
-        expect(slides).toHaveLength(3); // 10 + 10 + 5
-        expect(slides[0].content.split('\n')).toHaveLength(10);
-        expect(slides[1].content.split('\n')).toHaveLength(10);
-        expect(slides[2].content.split('\n')).toHaveLength(5);
+        // All lines in one slide when no verse structure
+        expect(slides).toHaveLength(1);
+        expect(slides[0].content.split('\n')).toHaveLength(25);
       });
 
-      it('should number slides correctly', () => {
+      it('should number single slide correctly', () => {
         const lyrics = Array.from({ length: 22 }, (_, i) => `Line ${i + 1}`).join('\n');
         const song: Song = {
           id: '1',
@@ -206,14 +205,12 @@ describe('slideUtils', () => {
 
         const slides = generateSlides(song);
 
-        expect(slides).toHaveLength(3);
+        expect(slides).toHaveLength(1);
         expect(slides[0].songSlideNumber).toBe(1);
-        expect(slides[1].songSlideNumber).toBe(2);
-        expect(slides[2].songSlideNumber).toBe(3);
-        expect(slides[2].songSlideCount).toBe(3);
+        expect(slides[0].songSlideCount).toBe(1);
       });
 
-      it('should show translation only on first slide', () => {
+      it('should include translation on the single slide', () => {
         const lyrics = Array.from({ length: 25 }, (_, i) => `Line ${i + 1}`).join('\n');
         const song: Song = {
           id: '1',
@@ -224,9 +221,8 @@ describe('slideUtils', () => {
 
         const slides = generateSlides(song);
 
+        expect(slides).toHaveLength(1);
         expect(slides[0].translation).toBeDefined();
-        expect(slides[1].translation).toBeUndefined();
-        expect(slides[2].translation).toBeUndefined();
       });
     });
 
@@ -244,7 +240,7 @@ describe('slideUtils', () => {
         expect(slides[0].content).toBe('Just one line');
       });
 
-      it('should handle exactly 11 lines without verse breaks', () => {
+      it('should handle exactly 11 lines without verse breaks in one slide', () => {
         const lyrics = Array.from({ length: 11 }, (_, i) => `Line ${i + 1}`).join('\n');
         const song: Song = {
           id: '1',
@@ -254,7 +250,9 @@ describe('slideUtils', () => {
 
         const slides = generateSlides(song);
 
-        expect(slides).toHaveLength(2); // 10 + 1
+        // All lines in one slide when no verse structure
+        expect(slides).toHaveLength(1);
+        expect(slides[0].content.split('\n')).toHaveLength(11);
       });
 
       it('should handle lyrics with extra whitespace', () => {

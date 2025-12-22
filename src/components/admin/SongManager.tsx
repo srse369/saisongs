@@ -36,7 +36,7 @@ export const SongManager: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(50);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
-  const lastFetchedUserIdRef = useRef<number | null>(null);
+  const lastFetchedUserIdRef = useRef<string | null>(null);
 
   // Create fuzzy search instance for fallback
   const fuzzySearch = useMemo(() => createSongFuzzySearch(songs), [songs]);

@@ -143,8 +143,7 @@ export const UserMultiSelect: React.FC<UserMultiSelectProps> = ({
                   </div>
                 ) : (
                   users.map(user => {
-                    const userIdNum = parseInt(user.id, 16);
-                    const isSelected = selectedUserIds.includes(userIdNum);
+                    const isSelected = selectedUserIds.includes(user.id);
                     return (
                       <button
                         key={user.id}

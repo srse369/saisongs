@@ -1636,16 +1636,20 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     if (!transformerRef.current || !stageRef.current) return;
     
     if (selectedId) {
-      const node = stageRef.current.findOne('#' + selectedId);
-      if (node) {
-        transformerRef.current.nodes([node]);
-        transformerRef.current.forceUpdate();
-        transformerRef.current.getLayer()?.batchDraw();
-      }
+      // Use requestAnimationFrame to ensure elements are rendered before attaching transformer
+      requestAnimationFrame(() => {
+        if (!transformerRef.current || !stageRef.current) return;
+        const node = stageRef.current.findOne('#' + selectedId);
+        if (node) {
+          transformerRef.current.nodes([node]);
+          transformerRef.current.forceUpdate();
+          transformerRef.current.getLayer()?.batchDraw();
+        }
+      });
     } else {
       transformerRef.current.nodes([]);
     }
-  }, [selectedId, canvasElements]);
+  }, [selectedId, canvasElements, selectedSlideIndex]);
 
   // Track mousedown globally to prevent deselection when clicking starts outside canvas
   useEffect(() => {
@@ -3534,7 +3538,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
 
                 {/* Song content elements for reference slide - draggable/stylable but with fixed text */}
                 {selectedSlideIndex === referenceSlideIndex && (
-                  <Group>
+                  <>
                     {/* Song Title - Editable position/style, fixed text */}
                     <Text
                       id="song-title-element"
@@ -3720,7 +3724,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                         });
                       }}
                     />
-                  </Group>
+                  </>
                 )}
 
                 {/* Elements - positioned in full slide coordinates */}
@@ -3831,6 +3835,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 {/* Transformer */}
                 <Transformer
                   ref={transformerRef}
+                  enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right']}
+                  rotateEnabled={true}
+                  keepRatio={false}
                   boundBoxFunc={(oldBox, newBox) => {
                     // Minimum size in slide coordinates
                     if (newBox.width < 40 || newBox.height < 40) {

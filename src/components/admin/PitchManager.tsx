@@ -54,11 +54,13 @@ export const PitchManager: React.FC = () => {
 
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [visibleCount, setVisibleCount] = useState(100);
+  const [showMyPitches, setShowMyPitches] = useState(false);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const lastFetchedUserIdRef = useRef<number | null>(null);
+  const lastFetchedUserIdRef = useRef<string | null>(null);
 
   // Check if the logged-in user has a singer profile (can manage own pitches)
+  // userId is now a hex string matching singer.id format
   const userSinger = useMemo(() => {
     if (!userId || !isAuthenticated) return null;
     return singers.find(s => s.id === userId);
@@ -238,6 +240,11 @@ export const PitchManager: React.FC = () => {
     };
 
     const filtered = pitches.filter((p) => {
+      // If "My Pitches" is enabled, only show pitches for the logged-in user
+      if (showMyPitches && userSinger && p.singerId !== userSinger.id) {
+        return false;
+      }
+
       // If navigated here with a specific songId, only show pitches for that song
       if (songFilterId && p.songId !== songFilterId) {
         return false;
@@ -312,12 +319,12 @@ export const PitchManager: React.FC = () => {
       if (songCompare !== 0) return songCompare;
       return compareStringsIgnoringSpecialChars(singerA?.name || '', singerB?.name || '');
     });
-  }, [pitches, debouncedSearchTerm, advancedFilters, songFilterId, singerFilterId, songMap, singerMap]);
+  }, [pitches, debouncedSearchTerm, advancedFilters, songFilterId, singerFilterId, songMap, singerMap, showMyPitches, userSinger]);
 
   // Reset visible pitches when search or underlying list changes
   useEffect(() => {
     setVisibleCount(100);
-  }, [debouncedSearchTerm, advancedFilters, pitches.length, songFilterId, singerFilterId]);
+  }, [debouncedSearchTerm, advancedFilters, pitches.length, songFilterId, singerFilterId, showMyPitches]);
 
   // Only render a subset of pitches for performance
   const displayedPitches = useMemo(
@@ -359,8 +366,14 @@ export const PitchManager: React.FC = () => {
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               Associate singers with songs and their pitch information
             </p>
-            {(songFilterId || singerFilterId) && (
+            {(songFilterId || singerFilterId || showMyPitches) && (
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                {showMyPitches && userSinger && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800">
+                    <i className="fas fa-user mr-2 text-xs"></i>
+                    <span className="font-medium">My Pitches</span>
+                  </span>
+                )}
                 {songFilterId && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
                     <span className="font-medium mr-1">Song:</span>
@@ -379,7 +392,10 @@ export const PitchManager: React.FC = () => {
                 )}
                 <button
                   type="button"
-                  onClick={handleClearFilters}
+                  onClick={() => {
+                    handleClearFilters();
+                    setShowMyPitches(false);
+                  }}
                   className="inline-flex items-center px-3 py-1 rounded-full border border-gray-300 dark:border-gray-600 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   Clear filters
@@ -441,6 +457,22 @@ export const PitchManager: React.FC = () => {
                   >
                     <i className="fas fa-plus text-lg"></i>
                     Create New Pitch
+                  </button>
+                </Tooltip>
+              )}
+              {userSinger && (
+                <Tooltip content={showMyPitches ? "Show all pitches" : "Show only my pitches"}>
+                  <button
+                    type="button"
+                    onClick={() => setShowMyPitches(!showMyPitches)}
+                    className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
+                      showMyPitches
+                        ? 'bg-purple-600 text-white hover:bg-purple-700'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <i className="fas fa-user text-sm"></i>
+                    My Pitches
                   </button>
                 </Tooltip>
               )}

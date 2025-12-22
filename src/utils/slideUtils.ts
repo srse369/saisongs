@@ -83,9 +83,9 @@ function limitTranslationTo4Lines(translationText: string): string {
 
 /**
  * Generates slides from a song's lyrics and translation.
- * Splits lyrics by double line breaks (verses) and creates one slide per verse.
- * If a verse exceeds the max lines threshold, it will be split into multiple slides.
- * Uses 8 lines max when translation exists, 10 lines max when no translation.
+ * - If lyrics have no double line breaks: all lines go into a single slide
+ * - If lyrics have double line breaks (verses): creates one slide per verse
+ * - If total lines <= 12: everything in one slide regardless of verse breaks
  * 
  * @param song - The song object with cached lyrics and meaning
  * @returns Array of Slide objects ready for presentation
@@ -121,8 +121,8 @@ export function generateSlides(song: Song): Slide[] {
         .filter(v => v.length > 0)
     : [];
   
-  // If total lines <= 10, ignore verse breaks and show everything in one slide
-  if (totalLineCount <= 10) {
+  // If total lines <= 12, ignore verse breaks and show everything in one slide
+  if (totalLineCount <= 12) {
     let translationText = limitTranslationTo4Lines(translationVerses[0] || '');
     
     // Show all lyrics in one slide
@@ -156,25 +156,15 @@ export function generateSlides(song: Song): Slide[] {
       });
     });
   } else {
-    // Total lines > 10 but no verse structure - split into 10 lines per slide
-    const maxLinesPerSlide = 10;
-    
+    // No verse structure (no double line breaks) - put all lines in one slide
     let translationText = limitTranslationTo4Lines(translationVerses[0] || '');
     
-    // Split into chunks of 10 lines
-    for (let i = 0; i < allLines.length; i += maxLinesPerSlide) {
-      const slideLines = allLines.slice(i, i + maxLinesPerSlide);
-      const slideContent = i === 0
-        ? prependTitleIfDifferent(slideLines.join('\n'), song.name)
-        : slideLines.join('\n');
-      
-      slides.push({
-        index: slides.length,
-        content: slideContent,
-        translation: i === 0 ? translationText : undefined, // Only show translation on first slide
-        songName: song.name,
-      });
-    }
+    slides.push({
+      index: 0,
+      content: prependTitleIfDifferent(allLines.join('\n'), song.name),
+      translation: translationText || undefined,
+      songName: song.name,
+    });
   }
 
   // Annotate slides with per-song slide number and total

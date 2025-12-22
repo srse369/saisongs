@@ -25,7 +25,7 @@ global.fetch = vi.fn((url: string, options?: any) => {
         json: () => Promise.resolve({
           success: true,
           role: 'admin',
-          userId: 1,
+          userId: 'ABC123DEF456',
           email: 'admin@test.com',
           name: 'Admin User'
         }),

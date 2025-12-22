@@ -410,15 +410,19 @@ export const TemplateManager: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [previewTemplate, previewSlides.length]);
 
-  // Filter templates based on search
+  // Filter and sort templates by name
   const filteredTemplates = useMemo(() => {
-    if (!searchTerm.trim()) return templates;
-    const query = searchTerm.toLowerCase();
-    return templates.filter(
-      t =>
-        t.name.toLowerCase().includes(query) ||
-        t.description?.toLowerCase().includes(query)
-    );
+    let result = templates;
+    if (searchTerm.trim()) {
+      const query = searchTerm.toLowerCase();
+      result = templates.filter(
+        t =>
+          t.name.toLowerCase().includes(query) ||
+          t.description?.toLowerCase().includes(query)
+      );
+    }
+    // Sort by name alphabetically
+    return [...result].sort((a, b) => a.name.localeCompare(b.name));
   }, [templates, searchTerm]);
 
   const handleCreateClick = () => {

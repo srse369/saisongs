@@ -9,13 +9,13 @@ interface AuthContextState {
   userRole: UserRole;
   isEditor: boolean;
   isAdmin: boolean;
-  userId: number | null;
+  userId: string | null;  // Hex string from RAWTOHEX (consistent with singer IDs)
   userName: string | null;
   userEmail: string | null;
   centerIds: number[];
   editorFor: number[];
   isLoading: boolean;
-  setAuthenticatedUser: (role: UserRole, userId: number, email: string, name?: string, centerIds?: number[], editorFor?: number[]) => void;
+  setAuthenticatedUser: (role: UserRole, userId: string, email: string, name?: string, centerIds?: number[], editorFor?: number[]) => void;
   logout: () => Promise<void>;
 }
 
@@ -32,7 +32,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || (
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [userRole, setUserRole] = useState<UserRole>('public');
-  const [userId, setUserId] = useState<number | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);  // Hex string from RAWTOHEX
   const [userName, setUserName] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [centerIds, setCenterIds] = useState<number[]>([]);
