@@ -2673,15 +2673,16 @@ export async function warmupCache(): Promise<void> {
   try {
     const singers = await databaseService.query(`
       SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        gender,
-        email,
-        center_ids,
-        created_at,
-        updated_at
-      FROM users
-      ORDER BY name
+        RAWTOHEX(u.id) as id,
+        u.name,
+        u.gender,
+        u.email,
+        u.center_ids,
+        u.created_at,
+        u.updated_at,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
+      FROM users u
+      ORDER BY u.name
     `);
 
     stats.push({ table: 'users', count: singers.length });
@@ -2705,6 +2706,7 @@ export async function warmupCache(): Promise<void> {
         center_ids: centerIds,
         created_at: s.created_at || s.CREATED_AT,
         updated_at: s.updated_at || s.UPDATED_AT,
+        pitch_count: parseInt(s.PITCH_COUNT || s.pitch_count || '0', 10),
       };
     });
     
