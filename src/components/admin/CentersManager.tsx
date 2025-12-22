@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserMultiSelect } from '../common/UserMultiSelect';
 import { clearCentersCache } from '../common/CenterBadges';
+import { RefreshIcon, Tooltip } from '../common';
 
 interface Center {
   id: number;
@@ -245,25 +246,38 @@ export const CentersManager: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Centers</h1>
-        <button
-          onClick={() => handleOpenForm()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          + Add Center
-        </button>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Centers</h1>
+          {!loading && centers.length > 0 && (
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {centers.length} center{centers.length !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Tooltip content="Refresh centers list">
+            <button
+              type="button"
+              onClick={() => fetchCenters()}
+              disabled={loading}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            >
+              <RefreshIcon className="w-4 h-4" />
+              Refresh
+            </button>
+          </Tooltip>
+          <button
+            onClick={() => handleOpenForm()}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+          >
+            + Add Center
+          </button>
+        </div>
       </div>
 
       {error && (
         <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <p className="text-red-700 dark:text-red-300">{error}</p>
-        </div>
-      )}
-
-      {/* Center count */}
-      {!loading && centers.length > 0 && (
-        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-          {centers.length} center{centers.length !== 1 ? 's' : ''}
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { feedbackService, type Feedback } from '../../services/FeedbackService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { Modal } from '../common/Modal';
+import { RefreshIcon, Tooltip } from '../common';
 
 const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
   bug: { label: 'Bug Report', icon: '🐛' },
@@ -120,7 +121,7 @@ export const FeedbackManager: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-wrap gap-4 items-center">
         <select
           value={filter.status || ''}
           onChange={(e) => setFilter({ ...filter, status: e.target.value || undefined })}
@@ -145,6 +146,18 @@ export const FeedbackManager: React.FC = () => {
           <option value="question">❓ Question</option>
           <option value="other">💬 Other</option>
         </select>
+
+        <Tooltip content="Refresh feedback list">
+          <button
+            type="button"
+            onClick={() => loadFeedback()}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          >
+            <RefreshIcon className="w-4 h-4" />
+            Refresh
+          </button>
+        </Tooltip>
       </div>
 
       {/* Feedback List */}

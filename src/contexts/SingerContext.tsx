@@ -78,8 +78,8 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
         }
       }
 
-      // Fallback: fetch from backend
-      const fetchedSingers = await singerService.getAllSingers(forceRefresh);
+      // Fallback: fetch from backend (don't pass nocache to backend - we only bypass localStorage)
+      const fetchedSingers = await singerService.getAllSingers();
       setSingers(fetchedSingers);
       setHasFetched(true);
 
