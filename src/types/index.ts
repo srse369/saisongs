@@ -260,6 +260,8 @@ export interface Song {
   createdBy?: string;                  // User ID who created the song
   createdAt: Date;
   updatedAt: Date;
+  
+  pitch_count?: number;                // Number of pitch assignments for this song
 }
 
 export interface Singer {

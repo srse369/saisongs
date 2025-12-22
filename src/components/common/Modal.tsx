@@ -21,17 +21,21 @@ export const Modal: React.FC<ModalProps> = ({
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && isOpen) {
+        // Stop propagation so other Escape handlers don't also fire
+        event.stopPropagation();
+        event.preventDefault();
         onClose();
       }
     };
 
     if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
+      // Use capture phase to handle before other handlers
+      document.addEventListener('keydown', handleEscape, true);
       document.body.style.overflow = 'hidden';
     }
 
     return () => {
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('keydown', handleEscape, true);
       document.body.style.overflow = 'unset';
     };
   }, [isOpen, onClose]);

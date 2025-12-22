@@ -194,9 +194,12 @@ export const PitchManager: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Clear search when Escape key is pressed while on this tab
+  // Clear search when Escape key is pressed while on this tab (only if no modal is open)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't clear search if a modal is open - let the modal handle Escape
+      if (showForm || viewingSong) return;
+      
       if (e.key === 'Escape') {
         setSearchTerm('');
         setDebouncedSearchTerm('');
@@ -206,7 +209,7 @@ export const PitchManager: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [showForm, viewingSong]);
 
   const handleClearFilters = () => {
     // Clear query params and local search input

@@ -25,10 +25,18 @@
 }
 
 .help-content strong {
-  font-weight: 600;
-  color: #111827;
+  font-weight: 700;
+  color: #111827; /* gray-900 for light mode */
 }
 
+/* Dark mode using class strategy */
 .dark .help-content strong {
-  color: #f9fafb;
+  color: #93c5fd !important; /* blue-300 - very bright for dark mode */
+}
+
+/* Dark mode using media query strategy */
+@media (prefers-color-scheme: dark) {
+  .help-content strong {
+    color: #93c5fd !important; /* blue-300 - very bright for dark mode */
+  }
 }

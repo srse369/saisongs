@@ -127,9 +127,12 @@ export const SongManager: React.FC = () => {
     setSearchTerm(value);
   };
 
-  // Clear search when Escape key is pressed while on this tab
+  // Clear search when Escape key is pressed while on this tab (only if no modal is open)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't clear search if a modal is open - let the modal handle Escape
+      if (isFormModalOpen || viewingSong) return;
+      
       if (e.key === 'Escape') {
         setSearchTerm('');
         setAdvancedFilters({});
@@ -138,7 +141,7 @@ export const SongManager: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isFormModalOpen, viewingSong]);
 
   const filteredSongs = useMemo(() => {
     let results = songs;

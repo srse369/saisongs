@@ -188,25 +188,26 @@ class CacheService {
     const db = await this.getDatabase();
     const songs = await db.query(`
       SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        external_source_url,
-        "LANGUAGE" as language,
-        deity,
-        tempo,
-        beat,
-        raga,
-        "LEVEL" as song_level,
-        audio_link,
-        video_link,
-        golden_voice,
-        reference_gents_pitch,
-        reference_ladies_pitch,
-        created_by,
-        created_at,
-        updated_at
-      FROM songs
-      ORDER BY LTRIM(REGEXP_REPLACE(LOWER(name), '[^a-zA-Z0-9 ]', ''), '0123456789 ')
+        RAWTOHEX(s.id) as id,
+        s.name,
+        s.external_source_url,
+        s."LANGUAGE" as language,
+        s.deity,
+        s.tempo,
+        s.beat,
+        s.raga,
+        s."LEVEL" as song_level,
+        s.audio_link,
+        s.video_link,
+        s.golden_voice,
+        s.reference_gents_pitch,
+        s.reference_ladies_pitch,
+        s.created_by,
+        s.created_at,
+        s.updated_at,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.song_id = s.id) as pitch_count
+      FROM songs s
+      ORDER BY LTRIM(REGEXP_REPLACE(LOWER(s.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ')
     `);
 
     const mappedSongs = songs.map((song: any) => ({
@@ -227,6 +228,7 @@ class CacheService {
       createdBy: extractValue(song.CREATED_BY),
       createdAt: extractValue(song.CREATED_AT),
       updatedAt: extractValue(song.UPDATED_AT),
+      pitch_count: parseInt(song.PITCH_COUNT || song.pitch_count || '0', 10),
       // CLOB fields set to null - fetch on-demand via getSong(id)
       lyrics: null,
       meaning: null,
@@ -250,28 +252,29 @@ class CacheService {
     const db = await this.getDatabase();
     const songs = await db.query(`
       SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        external_source_url,
-        DBMS_LOB.SUBSTR(lyrics, 4000, 1) AS lyrics,
-        DBMS_LOB.SUBSTR(meaning, 4000, 1) AS meaning,
-        "LANGUAGE" as language,
-        deity,
-        tempo,
-        beat,
-        raga,
-        "LEVEL" as song_level,
-        DBMS_LOB.SUBSTR(song_tags, 4000, 1) AS song_tags,
-        audio_link,
-        video_link,
-        golden_voice,
-        reference_gents_pitch,
-        reference_ladies_pitch,
-        created_by,
-        created_at,
-        updated_at
-      FROM songs
-      WHERE RAWTOHEX(id) = :1
+        RAWTOHEX(s.id) as id,
+        s.name,
+        s.external_source_url,
+        DBMS_LOB.SUBSTR(s.lyrics, 4000, 1) AS lyrics,
+        DBMS_LOB.SUBSTR(s.meaning, 4000, 1) AS meaning,
+        s."LANGUAGE" as language,
+        s.deity,
+        s.tempo,
+        s.beat,
+        s.raga,
+        s."LEVEL" as song_level,
+        DBMS_LOB.SUBSTR(s.song_tags, 4000, 1) AS song_tags,
+        s.audio_link,
+        s.video_link,
+        s.golden_voice,
+        s.reference_gents_pitch,
+        s.reference_ladies_pitch,
+        s.created_by,
+        s.created_at,
+        s.updated_at,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.song_id = s.id) as pitch_count
+      FROM songs s
+      WHERE RAWTOHEX(s.id) = :1
     `, [id]);
     
     if (songs.length === 0) return null;
@@ -297,7 +300,8 @@ class CacheService {
       referenceLadiesPitch: extractValue(song.REFERENCE_LADIES_PITCH),
       createdBy: extractValue(song.CREATED_BY),
       createdAt: extractValue(song.CREATED_AT),
-      updatedAt: extractValue(song.UPDATED_AT)
+      updatedAt: extractValue(song.UPDATED_AT),
+      pitch_count: parseInt(song.PITCH_COUNT || song.pitch_count || '0', 10),
     };
     
     // Cache individual song with CLOBs (5 min TTL)
@@ -448,7 +452,8 @@ class CacheService {
         referenceGentsPitch: extractValue(newSong.REFERENCE_GENTS_PITCH),
         referenceLadiesPitch: extractValue(newSong.REFERENCE_LADIES_PITCH),
         createdAt: extractValue(newSong.CREATED_AT),
-        updatedAt: extractValue(newSong.UPDATED_AT)
+        updatedAt: extractValue(newSong.UPDATED_AT),
+        pitch_count: 0, // New songs have no pitches yet
       };
 
       // Update cache directly - add to existing cache or invalidate to force fresh fetch
@@ -591,6 +596,11 @@ class CacheService {
 
     if (updatedSongs.length > 0) {
       const updatedSong = updatedSongs[0];
+      
+      // Preserve pitch_count from cache if exists, otherwise fetch fresh
+      const cached = this.get('songs:all');
+      const cachedSong = cached && Array.isArray(cached) ? cached.find((s: any) => s.id === id) : null;
+      
       const mappedSong = {
         id: extractValue(updatedSong.ID),
         name: extractValue(updatedSong.NAME),
@@ -610,11 +620,12 @@ class CacheService {
         referenceGentsPitch: extractValue(updatedSong.REFERENCE_GENTS_PITCH),
         referenceLadiesPitch: extractValue(updatedSong.REFERENCE_LADIES_PITCH),
         createdAt: extractValue(updatedSong.CREATED_AT),
-        updatedAt: extractValue(updatedSong.UPDATED_AT)
+        updatedAt: extractValue(updatedSong.UPDATED_AT),
+        pitch_count: cachedSong?.pitch_count ?? 0, // Preserve from cache since update doesn't change pitches
       };
 
       // Update cache directly - replace in list or add if not exists
-      const cached = this.get('songs:all');
+      // Use the already-fetched cached value from above
       if (cached && Array.isArray(cached)) {
         const songExists = cached.some(song => song.id === id);
         let updated;
@@ -1261,6 +1272,10 @@ class CacheService {
         this.invalidate('pitches:all');
       }
       
+      // Invalidate songs and singers cache since pitch_count changes
+      this.invalidate('songs:all');
+      this.invalidate('singers:all');
+      
       return normalizedPitch;
     }
     
@@ -1334,6 +1349,10 @@ class CacheService {
     
     // Also invalidate individual pitch cache
     this.invalidate(`pitch:${id}`);
+    
+    // Invalidate songs and singers cache since pitch_count changes
+    this.invalidate('songs:all');
+    this.invalidate('singers:all');
   }
 
   // ==================== SESSIONS ====================
@@ -2593,24 +2612,25 @@ export async function warmupCache(): Promise<void> {
   try {
     const songs = await databaseService.query(`
       SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        external_source_url,
-        "LANGUAGE" as language,
-        deity,
-        tempo,
-        beat,
-        raga,
-        "LEVEL" as song_level,
-        audio_link,
-        video_link,
-        golden_voice,
-        reference_gents_pitch,
-        reference_ladies_pitch,
-        created_at,
-        updated_at
-      FROM songs
-      ORDER BY name
+        RAWTOHEX(s.id) as id,
+        s.name,
+        s.external_source_url,
+        s."LANGUAGE" as language,
+        s.deity,
+        s.tempo,
+        s.beat,
+        s.raga,
+        s."LEVEL" as song_level,
+        s.audio_link,
+        s.video_link,
+        s.golden_voice,
+        s.reference_gents_pitch,
+        s.reference_ladies_pitch,
+        s.created_at,
+        s.updated_at,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.song_id = s.id) as pitch_count
+      FROM songs s
+      ORDER BY s.name
     `);
 
     stats.push({ table: 'songs', count: songs.length });
@@ -2633,6 +2653,7 @@ export async function warmupCache(): Promise<void> {
       referenceLadiesPitch: extractValue(song.REFERENCE_LADIES_PITCH),
       createdAt: extractValue(song.CREATED_AT),
       updatedAt: extractValue(song.UPDATED_AT),
+      pitch_count: parseInt(song.PITCH_COUNT || song.pitch_count || '0', 10),
       // CLOB fields will be fetched on-demand:
       lyrics: null,
       meaning: null,

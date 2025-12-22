@@ -138,9 +138,12 @@ export const SingerManager: React.FC = () => {
     setSearchTerm(e.target.value);
   };
 
-  // Clear search when Escape key is pressed while on this tab
+  // Clear search when Escape key is pressed while on this tab (only if no modal is open)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't clear search if a modal is open - let the modal handle Escape
+      if (isFormOpen) return;
+      
       if (e.key === 'Escape') {
         setSearchTerm('');
       }
@@ -148,7 +151,7 @@ export const SingerManager: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isFormOpen]);
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">

@@ -1,7 +1,7 @@
 import express from 'express';
 import { cacheService } from '../services/CacheService.js';
 import { databaseService } from '../services/DatabaseService.js';
-import { requireAuth, requireEditor } from '../middleware/simpleAuth.js';
+import { requireAuth, requireEditor, optionalAuth } from '../middleware/simpleAuth.js';
 import { handleSessionError } from '../utils/errorHandlers.js';
 
 const router = express.Router();
@@ -9,7 +9,8 @@ const router = express.Router();
 // ============ Named Sessions ============
 
 // Get all sessions - Public endpoint for presentation purposes
-router.get('/', async (req, res) => {
+// Uses optionalAuth to populate req.user if logged in (for center-based filtering)
+router.get('/', optionalAuth, async (req, res) => {
   try {
     // Bypass cache to always get fresh data (filtering is user-specific)
     const db = await (cacheService as any).getDatabase();
@@ -101,7 +102,8 @@ router.get('/', async (req, res) => {
 });
 
 // Get session by ID with items - Public endpoint for presentation purposes
-router.get('/:id', async (req, res) => {
+// Uses optionalAuth to populate req.user if logged in (for center-based access control)
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const session = await cacheService.getSession(id);

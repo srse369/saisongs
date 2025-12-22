@@ -96,7 +96,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
               {/* Content Section - First */}
               <div className="flex-1 min-w-0">
                 {/* Song Name - Clickable to preview with external link */}
-                <div className="flex items-center gap-1 mb-2">
+                <div className="flex items-center gap-2 mb-2">
                   <button
                     onClick={() => handlePresent(song)}
                     className="text-left text-base sm:text-lg font-semibold text-blue-700 dark:text-blue-300 hover:underline"
@@ -183,11 +183,18 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                 {isAuthenticated && (
                   <button
                     onClick={() => handleViewPitches(song)}
-                    title="View Pitches"
+                    title={`View ${song.pitch_count ?? 0} pitch assignment${(song.pitch_count ?? 0) !== 1 ? 's' : ''}`}
                     className="flex items-center gap-2 p-2 text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
                   >
                     <MusicIcon className="w-5 h-5" />
                     <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
+                    <span className={`inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold text-white rounded-full ${
+                      (song.pitch_count ?? 0) > 0 
+                        ? 'bg-blue-600 dark:bg-blue-500' 
+                        : 'bg-gray-400 dark:bg-gray-500'
+                    }`}>
+                      {song.pitch_count ?? 0}
+                    </span>
                   </button>
                 )}
                 {isEditor && (

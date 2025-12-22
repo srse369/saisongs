@@ -226,15 +226,6 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     {singer.gender}
                   </span>
                 )}
-                <div className="inline-flex items-center gap-1.5">
-                  <MusicIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                    Pitches:
-                  </span>
-                  <span className="inline-flex items-center justify-center w-8 h-8 text-sm font-bold text-white bg-blue-600 dark:bg-blue-500 rounded-full">
-                    {singer.pitch_count ?? 0}
-                  </span>
-                </div>
               </div>
               
               {/* Center Badges with Warning for Missing Centers */}
@@ -256,6 +247,13 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     >
                       <MusicIcon className="w-5 h-5" />
                       <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
+                      <span className={`inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold text-white rounded-full ${
+                        (singer.pitch_count ?? 0) > 0 
+                          ? 'bg-blue-600 dark:bg-blue-500' 
+                          : 'bg-gray-400 dark:bg-gray-500'
+                      }`}>
+                        {singer.pitch_count ?? 0}
+                      </span>
                     </button>
                   </Tooltip>
                   {isEditor && (
