@@ -34,6 +34,7 @@
     "multer": "^2.0.2",
     "oracledb": "^6.7.0",
     "pizzip": "^3.2.0",
+    "pptxgenjs": "^4.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-konva": "^19.2.1",

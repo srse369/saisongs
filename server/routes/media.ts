@@ -112,4 +112,72 @@ router.get('/upload-media/storage-info', async (req: Request, res: Response) => 
   }
 });
 
+/**
+ * GET /api/proxy-media
+ * Proxy external media files to bypass CORS restrictions
+ * Usage: /api/proxy-media?url=https://example.com/image.jpg
+ */
+router.get('/proxy-media', async (req: Request, res: Response) => {
+  try {
+    const url = req.query.url as string;
+    
+    if (!url) {
+      return res.status(400).json({ error: 'URL parameter is required' });
+    }
+    
+    // Validate URL
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+        return res.status(400).json({ error: 'Only HTTP and HTTPS URLs are supported' });
+      }
+    } catch {
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
+    
+    console.log('Proxying media:', url);
+    
+    // Fetch the external resource
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; SongStudio/1.0)',
+        'Accept': '*/*',
+      },
+    });
+    
+    if (!response.ok) {
+      console.error('Failed to fetch external media:', response.status, response.statusText);
+      return res.status(response.status).json({ 
+        error: 'Failed to fetch external media',
+        status: response.status,
+        statusText: response.statusText
+      });
+    }
+    
+    // Get content type and set appropriate headers
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    const contentLength = response.headers.get('content-length');
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+    
+    if (contentLength) {
+      res.setHeader('Content-Length', contentLength);
+    }
+    
+    // Stream the response
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+    
+  } catch (error) {
+    console.error('Error proxying media:', error);
+    res.status(500).json({ 
+      error: 'Failed to proxy media',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;

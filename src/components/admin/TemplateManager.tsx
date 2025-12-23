@@ -9,6 +9,7 @@ import { TemplateWysiwygEditor } from './TemplateWysiwygEditor';
 import { MediaExportModal } from './MediaExportModal';
 import { isMultiSlideTemplate } from '../../utils/templateUtils';
 import { pptxImportService } from '../../services/PptxImportService';
+import { pptxExportService } from '../../services/PptxExportService';
 import type { CloudStorageConfig } from '../../services/CloudStorageService';
 
 /**
@@ -288,6 +289,7 @@ export const TemplateManager: React.FC = () => {
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [importingPptx, setImportingPptx] = useState(false);
   const [importProgress, setImportProgress] = useState('');
+  const [exportingPptx, setExportingPptx] = useState<string | null>(null);
   const [showMediaExportModal, setShowMediaExportModal] = useState(false);
   const [pendingPptxFile, setPendingPptxFile] = useState<File | null>(null);
   const pptxInputRef = useRef<HTMLInputElement>(null);
@@ -551,6 +553,24 @@ export const TemplateManager: React.FC = () => {
       if (pptxInputRef.current) {
         pptxInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleExportPptx = async (template: PresentationTemplate) => {
+    if (exportingPptx) return; // Already exporting
+    
+    setExportingPptx(template.id || 'new');
+    setValidationError('');
+    
+    try {
+      await pptxExportService.exportTemplate(template);
+      setSuccessMessage(`Successfully exported "${template.name}" as PowerPoint!`);
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error) {
+      console.error('Error exporting PowerPoint:', error);
+      setValidationError(`Failed to export PowerPoint: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setExportingPptx(null);
     }
   };
 
@@ -954,6 +974,19 @@ export const TemplateManager: React.FC = () => {
                     >
                       <i className="fas fa-copy text-lg"></i>
                       <span className="text-sm font-medium whitespace-nowrap">Duplicate</span>
+                    </button>
+                  </Tooltip>
+                  {/* Export PowerPoint */}
+                  <Tooltip content="Download this template as a PowerPoint file (.pptx)">
+                    <button
+                      onClick={() => handleExportPptx(template)}
+                      disabled={exportingPptx === template.id}
+                      className="flex items-center gap-2 p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <i className={`fas ${exportingPptx === template.id ? 'fa-spinner fa-spin' : 'fa-download'} text-lg`}></i>
+                      <span className="text-sm font-medium whitespace-nowrap">
+                        {exportingPptx === template.id ? 'Exporting...' : 'Export'}
+                      </span>
                     </button>
                   </Tooltip>
                   {/* Set Default - only for admins */}

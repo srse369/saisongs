@@ -11,8 +11,11 @@ import { CenterBadges } from '../common/CenterBadges';
 import { CenterMultiSelect } from '../common/CenterMultiSelect';
 import { SongDetails } from '../admin/SongDetails';
 import { formatPitch } from '../../utils/pitchUtils';
+import { generateSessionPresentationSlides } from '../../utils/slideUtils';
 import TemplateSelector from '../presentation/TemplateSelector';
 import templateService from '../../services/TemplateService';
+import { pptxExportService } from '../../services/PptxExportService';
+import ApiClient from '../../services/ApiClient';
 import { Tooltip } from '../common';
 
 export const SessionManager: React.FC = () => {
@@ -34,6 +37,7 @@ export const SessionManager: React.FC = () => {
   const [loadingSession, setLoadingSession] = useState(false);
   const [sessionToLoad, setSessionToLoad] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Fetch songs and singers on mount
   useEffect(() => {
@@ -154,6 +158,49 @@ export const SessionManager: React.FC = () => {
     } else {
       // If no template selected, navigate without template ID (will use default)
       navigate('/session/present');
+    }
+  };
+
+  const handleExportToPowerPoint = async () => {
+    if (sessionItems.length === 0 || exporting) return;
+    
+    setExporting(true);
+    
+    try {
+      // Fetch full song data with lyrics - same logic as SessionPresentationMode
+      const songPromises = sessionItems.map(async ({ entry, song: cachedSong }) => {
+        // Check if cached song has full details (lyrics are loaded)
+        if (cachedSong && cachedSong.lyrics !== null && cachedSong.lyrics !== undefined) {
+          return cachedSong;
+        }
+        // Fetch from API to get full details (includes CLOB fields like lyrics)
+        return ApiClient.get<Song>(`/songs/${entry.songId}`);
+      });
+      const songsWithLyrics = await Promise.all(songPromises);
+
+      // Build songs array with metadata - same as presentation mode
+      const songsWithMetadata = sessionItems.map(({ entry, singer }, index) => {
+        const song = songsWithLyrics[index];
+        return {
+          song,
+          singerName: singer?.name,
+          pitch: entry.pitch,
+        };
+      });
+
+      // Generate slides using the same logic as presentation mode
+      const slides = generateSessionPresentationSlides(songsWithMetadata, selectedTemplate);
+
+      // Export to PowerPoint
+      const exportName = currentSession?.name || 'Session';
+      await pptxExportService.exportSession(slides, selectedTemplate, exportName);
+      
+      console.log('Session exported successfully');
+    } catch (error) {
+      console.error('Failed to export session:', error);
+      alert('Failed to export session to PowerPoint. Please try again.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -327,7 +374,7 @@ export const SessionManager: React.FC = () => {
       <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Session</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Session</h1>
             <a
               href="/help#live"
               className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
@@ -352,23 +399,22 @@ export const SessionManager: React.FC = () => {
                 className="w-full sm:w-auto min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center"
               >
                 <i className="fas fa-folder-open mr-2"></i>
-                Load Session
+                Load
               </button>
             </Tooltip>
           ) : (
             <div className="grid grid-cols-2 sm:flex gap-2">
               {/* Load Session */}
-              <Tooltip content="Load a previously saved session into this list">
-                <button
-                  type="button"
-                  onClick={() => setShowLoadModal(true)}
+          <Tooltip content="Load a previously saved session into this list">
+            <button
+              type="button"
+              onClick={() => setShowLoadModal(true)}
                   className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center flex items-center justify-center gap-1.5"
-                >
-                  <i className="fas fa-folder-open sm:hidden"></i>
-                  <span className="hidden sm:inline">Load<br />Session</span>
-                  <span className="sm:hidden">Load</span>
-                </button>
-              </Tooltip>
+            >
+                  <i className="fas fa-folder-open mr-1"></i>
+                  <span>Load</span>
+            </button>
+          </Tooltip>
               
               {/* Save Session (only for authenticated users) */}
               {isAuthenticated && (
@@ -378,9 +424,8 @@ export const SessionManager: React.FC = () => {
                     onClick={() => setShowSaveModal(true)}
                     className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg sm:rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
                   >
-                    <i className="fas fa-save sm:hidden"></i>
-                    <span className="hidden sm:inline">Save Session</span>
-                    <span className="sm:hidden">Save</span>
+                    <i className="fas fa-save mr-1"></i>
+                    <span>Save</span>
                   </button>
                 </Tooltip>
               )}
@@ -392,9 +437,8 @@ export const SessionManager: React.FC = () => {
                   onClick={clearSession}
                   className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
                 >
-                  <i className="fas fa-trash-alt sm:hidden"></i>
-                  <span className="hidden sm:inline">Clear Session</span>
-                  <span className="sm:hidden">Clear</span>
+                  <i className="fas fa-trash-alt mr-1"></i>
+                  <span>Clear</span>
                 </button>
               </Tooltip>
               
@@ -403,8 +447,8 @@ export const SessionManager: React.FC = () => {
                 <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
               </div>
               
-              {/* Present Session - Full width on mobile */}
-              <div className="col-span-2 sm:col-span-1">
+              {/* Present Session */}
+              <div className="col-span-1">
                 <Tooltip content="Start full-screen presentation with all songs in order">
                   <button
                     type="button"
@@ -412,7 +456,24 @@ export const SessionManager: React.FC = () => {
                     className="w-full min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg sm:rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors flex items-center justify-center gap-2"
                   >
                     <i className="fas fa-play"></i>
-                    Present Session
+                    <span className="hidden sm:inline">Present</span>
+                    <span className="sm:hidden">Present</span>
+                  </button>
+                </Tooltip>
+              </div>
+              
+              {/* Export to PowerPoint */}
+              <div className="col-span-1">
+                <Tooltip content="Export session to PowerPoint file with all song slides">
+                  <button
+                    type="button"
+                    onClick={handleExportToPowerPoint}
+                    disabled={exporting}
+                    className="w-full min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-purple-600 rounded-lg sm:rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  >
+                    <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-download'}`}></i>
+                    <span className="hidden sm:inline">{exporting ? 'Exporting...' : 'Export'}</span>
+                    <span className="sm:hidden">{exporting ? '...' : 'Export'}</span>
                   </button>
                 </Tooltip>
               </div>
