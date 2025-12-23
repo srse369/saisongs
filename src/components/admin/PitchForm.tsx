@@ -3,6 +3,7 @@ import type { SongSingerPitch, CreatePitchInput, Song, Singer } from '../../type
 import { ALL_PITCH_OPTIONS, formatPitchWithName } from '../../utils/pitchUtils';
 import { Tooltip } from '../common';
 import { useAuth } from '../../contexts/AuthContext';
+import { fetchCentersOnce } from '../common/CenterBadges';
 
 interface PitchFormProps {
   pitch?: SongSingerPitch | null;
@@ -35,20 +36,11 @@ export const PitchForm: React.FC<PitchFormProps> = ({
   const isEditMode = !!pitch;
   const isViewerCreatingForSelf = !isEditor && !!userSingerId && !isEditMode;
 
-  // Fetch centers for display
+  // Fetch centers for display using shared cache
   useEffect(() => {
-    const fetchCenters = async () => {
-      try {
-        const response = await fetch('/api/centers');
-        if (response.ok) {
-          const data = await response.json();
-          setCenters(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch centers:', error);
-      }
-    };
-    fetchCenters();
+    fetchCentersOnce().then(data => {
+      setCenters(data);
+    });
   }, []);
 
   // Initialize form with pitch data (edit mode) or pre-select user's singer (viewer creating for self)

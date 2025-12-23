@@ -111,7 +111,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {/* Song Name */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Song Name
               </label>
               <input
@@ -120,7 +120,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
                 onChange={(e) => handleFilterChange('songName', e.target.value)}
                 placeholder="Search by song..."
                 autoFocus
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <div className="flex items-center gap-1.5 mt-1">
                 <input
@@ -138,7 +138,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
 
             {/* Singer Name Combo Box */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Singer Name
               </label>
               <input
@@ -146,7 +146,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
                 value={filters.singerName || ''}
                 onChange={(e) => handleFilterChange('singerName', e.target.value)}
                 placeholder="Type or select singer..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <datalist id="singer-list">
                 {uniqueValues.singerNames.map(name => (
@@ -169,7 +169,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
 
             {/* Pitch */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Pitch
               </label>
               <input
@@ -177,7 +177,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
                 value={filters.pitch || ''}
                 onChange={(e) => handleFilterChange('pitch', e.target.value)}
                 placeholder="Search by pitch (e.g. C#)"
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <div className="flex items-center gap-1.5 mt-1">
                 <input
@@ -195,7 +195,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
 
             {/* Deity Combo Box */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Deity (from song)
               </label>
               <input
@@ -203,7 +203,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
                 value={filters.deity || ''}
                 onChange={(e) => handleFilterChange('deity', e.target.value)}
                 placeholder="Type or select deity..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <datalist id="pitch-deity-list">
                 {uniqueValues.deities.map(deity => (
@@ -226,7 +226,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
 
             {/* Language Combo Box */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Language (from song)
               </label>
               <input
@@ -234,7 +234,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
                 value={filters.language || ''}
                 onChange={(e) => handleFilterChange('language', e.target.value)}
                 placeholder="Type or select language..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <datalist id="pitch-language-list">
                 {uniqueValues.languages.map(language => (
@@ -257,7 +257,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
 
             {/* Raga Combo Box */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Raga (from song)
               </label>
               <input
@@ -265,7 +265,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
                 value={filters.raga || ''}
                 onChange={(e) => handleFilterChange('raga', e.target.value)}
                 placeholder="Type or select raga..."
-                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <datalist id="pitch-raga-list">
                 {uniqueValues.ragas.map(raga => (

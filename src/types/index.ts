@@ -309,7 +309,13 @@ export interface SessionItem {
 
 export interface SessionItemWithDetails extends SessionItem {
   songName: string;
+  songDeity?: string;
+  songLanguage?: string;
+  songTempo?: string;
+  songRaga?: string;
   singerName?: string;
+  singerGender?: string;
+  singerCenterIds?: number[];
 }
 
 export interface NamedSessionWithItems extends NamedSession {

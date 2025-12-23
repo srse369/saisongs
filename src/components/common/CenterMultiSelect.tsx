@@ -78,16 +78,10 @@ export const CenterMultiSelect: React.FC<CenterMultiSelectProps> = ({
 
   const fetchAllCenters = async () => {
     try {
-      const timestamp = Date.now();
-      const response = await fetch(`${API_BASE_URL}/centers?_t=${timestamp}`, {
-        credentials: 'include',
-        cache: 'no-store',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setAllCenters(data);
-      }
+      // Use cached centers fetch for read-only centers display
+      const { fetchCentersOnce } = await import('./CenterBadges');
+      const data = await fetchCentersOnce();
+      setAllCenters(data);
     } catch (err) {
       console.error('Error fetching all centers:', err);
     }

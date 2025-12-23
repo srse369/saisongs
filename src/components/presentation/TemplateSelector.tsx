@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import templateService from '../../services/TemplateService';
+import { useTemplates } from '../../contexts/TemplateContext';
 import type { PresentationTemplate } from '../../types';
 
 interface TemplateSelectorProps {
@@ -9,10 +9,16 @@ interface TemplateSelectorProps {
 }
 
 export default function TemplateSelector({ onTemplateSelect, currentTemplateId, onExpandedChange }: TemplateSelectorProps) {
-  const [templates, setTemplates] = useState<PresentationTemplate[]>([]);
+  const { templates: contextTemplates, loading: contextLoading, fetchTemplates } = useTemplates();
   const [expanded, setExpanded] = useState(false);
-  const [loading, setLoading] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch templates on mount if not already loaded
+  useEffect(() => {
+    if (contextTemplates.length === 0 && !contextLoading) {
+      fetchTemplates();
+    }
+  }, [contextTemplates.length, contextLoading, fetchTemplates]);
 
   // Notify parent when expanded state changes
   useEffect(() => {
@@ -29,10 +35,6 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
       animation: pulse-gentle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
   `;
-
-  useEffect(() => {
-    loadTemplates();
-  }, []);
 
   // Handle escape key to close dropdown
   useEffect(() => {
@@ -64,18 +66,6 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [expanded]);
 
-  const loadTemplates = async () => {
-    try {
-      setLoading(true);
-      const data = await templateService.getAllTemplates();
-      setTemplates(data);
-    } catch (error) {
-      console.error('Error loading templates:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSelect = (template: PresentationTemplate) => {
     if (onTemplateSelect) {
       onTemplateSelect(template);
@@ -83,7 +73,7 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
     setExpanded(false);
   };
 
-  const selectedTemplate = templates.find(t => t.id === currentTemplateId);
+  const selectedTemplate = contextTemplates.find(t => t.id === currentTemplateId);
   const isTemplateSelected = !!selectedTemplate;
 
   return (
@@ -111,18 +101,18 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
 
       {expanded && (
         <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 min-w-max max-h-96 overflow-y-auto">
-          {loading ? (
+          {contextLoading ? (
             <div className="p-6 text-center text-gray-500 dark:text-gray-400">
               <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600 mb-2"></div>
               <p>Loading templates...</p>
             </div>
-          ) : templates.length === 0 ? (
+            ) : contextTemplates.length === 0 ? (
             <div className="p-6 text-center text-gray-500 dark:text-gray-400">
               No templates available
             </div>
           ) : (
             <div className="py-1">
-              {templates.map((template, index) => (
+              {contextTemplates.map((template, index) => (
                 <button
                   key={template.id}
                   onClick={() => handleSelect(template)}
@@ -130,7 +120,7 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
                     currentTemplateId === template.id 
                       ? 'bg-purple-50 dark:bg-purple-900/30 border-l-4 border-purple-600' 
                       : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-l-4 border-transparent'
-                  } ${index !== templates.length - 1 ? 'border-b border-gray-100 dark:border-gray-700/50' : ''}`}
+                  } ${index !== contextTemplates.length - 1 ? 'border-b border-gray-100 dark:border-gray-700/50' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">

@@ -219,10 +219,10 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         <SlideBackground templateSlide={slide.templateSlide} />
         
         {/* Static slide overlays */}
-        <SlideImages templateSlide={slide.templateSlide} />
-        <SlideVideos templateSlide={slide.templateSlide} />
-        {!skipAudio && <SlideAudios templateSlide={slide.templateSlide} />}
-        <SlideText templateSlide={slide.templateSlide} />
+        <SlideImages templateSlide={slide.templateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
+        <SlideVideos templateSlide={slide.templateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
+        {!skipAudio && <SlideAudios templateSlide={slide.templateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />}
+        <SlideText templateSlide={slide.templateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
 
         {/* Next-song hint - positioned using template style from reference slide */}
         {(() => {

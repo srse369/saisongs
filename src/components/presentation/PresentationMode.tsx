@@ -7,6 +7,7 @@ import type { Slide, Song, PresentationTemplate } from '../../types';
 import apiClient from '../../services/ApiClient';
 import templateService from '../../services/TemplateService';
 import { useSearchParams } from 'react-router-dom';
+import { useSongs } from '../../contexts/SongContext';
 
 interface PresentationModeProps {
   songId: string;
@@ -20,6 +21,7 @@ const MAX_CONTENT_SCALE = 1.5;
 const CONTENT_SCALE_STEP = 0.1;
 
 export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onExit, templateId }) => {
+  const { songs } = useSongs();
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -67,7 +69,16 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
               return null;
             }
           })(),
-          apiClient.getSong(songId) as Promise<Song | null>
+          (async () => {
+            // Try to get from context cache, but verify it has full details
+            const cachedSong = songs.find(s => s.id === songId);
+            // Check if cached song has full details (lyrics are loaded)
+            if (cachedSong && cachedSong.lyrics !== null && cachedSong.lyrics !== undefined) {
+              return cachedSong;
+            }
+            // Fetch from API to get full details
+            return apiClient.getSong(songId) as Promise<Song | null>;
+          })()
         ]);
 
         if (!song) {

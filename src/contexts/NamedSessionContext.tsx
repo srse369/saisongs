@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import type {
   NamedSession,
   NamedSessionWithItems,
@@ -215,9 +215,14 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setError(null);
   }, []);
 
-  // Load sessions on mount
+  const hasLoadedRef = useRef(false);
+
+  // Load sessions on mount (only once)
   useEffect(() => {
-    loadSessions();
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      loadSessions();
+    }
   }, [loadSessions]);
 
   const value: NamedSessionContextType = {

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useParams, Outlet } from 'react-router-dom';
 import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { OTPLoginDialog } from './components/admin';
 import { SongList, PresentationMode } from './components/presentation';
@@ -53,6 +53,7 @@ function AppContent() {
   const { fetchTemplates } = useTemplates();
   const { loadSessions } = useNamedSessions();
   const initialLoadDone = useRef(false);
+  const authFetchDone = useRef(false);
   
   // Track page views for analytics
   usePageTracking();
@@ -68,7 +69,8 @@ function AppContent() {
 
   // Warm up cache for protected data (singers, pitches, templates) when user authenticates
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !authFetchDone.current) {
+      authFetchDone.current = true;
       fetchSingers();
       fetchAllPitches();
       fetchTemplates();
@@ -101,136 +103,97 @@ function AppContent() {
           closePasswordDialog();
           
           // Pre-populate caches with fresh data after login
+          // Note: fetchTemplates() is already called by the isAuthenticated effect above
           fetchSongs();
           fetchSingers();
           fetchAllPitches();
-          fetchTemplates();
           loadSessions();
         }}
       />
       
       <Routes>
-                  {/* Public Routes with Layout */}
-                  <Route path="/" element={<Layout><HomePage /></Layout>} />
-                  <Route path="/help" element={
-                    <Layout>
-                      <Suspense fallback={<LoadingFallback />}>
-                        <Help />
-                      </Suspense>
-                    </Layout>
-                  } />
-                  <Route path="/session" element={<Layout><SessionManager /></Layout>} />
-                  <Route
-                    path="/admin/import"
-                    element={
-                      <ProtectedRoute requireAdmin={true}>
-                        <Layout>
-                          <BulkImportPage />
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/import-csv"
-                    element={
-                      <ProtectedRoute requireAdmin={true}>
-                        <Layout>
-                          <CsvImportPage />
-                        </Layout>
-                      </ProtectedRoute>
-                    }
-                  />
-                  
-                  {/* Public route - Song list (no singer/pitch info) */}
-                  <Route path="/admin/songs" element={
-                    <Layout>
-                      <Suspense fallback={<LoadingFallback />}>
-                        <SongManager />
-                      </Suspense>
-                    </Layout>
-                  } />
-                  
-                  {/* Protected routes - Singer and pitch data requires authentication */}
-                  <Route 
-                    path="/admin/singers" 
-                    element={
-                      <ProtectedRoute>
-                        <Layout>
-                          <Suspense fallback={<LoadingFallback />}>
-                            <SingerManager />
-                          </Suspense>
-                        </Layout>
-                      </ProtectedRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/admin/pitches" 
-                    element={
-                      <ProtectedRoute>
-                        <Layout>
-                          <Suspense fallback={<LoadingFallback />}>
-                            <PitchManager />
-                          </Suspense>
-                        </Layout>
-                      </ProtectedRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/admin/analytics" 
-                    element={
-                      <ProtectedRoute requireAdmin={true}>
-                        <Layout>
-                          <Suspense fallback={<LoadingFallback />}>
-                            <Analytics />
-                          </Suspense>
-                        </Layout>
-                      </ProtectedRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/admin/feedback" 
-                    element={
-                      <ProtectedRoute requireAdmin={true}>
-                        <Layout>
-                          <Suspense fallback={<LoadingFallback />}>
-                            <FeedbackManager />
-                          </Suspense>
-                        </Layout>
-                      </ProtectedRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/admin/templates" 
-                    element={
-                      <ProtectedRoute requireEditor={true}>
-                        <Layout>
-                          <Suspense fallback={<LoadingFallback />}>
-                            <TemplateManager />
-                          </Suspense>
-                        </Layout>
-                      </ProtectedRoute>
-                    } 
-                  />
-                  <Route 
-                    path="/admin/centers" 
-                    element={
-                      <ProtectedRoute requireAdmin={true}>
-                        <Layout>
-                          <Suspense fallback={<LoadingFallback />}>
-                            <CentersManager />
-                          </Suspense>
-                        </Layout>
-                      </ProtectedRoute>
-                    } 
-                  />
-                  
-                  {/* Presentation Mode without Layout (full-screen) */}
-                  <Route path="/presentation/:songId" element={<PresentationModePage />} />
-                  <Route path="/session/present" element={<SessionPresentationPage />} />
+        {/* Routes with persistent Layout */}
+        <Route element={<Layout><Outlet /></Layout>}>
+          {/* Public Routes */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/help" element={
+            <Suspense fallback={<LoadingFallback />}>
+              <Help />
+            </Suspense>
+          } />
+          <Route path="/session" element={<SessionManager />} />
+          
+          {/* Admin Import Routes */}
+          <Route path="/admin/import" element={
+            <ProtectedRoute requireAdmin={true}>
+              <BulkImportPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/import-csv" element={
+            <ProtectedRoute requireAdmin={true}>
+              <CsvImportPage />
+            </ProtectedRoute>
+          } />
+          
+          {/* Public route - Song list */}
+          <Route path="/admin/songs" element={
+            <Suspense fallback={<LoadingFallback />}>
+              <SongManager />
+            </Suspense>
+          } />
+          
+          {/* Protected routes */}
+          <Route path="/admin/singers" element={
+            <ProtectedRoute>
+              <Suspense fallback={<LoadingFallback />}>
+                <SingerManager />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/pitches" element={
+            <ProtectedRoute>
+              <Suspense fallback={<LoadingFallback />}>
+                <PitchManager />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/analytics" element={
+            <ProtectedRoute requireAdmin={true}>
+              <Suspense fallback={<LoadingFallback />}>
+                <Analytics />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/feedback" element={
+            <ProtectedRoute requireAdmin={true}>
+              <Suspense fallback={<LoadingFallback />}>
+                <FeedbackManager />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/templates" element={
+            <ProtectedRoute requireEditor={true}>
+              <Suspense fallback={<LoadingFallback />}>
+                <TemplateManager />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/centers" element={
+            <ProtectedRoute requireAdmin={true}>
+              <Suspense fallback={<LoadingFallback />}>
+                <CentersManager />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+        </Route>
+        
+        {/* Presentation Mode without Layout (full-screen) */}
+        <Route path="/presentation/:songId" element={<PresentationModePage />} />
+        <Route path="/session/present" element={<SessionPresentationPage />} />
 
-                  {/* Redirect unknown routes to home */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+        {/* Redirect unknown routes to home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </>
   );
 }

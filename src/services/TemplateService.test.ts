@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import templateService from './TemplateService';
+import templateService, { clearTemplateCache } from './TemplateService';
 import apiClient from './ApiClient';
 import type { PresentationTemplate } from '../types';
 
@@ -10,6 +10,8 @@ describe('TemplateService', () => {
     vi.clearAllMocks();
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    // Clear the template cache before each test
+    clearTemplateCache();
   });
 
   describe('getAllTemplates', () => {
@@ -47,6 +49,7 @@ describe('TemplateService', () => {
 
   describe('getTemplate', () => {
     it('should fetch template by ID', async () => {
+      const fixedDate = new Date('2025-01-01T00:00:00Z');
       const mockTemplate: PresentationTemplate = {
         id: '1',
         name: 'Template 1',
@@ -56,8 +59,8 @@ describe('TemplateService', () => {
         
         isDefault: false,
         center_ids: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: fixedDate,
+        updatedAt: fixedDate,
       };
 
       vi.mocked(apiClient.get).mockResolvedValue(mockTemplate);

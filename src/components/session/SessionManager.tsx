@@ -17,8 +17,8 @@ import { Tooltip } from '../common';
 
 export const SessionManager: React.FC = () => {
   const { entries, removeSong, clearSession, reorderSession, addSong } = useSession();
-  const { songs } = useSongs();
-  const { singers } = useSingers();
+  const { songs, fetchSongs } = useSongs();
+  const { singers, fetchSingers } = useSingers();
   const { sessions, createSession, setSessionItems, loadSession, currentSession, loadSessions, loading, deleteSession } = useNamedSessions();
   const { isEditor, isAuthenticated, userEmail, userRole } = useAuth();
   const navigate = useNavigate();
@@ -35,8 +35,19 @@ export const SessionManager: React.FC = () => {
   const [sessionToLoad, setSessionToLoad] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
 
-  // Restore previously selected template from localStorage on mount
+  // Fetch songs and singers on mount
   useEffect(() => {
+    fetchSongs();
+    fetchSingers();
+  }, [fetchSongs, fetchSingers]);
+
+  // Restore previously selected template from localStorage (only if session has songs)
+  useEffect(() => {
+    // Skip template loading if session is empty
+    if (entries.length === 0) {
+      return;
+    }
+
     const restoreTemplate = async () => {
       const savedTemplateId = localStorage.getItem('selectedSessionTemplateId');
       if (savedTemplateId) {
@@ -65,7 +76,7 @@ export const SessionManager: React.FC = () => {
       }
     };
     restoreTemplate();
-  }, []);
+  }, [entries.length]);
 
   // Listen for template changes from presentation mode (via localStorage)
   // This handles cross-tab synchronization
@@ -297,14 +308,9 @@ export const SessionManager: React.FC = () => {
       
       // Load songs into the active session context
       currentSession.items.forEach(item => {
-        // In editor mode, include singer and pitch; in public mode, load without them
-        if (isEditor) {
-          const singer = singers.find(s => s.id === item.singerId);
-          addSong(item.songId, singer?.id, item.pitch);
-        } else {
-          // Public mode: load songs without singer names or pitches
-          addSong(item.songId, undefined, undefined);
-        }
+        // All authenticated users (editors and viewers) can see singer and pitch info
+        // from sessions that belong to their centers
+        addSong(item.songId, item.singerId, item.pitch);
       });
       
       setShowLoadModal(false);

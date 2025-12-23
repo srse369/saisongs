@@ -240,6 +240,7 @@ export function generatePresentationSlides(
       ...slide,
       index: result.length,
       slideType: 'song',
+      templateSlide: slides[refIndex], // Set reference slide for proper rendering
     });
   });
 
@@ -326,6 +327,7 @@ export function generateSessionPresentationSlides(
       singerName,
       pitch,
       slideType: 'song' as const,
+      templateSlide: templateSlides[refIndex], // Set reference slide for proper rendering
       // Add session metadata
       sessionSongIndex: songIndex + 1,
       totalSongs: songs.length,

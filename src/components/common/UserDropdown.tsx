@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { RoleBadge } from './RoleBadge';
+import { fetchCentersOnce } from './CenterBadges';
 
 interface Center {
   id: number;
@@ -16,24 +17,14 @@ export const UserDropdown: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // Fetch centers on mount
+  // Fetch centers on mount using cached fetch
   useEffect(() => {
-    const fetchCenters = async () => {
-      try {
-        const response = await fetch('/api/centers', {
-          credentials: 'include'
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setCenters(data);
-        }
-      } catch (error) {
-        console.error('Error fetching centers:', error);
-      }
-    };
-    
     if (userRole !== 'public') {
-      fetchCenters();
+      fetchCentersOnce().then(data => {
+        setCenters(data);
+      }).catch(error => {
+        console.error('Error fetching centers:', error);
+      });
     }
   }, [userRole]);
 

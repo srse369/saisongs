@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { FilterInput } from './FilterInput';
 import type { Song } from '../../types';
 
 export interface SongSearchFilters {
@@ -110,23 +109,30 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
       {isExpanded && (
         <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 animate-fade-in">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterInput
-              label="Song Name"
-              value={filters.name || ''}
-              placeholder="Search by name..."
-              onChange={(value) => handleFilterChange('name', value)}
-            />
-            <div className="flex items-center gap-1.5 mt-1">
-              <input
-                type="checkbox"
-                id="name-case-sensitive"
-                checked={filters.nameCaseSensitive || false}
-                onChange={(e) => handleCaseSensitivityChange('nameCaseSensitive', e.target.checked)}
-                className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer"
-              />
-              <label htmlFor="name-case-sensitive" className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
-                Case sensitive
+            {/* Song Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Song Name
               </label>
+              <input
+                type="text"
+                value={filters.name || ''}
+                onChange={(e) => handleFilterChange('name', e.target.value)}
+                placeholder="Search by name..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+              />
+              <div className="flex items-center gap-1.5 mt-1">
+                <input
+                  type="checkbox"
+                  id="name-case-sensitive"
+                  checked={filters.nameCaseSensitive || false}
+                  onChange={(e) => handleCaseSensitivityChange('nameCaseSensitive', e.target.checked)}
+                  className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer"
+                />
+                <label htmlFor="name-case-sensitive" className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
+                  Case sensitive
+                </label>
+              </div>
             </div>
             
             {/* Deity Combo Box */}
@@ -315,12 +321,17 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
               </div>
             </div>
 
+            {/* Tags */}
             <div>
-              <FilterInput
-                label="Tags"
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tags
+              </label>
+              <input
+                type="text"
                 value={filters.songTags || ''}
+                onChange={(e) => handleFilterChange('songTags', e.target.value)}
                 placeholder="Search by tags..."
-                onChange={(value) => handleFilterChange('songTags', value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <div className="flex items-center gap-1.5 mt-1">
                 <input

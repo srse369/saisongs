@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserMultiSelect } from '../common/UserMultiSelect';
 import { clearCentersCache } from '../common/CenterBadges';
@@ -38,9 +38,14 @@ export const CentersManager: React.FC = () => {
     badge_text_color: '#1e40af',
     editor_ids: [] as string[],
   });
+  
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
-    fetchCenters();
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchCenters();
+    }
   }, []);
 
   // Handle escape key press

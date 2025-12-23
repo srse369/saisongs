@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { formatPitch, formatPitchWithName } from '../../utils/pitchUtils';
+import { toTitleCase } from '../../utils/textUtils';
+import { fetchCentersOnce } from '../common/CenterBadges';
 
 interface PitchWithDetails extends SongSingerPitch {
   songName?: string;
@@ -14,6 +16,11 @@ interface PitchWithDetails extends SongSingerPitch {
   externalSourceUrl?: string;
   referenceGentsPitch?: string;
   referenceLadiesPitch?: string;
+  deity?: string;
+  language?: string;
+  tempo?: string;
+  raga?: string;
+  beat?: string;
 }
 
 interface PitchListProps {
@@ -52,20 +59,11 @@ export const PitchList: React.FC<PitchListProps> = ({
   // Create a map for quick lookups
   const [centers, setCenters] = useState<Array<{id: number; name: string}>>([]);
 
-  // Fetch centers for display
+  // Fetch centers for display using shared cache
   useEffect(() => {
-    const fetchCenters = async () => {
-      try {
-        const response = await fetch('/api/centers');
-        if (response.ok) {
-          const data = await response.json();
-          setCenters(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch centers:', error);
-      }
-    };
-    fetchCenters();
+    fetchCentersOnce().then(data => {
+      setCenters(data);
+    });
   }, []);
 
   // Memoize maps to prevent recreation on every render (performance optimization)
@@ -73,7 +71,12 @@ export const PitchList: React.FC<PitchListProps> = ({
     name: song.name, 
     externalSourceUrl: song.externalSourceUrl,
     referenceGentsPitch: song.referenceGentsPitch,
-    referenceLadiesPitch: song.referenceLadiesPitch
+    referenceLadiesPitch: song.referenceLadiesPitch,
+    deity: song.deity,
+    language: song.language,
+    tempo: song.tempo,
+    raga: song.raga,
+    beat: song.beat
   }])), [songs]);
   const singerMap = useMemo(() => new Map(singers.map(singer => [singer.id, { name: singer.name, gender: singer.gender, center_ids: singer.center_ids }])), [singers]);
 
@@ -86,7 +89,12 @@ export const PitchList: React.FC<PitchListProps> = ({
     singerCenterIds: singerMap.get(pitch.singerId)?.center_ids,
     externalSourceUrl: songMap.get(pitch.songId)?.externalSourceUrl,
     referenceGentsPitch: songMap.get(pitch.songId)?.referenceGentsPitch,
-    referenceLadiesPitch: songMap.get(pitch.songId)?.referenceLadiesPitch
+    referenceLadiesPitch: songMap.get(pitch.songId)?.referenceLadiesPitch,
+    deity: songMap.get(pitch.songId)?.deity,
+    language: songMap.get(pitch.songId)?.language,
+    tempo: songMap.get(pitch.songId)?.tempo,
+    raga: songMap.get(pitch.songId)?.raga,
+    beat: songMap.get(pitch.songId)?.beat
   })), [pitches, songMap, singerMap]);
 
   const handleDeleteClick = (pitch: PitchWithDetails) => {
@@ -176,6 +184,34 @@ export const PitchList: React.FC<PitchListProps> = ({
                         <i className="fas fa-external-link-alt text-base"></i>
                       </a>
                     </Tooltip>
+                  )}
+                </div>
+
+                {/* Raga and Beat (without tempo) */}
+                {(pitch.raga || pitch.beat) && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    {pitch.raga && <span>Raga: {toTitleCase(pitch.raga)}</span>}
+                    {pitch.raga && pitch.beat && <span className="mx-2">•</span>}
+                    {pitch.beat && <span>Beat: {toTitleCase(pitch.beat)}</span>}
+                  </p>
+                )}
+
+                {/* Deity, Language, and Tempo badges */}
+                <div className="flex flex-wrap gap-2 text-xs mb-2">
+                  {pitch.deity && (
+                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 rounded font-medium">
+                      {toTitleCase(pitch.deity)}
+                    </span>
+                  )}
+                  {pitch.language && (
+                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded font-medium">
+                      {toTitleCase(pitch.language)}
+                    </span>
+                  )}
+                  {pitch.tempo && (
+                    <span className="px-2 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded font-medium">
+                      {toTitleCase(pitch.tempo)}
+                    </span>
                   )}
                 </div>
                 

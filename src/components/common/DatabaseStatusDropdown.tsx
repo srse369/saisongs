@@ -1,6 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../../services/ApiClient';
 
+// Cache health stats for 60 seconds
+let healthStatsCache: { stats: any; timestamp: number } | null = null;
+const HEALTH_STATS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+// Cache Brevo status for 60 seconds (changes less frequently)
+let brevoStatusCache: { status: any; timestamp: number } | null = null;
+const BREVO_STATUS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
 interface DatabaseStatusDropdownProps {
   isConnected: boolean;
   connectionError: string | null;
@@ -35,6 +43,12 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
   const [statsError, setStatsError] = useState<string | null>(null);
   const [reloadingCache, setReloadingCache] = useState(false);
   const [reloadMessage, setReloadMessage] = useState<string | null>(null);
+  const [clearingLocalStorage, setClearingLocalStorage] = useState(false);
+  const [localStorageMessage, setLocalStorageMessage] = useState<string | null>(null);
+  const [lastLocalStorageClear, setLastLocalStorageClear] = useState<number | null>(() => {
+    const saved = localStorage.getItem('lastLocalStorageClear');
+    return saved ? parseInt(saved, 10) : null;
+  });
   const [brevoStatus, setBrevoStatus] = useState<BrevoStatus | null>(null);
   const [brevoLoading, setBrevoLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -60,11 +74,22 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
   useEffect(() => {
     const fetchStats = async () => {
       if (isOpen && isConnected && !stats) {
+        // Check cache first
+        if (healthStatsCache && Date.now() - healthStatsCache.timestamp < HEALTH_STATS_CACHE_TTL_MS) {
+          setStats(healthStatsCache.stats);
+          return;
+        }
+
         setLoading(true);
         setStatsError(null);
         try {
           const response = await apiClient.get<any>('/health?stats=true');
           if (response && response.stats) {
+            // Cache the stats
+            healthStatsCache = {
+              stats: response.stats,
+              timestamp: Date.now()
+            };
             setStats(response.stats);
           } else if (response && response.statsError) {
             setStatsError(response.statsError);
@@ -81,17 +106,30 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
 
     const fetchBrevoStatus = async () => {
       if (isOpen && !brevoStatus) {
+        // Check cache first
+        if (brevoStatusCache && Date.now() - brevoStatusCache.timestamp < BREVO_STATUS_CACHE_TTL_MS) {
+          setBrevoStatus(brevoStatusCache.status);
+          return;
+        }
+
         setBrevoLoading(true);
         try {
           const response = await apiClient.get<BrevoStatus>('/health/brevo');
+          // Cache the status
+          brevoStatusCache = {
+            status: response,
+            timestamp: Date.now()
+          };
           setBrevoStatus(response);
         } catch (error) {
           console.error('Failed to fetch Brevo status:', error);
-          setBrevoStatus({
-            status: 'error',
+          const errorStatus = {
+            status: 'error' as const,
             message: error instanceof Error ? error.message : 'Failed to check status',
             configured: false
-          });
+          };
+          // Don't cache errors
+          setBrevoStatus(errorStatus);
         } finally {
           setBrevoLoading(false);
         }
@@ -119,12 +157,19 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
     try {
       const response = await apiClient.post('/cache/reload');
       setReloadMessage('Cache reloaded successfully!');
+      // Invalidate health stats cache
+      healthStatsCache = null;
       // Refresh stats after reload
       setStats(null);
       setStatsError(null);
       // Fetch fresh stats
       const healthResponse = await apiClient.get<any>('/health?stats=true');
       if (healthResponse && healthResponse.stats) {
+        // Cache the fresh stats
+        healthStatsCache = {
+          stats: healthResponse.stats,
+          timestamp: Date.now()
+        };
         setStats(healthResponse.stats);
       }
     } catch (error) {
@@ -132,6 +177,57 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
       setReloadMessage(`Error: ${errorMsg}`);
     } finally {
       setReloadingCache(false);
+    }
+  };
+
+  const handleClearLocalStorage = () => {
+    // Check cooldown (2 minutes = 120000ms)
+    const now = Date.now();
+    const cooldownMs = 2 * 60 * 1000; // 2 minutes
+    
+    if (lastLocalStorageClear && now - lastLocalStorageClear < cooldownMs) {
+      const remainingSeconds = Math.ceil((cooldownMs - (now - lastLocalStorageClear)) / 1000);
+      setLocalStorageMessage(`Please wait ${remainingSeconds} seconds before clearing again`);
+      setTimeout(() => setLocalStorageMessage(null), 3000);
+      return;
+    }
+
+    if (!confirm('Clear local cache and reload page? This will fetch fresh data from the server.')) {
+      return;
+    }
+
+    setClearingLocalStorage(true);
+    setLocalStorageMessage(null);
+    
+    try {
+      // Clear app-specific localStorage caches
+      const cacheKeys = [
+        'songStudio:songsCache',
+        'songStudio:singersCache',
+        'songStudio:pitchesCache',
+        'songStudio:templatesCache',
+        'songStudio:centersCache',
+      ];
+      
+      cacheKeys.forEach(key => {
+        window.localStorage.removeItem(key);
+      });
+      
+      // Update last clear timestamp
+      const timestamp = Date.now();
+      setLastLocalStorageClear(timestamp);
+      localStorage.setItem('lastLocalStorageClear', timestamp.toString());
+      
+      setLocalStorageMessage('Local cache cleared successfully! Page will refresh...');
+      
+      // Reload page after short delay to re-fetch fresh data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to clear local cache';
+      setLocalStorageMessage(`Error: ${errorMsg}`);
+      setClearingLocalStorage(false);
     }
   };
 
@@ -253,6 +349,39 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                   ) : null}
                 </div>
                 
+                {/* Clear Local Storage Button (All Users) */}
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={handleClearLocalStorage}
+                    disabled={clearingLocalStorage}
+                    className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 dark:bg-orange-700 dark:hover:bg-orange-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {clearingLocalStorage ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin text-base mr-2"></i>
+                        Clearing...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-trash-alt text-base mr-2"></i>
+                        Clear Local Cache
+                      </>
+                    )}
+                  </button>
+                  {localStorageMessage && (
+                    <p className={`mt-2 text-xs text-center ${
+                      localStorageMessage.startsWith('Error') || localStorageMessage.startsWith('Please wait')
+                        ? 'text-red-600 dark:text-red-400' 
+                        : 'text-green-600 dark:text-green-400'
+                    }`}>
+                      {localStorageMessage}
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
+                    Clears cached songs, singers, pitches, and templates. 2-minute cooldown.
+                  </p>
+                </div>
+                
                 {/* Reload Cache Button (Admin Only) */}
                 {isAdmin && (
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -269,7 +398,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                       ) : (
                         <>
                           <i className="fas fa-sync text-base mr-2"></i>
-                          Reload Cache
+                          Reload Backend Cache
                         </>
                       )}
                     </button>

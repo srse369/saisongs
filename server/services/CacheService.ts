@@ -1641,7 +1641,13 @@ class CacheService {
         si.created_at,
         si.updated_at,
         s.name as song_name,
-        sg.name as singer_name
+        s.deity as song_deity,
+        s.language as song_language,
+        s.tempo as song_tempo,
+        s.raga as song_raga,
+        sg.name as singer_name,
+        sg.gender as singer_gender,
+        sg.center_ids as singer_center_ids
       FROM song_session_items si
       JOIN songs s ON si.song_id = s.id
       LEFT JOIN users sg ON si.singer_id = sg.id
@@ -1649,18 +1655,39 @@ class CacheService {
       ORDER BY si.sequence_order
     `, [id]);
 
-    const mappedItems = items.map((row: any) => ({
-      id: row.ID,
-      sessionId: row.SESSION_ID,
-      songId: row.SONG_ID,
-      singerId: row.SINGER_ID || undefined,
-      pitch: row.PITCH,
-      sequenceOrder: row.SEQUENCE_ORDER,
-      songName: row.SONG_NAME,
-      singerName: row.SINGER_NAME,
-      createdAt: row.CREATED_AT,
-      updatedAt: row.UPDATED_AT,
-    }));
+    const mappedItems = items.map((row: any) => {
+      // Parse singer center IDs
+      let singerCenterIds: number[] | undefined = undefined;
+      try {
+        if (row.SINGER_CENTER_IDS) {
+          const parsed = JSON.parse(row.SINGER_CENTER_IDS);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            singerCenterIds = parsed;
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing singer center_ids:', e);
+      }
+
+      return {
+        id: row.ID,
+        sessionId: row.SESSION_ID,
+        songId: row.SONG_ID,
+        singerId: row.SINGER_ID || undefined,
+        pitch: row.PITCH,
+        sequenceOrder: row.SEQUENCE_ORDER,
+        songName: row.SONG_NAME,
+        songDeity: row.SONG_DEITY,
+        songLanguage: row.SONG_LANGUAGE,
+        songTempo: row.SONG_TEMPO,
+        songRaga: row.SONG_RAGA,
+        singerName: row.SINGER_NAME,
+        singerGender: row.SINGER_GENDER,
+        singerCenterIds: singerCenterIds,
+        createdAt: row.CREATED_AT,
+        updatedAt: row.UPDATED_AT,
+      };
+    });
 
     return {
       id: sessionRow.ID,

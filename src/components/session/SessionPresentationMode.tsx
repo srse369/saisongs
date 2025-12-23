@@ -86,11 +86,18 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
             }
           })(),
           (async () => {
-            const songPromises = entries.map(entry => 
-              ApiClient.get<Song>(`/songs/${entry.songId}`)
-            );
-            const songs = await Promise.all(songPromises);
-            return songs;
+            // Get songs from context cache first, but verify they have full details
+            const songPromises = entries.map(async (entry) => {
+              const cachedSong = songs.find(s => s.id === entry.songId);
+              // Check if cached song has full details (lyrics are loaded)
+              if (cachedSong && cachedSong.lyrics !== null && cachedSong.lyrics !== undefined) {
+                return cachedSong;
+              }
+              // Fetch from API to get full details (includes CLOB fields)
+              return ApiClient.get<Song>(`/songs/${entry.songId}`);
+            });
+            const songsData = await Promise.all(songPromises);
+            return songsData;
           })()
         ]);
 

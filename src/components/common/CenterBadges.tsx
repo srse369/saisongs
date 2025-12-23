@@ -25,7 +25,11 @@ export const clearCentersCache = (): void => {
   centersFetchPromise = null;
 };
 
-const fetchCentersOnce = async (): Promise<Center[]> => {
+/**
+ * Fetches centers with singleton caching to prevent duplicate requests.
+ * Exported for use in other components that need center data.
+ */
+export const fetchCentersOnce = async (): Promise<Center[]> => {
   // Return cached data if available
   if (centersCache) {
     return centersCache;

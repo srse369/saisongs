@@ -21,8 +21,14 @@ export const SongDetails: React.FC<SongDetailsProps> = ({ song }) => {
 
       setLoading(true);
       try {
-        const response = await ApiClient.get<Song>(`/songs/${song.id}`);
-        setFullSong(response);
+        // Use songService which has proper caching
+        const { songService } = await import('../../services');
+        const response = await songService.getSongById(song.id);
+        if (response) {
+          setFullSong(response);
+        } else {
+          setFullSong(song);
+        }
       } catch (error) {
         console.error('Error fetching full song details:', error);
         // Fall back to the original song data

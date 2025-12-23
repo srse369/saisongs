@@ -5,6 +5,23 @@
 import apiClient from './ApiClient';
 import type { PresentationTemplate, TemplateReference } from '../types';
 
+// Simple in-memory cache for individual templates (5 second TTL)
+interface TemplateCache {
+  template: PresentationTemplate;
+  timestamp: number;
+}
+const templateCache = new Map<string, TemplateCache>();
+const templateFetchPromises = new Map<string, Promise<PresentationTemplate>>();
+const TEMPLATE_CACHE_TTL_MS = 5000; // 5 seconds
+
+/**
+ * Clear the template cache (for testing purposes)
+ */
+export const clearTemplateCache = () => {
+  templateCache.clear();
+  templateFetchPromises.clear();
+};
+
 class TemplateService {
   /**
    * Get all templates
@@ -12,6 +29,15 @@ class TemplateService {
   async getAllTemplates(): Promise<PresentationTemplate[]> {
     try {
       const templates = await apiClient.get<PresentationTemplate[]>('/templates');
+      // Update individual template cache when we fetch all
+      templates.forEach(template => {
+        if (template.id) {
+          templateCache.set(template.id, {
+            template,
+            timestamp: Date.now()
+          });
+        }
+      });
       return templates;
     } catch (error) {
       console.error('❌ Error fetching templates:', error);
@@ -20,16 +46,43 @@ class TemplateService {
   }
 
   /**
-   * Get template by ID
+   * Get template by ID (with caching and promise deduplication)
    */
   async getTemplate(id: string): Promise<PresentationTemplate> {
-    try {
-      const template = await apiClient.get<PresentationTemplate>(`/templates/${id}`);
-      return template;
-    } catch (error) {
-      console.error('❌ Error fetching template:', error);
-      throw error;
+    // Check cache first
+    const cached = templateCache.get(id);
+    if (cached && Date.now() - cached.timestamp < TEMPLATE_CACHE_TTL_MS) {
+      return cached.template;
     }
+
+    // Check if fetch is already in progress
+    const existingPromise = templateFetchPromises.get(id);
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    // Start new fetch
+    const fetchPromise = (async () => {
+      try {
+        const template = await apiClient.get<PresentationTemplate>(`/templates/${id}`);
+        // Cache the result
+        templateCache.set(id, {
+          template,
+          timestamp: Date.now()
+        });
+        return template;
+      } catch (error) {
+        console.error('❌ Error fetching template:', error);
+        throw error;
+      } finally {
+        // Remove from in-flight promises
+        templateFetchPromises.delete(id);
+      }
+    })();
+
+    // Store the promise
+    templateFetchPromises.set(id, fetchPromise);
+    return fetchPromise;
   }
 
   /**
@@ -52,6 +105,8 @@ class TemplateService {
     try {
       console.log('📊 Creating template:', template.name);
       const created = await apiClient.post<PresentationTemplate>('/templates', template);
+      // Clear cache since list has changed
+      templateCache.clear();
       console.log('✅ Template created successfully');
       return created;
     } catch (error) {
@@ -67,6 +122,8 @@ class TemplateService {
     try {
       console.log('📊 Updating template:', id);
       const updated = await apiClient.put<PresentationTemplate>(`/templates/${id}`, updates);
+      // Invalidate cached entry for this template
+      templateCache.delete(id);
       console.log('✅ Template updated successfully');
       return updated;
     } catch (error) {
@@ -82,6 +139,8 @@ class TemplateService {
     try {
       console.log('📊 Deleting template:', id);
       await apiClient.delete(`/templates/${id}`);
+      // Remove from cache
+      templateCache.delete(id);
       console.log('✅ Template deleted successfully');
     } catch (error) {
       console.error('❌ Error deleting template:', error);

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { MusicIcon } from '../common';
+import { toTitleCase } from '../../utils/textUtils';
 
 interface SongListProps {
   songs: Song[];
@@ -121,9 +122,9 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                 {/* Raga and Beat (without tempo) */}
                 {(song.raga || song.beat) && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                    {song.raga && <span>Raga: {song.raga}</span>}
+                    {song.raga && <span>Raga: {toTitleCase(song.raga)}</span>}
                     {song.raga && song.beat && <span className="mx-2">•</span>}
-                    {song.beat && <span>Beat: {song.beat}</span>}
+                    {song.beat && <span>Beat: {toTitleCase(song.beat)}</span>}
                   </p>
                 )}
 
@@ -131,17 +132,17 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                 <div className="flex flex-wrap gap-2 text-xs mb-2">
                   {song.deity && (
                     <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 rounded font-medium">
-                      {song.deity}
+                      {toTitleCase(song.deity)}
                     </span>
                   )}
                   {song.language && (
                     <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded font-medium">
-                      {song.language}
+                      {toTitleCase(song.language)}
                     </span>
                   )}
                   {song.tempo && (
                     <span className="px-2 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded font-medium">
-                      {song.tempo}
+                      {toTitleCase(song.tempo)}
                     </span>
                   )}
                 </div>
