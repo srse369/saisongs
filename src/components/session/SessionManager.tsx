@@ -341,28 +341,32 @@ export const SessionManager: React.FC = () => {
             present them as a continuous slideshow.
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+        {/* Action buttons - Grid on mobile, flex on desktop */}
+        <div className="w-full sm:w-auto">
           {/* When session is empty, only show Load Session */}
           {sessionItems.length === 0 ? (
             <Tooltip content="Load a previously saved session into this list">
               <button
                 type="button"
                 onClick={() => setShowLoadModal(true)}
-                className="px-4 py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center leading-tight"
+                className="w-full sm:w-auto min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center"
               >
-                Load<br />Session
+                <i className="fas fa-folder-open mr-2"></i>
+                Load Session
               </button>
             </Tooltip>
           ) : (
-            <>
+            <div className="grid grid-cols-2 sm:flex gap-2">
               {/* Load Session */}
               <Tooltip content="Load a previously saved session into this list">
                 <button
                   type="button"
                   onClick={() => setShowLoadModal(true)}
-                  className="px-4 py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center leading-tight"
+                  className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center flex items-center justify-center gap-1.5"
                 >
-                  Load<br />Session
+                  <i className="fas fa-folder-open sm:hidden"></i>
+                  <span className="hidden sm:inline">Load<br />Session</span>
+                  <span className="sm:hidden">Load</span>
                 </button>
               </Tooltip>
               
@@ -372,9 +376,11 @@ export const SessionManager: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowSaveModal(true)}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg sm:rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
                   >
-                    Save Session
+                    <i className="fas fa-save sm:hidden"></i>
+                    <span className="hidden sm:inline">Save Session</span>
+                    <span className="sm:hidden">Save</span>
                   </button>
                 </Tooltip>
               )}
@@ -384,26 +390,33 @@ export const SessionManager: React.FC = () => {
                 <button
                   type="button"
                   onClick={clearSession}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
                 >
-                  Clear Session
+                  <i className="fas fa-trash-alt sm:hidden"></i>
+                  <span className="hidden sm:inline">Clear Session</span>
+                  <span className="sm:hidden">Clear</span>
                 </button>
               </Tooltip>
               
               {/* Template */}
-              <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
+              <div className="min-h-[48px] sm:min-h-0">
+                <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
+              </div>
               
-              {/* Present Session */}
-              <Tooltip content="Start full-screen presentation with all songs in order">
-                <button
-                  type="button"
-                  onClick={handlePresentSession}
-                  className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
-                >
-                  Present Session
-                </button>
-              </Tooltip>
-            </>
+              {/* Present Session - Full width on mobile */}
+              <div className="col-span-2 sm:col-span-1">
+                <Tooltip content="Start full-screen presentation with all songs in order">
+                  <button
+                    type="button"
+                    onClick={handlePresentSession}
+                    className="w-full min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg sm:rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <i className="fas fa-play"></i>
+                    Present Session
+                  </button>
+                </Tooltip>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -503,19 +516,19 @@ export const SessionManager: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Action buttons */}
+                {/* Action buttons - Touch-friendly */}
                 <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
                   <button
                     onClick={() => handlePreviewSong(song.id)}
                     title="Preview"
-                    className="p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-lg sm:rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors flex items-center justify-center"
                   >
                     <i className="fas fa-eye text-lg"></i>
                   </button>
                   <button
                     onClick={() => removeSong(entry.songId, entry.singerId)}
                     title="Remove"
-                    className="flex items-center gap-2 p-2 rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
                   >
                     <i className="fas fa-times text-lg"></i>
                     <span className="text-sm font-medium whitespace-nowrap">Remove</span>

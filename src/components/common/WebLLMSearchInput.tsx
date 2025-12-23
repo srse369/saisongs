@@ -121,7 +121,7 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
         {/* Search Icon */}
         <i className={`fas fa-search text-base absolute left-3 ${llmEnabled ? 'text-purple-500' : 'text-gray-400'}`}></i>
 
-        {/* Search Input */}
+        {/* Search Input - larger touch target on mobile */}
         <input
           ref={ref}
           type="text"
@@ -131,7 +131,7 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
           placeholder={llmEnabled ? placeholder : 'Search (Enable AI for natural language)...'}
           autoFocus
           className={`
-            w-full pl-10 pr-32 py-2.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
+            w-full pl-10 pr-32 py-3 sm:py-2.5 text-base sm:text-sm border rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
             ${llmEnabled 
               ? 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/10' 
               : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800'
@@ -141,12 +141,12 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
         />
 
         {/* Right side controls */}
-        <div className="absolute right-3 flex items-center gap-2">
-          {/* Clear button */}
+        <div className="absolute right-2 sm:right-3 flex items-center gap-1 sm:gap-2">
+          {/* Clear button - larger touch target on mobile */}
           {value && (
             <button
               onClick={() => onChange('')}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              className="w-8 h-8 sm:w-6 sm:h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
               title="Clear"
             >
               <i className="fas fa-times text-base"></i>

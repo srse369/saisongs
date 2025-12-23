@@ -82,7 +82,7 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setExpanded(!expanded)}
-          className={`flex items-center gap-3 px-5 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 shadow-lg hover:shadow-xl transition-all duration-200 font-medium ${
+          className={`w-full sm:w-auto min-h-[48px] sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 sm:gap-3 px-3 sm:px-5 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 shadow-lg hover:shadow-xl transition-all duration-200 font-medium ${
             isTemplateSelected 
               ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 focus:ring-purple-500'
               : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 focus:ring-amber-500 animate-pulse-gentle'
@@ -90,17 +90,19 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
           title={isTemplateSelected ? 'Select presentation template' : 'Pick a template for presentation'}
         >
           <i className="fas fa-layer-group text-lg"></i>
-          <div className="flex flex-col items-start gap-0.5">
+          {/* Mobile: simplified, Desktop: full layout */}
+          <span className="sm:hidden text-sm font-medium">Template</span>
+          <div className="hidden sm:flex flex-col items-start gap-0.5">
             <span className="text-xs font-bold opacity-90 tracking-wider">TEMPLATE</span>
             <span className="text-sm truncate max-w-xs">
               {isTemplateSelected ? selectedTemplate?.name : 'Select one'}
             </span>
           </div>
-          <i className={`fas fa-chevron-down text-base flex-shrink-0 transition-transform duration-200 ml-auto ${expanded ? 'rotate-180' : ''}`}></i>
+          <i className={`fas fa-chevron-down text-base flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}></i>
         </button>
 
       {expanded && (
-        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 min-w-max max-h-96 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 sm:right-auto mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 sm:min-w-max max-h-[70vh] sm:max-h-96 overflow-y-auto">
           {contextLoading ? (
             <div className="p-6 text-center text-gray-500 dark:text-gray-400">
               <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600 mb-2"></div>
@@ -116,10 +118,10 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
                 <button
                   key={template.id}
                   onClick={() => handleSelect(template)}
-                  className={`w-full text-left px-4 py-3 transition-colors ${
+                  className={`w-full text-left px-4 py-4 sm:py-3 transition-colors ${
                     currentTemplateId === template.id 
                       ? 'bg-purple-50 dark:bg-purple-900/30 border-l-4 border-purple-600' 
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-l-4 border-transparent'
+                      : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-l-4 border-transparent active:bg-gray-100 dark:active:bg-gray-700'
                   } ${index !== contextTemplates.length - 1 ? 'border-b border-gray-100 dark:border-gray-700/50' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-3">

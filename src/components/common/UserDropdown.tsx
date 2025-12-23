@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { RoleBadge } from './RoleBadge';
 import { fetchCentersOnce } from './CenterBadges';
+import { Modal } from './Modal';
+import apiClient from '../../services/ApiClient';
 
 interface Center {
   id: number;
@@ -10,10 +12,19 @@ interface Center {
   badge_text_color: string;
 }
 
+interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
 export const UserDropdown: React.FC = () => {
   const { userName, userEmail, userRole, centerIds, editorFor, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [centers, setCenters] = useState<Center[]>([]);
+  const [showAdminsModal, setShowAdminsModal] = useState(false);
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -54,6 +65,22 @@ export const UserDropdown: React.FC = () => {
   const handleNavigate = (path: string) => {
     navigate(path);
     setIsOpen(false);
+  };
+
+  const handleShowAdmins = async () => {
+    setIsOpen(false);
+    setShowAdminsModal(true);
+    setLoadingAdmins(true);
+    try {
+      const response = await apiClient.get('/auth/admins');
+      if (response && response.admins) {
+        setAdmins(response.admins);
+      }
+    } catch (error) {
+      console.error('Error fetching admins:', error);
+    } finally {
+      setLoadingAdmins(false);
+    }
   };
 
   // Get profile icon (same for all users)
@@ -181,51 +208,58 @@ export const UserDropdown: React.FC = () => {
             </div>
           </div>
 
-          {/* Menu Items Section */}
+          {/* Admin Menu Items Section */}
           {userRole === 'admin' && (
-            <>
-              <div className="py-2 border-b border-gray-200 dark:border-gray-700">
-                <button
-                  onClick={() => handleNavigate('/admin/centers')}
-                  className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <i className="fas fa-building w-4 h-4 mr-3"></i>
-                  Centers
-                </button>
-                <button
-                  onClick={() => handleNavigate('/admin/analytics')}
-                  className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <i className="fas fa-chart-bar w-4 h-4 mr-3"></i>
-                  Analytics
-                </button>
-                <button
-                  onClick={() => handleNavigate('/admin/feedback')}
-                  className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <i className="fas fa-comment w-4 h-4 mr-3"></i>
-                  Feedback
-                </button>
-              </div>
-              
-              {/* Import Section */}
-              <div className="py-2 border-b border-gray-200 dark:border-gray-700">
-                <button
-                  onClick={() => handleNavigate('/admin/import')}
-                  className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <i className="fas fa-download w-4 h-4 mr-3"></i>
-                  Import Songs
-                </button>
-                <button
-                  onClick={() => handleNavigate('/admin/import-csv')}
-                  className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <i className="fas fa-file-import w-4 h-4 mr-3"></i>
-                  Import Singers & Pitches
-                </button>
-              </div>
-            </>
+            <div className="py-2 border-b border-gray-200 dark:border-gray-700">
+              <button
+                onClick={handleShowAdmins}
+                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <i className="fas fa-user-shield w-4 h-4 mr-3"></i>
+                Admins
+              </button>
+              <button
+                onClick={() => handleNavigate('/admin/centers')}
+                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <i className="fas fa-building w-4 h-4 mr-3"></i>
+                Centers
+              </button>
+              <button
+                onClick={() => handleNavigate('/admin/analytics')}
+                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <i className="fas fa-chart-bar w-4 h-4 mr-3"></i>
+                Analytics
+              </button>
+              <button
+                onClick={() => handleNavigate('/admin/feedback')}
+                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <i className="fas fa-comment w-4 h-4 mr-3"></i>
+                Feedback
+              </button>
+              <button
+                onClick={() => handleNavigate('/admin/import')}
+                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <i className="fas fa-download w-4 h-4 mr-3"></i>
+                Import Songs
+              </button>
+            </div>
+          )}
+          
+          {/* Import Section - Available to editors and admins */}
+          {(userRole === 'admin' || userRole === 'editor') && (
+            <div className="py-2 border-b border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => handleNavigate('/admin/import-csv')}
+                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <i className="fas fa-file-import w-4 h-4 mr-3"></i>
+                Import Singers & Pitches
+              </button>
+            </div>
           )}
 
           {/* Actions Section */}
@@ -240,6 +274,56 @@ export const UserDropdown: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Admins Modal */}
+      <Modal
+        isOpen={showAdminsModal}
+        onClose={() => setShowAdminsModal(false)}
+        title="System Administrators"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Users with full administrative access to the system.
+          </p>
+          
+          {loadingAdmins ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : admins.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No administrators found.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {admins.map((admin) => (
+                <div
+                  key={admin.id}
+                  className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                >
+                  <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full">
+                    <i className="fas fa-user-shield"></i>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {admin.name}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {admin.email}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Total: {admins.length} administrator{admins.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

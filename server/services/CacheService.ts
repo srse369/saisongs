@@ -2927,14 +2927,42 @@ export async function warmupCache(): Promise<void> {
 
     stats.push({ table: 'centers', count: centers.length });
 
-    // Normalize Oracle uppercase column names
-    const normalizedCenters = centers.map((center: any) => ({
-      id: center.ID || center.id,
-      name: center.NAME || center.name,
-      badge_text_color: center.BADGE_TEXT_COLOR || center.badge_text_color,
-      created_at: center.CREATED_AT || center.created_at,
-      updated_at: center.UPDATED_AT || center.updated_at,
-    }));
+    // Get all users with their editor_for arrays to build editor_ids for each center
+    const users = await databaseService.query(
+      `SELECT RAWTOHEX(id) as id, editor_for FROM users WHERE editor_for IS NOT NULL`
+    );
+
+    // Build a map of center_id -> user_ids who are editors
+    const centerEditors = new Map<number, string[]>();
+    for (const user of users) {
+      try {
+        const editorFor = (user as any).EDITOR_FOR || (user as any).editor_for;
+        if (editorFor) {
+          const centerIds = JSON.parse(editorFor);
+          for (const centerId of centerIds) {
+            if (!centerEditors.has(centerId)) {
+              centerEditors.set(centerId, []);
+            }
+            centerEditors.get(centerId)!.push((user as any).ID || (user as any).id);
+          }
+        }
+      } catch {
+        // Skip invalid JSON
+      }
+    }
+
+    // Normalize Oracle uppercase column names and add editor_ids
+    const normalizedCenters = centers.map((center: any) => {
+      const id = center.ID || center.id;
+      return {
+        id,
+        name: center.NAME || center.name,
+        badge_text_color: center.BADGE_TEXT_COLOR || center.badge_text_color,
+        editor_ids: centerEditors.get(id) || [],
+        created_at: center.CREATED_AT || center.created_at,
+        updated_at: center.UPDATED_AT || center.updated_at,
+      };
+    });
 
     cacheService.set('centers:all', normalizedCenters, CACHE_TTL);
     successCount++;

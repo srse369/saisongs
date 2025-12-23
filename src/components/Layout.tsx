@@ -2,8 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../contexts/AuthContext';
-import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, CenterBadges, Tooltip } from './common';
+import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, CenterBadges, Tooltip, Modal } from './common';
 import { FeedbackDrawer } from './common/FeedbackDrawer';
+import apiClient from '../services/ApiClient';
+
+interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+}
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,8 +21,27 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [showAdminsModal, setShowAdminsModal] = useState(false);
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
   const { isConnected, connectionError, resetConnection } = useDatabase();
   const { isAuthenticated, userRole, userName, userEmail, logout, centerIds, editorFor, isAdmin } = useAuth();
+
+  const handleShowAdmins = async () => {
+    setIsMobileMenuOpen(false);
+    setShowAdminsModal(true);
+    setLoadingAdmins(true);
+    try {
+      const response = await apiClient.get('/auth/admins');
+      if (response && response.admins) {
+        setAdmins(response.admins);
+      }
+    } catch (error) {
+      console.error('Error fetching admins:', error);
+    } finally {
+      setLoadingAdmins(false);
+    }
+  };
 
   // Check if current path matches the link
   const isActive = (path: string) => {
@@ -277,6 +303,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                       {userRole === 'admin' && (
                         <div className="space-y-1 mb-3">
                           <button
+                            onClick={handleShowAdmins}
+                            className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                          >
+                            <i className="fas fa-user-shield w-4 h-4 mr-2"></i>
+                            Admins
+                          </button>
+                          <button
                             onClick={() => {
                               navigate('/admin/centers');
                               setIsMobileMenuOpen(false);
@@ -305,6 +338,22 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                           >
                             <i className="fas fa-comment w-4 h-4 mr-2"></i>
                             Feedback
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Import - Available to editors and admins */}
+                      {(userRole === 'admin' || userRole === 'editor') && (
+                        <div className="space-y-1 mb-3">
+                          <button
+                            onClick={() => {
+                              navigate('/admin/import-csv');
+                              setIsMobileMenuOpen(false);
+                            }}
+                            className="w-full flex items-center px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                          >
+                            <i className="fas fa-file-import w-4 h-4 mr-2"></i>
+                            Import Singers & Pitches
                           </button>
                         </div>
                       )}
@@ -378,6 +427,56 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Feedback Drawer */}
       <FeedbackDrawer isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
+
+      {/* Admins Modal */}
+      <Modal
+        isOpen={showAdminsModal}
+        onClose={() => setShowAdminsModal(false)}
+        title="System Administrators"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Users with full administrative access to the system.
+          </p>
+          
+          {loadingAdmins ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : admins.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No administrators found.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {admins.map((admin) => (
+                <div
+                  key={admin.id}
+                  className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                >
+                  <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full">
+                    <i className="fas fa-user-shield"></i>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {admin.name}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {admin.email}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Total: {admins.length} administrator{admins.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -238,12 +238,12 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                 )}
               </div>
               
-              {/* Actions */}
+              {/* Actions - Touch-friendly on mobile */}
               <div className="flex flex-wrap items-center justify-start gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
                   <Tooltip content={`View ${singer.pitch_count ?? 0} pitch assignment${(singer.pitch_count ?? 0) !== 1 ? 's' : ''}`}>
                     <button
                       onClick={() => handleViewPitches(singer)}
-                      className="inline-flex items-center gap-2 p-2 rounded-md text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                      className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
                     >
                       <MusicIcon className="w-5 h-5" />
                       <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
@@ -261,7 +261,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     <Tooltip content="Edit singer profile (name, gender, centers)">
                       <button
                         onClick={() => onEdit(singer)}
-                        className="inline-flex items-center gap-2 p-2 rounded-md text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <i className="fas fa-edit text-lg"></i>
                         <span className="text-sm font-medium whitespace-nowrap">Edit</span>
@@ -273,7 +273,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     <Tooltip content="Delete singer and all their pitch assignments">
                       <button
                         onClick={() => handleDeleteClick(singer)}
-                        className="inline-flex items-center gap-2 p-2 rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500"
                       >
                         <i className="fas fa-trash text-lg"></i>
                         <span className="text-sm font-medium whitespace-nowrap">Delete</span>

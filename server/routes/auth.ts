@@ -326,6 +326,37 @@ router.post('/logout', (req, res) => {
 });
 
 /**
+ * GET /api/auth/admins
+ * Get list of all admin users (admin only)
+ */
+router.get('/admins', async (req, res) => {
+  // Check if user is authenticated and is an admin
+  if (!req.session?.userId || req.session?.userRole !== 'admin') {
+    return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
+  }
+
+  try {
+    const admins = await db.query<any>(
+      `SELECT RAWTOHEX(id) as id, name, email 
+       FROM users 
+       WHERE is_admin = 1 
+       ORDER BY name`
+    );
+
+    const result = admins.map((admin: any) => ({
+      id: admin.id || admin.ID,
+      name: admin.name || admin.NAME,
+      email: admin.email || admin.EMAIL,
+    }));
+
+    return res.json({ admins: result });
+  } catch (error) {
+    console.error('[AUTH] Error fetching admins:', error);
+    return res.status(500).json({ error: 'Failed to fetch admin users' });
+  }
+});
+
+/**
  * GET /api/auth/session
  * Check current session status and refresh center data from database
  */

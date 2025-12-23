@@ -130,7 +130,7 @@ function AppContent() {
             </ProtectedRoute>
           } />
           <Route path="/admin/import-csv" element={
-            <ProtectedRoute requireAdmin={true}>
+            <ProtectedRoute requireEditor={true}>
               <CsvImportPage />
             </ProtectedRoute>
           } />

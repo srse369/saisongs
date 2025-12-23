@@ -40,3 +40,92 @@
     color: #93c5fd !important; /* blue-300 - very bright for dark mode */
   }
 }
+
+/* ========================================
+   Mobile-First Responsive Improvements
+   ======================================== */
+
+/* Slide-up animation for mobile modals */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Safe area padding for notched devices (iPhone X+) */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+/* Touch-friendly minimum sizes */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Prevent text selection on touch UI elements */
+.no-select {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Better tap highlighting on mobile */
+@media (hover: none) and (pointer: coarse) {
+  /* Touch devices */
+  button, 
+  a, 
+  [role="button"] {
+    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.2);
+  }
+  
+  /* Larger touch targets for interactive elements */
+  .touch-target-auto {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Improve scrolling on mobile */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+}
+
+/* Hide scrollbar on mobile for cleaner look */
+@media (max-width: 640px) {
+  .hide-scrollbar-mobile::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar-mobile {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Mobile-friendly form inputs */
+@media (max-width: 640px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  select {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+}
