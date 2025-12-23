@@ -18,6 +18,7 @@ interface PitchContextState {
   updatePitch: (id: string, input: UpdatePitchInput) => Promise<SongSingerPitch | null>;
   deletePitch: (id: string) => Promise<void>;
   clearError: () => void;
+  clearState: () => void;
 }
 
 const PitchContext = createContext<PitchContextState | undefined>(undefined);
@@ -35,6 +36,12 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
 
   const clearError = useCallback(() => {
     setError(null);
+  }, []);
+
+  const clearState = useCallback(() => {
+    setPitches([]);
+    setError(null);
+    setHasFetched(false);
   }, []);
 
   const fetchAllPitches = useCallback(async (forceRefresh: boolean = false) => {
@@ -241,6 +248,7 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
     updatePitch,
     deletePitch,
     clearError,
+    clearState,
   };
 
   return <PitchContext.Provider value={value}>{children}</PitchContext.Provider>;

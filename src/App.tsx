@@ -12,7 +12,7 @@ import { PitchProvider, usePitches } from './contexts/PitchContext';
 import { TemplateProvider, useTemplates } from './contexts/TemplateContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { SessionProvider } from './contexts/SessionContext';
+import { SessionProvider, useSession } from './contexts/SessionContext';
 import { NamedSessionProvider, useNamedSessions } from './contexts/NamedSessionContext';
 import { useAdminShortcut } from './hooks';
 import { usePageTracking } from './hooks/usePageTracking';
@@ -48,10 +48,11 @@ function AppContent() {
   const { isPasswordDialogOpen, closePasswordDialog } = useAdminShortcut();
   const { isAuthenticated, isLoading, setAuthenticatedUser } = useAuth();
   const { fetchSongs } = useSongs();
-  const { fetchSingers } = useSingers();
-  const { fetchAllPitches } = usePitches();
-  const { fetchTemplates } = useTemplates();
+  const { fetchSingers, clearState: clearSingers } = useSingers();
+  const { fetchAllPitches, clearState: clearPitches } = usePitches();
+  const { fetchTemplates, clearState: clearTemplates } = useTemplates();
   const { loadSessions } = useNamedSessions();
+  const { clearSession } = useSession();
   const initialLoadDone = useRef(false);
   const authFetchDone = useRef(false);
   
@@ -68,12 +69,25 @@ function AppContent() {
   }, []); // Empty deps - only run once on mount
 
   // Warm up cache for protected data (singers, pitches, templates) when user authenticates
+  // Clear protected data when logging out
   useEffect(() => {
     if (isAuthenticated && !authFetchDone.current) {
       authFetchDone.current = true;
       fetchSingers();
       fetchAllPitches();
       fetchTemplates();
+    } else if (!isAuthenticated && authFetchDone.current) {
+      // User logged out - clear all protected data immediately
+      authFetchDone.current = false;
+      
+      // Clear in-memory state for all protected data
+      clearSingers();
+      clearPitches();
+      clearTemplates();
+      clearSession(); // Clear the live session
+      
+      // Refetch templates to get public-only list (no center restrictions)
+      fetchTemplates(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]); // Fetch when authentication status changes

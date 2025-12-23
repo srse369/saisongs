@@ -39,11 +39,14 @@ export const SessionManager: React.FC = () => {
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  // Fetch songs and singers on mount
+  // Fetch songs on mount (public data)
+  // Fetch singers only when authenticated (protected data)
   useEffect(() => {
     fetchSongs();
-    fetchSingers();
-  }, [fetchSongs, fetchSingers]);
+    if (isAuthenticated) {
+      fetchSingers();
+    }
+  }, [fetchSongs, fetchSingers, isAuthenticated]);
 
   // Restore previously selected template from localStorage (only if session has songs)
   useEffect(() => {

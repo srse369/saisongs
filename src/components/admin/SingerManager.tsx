@@ -10,10 +10,11 @@ import type { Singer, CreateSingerInput } from '../../types';
 
 export const SingerManager: React.FC = () => {
   const { singers, loading, error, fetchSingers, createSinger, updateSinger, deleteSinger, mergeSingers } = useSingers();
-  const { isEditor, userId } = useAuth();
+  const { isEditor, userId, logout } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSinger, setEditingSinger] = useState<Singer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'pitchCount'>('name');
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const lastFetchedUserIdRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -64,6 +65,9 @@ export const SingerManager: React.FC = () => {
 
   const handleFormSubmit = async (input: CreateSingerInput, adminFields?: { is_admin: boolean; editor_for: number[] }) => {
     if (editingSinger) {
+      // Check if user is updating their own email
+      const isUpdatingOwnEmail = editingSinger.id === userId && input.email && input.email !== editingSinger.email;
+      
       const result = await updateSinger(editingSinger.id, input);
       if (result && adminFields) {
         // If admin fields provided, update them via separate API calls
@@ -100,6 +104,12 @@ export const SingerManager: React.FC = () => {
       if (result) {
         setIsFormOpen(false);
         setEditingSinger(null);
+        
+        // If user updated their own email, log them out
+        if (isUpdatingOwnEmail) {
+          await logout();
+          window.location.href = '/';
+        }
       }
     } else {
       const result = await createSinger(input);
@@ -123,28 +133,37 @@ export const SingerManager: React.FC = () => {
   };
 
   const filteredSingers = React.useMemo(() => {
-    if (!searchTerm.trim()) return singers;
+    let result = searchTerm.trim() ? singers.filter((singer) => 
+      singer.name.toLowerCase().includes(searchTerm.toLowerCase())
+    ) : [...singers];
     
-    const q = searchTerm.toLowerCase();
-    const filtered = singers.filter((singer) => 
-      singer.name.toLowerCase().includes(q)
-    );
+    // Apply sorting
+    if (sortBy === 'pitchCount') {
+      result.sort((a, b) => (b.pitch_count ?? 0) - (a.pitch_count ?? 0));
+    } else {
+      // Sort by name
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        result.sort((a, b) => {
+          const aName = a.name.toLowerCase();
+          const bName = b.name.toLowerCase();
+          const aStartsWith = aName.startsWith(q);
+          const bStartsWith = bName.startsWith(q);
+          
+          // Prefix matches come first
+          if (aStartsWith && !bStartsWith) return -1;
+          if (!aStartsWith && bStartsWith) return 1;
+          
+          // If both start with query or neither does, sort alphabetically
+          return compareStringsIgnoringSpecialChars(a.name, b.name);
+        });
+      } else {
+        result.sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
+      }
+    }
     
-    // Sort results: prioritize singers that start with the search term
-    return filtered.sort((a, b) => {
-      const aName = a.name.toLowerCase();
-      const bName = b.name.toLowerCase();
-      const aStartsWith = aName.startsWith(q);
-      const bStartsWith = bName.startsWith(q);
-      
-      // Prefix matches come first
-      if (aStartsWith && !bStartsWith) return -1;
-      if (!aStartsWith && bStartsWith) return 1;
-      
-      // If both start with query or neither does, sort alphabetically
-      return compareStringsIgnoringSpecialChars(a.name, b.name);
-  });
-  }, [singers, searchTerm]);
+    return result;
+  }, [singers, searchTerm, sortBy]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -200,6 +219,16 @@ export const SingerManager: React.FC = () => {
               <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+              <Tooltip content="Sort singers by name or pitch count">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'name' | 'pitchCount')}
+                  className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                >
+                  <option value="name">Sort: Name</option>
+                  <option value="pitchCount">Sort: Pitch Count</option>
+                </select>
+              </Tooltip>
               <Tooltip content="Reload singers from the database to see the latest changes">
                 <button
                   type="button"

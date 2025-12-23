@@ -21,6 +21,7 @@ interface TemplateContextState {
   duplicateTemplate: (id: string, name: string, centerIds: number[]) => Promise<PresentationTemplate | null>;
   validateYaml: (yamlContent: string) => Promise<{ valid: boolean; template?: Partial<PresentationTemplate>; error?: string }>;
   clearError: () => void;
+  clearState: () => void;
 }
 
 const TemplateContext = createContext<TemplateContextState | undefined>(undefined);
@@ -38,6 +39,12 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
 
   const clearError = useCallback(() => {
     setError(null);
+  }, []);
+
+  const clearState = useCallback(() => {
+    setTemplates([]);
+    setError(null);
+    setHasFetched(false);
   }, []);
 
   const fetchTemplates = useCallback(async (forceRefresh: boolean = false) => {
@@ -309,6 +316,7 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
     duplicateTemplate,
     validateYaml,
     clearError,
+    clearState,
   };
 
   return <TemplateContext.Provider value={value}>{children}</TemplateContext.Provider>;

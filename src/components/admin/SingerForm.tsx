@@ -252,7 +252,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
 
       <div>
         <label htmlFor="singer-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Email {isEditMode ? '(Required for Admin/Editor)' : '(Optional)'}
+          Email {isEditMode ? '(Required for Admin/Editor/Viewer)' : '(Optional)'}
           <Tooltip content={isEditMode ? "Valid email is required to grant admin privileges or editor permissions" : "Contact email for notifications and communication"}>
             <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
               <i className="fas fa-info-circle text-xs"></i>
@@ -275,7 +275,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
         )}
         {isEditMode && !email.trim() && (
           <p className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
-            ⚠️ Email required to grant admin privileges or editor permissions
+            ⚠️ Email required to grant admin privileges or editor or viewer permissions
           </p>
         )}
       </div>

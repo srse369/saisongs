@@ -122,12 +122,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Clear user state
       setUserRole('public');
       setUserId(null);
       setUserName(null);
       setUserEmail(null);
       setCenterIds([]);
       setEditorFor([]);
+      
+      // Clear all data caches so logged-out users don't see cached center-restricted content
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('songStudio:singersCache');
+        window.localStorage.removeItem('songStudio:pitchesCache');
+        window.localStorage.removeItem('songStudio:templatesCache');
+        window.localStorage.removeItem('songStudio:centersCache');
+        window.localStorage.removeItem('songStudio:songsCache'); // Songs are public but clear for consistency
+        window.localStorage.removeItem('selectedSessionTemplateId'); // May reference a center-restricted template
+      }
+      
+      // Clear in-memory centers cache from CenterBadges
+      try {
+        const { clearCentersCache } = await import('../components/common/CenterBadges');
+        clearCentersCache();
+      } catch (error) {
+        console.warn('Failed to clear centers cache:', error);
+      }
     }
   }, []);
 

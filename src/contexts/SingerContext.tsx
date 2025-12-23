@@ -19,6 +19,7 @@ interface SingerContextState {
   deleteSinger: (id: string) => Promise<void>;
   mergeSingers: (targetSingerId: string, singerIdsToMerge: string[]) => Promise<boolean>;
   clearError: () => void;
+  clearState: () => void;
 }
 
 const SingerContext = createContext<SingerContextState | undefined>(undefined);
@@ -36,6 +37,12 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
 
   const clearError = useCallback(() => {
     setError(null);
+  }, []);
+
+  const clearState = useCallback(() => {
+    setSingers([]);
+    setError(null);
+    setHasFetched(false);
   }, []);
 
   const fetchSingers = useCallback(async (forceRefresh: boolean = false) => {
@@ -258,6 +265,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
     deleteSinger,
     mergeSingers,
     clearError,
+    clearState,
   };
 
   return <SingerContext.Provider value={value}>{children}</SingerContext.Provider>;

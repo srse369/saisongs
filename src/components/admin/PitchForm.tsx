@@ -94,11 +94,14 @@ export const PitchForm: React.FC<PitchFormProps> = ({
       setPitchValue(pitch.pitch);
     } else {
       setSongId('');
-      setSingerId('');
+      // Don't clear singerId if viewer is creating for themselves
+      if (!isViewerCreatingForSelf || !userSingerId) {
+        setSingerId('');
+      }
       setPitchValue('');
     }
     setErrors({});
-  }, [pitch]);
+  }, [pitch, isViewerCreatingForSelf, userSingerId]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
