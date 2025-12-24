@@ -9,6 +9,7 @@ interface Center {
   name: string;
   badgeTextColor: string;
   editorIds?: string[];
+  singerCount?: number;
   createdAt: string;
 }
 
@@ -310,61 +311,56 @@ export const CentersManager: React.FC = () => {
           {centers.map((center) => (
             <div
               key={center.id}
-              className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow"
+              className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow"
             >
-              {/* Icon */}
-              <div 
-                className="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-full"
-                style={{ 
-                  backgroundColor: `${center.badgeTextColor}20`,
-                  color: center.badgeTextColor 
-                }}
-              >
-                <i className="fas fa-building text-xl"></i>
-              </div>
-              
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {center.name}
-                  </h3>
-                  <span
-                    className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700"
-                    style={{ color: center.badgeTextColor }}
-                  >
-                    {center.name}
+              <div className="flex items-center gap-4">
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {center.name}
+                    </h3>
+                    <span
+                      className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700"
+                      style={{ color: center.badgeTextColor }}
+                    >
+                      {center.name}
+                    </span>
+                  </div>
+                <div className="flex items-center gap-3 mt-2 text-xs">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
+                    <i className="fas fa-users"></i>
+                    <span className="font-medium">{center.singerCount ?? 0}</span>
+                    <span>singer{(center.singerCount ?? 0) !== 1 ? 's' : ''}</span>
                   </span>
-                </div>
-                <div className="flex items-center gap-4 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  <span>
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
+                    <i className="fas fa-user-edit"></i>
+                    <span className="font-medium">{center.editorIds?.length ?? 0}</span>
+                    <span>editor{(center.editorIds?.length ?? 0) !== 1 ? 's' : ''}</span>
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400">
                     <i className="fas fa-calendar-alt mr-1"></i>
                     Created {new Date(center.createdAt).toLocaleDateString()}
                   </span>
-                  {center.editorIds && center.editorIds.length > 0 && (
-                    <span>
-                      <i className="fas fa-user-edit mr-1"></i>
-                      {center.editorIds.length} editor{center.editorIds.length !== 1 ? 's' : ''}
-                    </span>
-                  )}
+                </div>
                 </div>
               </div>
               
               {/* Actions */}
-              <div className="flex-shrink-0 flex gap-2">
+              <div className="flex flex-wrap items-center gap-2 pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => handleOpenForm(center)}
-                  className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                  className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
                 >
-                  <i className="fas fa-edit text-blue-600 dark:text-blue-400"></i>
-                  <span className="hidden sm:inline text-sm font-medium">Edit</span>
+                  <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
+                  <span className="text-sm font-medium whitespace-nowrap">Edit</span>
                 </button>
                 <button
                   onClick={() => handleDelete(center)}
-                  className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                  className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
                 >
-                  <i className="fas fa-trash text-red-600 dark:text-red-400"></i>
-                  <span className="hidden sm:inline text-sm font-medium">Delete</span>
+                  <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
+                  <span className="text-sm font-medium whitespace-nowrap">Delete</span>
                 </button>
               </div>
             </div>

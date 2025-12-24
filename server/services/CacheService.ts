@@ -2393,23 +2393,38 @@ class CacheService {
        ORDER BY name ASC`
     );
 
-    // Get all users with their editor_for arrays
+    // Get all users with their editor_for and center_ids arrays
     const users = await this.dbRead<any>(
-      `SELECT RAWTOHEX(id) as id, editor_for FROM users WHERE editor_for IS NOT NULL`
+      `SELECT RAWTOHEX(id) as id, editor_for, center_ids, name FROM users WHERE name IS NOT NULL`
     );
 
-    // Build a map of center_id -> user_ids who are editors
+    // Build maps for center_id -> user_ids who are editors, and center_id -> singer count
+    // Use Number keys for consistent lookups (JSON parse may return numbers, Oracle may return strings)
     const centerEditors = new Map<number, string[]>();
+    const centerSingerCount = new Map<number, number>();
+    
     for (const user of users) {
       try {
+        // Count editors
         const editorFor = user.EDITOR_FOR || user.editor_for;
         if (editorFor) {
           const centerIds = JSON.parse(editorFor);
           for (const centerId of centerIds) {
-            if (!centerEditors.has(centerId)) {
-              centerEditors.set(centerId, []);
+            const numCenterId = Number(centerId);
+            if (!centerEditors.has(numCenterId)) {
+              centerEditors.set(numCenterId, []);
             }
-            centerEditors.get(centerId)!.push(user.ID || user.id);
+            centerEditors.get(numCenterId)!.push(user.ID || user.id);
+          }
+        }
+        
+        // Count singers (users with center_ids)
+        const centerIds = user.CENTER_IDS || user.center_ids;
+        if (centerIds) {
+          const parsedCenterIds = JSON.parse(centerIds);
+          for (const centerId of parsedCenterIds) {
+            const numCenterId = Number(centerId);
+            centerSingerCount.set(numCenterId, (centerSingerCount.get(numCenterId) || 0) + 1);
           }
         }
       } catch {
@@ -2417,14 +2432,15 @@ class CacheService {
       }
     }
 
-    // Normalize Oracle uppercase column names to lowercase and add editor_ids
+    // Normalize Oracle uppercase column names to camelCase and add editorIds and singerCount
     const normalizedCenters = centers.map(center => {
-      const id = center.ID || center.id;
+      const id = Number(center.ID || center.id);
       return {
         id,
         name: center.NAME || center.name,
         badgeTextColor: center.BADGE_TEXT_COLOR || center.badge_text_color,
-        editor_ids: centerEditors.get(id) || [],
+        editorIds: centerEditors.get(id) || [],
+        singerCount: centerSingerCount.get(id) || 0,
         createdAt: center.CREATED_AT || center.created_at,
         updatedAt: center.UPDATED_AT || center.updated_at,
       };
@@ -3071,23 +3087,38 @@ export async function warmupCache(): Promise<void> {
 
     stats.push({ table: 'centers', count: centers.length });
 
-    // Get all users with their editor_for arrays to build editor_ids for each center
-    const users = await databaseService.executeQuery(
-      `SELECT RAWTOHEX(id) as id, editor_for FROM users WHERE editor_for IS NOT NULL`
+    // Get all users with their editor_for and center_ids arrays
+    const usersForCenters = await databaseService.executeQuery(
+      `SELECT RAWTOHEX(id) as id, editor_for, center_ids FROM users WHERE name IS NOT NULL`
     );
 
-    // Build a map of center_id -> user_ids who are editors
+    // Build maps for center_id -> user_ids who are editors, and center_id -> singer count
+    // Use Number keys for consistent lookups
     const centerEditors = new Map<number, string[]>();
-    for (const user of users) {
+    const centerSingerCount = new Map<number, number>();
+    
+    for (const user of usersForCenters) {
       try {
+        // Count editors
         const editorFor = (user as any).EDITOR_FOR || (user as any).editor_for;
         if (editorFor) {
-          const centerIds = JSON.parse(editorFor);
-          for (const centerId of centerIds) {
-            if (!centerEditors.has(centerId)) {
-              centerEditors.set(centerId, []);
+          const editorCenterIds = JSON.parse(editorFor);
+          for (const centerId of editorCenterIds) {
+            const numCenterId = Number(centerId);
+            if (!centerEditors.has(numCenterId)) {
+              centerEditors.set(numCenterId, []);
             }
-            centerEditors.get(centerId)!.push((user as any).ID || (user as any).id);
+            centerEditors.get(numCenterId)!.push((user as any).ID || (user as any).id);
+          }
+        }
+        
+        // Count singers (users with center_ids)
+        const userCenterIds = (user as any).CENTER_IDS || (user as any).center_ids;
+        if (userCenterIds) {
+          const parsedCenterIds = JSON.parse(userCenterIds);
+          for (const centerId of parsedCenterIds) {
+            const numCenterId = Number(centerId);
+            centerSingerCount.set(numCenterId, (centerSingerCount.get(numCenterId) || 0) + 1);
           }
         }
       } catch {
@@ -3095,14 +3126,15 @@ export async function warmupCache(): Promise<void> {
       }
     }
 
-    // Normalize Oracle uppercase column names and add editor_ids
+    // Normalize Oracle uppercase column names to camelCase and add editorIds and singerCount
     const normalizedCenters = centers.map((center: any) => {
-      const id = center.ID || center.id;
+      const id = Number(center.ID || center.id);
       return {
         id,
         name: center.NAME || center.name,
         badgeTextColor: center.BADGE_TEXT_COLOR || center.badge_text_color,
-        editor_ids: centerEditors.get(id) || [],
+        editorIds: centerEditors.get(id) || [],
+        singerCount: centerSingerCount.get(id) || 0,
         createdAt: center.CREATED_AT || center.created_at,
         updatedAt: center.UPDATED_AT || center.updated_at,
       };
