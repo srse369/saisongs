@@ -22,9 +22,20 @@ import { warmupCache, cacheService } from './services/CacheService.js';
 import { OracleSessionStore } from './middleware/OracleSessionStore.js';
 import { emailService } from './services/EmailService.js';
 import { PPTX_MEDIA_DIR } from './config/env.js';
+import { readFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Read version from package.json
+const packageJsonPath = path.join(__dirname, '..', 'package.json');
+let APP_VERSION = 'unknown';
+try {
+  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+  APP_VERSION = packageJson.version;
+} catch (error) {
+  console.warn('Could not read package.json for version:', error);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3111;
@@ -88,6 +99,7 @@ app.get('/api/health', async (req, res) => {
   try {
     const response: any = { 
       status: 'ok', 
+      version: APP_VERSION,
       timestamp: new Date().toISOString() 
     };
 

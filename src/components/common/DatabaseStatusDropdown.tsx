@@ -436,16 +436,14 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
             )}
             
             {/* Release Version */}
-            {import.meta.env.VITE_RELEASE_VERSION && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between px-2 py-1.5">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Version:</span>
-                  <span className="text-xs font-mono text-gray-700 dark:text-gray-300">
-                    {import.meta.env.VITE_RELEASE_VERSION}
-                  </span>
-                </div>
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Version:</span>
+                <span className="text-xs font-mono text-gray-700 dark:text-gray-300">
+                  {import.meta.env.VITE_APP_VERSION || 'dev'}
+                </span>
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}

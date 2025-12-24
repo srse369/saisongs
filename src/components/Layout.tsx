@@ -411,6 +411,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-1">
             Thanks 🙏 to sairhythms for Songs and Metadata.
           </p>
+          <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-1">
+            v{import.meta.env.VITE_APP_VERSION || 'dev'}
+          </p>
         </div>
       </footer>
 
