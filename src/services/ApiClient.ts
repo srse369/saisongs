@@ -180,8 +180,9 @@ export class ApiClient {
   }
 
   // Songs API
-  async getSongs() {
-    return this.request('/songs');
+  async getSongs(nocache: boolean = false) {
+    const url = nocache ? '/songs?nocache=true' : '/songs';
+    return this.request(url);
   }
 
   async getSong(id: string, nocache: boolean = false) {
@@ -243,8 +244,9 @@ export class ApiClient {
   }
 
   // Pitches API
-  async getPitches() {
-    return this.request('/pitches');
+  async getPitches(nocache: boolean = false) {
+    const url = nocache ? '/pitches?nocache=true' : '/pitches';
+    return this.request(url);
   }
 
   async getPitch(id: string, nocache: boolean = false) {

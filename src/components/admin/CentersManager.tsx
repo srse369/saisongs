@@ -354,16 +354,16 @@ export const CentersManager: React.FC = () => {
               <div className="flex-shrink-0 flex gap-2">
                 <button
                   onClick={() => handleOpenForm(center)}
-                  className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 px-3 py-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
+                  className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
                 >
-                  <i className="fas fa-edit"></i>
+                  <i className="fas fa-edit text-blue-600 dark:text-blue-400"></i>
                   <span className="hidden sm:inline text-sm font-medium">Edit</span>
                 </button>
                 <button
                   onClick={() => handleDelete(center)}
-                  className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition-colors"
+                  className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
                 >
-                  <i className="fas fa-trash"></i>
+                  <i className="fas fa-trash text-red-600 dark:text-red-400"></i>
                   <span className="hidden sm:inline text-sm font-medium">Delete</span>
                 </button>
               </div>

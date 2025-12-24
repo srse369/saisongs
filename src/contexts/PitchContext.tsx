@@ -84,8 +84,8 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
         }
       }
 
-      // Fallback: fetch from backend
-      const fetchedPitches = await pitchService.getAllPitches();
+      // Fetch from backend - pass nocache if force refresh to invalidate server cache too
+      const fetchedPitches = await pitchService.getAllPitches(forceRefresh);
       setPitches(fetchedPitches);
       setHasFetched(true);
 

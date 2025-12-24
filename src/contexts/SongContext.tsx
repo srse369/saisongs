@@ -84,8 +84,8 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
         }
       }
 
-      // Fallback: fetch from backend
-      const freshSongs = await songService.getAllSongs();
+      // Fetch from backend - pass nocache if force refresh to invalidate server cache too
+      const freshSongs = await songService.getAllSongs(forceRefresh);
       const sortedSongs = freshSongs.sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
       setSongs(sortedSongs);
 

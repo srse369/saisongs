@@ -301,11 +301,14 @@ class DatabaseReadService {
     if (users.length === 0) return null;
     
     const user = users[0];
+    // Get is_admin value (Oracle returns uppercase)
+    const isAdminVal = user.is_admin ?? user.IS_ADMIN ?? 0;
+    
     return {
       id: user.id || user.ID,
       name: user.name || user.NAME,
       email: user.email || user.EMAIL,
-      isAdmin: (user.is_admin || user.IS_ADMIN) === 1,
+      isAdmin: isAdminVal === 1 || isAdminVal === '1' || isAdminVal === true,
       editorFor: this.parseJsonField(user.editor_for || user.EDITOR_FOR),
       centerIds: this.parseJsonField(user.center_ids || user.CENTER_IDS),
     };

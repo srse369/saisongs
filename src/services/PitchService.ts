@@ -72,9 +72,9 @@ class PitchService {
    * Retrieves all pitch associations in the system.
    * @returns Array of normalized pitch associations
    */
-  async getAllPitches(): Promise<SongSingerPitch[]> {
+  async getAllPitches(nocache: boolean = false): Promise<SongSingerPitch[]> {
     try {
-      const raw = await apiClient.getPitches();
+      const raw = await apiClient.getPitches(nocache);
       return (raw as any[]).map((row) => this.mapRowToPitch(row));
     } catch (error) {
       console.error('Error fetching all pitches:', error);

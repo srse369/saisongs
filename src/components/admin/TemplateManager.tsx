@@ -950,18 +950,18 @@ export const TemplateManager: React.FC = () => {
                   <Tooltip content="Preview this template with sample content">
                     <button
                       onClick={() => handlePreview(template)}
-                      className="p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+                      className="p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                     >
-                      <i className="fas fa-eye text-lg"></i>
+                      <i className="fas fa-eye text-lg text-purple-600 dark:text-purple-400"></i>
                     </button>
                   </Tooltip>
                   {canEditTemplate(template) && (
                     <Tooltip content="Edit template layout, styling, and slide configuration">
                       <button
                         onClick={() => handleEditClick(template)}
-                        className="flex items-center gap-2 p-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        className="flex items-center gap-2 p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                       >
-                        <i className="fas fa-edit text-lg"></i>
+                        <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
                         <span className="text-sm font-medium whitespace-nowrap">Edit</span>
                       </button>
                     </Tooltip>
@@ -970,9 +970,9 @@ export const TemplateManager: React.FC = () => {
                   <Tooltip content="Create a copy of this template that you can modify">
                     <button
                       onClick={() => handleDuplicateClick(template)}
-                      className="flex items-center gap-2 p-2 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                      className="flex items-center gap-2 p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                     >
-                      <i className="fas fa-copy text-lg"></i>
+                      <i className="fas fa-copy text-lg text-green-600 dark:text-green-400"></i>
                       <span className="text-sm font-medium whitespace-nowrap">Duplicate</span>
                     </button>
                   </Tooltip>
@@ -981,9 +981,9 @@ export const TemplateManager: React.FC = () => {
                     <button
                       onClick={() => handleExportPptx(template)}
                       disabled={exportingPptx === template.id}
-                      className="flex items-center gap-2 p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="flex items-center gap-2 p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      <i className={`fas ${exportingPptx === template.id ? 'fa-spinner fa-spin' : 'fa-download'} text-lg`}></i>
+                      <i className={`fas ${exportingPptx === template.id ? 'fa-spinner fa-spin' : 'fa-download'} text-lg text-purple-600 dark:text-purple-400`}></i>
                       <span className="text-sm font-medium whitespace-nowrap">
                         {exportingPptx === template.id ? 'Exporting...' : 'Export'}
                       </span>
@@ -994,9 +994,9 @@ export const TemplateManager: React.FC = () => {
                     <Tooltip content="Make this the default template for new presentations">
                       <button
                         onClick={() => handleSetDefault(template.id!)}
-                        className="flex items-center gap-2 p-2 text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors"
+                        className="flex items-center gap-2 p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                       >
-                        <i className="fas fa-star text-lg"></i>
+                        <i className="fas fa-star text-lg text-yellow-500 dark:text-yellow-400"></i>
                         <span className="text-sm font-medium whitespace-nowrap">Set Default</span>
                       </button>
                     </Tooltip>
@@ -1005,9 +1005,9 @@ export const TemplateManager: React.FC = () => {
                     <Tooltip content="Permanently delete this template">
                       <button
                         onClick={() => handleDelete(template.id!)}
-                        className="flex items-center gap-2 p-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                        className="flex items-center gap-2 p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                       >
-                        <i className="fas fa-trash text-lg"></i>
+                        <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
                       <span className="text-sm font-medium whitespace-nowrap">Delete</span>
                     </button>
                     </Tooltip>

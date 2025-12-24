@@ -123,17 +123,17 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                 <button
                   onClick={() => handlePresent(song)}
                   title="Preview"
-                  className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-lg sm:rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors flex items-center justify-center"
+                  className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors flex items-center justify-center"
                 >
-                  <i className="fas fa-eye text-lg"></i>
+                  <i className="fas fa-eye text-lg text-purple-600 dark:text-purple-400"></i>
                 </button>
                 <button
                   onClick={() => addSong(song.id)}
                   disabled={songIds.includes(song.id)}
                   title={songIds.includes(song.id) ? 'In Live' : 'Add to Live'}
-                  className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg sm:rounded-md hover:bg-emerald-100 dark:hover:bg-emerald-900/50 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <i className={`fas ${songIds.includes(song.id) ? 'fa-check' : 'fa-plus'} text-lg`}></i>
+                  <i className={`fas ${songIds.includes(song.id) ? 'fa-check' : 'fa-plus'} text-lg text-emerald-600 dark:text-emerald-400`}></i>
                   <span className="text-sm font-medium whitespace-nowrap">Add to Session</span>
                 </button>
                 {/* Only show View Pitches button when authenticated (pitches contain private singer info) */}
@@ -145,10 +145,10 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                   >
                     <MusicIcon className="w-5 h-5" />
                     <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
-                    <span className={`inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold text-white rounded-full ${
+                    <span className={`inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold rounded-full ${
                       (song.pitchCount ?? 0) > 0 
-                        ? 'bg-blue-600 dark:bg-blue-500' 
-                        : 'bg-gray-400 dark:bg-gray-500'
+                        ? 'text-white bg-gray-900 dark:bg-black' 
+                        : 'text-gray-500 bg-gray-300 dark:bg-gray-600 dark:text-gray-400'
                     }`}>
                       {song.pitchCount ?? 0}
                     </span>
@@ -158,9 +158,9 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                   <button
                     onClick={() => onEdit(song)}
                     title="Edit"
-                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg sm:rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                   >
-                    <i className="fas fa-edit text-lg"></i>
+                    <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
                     <span className="text-sm font-medium whitespace-nowrap">Edit</span>
                   </button>
                 )}
@@ -169,16 +169,16 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                     onClick={() => handleSyncClick(song.id)}
                     disabled={syncingSongId === song.id}
                     title="Sync from external source"
-                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg sm:rounded-md hover:bg-yellow-100 dark:hover:bg-yellow-900/50 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {syncingSongId === song.id ? (
                       <>
-                        <i className="fas fa-sync text-lg animate-spin"></i>
+                        <i className="fas fa-sync text-lg text-yellow-600 dark:text-yellow-400 animate-spin"></i>
                         <span className="text-sm font-medium whitespace-nowrap">Syncing...</span>
                       </>
                     ) : (
                       <>
-                        <i className="fas fa-sync text-lg"></i>
+                        <i className="fas fa-sync text-lg text-yellow-600 dark:text-yellow-400"></i>
                         <span className="text-sm font-medium whitespace-nowrap">Sync</span>
                       </>
                     )}
@@ -189,9 +189,9 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                   <button
                     onClick={() => handleDeleteClick(song)}
                     title="Delete"
-                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-lg sm:rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                   >
-                    <i className="fas fa-trash text-lg"></i>
+                    <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
                     <span className="text-sm font-medium whitespace-nowrap">Delete</span>
                   </button>
                 )}

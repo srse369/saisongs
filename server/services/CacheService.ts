@@ -775,12 +775,15 @@ class CacheService {
         console.error('Error parsing editor_for for singer:', e);
       }
       
+      // Get is_admin value (Oracle returns uppercase)
+      const isAdminVal = s.is_admin ?? s.IS_ADMIN ?? 0;
+      
       return {
         id: s.id || s.ID,
         name: s.name || s.NAME,
         gender: s.gender || s.GENDER,
         email: s.email || s.EMAIL,
-        isAdmin: (s.is_admin || s.IS_ADMIN) === 1,
+        isAdmin: isAdminVal === 1 || isAdminVal === '1' || isAdminVal === true,
         centerIds: centerIds,
         editorFor: editorFor,
         createdAt: s.created_at || s.CREATED_AT,
@@ -832,12 +835,15 @@ class CacheService {
       console.error('Error parsing editor_for for singer:', e);
     }
     
+    // Get is_admin value (Oracle returns uppercase)
+    const isAdminVal = s.is_admin ?? s.IS_ADMIN ?? 0;
+    
     return {
       id: s.id || s.ID,
       name: s.name || s.NAME,
       gender: s.gender || s.GENDER,
       email: s.email || s.EMAIL,
-      isAdmin: (s.is_admin || s.IS_ADMIN) === 1,
+      isAdmin: isAdminVal === 1 || isAdminVal === '1' || isAdminVal === true,
       centerIds: centerIds,
       editorFor: editorFor,
       createdAt: s.created_at || s.CREATED_AT,
@@ -1022,12 +1028,15 @@ class CacheService {
         console.error('Error parsing editor_for:', e);
       }
       
+      // Get is_admin value (Oracle returns uppercase)
+      const isAdminVal = s.is_admin ?? s.IS_ADMIN ?? 0;
+      
       const normalizedSinger = {
         id: s.id || s.ID,
         name: s.name || s.NAME,
         gender: s.gender || s.GENDER,
         email: s.email || s.EMAIL,
-        isAdmin: (s.is_admin || s.IS_ADMIN) === 1,
+        isAdmin: isAdminVal === 1 || isAdminVal === '1' || isAdminVal === true,
         centerIds: parsedCenterIds,
         editorFor: parsedEditorFor,
         createdAt: s.created_at || s.CREATED_AT,

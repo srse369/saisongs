@@ -206,7 +206,11 @@ export const SingerMergeModal: React.FC<SingerMergeModalProps> = ({
                         {singer.gender}
                       </span>
                     )}
-                    <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-blue-600 dark:bg-blue-500 rounded-full" title={`${singer.pitchCount ?? 0} pitch assignments`}>
+                    <span className={`inline-flex items-center justify-center w-6 h-6 text-xs font-bold rounded-full ${
+                      (singer.pitchCount ?? 0) > 0 
+                        ? 'text-white bg-gray-900 dark:bg-black' 
+                        : 'text-gray-500 bg-gray-300 dark:bg-gray-600 dark:text-gray-400'
+                    }`} title={`${singer.pitchCount ?? 0} pitch assignments`}>
                       {singer.pitchCount ?? 0}
                     </span>
                   </div>
@@ -254,7 +258,11 @@ export const SingerMergeModal: React.FC<SingerMergeModalProps> = ({
                         <i className="fas fa-times text-xs"></i>
                         {singer.name}
                         {singer.gender && ` (${singer.gender})`}
-                        <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-blue-600 dark:bg-blue-500 rounded-full ml-auto" title={`${singer.pitchCount ?? 0} pitches`}>
+                        <span className={`inline-flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full ml-auto ${
+                          (singer.pitchCount ?? 0) > 0 
+                            ? 'text-white bg-gray-900 dark:bg-black' 
+                            : 'text-gray-500 bg-gray-300 dark:bg-gray-600 dark:text-gray-400'
+                        }`} title={`${singer.pitchCount ?? 0} pitches`}>
                           {singer.pitchCount ?? 0}
                         </span>
                       </li>

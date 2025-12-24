@@ -51,9 +51,9 @@ class SongService {
   /**
    * Retrieves all songs
    */
-  async getAllSongs(): Promise<Song[]> {
+  async getAllSongs(nocache: boolean = false): Promise<Song[]> {
     try {
-      return await apiClient.getSongs();
+      return await apiClient.getSongs(nocache);
     } catch (error) {
       console.error('Error fetching all songs:', error);
       throw new DatabaseError(

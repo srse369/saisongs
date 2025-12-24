@@ -561,21 +561,21 @@ export const SessionManager: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Action buttons - Touch-friendly */}
-                <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+                {/* Action buttons - Touch-friendly, aligned with song card */}
+                <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700 ml-11">
                   <button
                     onClick={() => handlePreviewSong(song.id)}
                     title="Preview"
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-lg sm:rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors flex items-center justify-center"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors flex items-center justify-center"
                   >
-                    <i className="fas fa-eye text-lg"></i>
+                    <i className="fas fa-eye text-lg text-purple-600 dark:text-purple-400"></i>
                   </button>
                   <button
                     onClick={() => removeSong(entry.songId, entry.singerId)}
                     title="Remove"
-                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                   >
-                    <i className="fas fa-times text-lg"></i>
+                    <i className="fas fa-times text-lg text-red-600 dark:text-red-400"></i>
                     <span className="text-sm font-medium whitespace-nowrap">Remove</span>
                   </button>
                 </div>

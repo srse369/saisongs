@@ -206,7 +206,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
               )}
               
               <div className="flex-1 flex flex-col gap-3">
-              {/* Singer Name and Gender */}
+              {/* Singer Name (color-coded by gender) */}
               <div className="flex items-center gap-3 flex-wrap">
                 <h3 className={`text-lg font-semibold ${
                   singer.gender?.toLowerCase() === 'male' 
@@ -221,11 +221,6 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                 }`}>
                   {singer.name}
                 </h3>
-                {singer.gender && (
-                  <span className="text-sm text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                    {singer.gender}
-                  </span>
-                )}
                 {!singer.email && (
                   <Tooltip content="No email address - cannot grant login permissions">
                     <span className="text-sm text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded border border-yellow-200 dark:border-yellow-800">
@@ -255,10 +250,10 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     >
                       <MusicIcon className="w-5 h-5" />
                       <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
-                      <span className={`inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold text-white rounded-full ${
+                      <span className={`inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold rounded-full ${
                         (singer.pitchCount ?? 0) > 0 
-                          ? 'bg-blue-600 dark:bg-blue-500' 
-                          : 'bg-gray-400 dark:bg-gray-500'
+                          ? 'text-white bg-gray-900 dark:bg-black' 
+                          : 'text-gray-500 bg-gray-300 dark:bg-gray-600 dark:text-gray-400'
                       }`}>
                         {singer.pitchCount ?? 0}
                       </span>
@@ -269,9 +264,9 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     <Tooltip content="Edit singer profile (name, gender, centers)">
                       <button
                         onClick={() => onEdit(singer)}
-                        className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
                       >
-                        <i className="fas fa-edit text-lg"></i>
+                        <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
                         <span className="text-sm font-medium whitespace-nowrap">Edit</span>
                       </button>
                     </Tooltip>
@@ -281,9 +276,9 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     <Tooltip content="Delete singer and all their pitch assignments">
                       <button
                         onClick={() => handleDeleteClick(singer)}
-                        className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
                       >
-                        <i className="fas fa-trash text-lg"></i>
+                        <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
                         <span className="text-sm font-medium whitespace-nowrap">Delete</span>
                       </button>
                     </Tooltip>
