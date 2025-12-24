@@ -30,13 +30,11 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
   onNameClick,
   nameClickTitle = 'Click to preview',
 }) => {
-  const hasRagaOrBeat = song.raga || song.beat;
   const hasReferencePitches = song.referenceGentsPitch || song.referenceLadiesPitch;
-
-  const hasBadges = song.deity || song.language || song.tempo;
+  const hasMetadataFields = song.raga || song.beat || song.deity || song.language || song.tempo;
 
   return (
-    <div className="bg-slate-100/80 dark:bg-gray-900/60 px-4 pt-1 pb-2 mb-3 rounded-lg">
+    <div className="bg-slate-100/80 dark:bg-gray-900/60 px-2 pt-1 pb-1 mb-1.5 rounded-lg">
       {/* Song Name with External Link */}
       <div className="flex items-center gap-2">
         {onNameClick ? (
@@ -68,19 +66,21 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
         )}
       </div>
 
-      {/* Deity, Language, and Tempo - right below song name */}
-      {hasBadges && (
-        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+      {/* Deity, Language, and Tempo */}
+      {(song.deity || song.language || song.tempo) && (
+        <div className="flex flex-wrap items-center text-xs text-gray-600 dark:text-gray-400">
           {song.deity && (
             <span>
               Deity: <span className="px-1.5 py-0.5 bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 rounded font-medium">{toTitleCase(song.deity)}</span>
             </span>
           )}
+          {song.deity && (song.language || song.tempo) && <span className="mx-2">•</span>}
           {song.language && (
             <span>
               Language: <span className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded font-medium">{toTitleCase(song.language)}</span>
             </span>
           )}
+          {song.language && song.tempo && <span className="mx-2">•</span>}
           {song.tempo && (
             <span>
               Tempo: <span className="px-1.5 py-0.5 bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 rounded font-medium">{toTitleCase(song.tempo)}</span>
@@ -89,27 +89,28 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
         </div>
       )}
 
-      {/* Raga and Beat */}
-      {hasRagaOrBeat && (
-        <p className="text-xs text-gray-600 dark:text-gray-400">
+      {/* Raga and Beat - on next line */}
+      {(song.raga || song.beat) && (
+        <div className="flex flex-wrap items-center text-xs text-gray-600 dark:text-gray-400">
           {song.raga && <span>Raga: {toTitleCase(song.raga)}</span>}
           {song.raga && song.beat && <span className="mx-2">•</span>}
           {song.beat && <span>Beat: {toTitleCase(song.beat)}</span>}
-        </p>
+        </div>
       )}
 
       {/* Reference Pitches */}
       {hasReferencePitches && (
-        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+        <div className="flex flex-wrap items-center text-xs text-gray-600 dark:text-gray-400">
           <span>Ref:</span>
           {song.referenceGentsPitch && (
-            <span>
+            <span className="ml-4">
               <span className="text-blue-600 dark:text-blue-400 font-medium">Gents</span>
               <span className="ml-1 font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.referenceGentsPitch)}</span>
             </span>
           )}
+          {song.referenceGentsPitch && song.referenceLadiesPitch && <span className="mx-2">•</span>}
           {song.referenceLadiesPitch && (
-            <span>
+            <span className={song.referenceGentsPitch ? '' : 'ml-4'}>
               <span className="text-pink-600 dark:text-pink-400 font-medium">Ladies</span>
               <span className="ml-1 font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.referenceLadiesPitch)}</span>
             </span>

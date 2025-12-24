@@ -372,7 +372,7 @@ export const PitchManager: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-      <div className="mb-4 sm:mb-8">
+      <div className="mb-4 sm:mb-2">
         <div className="flex flex-col gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -565,7 +565,7 @@ export const PitchManager: React.FC = () => {
 
       {/* Pitch count status */}
       {filteredPitches.length > 0 && (
-        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+        <div className="mb-2 text-sm text-gray-600 dark:text-gray-400">
           {displayedPitches.length < filteredPitches.length
             ? `Showing ${displayedPitches.length} of ${filteredPitches.length} pitches`
             : `${filteredPitches.length} pitch${filteredPitches.length !== 1 ? 'es' : ''}`}

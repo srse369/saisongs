@@ -310,8 +310,8 @@ export const SongManager: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 animate-fade-in">
-      <div className="mb-4 sm:mb-8">
-        <div className="flex flex-col gap-4 mb-4 sm:mb-6">
+      <div className="mb-4 sm:mb-2">
+        <div className="flex flex-col gap-4 mb-4 sm:mb-2">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-1">
@@ -388,8 +388,7 @@ export const SongManager: React.FC = () => {
               <button
                 onClick={clearError}
                 className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 focus:outline-none flex-shrink-0"
-                aria-label="Dismiss error"
-              >
+                aria-label="Dismiss error">
                 <i className="fas fa-times text-lg"></i>
               </button>
             </div>
@@ -398,7 +397,7 @@ export const SongManager: React.FC = () => {
 
         {/* Song count status */}
         {filteredSongs.length > 0 && (
-          <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+          <div className="mb-2 text-sm text-gray-600 dark:text-gray-400">
             {displayedSongs.length < filteredSongs.length
               ? `Showing ${displayedSongs.length} of ${filteredSongs.length} songs`
               : `${filteredSongs.length} song${filteredSongs.length !== 1 ? 's' : ''}`}

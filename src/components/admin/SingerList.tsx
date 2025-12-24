@@ -134,53 +134,59 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
   }
 
   return (
-    <>      {/* Merge mode controls */}
-      {isEditor && onMerge && (
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          {!isSelectionMode ? (
-            <Tooltip content="Merge multiple singer profiles into one, combining all their pitch information">
-              <button
-                onClick={handleStartSelection}
-                className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <i className="fas fa-check-square mr-2"></i>
-                Select Singers to Merge
-              </button>
-            </Tooltip>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <span className="font-semibold">{selectedSingerIds.length}</span>
-                <span>singer{selectedSingerIds.length !== 1 ? 's' : ''} selected</span>
-              </div>
-              {selectedSingerIds.length > 0 && (
+    <>
+      {/* Singer count and merge controls */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          {singers.length} singer{singers.length !== 1 ? 's' : ''}
+        </div>
+        {isEditor && onMerge && (
+          <div className="flex flex-wrap items-center gap-3">
+            {!isSelectionMode ? (
+              <Tooltip content="Merge multiple singer profiles into one, combining all their pitch information">
                 <button
-                  onClick={() => setSelectedSingerIds([])}
-                  className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline"
+                  onClick={handleStartSelection}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center gap-2 whitespace-nowrap"
                 >
-                  Deselect All
-                </button>
-              )}
-              <Tooltip content={selectedSingerIds.length < 2 ? "Select at least 2 singers to merge" : "Combine selected singers into one profile"}>
-                <button
-                  onClick={handleOpenMergeModal}
-                  disabled={selectedSingerIds.length < 2}
-                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <i className="fas fa-code-merge mr-2"></i>
-                  Merge Selected
+                  <i className="fas fa-code-merge text-blue-600 dark:text-blue-400"></i>
+                  Merge Singers
                 </button>
               </Tooltip>
-              <button
-                onClick={handleCancelSelection}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              >
-                Cancel
-              </button>
-            </>
-          )}
-        </div>
-      )}
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <span className="font-semibold">{selectedSingerIds.length}</span>
+                  <span>selected</span>
+                </div>
+                {selectedSingerIds.length > 0 && (
+                  <button
+                    onClick={() => setSelectedSingerIds([])}
+                    className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline"
+                  >
+                    Clear
+                  </button>
+                )}
+                <Tooltip content={selectedSingerIds.length < 2 ? "Select at least 2 singers to merge" : "Combine selected singers into one profile"}>
+                  <button
+                    onClick={handleOpenMergeModal}
+                    disabled={selectedSingerIds.length < 2}
+                    className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <i className="fas fa-code-merge"></i>
+                    Merge
+                  </button>
+                </Tooltip>
+                <button
+                  onClick={handleCancelSelection}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
       {/* Card layout for all screen sizes - SAME AS SONGS */}
       <div className="space-y-3">
         {singers.map((singer) => (

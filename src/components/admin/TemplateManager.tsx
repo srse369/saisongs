@@ -799,15 +799,18 @@ export const TemplateManager: React.FC = () => {
 
           {/* Controls */}
           <div className="flex flex-col lg:flex-row gap-3 w-full">
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search templates..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              autoFocus
-              className="flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="relative flex-1 lg:min-w-[300px]">
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search templates..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                autoFocus
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
+            </div>
             <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
               <Tooltip content="Reload templates from the database">
                 <button

@@ -105,11 +105,12 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
 
                 {/* Audio Player */}
                 {song.audioLink && (
-                  <div className="mt-3">
+                  <div className="mt-2">
                     <audio
                       controls
                       preload="none"
                       className="w-full max-w-xs dark:invert dark:brightness-90 dark:contrast-90 dark:hue-rotate-180"
+                      style={{ height: '32px' }}
                     >
                       <source src={song.audioLink} />
                       Your browser does not support the audio element.
