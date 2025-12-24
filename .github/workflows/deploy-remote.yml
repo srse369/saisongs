@@ -30,16 +30,23 @@ concurrency:
   group: "deploy-remote"
   cancel-in-progress: false
 
+# Required for pushing version bump commits
+permissions:
+  contents: write
+
 jobs:
   version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       new_version: ${{ steps.bump.outputs.new_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
