@@ -1,6 +1,7 @@
 import express from 'express';
 import { cacheService } from '../services/CacheService.js';
-import { databaseService } from '../services/DatabaseService.js';
+import { databaseReadService } from '../services/DatabaseReadService.js';
+import { databaseWriteService } from '../services/DatabaseWriteService.js';
 import { requireEditor, requireAuth, requireAdmin } from '../middleware/simpleAuth.js';
 
 const router = express.Router();
@@ -28,12 +29,12 @@ router.get('/', requireAuth, async (req, res) => {
       
       // Filter singers to only those in accessible centers or untagged singers
       singers = allSingers.filter(singer => {
-        // Singers without center_ids are visible to everyone
-        if (!singer.center_ids || singer.center_ids.length === 0) {
+        // Singers without centerIds are visible to everyone
+        if (!singer.centerIds || singer.centerIds.length === 0) {
           return true;
         }
         // Check if singer belongs to any accessible center
-        return singer.center_ids.some((cid: number) => accessibleCenters.includes(cid));
+        return singer.centerIds.some((cid: number) => accessibleCenters.includes(cid));
       });
     }
     
@@ -111,7 +112,8 @@ router.get('/:id', requireAuth, async (req, res) => {
 // Create new singer - requires editor or admin role
 router.post('/', requireEditor, async (req, res) => {
   try {
-    const { name, gender, email, center_ids } = req.body;
+    const { name, gender, email } = req.body;
+    const centerIds = req.body.centerIds ?? req.body.center_ids;
     const user = req.user;
     
     if (!name || !name.trim()) {
@@ -124,21 +126,21 @@ router.post('/', requireEditor, async (req, res) => {
     }
     
     // Validate that at least one center is selected
-    if (!center_ids || center_ids.length === 0) {
+    if (!centerIds || centerIds.length === 0) {
       return res.status(400).json({ error: 'At least one center must be selected' });
     }
     
     // For editors, validate they can only assign singers to centers they have editor access to
-    if (user?.role === 'editor' && center_ids && center_ids.length > 0) {
+    if (user?.role === 'editor' && centerIds && centerIds.length > 0) {
       // Use the user's editorFor array directly from session
       const editableCenterIds = user.editorFor || [];
       
-      // Check if all requested center_ids are in the editable list
-      const invalidCenters = center_ids.filter((cid: number) => !editableCenterIds.includes(cid));
+      // Check if all requested centerIds are in the editable list
+      const invalidCenters = centerIds.filter((cid: number) => !editableCenterIds.includes(cid));
       if (invalidCenters.length > 0) {
         console.log('Access denied (create):', {
           userId: user.id,
-          requestedCenters: center_ids,
+          requestedCenters: centerIds,
           editableCenters: editableCenterIds,
           invalidCenters
         });
@@ -176,7 +178,7 @@ router.post('/', requireEditor, async (req, res) => {
       return res.status(200).json(normalizedDuplicate);
     }
     
-    const newSinger = await cacheService.createSinger(name, gender, email, center_ids, user.email);
+    const newSinger = await cacheService.createSinger({ name, gender, email, centerIds, createdBy: user.email });
     res.status(201).json(newSinger);
   } catch (error) {
     console.error('Error creating singer:', error);
@@ -188,7 +190,8 @@ router.post('/', requireEditor, async (req, res) => {
 router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, gender, email, center_ids } = req.body;
+    const { name, gender, email } = req.body;
+    const centerIds = req.body.centerIds ?? req.body.center_ids;
     const user = req.user;
     
     // Check if user is updating their own record
@@ -210,7 +213,7 @@ router.put('/:id', requireAuth, async (req, res) => {
     }
     
     // Validate that at least one center is selected
-    if (center_ids !== undefined && (!center_ids || center_ids.length === 0)) {
+    if (centerIds !== undefined && (!centerIds || centerIds.length === 0)) {
       return res.status(400).json({ error: 'At least one center must be selected' });
     }
     
@@ -220,25 +223,25 @@ router.put('/:id', requireAuth, async (req, res) => {
     }
     
     // For editors, validate they can only ADD singers to centers they have editor access to
-    if (user?.role === 'editor' && center_ids && center_ids.length > 0) {
-      // Get the singer's current center_ids
+    if (user?.role === 'editor' && centerIds && centerIds.length > 0) {
+      // Get the singer's current centerIds
       const singer = await cacheService.getSinger(id);
-      const currentCenterIds = singer?.center_ids || [];
+      const currentCenterIds = singer?.centerIds || [];
       
       // Find centers being ADDED (not already assigned)
-      const newCenterIds = center_ids.filter((cid: number) => !currentCenterIds.includes(cid));
+      const newCenterIds = centerIds.filter((cid: number) => !currentCenterIds.includes(cid));
       
       if (newCenterIds.length > 0) {
         // Use the user's editorFor array directly from session
         const editableCenterIds = user.editorFor || [];
         
-        // Check if all NEW center_ids are in the editable list
+        // Check if all NEW centerIds are in the editable list
         const invalidCenters = newCenterIds.filter((cid: number) => !editableCenterIds.includes(cid));
         if (invalidCenters.length > 0) {
           console.log('Access denied:', {
             userId: user.id,
             currentCenters: currentCenterIds,
-            requestedCenters: center_ids,
+            requestedCenters: centerIds,
             newCenters: newCenterIds,
             editableCenters: editableCenterIds,
             invalidCenters
@@ -250,7 +253,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       }
     }
     
-    await cacheService.updateSinger(id, name, gender, email, center_ids, user.email);
+    await cacheService.updateSinger(id, { name, gender, email, centerIds, updatedBy: user.email });
     
     // Also invalidate the singers:all cache to ensure list views get fresh data
     cacheService.invalidate('singers:all');
@@ -296,9 +299,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
     
     // Check if singer has any pitch associations (applies to ALL users including admins)
-    const pitchQuery = 'SELECT COUNT(*) as count FROM song_singer_pitches WHERE singer_id = HEXTORAW(:1)';
-    const pitchResult = await databaseService.query(pitchQuery, [id]);
-    const pitchCount = pitchResult[0]?.COUNT || 0;
+    const pitchCount = await databaseReadService.getSingerPitchCount(id);
     
     if (pitchCount > 0) {
       return res.status(400).json({ 
@@ -309,7 +310,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     
     // For editors (non-admins) deleting someone else's record, validate they can only delete singers from their centers
     if (user?.role === 'editor' && !isOwnRecord) {
-      const singerCenterIds = singer.center_ids || [];
+      const singerCenterIds = singer.centerIds || [];
       const editableCenterIds = user.editorFor || [];
       
       // Check if singer belongs to at least one center the editor manages
@@ -335,15 +336,15 @@ router.delete('/:id', requireAuth, async (req, res) => {
 router.patch('/:id/admin', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { is_admin } = req.body;
+    const isAdminValue = req.body.isAdmin ?? req.body.is_admin;
     
-    // Validate is_admin value
-    if (is_admin !== 0 && is_admin !== 1 && is_admin !== true && is_admin !== false) {
-      return res.status(400).json({ error: 'is_admin must be 0 or 1 (or true/false)' });
+    // Validate isAdmin value
+    if (isAdminValue !== 0 && isAdminValue !== 1 && isAdminValue !== true && isAdminValue !== false) {
+      return res.status(400).json({ error: 'isAdmin must be 0 or 1 (or true/false)' });
     }
     
     // Convert boolean to number if needed
-    const adminValue = (is_admin === true || is_admin === 1) ? 1 : 0;
+    const adminValue = (isAdminValue === true || isAdminValue === 1) ? 1 : 0;
     
     // Update admin status
     await cacheService.updateSingerAdminStatus(id, adminValue);
@@ -357,19 +358,19 @@ router.patch('/:id/admin', requireAdmin, async (req, res) => {
   }
 });
 
-// Update user editor_for (admin only)
+// Update user editorFor (admin only)
 router.patch('/:id/editor-for', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { editor_for } = req.body;
+    const editorForValue = req.body.editorFor ?? req.body.editor_for;
     
-    // Validate editor_for is an array
-    if (!Array.isArray(editor_for)) {
-      return res.status(400).json({ error: 'editor_for must be an array of center IDs' });
+    // Validate editorFor is an array
+    if (!Array.isArray(editorForValue)) {
+      return res.status(400).json({ error: 'editorFor must be an array of center IDs' });
     }
     
     // Validate all elements are numbers
-    for (const centerId of editor_for) {
+    for (const centerId of editorForValue) {
       if (typeof centerId !== 'number') {
         return res.status(400).json({ 
           error: `Invalid center ID "${centerId}". All elements must be numbers` 
@@ -377,11 +378,11 @@ router.patch('/:id/editor-for', requireAdmin, async (req, res) => {
       }
     }
     
-    // Update editor_for
-    await cacheService.updateUserEditorFor(id, editor_for);
+    // Update editorFor
+    await cacheService.updateUserEditorFor(id, editorForValue);
     res.json({ 
       message: 'Editor centers updated successfully',
-      editor_for 
+      editorFor: editorForValue 
     });
   } catch (error) {
     console.error('Error updating editor_for:', error);
@@ -436,7 +437,7 @@ router.post('/merge', requireEditor, async (req, res) => {
       const editableCenterIds = user.editorFor || [];
       
       // Check target singer
-      const targetCenterIds = targetSinger.center_ids || [];
+      const targetCenterIds = targetSinger.centerIds || [];
       const hasAccessToTarget = targetCenterIds.some((centerId: number) => 
         editableCenterIds.includes(centerId)
       );
@@ -448,7 +449,7 @@ router.post('/merge', requireEditor, async (req, res) => {
       
       // Check all singers to merge
       for (const singer of singersToMerge) {
-        const singerCenterIds = singer.center_ids || [];
+        const singerCenterIds = singer.centerIds || [];
         const hasAccess = singerCenterIds.some((centerId: number) => 
           editableCenterIds.includes(centerId)
         );
@@ -463,61 +464,32 @@ router.post('/merge', requireEditor, async (req, res) => {
     // Perform the merge in a transaction-like manner
     try {
       // Step 1: Get all pitches for target singer to identify conflicts
-      const targetPitchesQuery = `
-        SELECT RAWTOHEX(song_id) as song_id
-        FROM song_singer_pitches 
-        WHERE singer_id = HEXTORAW(:targetId)
-      `;
-      const targetPitchesResult = await databaseService.query(targetPitchesQuery, [targetSingerId]);
-      const targetSongIds = new Set(targetPitchesResult.map((row: any) => row.SONG_ID || row.song_id));
+      const targetPitches = await databaseReadService.getSingerPitches(targetSingerId);
+      const targetSongIds = new Set(targetPitches.map(p => p.songId));
       
       // Step 2: For each singer being merged, handle their pitches
       for (const singerId of singerIdsToMerge) {
         // Get pitches for this singer
-        const mergePitchesQuery = `
-          SELECT RAWTOHEX(id) as id, RAWTOHEX(song_id) as song_id, pitch
-          FROM song_singer_pitches 
-          WHERE singer_id = HEXTORAW(:singerId)
-        `;
-        const mergePitches = await databaseService.query(mergePitchesQuery, [singerId]);
+        const mergePitches = await databaseReadService.getSingerPitches(singerId);
         
         // Process each pitch
         for (const pitch of mergePitches) {
-          const songId = pitch.SONG_ID || pitch.song_id;
-          const pitchId = pitch.ID || pitch.id;
+          const songId = pitch.songId;
+          const pitchId = pitch.id;
           
           if (targetSongIds.has(songId)) {
             // Conflict: target singer already has this song - delete this pitch
-            const deleteQuery = `
-              DELETE FROM song_singer_pitches 
-              WHERE id = HEXTORAW(:pitchId)
-            `;
-            await databaseService.query(deleteQuery, [pitchId]);
+            await databaseWriteService.deletePitchById(pitchId);
           } else {
             // No conflict: check if we already transferred a pitch for this song
-            const checkQuery = `
-              SELECT COUNT(*) as count
-              FROM song_singer_pitches 
-              WHERE singer_id = HEXTORAW(:targetId) AND song_id = HEXTORAW(:songId)
-            `;
-            const checkResult = await databaseService.query(checkQuery, [targetSingerId, songId]);
-            const alreadyHasSong = (checkResult[0]?.COUNT || checkResult[0]?.count || 0) > 0;
+            const alreadyHasSong = await databaseReadService.checkSingerHasSongPitch(targetSingerId, songId);
             
             if (alreadyHasSong) {
               // Another merged singer already had this song and we transferred it - delete this duplicate
-              const deleteQuery = `
-                DELETE FROM song_singer_pitches 
-                WHERE id = HEXTORAW(:pitchId)
-              `;
-              await databaseService.query(deleteQuery, [pitchId]);
+              await databaseWriteService.deletePitchById(pitchId);
             } else {
               // Transfer this pitch to target singer
-              const updateQuery = `
-                UPDATE song_singer_pitches 
-                SET singer_id = HEXTORAW(:targetId), updated_at = CURRENT_TIMESTAMP
-                WHERE id = HEXTORAW(:pitchId)
-              `;
-              await databaseService.query(updateQuery, [targetSingerId, pitchId]);
+              await databaseWriteService.updatePitchSinger(pitchId, targetSingerId);
               
               // Add to target's song set so future duplicates are deleted
               targetSongIds.add(songId);

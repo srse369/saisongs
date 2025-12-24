@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 interface Center {
   id: number;
   name: string;
-  badge_text_color?: string;
+  badgeTextColor?: string;
 }
 
 interface CenterBadgesProps {
@@ -121,7 +121,7 @@ export const CenterBadges: React.FC<CenterBadgesProps> = ({
           key={center.id}
           className="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-200 dark:bg-gray-700 rounded"
           style={{ 
-            color: center.badge_text_color || '#374151'
+            color: center.badgeTextColor || '#374151'
           }}
         >
           📍 {center.name}

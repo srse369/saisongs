@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 interface Center {
   id: number;
   name: string;
-  badge_text_color: string;
+  badgeTextColor: string;
 }
 
 interface CenterMultiSelectProps {
@@ -136,7 +136,7 @@ export const CenterMultiSelect: React.FC<CenterMultiSelectProps> = ({
                     ? 'bg-gray-200 dark:bg-gray-600 opacity-75' 
                     : 'bg-gray-100 dark:bg-gray-700'
                 }`}
-                style={{ color: center.badge_text_color }}
+                style={{ color: center.badgeTextColor }}
                 title={isReadOnly ? 'Managed by another center - cannot remove' : ''}
               >
                 {center.name}
@@ -208,7 +208,7 @@ export const CenterMultiSelect: React.FC<CenterMultiSelectProps> = ({
                   />
                   <span
                     className="text-sm font-medium"
-                    style={{ color: center.badge_text_color }}
+                    style={{ color: center.badgeTextColor }}
                   >
                     {center.name}
                   </span>

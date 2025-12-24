@@ -30,6 +30,7 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditMode = !!song;
+  const hasExternalSource = !!externalSourceUrl.trim();
   
   // Track if form has unsaved changes
   const hasUnsavedChanges = useMemo(() => {
@@ -220,6 +221,17 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+      {/* External Source Warning */}
+      {isEditMode && hasExternalSource && (
+        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md">
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            <i className="fas fa-sync-alt mr-2"></i>
+            <strong>External Source Linked:</strong> This song syncs data from an external source.
+            Manual edits may be overwritten on next sync.
+          </p>
+        </div>
+      )}
+      
       {/* Song Name */}
       <div>
         <label htmlFor="song-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

@@ -19,7 +19,7 @@ router.get('/', optionalAuth, async (req, res) => {
       templates = cacheService.filterByCenterAccess(allTemplates, req.user.role, accessibleCenterIds);
     } else {
       // Public/unauthenticated users should only see templates with no center restrictions
-      templates = allTemplates.filter(t => !t.center_ids || t.center_ids.length === 0);
+      templates = allTemplates.filter(t => !t.centerIds || t.centerIds.length === 0);
     }
     
     res.json(templates);
@@ -42,7 +42,7 @@ router.get('/default', optionalAuth, async (req, res) => {
       accessibleTemplates = cacheService.filterByCenterAccess(allTemplates, req.user.role, accessibleCenterIds);
     } else {
       // Public users only see templates with no center restrictions
-      accessibleTemplates = allTemplates.filter(t => !t.center_ids || t.center_ids.length === 0);
+      accessibleTemplates = allTemplates.filter(t => !t.centerIds || t.centerIds.length === 0);
     }
     
     // Find default template from accessible templates
@@ -69,7 +69,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     }
     
     // Check if user has access to this template based on center restrictions
-    const templateCenterIds = template.center_ids || [];
+    const templateCenterIds = template.centerIds || [];
     
     if (req.user) {
       // Authenticated user: check if they have access via their centers
@@ -116,7 +116,7 @@ router.post('/', requireAuth, async (req, res) => {
 
     // For editors, validate they have access to all template centers
     if (user.role === 'editor') {
-      const templateCenterIds = template.center_ids || [];
+      const templateCenterIds = template.centerIds || [];
       const editableCenterIds = user.editorFor || [];
       const hasAccess = templateCenterIds.every(cid => editableCenterIds.includes(cid));
       
@@ -160,7 +160,7 @@ router.put('/:id', requireAuth, async (req, res) => {
 
     // For editors, validate they have access to template's centers
     if (user.role === 'editor') {
-      const existingCenterIds = existingTemplate.center_ids || [];
+      const existingCenterIds = existingTemplate.centerIds || [];
       const editableCenterIds = user.editorFor || [];
       const hasAccess = existingCenterIds.length === 0 || existingCenterIds.some(cid => editableCenterIds.includes(cid));
       
@@ -177,13 +177,13 @@ router.put('/:id', requireAuth, async (req, res) => {
         });
       }
 
-      // If updating center_ids, validate new centers too
-      if (updates.center_ids) {
-        const allNewCenters = updates.center_ids.every(cid => editableCenterIds.includes(cid));
+      // If updating centerIds, validate new centers too
+      if (updates.centerIds) {
+        const allNewCenters = updates.centerIds.every(cid => editableCenterIds.includes(cid));
         if (!allNewCenters) {
           // Get center names for better error message
           const allCenters = await cacheService.getAllCenters();
-          const invalidCenterIds = updates.center_ids.filter(cid => !editableCenterIds.includes(cid));
+          const invalidCenterIds = updates.centerIds.filter(cid => !editableCenterIds.includes(cid));
           const invalidCenterNames = invalidCenterIds
             .map(cid => allCenters.find(c => c.id === cid)?.name || `Center ${cid}`)
             .join(', ');
@@ -223,7 +223,8 @@ router.post('/:id/duplicate', requireEditor, async (req, res) => {
     const user = req.user;
 
     const { id } = req.params;
-    const { name, center_ids } = req.body;
+    const { name } = req.body;
+    const centerIds = req.body.centerIds ?? req.body.center_ids;
     
     if (!name) {
       return res.status(400).json({ error: 'New template name is required' });
@@ -237,7 +238,7 @@ router.post('/:id/duplicate', requireEditor, async (req, res) => {
 
     // For editors, validate they have access to source template's centers
     if (user.role === 'editor') {
-      const sourceCenterIds = existingTemplate.center_ids || [];
+      const sourceCenterIds = existingTemplate.centerIds || [];
       const editableCenterIds = user.editorFor || [];
       
       // If source template has centers, editor must have access to at least one
@@ -260,12 +261,12 @@ router.post('/:id/duplicate', requireEditor, async (req, res) => {
       // If source template has no centers (global), editors can still duplicate it
 
       // Validate they have access to all requested centers for the duplicate
-      if (center_ids && center_ids.length > 0) {
-        const allCentersValid = center_ids.every((cid: number) => editableCenterIds.includes(cid));
+      if (centerIds && centerIds.length > 0) {
+        const allCentersValid = centerIds.every((cid: number) => editableCenterIds.includes(cid));
         if (!allCentersValid) {
           // Get center names for better error message
           const allCenters = await cacheService.getAllCenters();
-          const invalidCenterIds = center_ids.filter((cid: number) => !editableCenterIds.includes(cid));
+          const invalidCenterIds = centerIds.filter((cid: number) => !editableCenterIds.includes(cid));
           const invalidCenterNames = invalidCenterIds
             .map((cid: number) => allCenters.find(c => c.id === cid)?.name || `Center ${cid}`)
             .join(', ');
@@ -283,7 +284,7 @@ router.post('/:id/duplicate', requireEditor, async (req, res) => {
     const duplicateTemplate: PresentationTemplate = {
       ...templateData,
       name,
-      center_ids: center_ids || [],
+      centerIds: centerIds || [],
       isDefault: false,
     };
 
@@ -319,7 +320,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     // For editors, validate they have access to template's centers
     if (user.role === 'editor') {
-      const templateCenterIds = existingTemplate.center_ids || [];
+      const templateCenterIds = existingTemplate.centerIds || [];
       const editableCenterIds = user.editorFor || [];
       const hasAccess = templateCenterIds.length === 0 || templateCenterIds.some(cid => editableCenterIds.includes(cid));
       

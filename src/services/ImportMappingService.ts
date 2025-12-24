@@ -45,7 +45,7 @@ export async function saveSongMapping(csvSongName: string, dbSongId: string, dbS
     
     await apiClient.post('/import-mappings/songs', {
       csv_song_name: normalizedCsvName,
-      db_song_id: dbSongId,
+      dbSongId: dbSongId,
       db_song_name: dbSongName,
     });
     return true;

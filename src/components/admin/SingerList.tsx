@@ -238,8 +238,8 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
               
               {/* Center Badges with Warning for Missing Centers */}
               <div className="flex items-center gap-2">
-                <CenterBadges centerIds={singer.center_ids} showWarningIfEmpty={true} />
-                {(!singer.center_ids || singer.center_ids.length === 0) && (
+                <CenterBadges centerIds={singer.centerIds} showWarningIfEmpty={true} />
+                {(!singer.centerIds || singer.centerIds.length === 0) && (
                   <span className="text-xs text-yellow-600 dark:text-yellow-400 italic">
                     (Needs center assignment)
                   </span>
@@ -248,7 +248,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
               
               {/* Actions - Touch-friendly on mobile */}
               <div className="flex flex-wrap items-center justify-start gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
-                  <Tooltip content={`View ${singer.pitch_count ?? 0} pitch assignment${(singer.pitch_count ?? 0) !== 1 ? 's' : ''}`}>
+                  <Tooltip content={`View ${singer.pitchCount ?? 0} pitch assignment${(singer.pitchCount ?? 0) !== 1 ? 's' : ''}`}>
                     <button
                       onClick={() => handleViewPitches(singer)}
                       className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
@@ -256,11 +256,11 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                       <MusicIcon className="w-5 h-5" />
                       <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
                       <span className={`inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold text-white rounded-full ${
-                        (singer.pitch_count ?? 0) > 0 
+                        (singer.pitchCount ?? 0) > 0 
                           ? 'bg-blue-600 dark:bg-blue-500' 
                           : 'bg-gray-400 dark:bg-gray-500'
                       }`}>
-                        {singer.pitch_count ?? 0}
+                        {singer.pitchCount ?? 0}
                       </span>
                     </button>
                   </Tooltip>

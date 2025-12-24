@@ -70,14 +70,14 @@ router.get('/song/:songId', async (req, res) => {
 // Create new pitch association
 router.post('/', async (req, res) => {
   try {
-    // Accept both snake_case (from frontend) and camelCase (for compatibility)
-    const songId = req.body.song_id || req.body.songId;
-    const singerId = req.body.singer_id || req.body.singerId;
+    // Accept both camelCase (preferred) and snake_case (legacy)
+    const songId = req.body.songId ?? req.body.song_id;
+    const singerId = req.body.singerId ?? req.body.singer_id;
     const pitch = req.body.pitch;
     
     if (!songId || !singerId || !pitch) {
       return res.status(400).json({ 
-        error: 'Missing required fields: song_id, singer_id, pitch',
+        error: 'Missing required fields: songId, singerId, pitch',
         received: req.body 
       });
     }
@@ -99,7 +99,7 @@ router.post('/', async (req, res) => {
     
     if (!isOwnPitch) {
       // If not creating for themselves, check editor permissions
-      const singerCenterIds = singer.center_ids || [];
+      const singerCenterIds = singer.centerIds || [];
       
       // For editors, check if they have access to any of the singer's centers
       if (user.role === 'editor') {
@@ -121,7 +121,7 @@ router.post('/', async (req, res) => {
     
     // Check for duplicate pitch (same song + singer combination)
     const allPitches = await cacheService.getAllPitches();
-    const existing = allPitches.find(p => p.song_id === songId && p.singer_id === singerId);
+    const existing = allPitches.find(p => p.songId === songId && p.singerId === singerId);
     
     if (existing) {
       // Normalize both for comparison (trim whitespace, case-insensitive)
@@ -135,7 +135,7 @@ router.post('/', async (req, res) => {
       }
       
       // If pitch is different, update it and return the updated pitch
-      await cacheService.updatePitch(existing.id, pitch, user.email);
+      await cacheService.updatePitch(existing.id, { pitch, updatedBy: user.email });
       // Fetch the updated pitch to return
       const updatedPitch = await cacheService.getPitch(existing.id);
       return res.status(200).json(updatedPitch);
@@ -143,10 +143,10 @@ router.post('/', async (req, res) => {
     
     // Create new pitch association
     const createdPitch = await cacheService.createPitch({
-      song_id: songId,
-      singer_id: singerId,
+      songId: songId,
+      singerId: singerId,
       pitch: pitch,
-      created_by: user.email
+      createdBy: user.email
     });
     res.status(201).json(createdPitch);
   } catch (error) {
@@ -174,21 +174,21 @@ router.put('/:id', async (req, res) => {
     }
 
     // Get the singer to check their center associations
-    const singer = await cacheService.getSinger(existingPitch.singer_id);
+    const singer = await cacheService.getSinger(existingPitch.singerId);
     
     // Handle orphaned pitch (singer was deleted but pitch still exists)
     if (!singer) {
-      console.warn(`⚠️  Orphaned pitch detected: ${id} (singer ${existingPitch.singer_id} not found). Denying update.`);
+      console.warn(`⚠️  Orphaned pitch detected: ${id} (singer ${existingPitch.singerId} not found). Denying update.`);
       return res.status(400).json({ 
         error: 'Cannot update orphaned pitch',
         message: 'This pitch references a singer that no longer exists. Please delete this pitch instead of updating it.'
       });
     }
 
-    const singerCenterIds = singer.center_ids || [];
+    const singerCenterIds = singer.centerIds || [];
     
     // Allow if user is updating their own pitch (viewer can edit own pitches)
-    const isOwnPitch = user.id === existingPitch.singer_id;
+    const isOwnPitch = user.id === existingPitch.singerId;
     
     if (!isOwnPitch) {
       // If not updating their own pitch, check editor permissions
@@ -209,7 +209,7 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    await cacheService.updatePitch(id, pitch, user.email);
+    await cacheService.updatePitch(id, { pitch, updatedBy: user.email });
     res.json({ message: 'Pitch association updated successfully' });
   } catch (error) {
     console.error('Error updating pitch:', error);
@@ -235,11 +235,11 @@ router.delete('/:id', async (req, res) => {
     }
 
     // Get the singer to check their center associations
-    const singer = await cacheService.getSinger(existingPitch.singer_id);
+    const singer = await cacheService.getSinger(existingPitch.singerId);
     
     // Handle orphaned pitch (singer was deleted but pitch still exists due to CASCADE delay or cache issues)
     if (!singer) {
-      console.warn(`⚠️  Orphaned pitch detected: ${id} (singer ${existingPitch.singer_id} not found). Allowing deletion.`);
+      console.warn(`⚠️  Orphaned pitch detected: ${id} (singer ${existingPitch.singerId} not found). Allowing deletion.`);
       // Admins can delete orphaned pitches
       if (user.role === 'admin') {
         await cacheService.deletePitch(id);
@@ -256,10 +256,10 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    const singerCenterIds = singer.center_ids || [];
+    const singerCenterIds = singer.centerIds || [];
     
     // Allow if user is deleting their own pitch (viewer can delete own pitches)
-    const isOwnPitch = user.id === existingPitch.singer_id;
+    const isOwnPitch = user.id === existingPitch.singerId;
     
     if (!isOwnPitch) {
       // If not deleting their own pitch, check editor permissions

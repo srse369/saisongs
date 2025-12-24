@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { SongSingerPitch, CreatePitchInput, Song, Singer } from '../../types';
 import { ALL_PITCH_OPTIONS, formatPitchWithName } from '../../utils/pitchUtils';
+import { formatNormalizedPitch } from '../../utils/pitchNormalization';
 import { Tooltip } from '../common';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchCentersOnce } from '../common/CenterBadges';
@@ -158,7 +159,11 @@ export const PitchForm: React.FC<PitchFormProps> = ({
           id="pitch-song"
           value={songId}
           onChange={(e) => setSongId(e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ${
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+            isEditMode 
+              ? 'bg-gray-100 text-gray-500 cursor-not-allowed dark:!bg-gray-900 dark:!text-gray-500 dark:border-gray-700' 
+              : 'dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100'
+          } ${
             errors.songId ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
           }`}
           disabled={isSubmitting || isEditMode}
@@ -188,15 +193,19 @@ export const PitchForm: React.FC<PitchFormProps> = ({
           id="pitch-singer"
           value={singerId}
           onChange={(e) => setSingerId(e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ${
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+            (isEditMode || isViewerCreatingForSelf)
+              ? 'bg-gray-100 text-gray-500 cursor-not-allowed dark:!bg-gray-900 dark:!text-gray-500 dark:border-gray-700' 
+              : 'dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100'
+          } ${
             errors.singerId ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
           }`}
           disabled={isSubmitting || isEditMode || isViewerCreatingForSelf}
         >
           <option value="">Select a singer</option>
           {singers.map((singer) => {
-            const singerCenters = singer.center_ids && singer.center_ids.length > 0
-              ? centers.filter(c => singer.center_ids!.includes(c.id)).map(c => c.name).join(', ')
+            const singerCenters = singer.centerIds && singer.centerIds.length > 0
+              ? centers.filter(c => singer.centerIds!.includes(c.id)).map(c => c.name).join(', ')
               : '';
             return (
               <option key={singer.id} value={singer.id}>
@@ -224,13 +233,17 @@ export const PitchForm: React.FC<PitchFormProps> = ({
             {selectedSong?.referenceGentsPitch && (
               <div className="text-sm">
                 <span className="text-gray-600 dark:text-gray-400">Gents: </span>
-                <span className="font-semibold text-blue-700 dark:text-blue-300">{selectedSong.referenceGentsPitch}</span>
+                <span className="font-semibold text-blue-700 dark:text-blue-300">
+                  {formatNormalizedPitch(selectedSong.referenceGentsPitch)}
+                </span>
               </div>
             )}
             {selectedSong?.referenceLadiesPitch && (
               <div className="text-sm">
                 <span className="text-gray-600 dark:text-gray-400">Ladies: </span>
-                <span className="font-semibold text-blue-700 dark:text-blue-300">{selectedSong.referenceLadiesPitch}</span>
+                <span className="font-semibold text-blue-700 dark:text-blue-300">
+                  {formatNormalizedPitch(selectedSong.referenceLadiesPitch)}
+                </span>
               </div>
             )}
           </div>

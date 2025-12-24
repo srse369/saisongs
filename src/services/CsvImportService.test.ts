@@ -487,8 +487,8 @@ describe('CsvImportService', () => {
       expect(result.pitchesUpdated).toBe(0);
       expect(result.errors).toHaveLength(0);
       expect(apiClient.createPitch).toHaveBeenCalledWith({
-        song_id: 'song1',
-        singer_id: 'singer1',
+        songId: 'song1',
+        singerId: 'singer1',
         pitch: 'C',
       });
     });
@@ -789,8 +789,8 @@ describe('CsvImportService', () => {
 
       expect(result.success).toBe(true);
       expect(apiClient.createPitch).toHaveBeenCalledWith({
-        song_id: 'song1',
-        singer_id: 'singer1', // From existing mockSingers
+        songId: 'song1',
+        singerId: 'singer1', // From existing mockSingers
         pitch: 'C',
       });
     });
@@ -849,8 +849,8 @@ describe('CsvImportService', () => {
 
       expect(result.success).toBe(true);
       expect(apiClient.createPitch).toHaveBeenCalledWith({
-        song_id: 'song1',
-        singer_id: 'newsinger1', // Newly created singer
+        songId: 'song1',
+        singerId: 'newsinger1', // Newly created singer
         pitch: 'C#',
       });
     });

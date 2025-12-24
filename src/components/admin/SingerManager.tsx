@@ -63,7 +63,7 @@ export const SingerManager: React.FC = () => {
     setEditingSinger(null);
   };
 
-  const handleFormSubmit = async (input: CreateSingerInput, adminFields?: { is_admin: boolean; editor_for: number[] }) => {
+  const handleFormSubmit = async (input: CreateSingerInput, adminFields?: { isAdmin: boolean; editorFor: number[] }) => {
     if (editingSinger) {
       // Check if user is updating their own email
       const isUpdatingOwnEmail = editingSinger.id === userId && input.email && input.email !== editingSinger.email;
@@ -76,20 +76,20 @@ export const SingerManager: React.FC = () => {
         );
         
         try {
-          // Update is_admin status
+          // Update isAdmin status
           await fetch(`${API_BASE_URL}/singers/${editingSinger.id}/admin`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ is_admin: adminFields.is_admin ? 1 : 0 }),
+            body: JSON.stringify({ isAdmin: adminFields.isAdmin ? 1 : 0 }),
           });
           
-          // Update editor_for
+          // Update editorFor
           await fetch(`${API_BASE_URL}/singers/${editingSinger.id}/editor-for`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ editor_for: adminFields.editor_for }),
+            body: JSON.stringify({ editorFor: adminFields.editorFor }),
           });
           
           // Clear centers cache since editor assignments affect center data
@@ -139,7 +139,7 @@ export const SingerManager: React.FC = () => {
     
     // Apply sorting
     if (sortBy === 'pitchCount') {
-      result.sort((a, b) => (b.pitch_count ?? 0) - (a.pitch_count ?? 0));
+      result.sort((a, b) => (b.pitchCount ?? 0) - (a.pitchCount ?? 0));
     } else {
       // Sort by name
       if (searchTerm.trim()) {

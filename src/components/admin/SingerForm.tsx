@@ -6,7 +6,7 @@ import { Tooltip } from '../common';
 
 interface SingerFormProps {
   singer?: Singer | null;
-  onSubmit: (input: CreateSingerInput, adminFields?: { is_admin: boolean; editor_for: number[] }) => Promise<void>;
+  onSubmit: (input: CreateSingerInput, adminFields?: { isAdmin: boolean; editorFor: number[] }) => Promise<void>;
   onCancel: () => void;
   onUnsavedChangesRef?: React.MutableRefObject<(() => boolean) | null>;
 }
@@ -39,7 +39,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
     if (!isEditMode) return true; // Always allow creating new singers
     // Allow users to edit their own profile
     if (singer?.id === userId) return true;
-    const singerCenters = singer?.center_ids || [];
+    const singerCenters = singer?.centerIds || [];
     // User must have editor access to at least one of the singer's centers
     return singerCenters.some(centerId => editorFor.includes(centerId));
   }, [isAdmin, isEditMode, singer, editorFor, userId]);
@@ -51,15 +51,15 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
   const hasUnsavedChanges = useMemo(() => {
     if (singer) {
       // Edit mode - compare with original values
-      const originalCenterIds = singer.center_ids || [];
-      const originalEditorFor = singer.editor_for || [];
+      const originalCenterIds = singer.centerIds || [];
+      const originalEditorFor = singer.editorFor || [];
       const centerIdsChanged = JSON.stringify(centerIds.slice().sort()) !== JSON.stringify(originalCenterIds.slice().sort());
       const editorForChanged = JSON.stringify(editorForCenters.slice().sort()) !== JSON.stringify(originalEditorFor.slice().sort());
       return name !== singer.name || 
              gender !== (singer.gender || '') || 
              email !== (singer.email || '') ||
              centerIdsChanged ||
-             singerIsAdmin !== (singer.is_admin || false) ||
+             singerIsAdmin !== (singer.isAdmin || false) ||
              editorForChanged;
     } else {
       // Create mode - check if any field has content
@@ -87,7 +87,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
   useEffect(() => {
     if (singer) {
       console.log('Singer data:', singer);
-      console.log('Editor for:', singer.editor_for);
+      console.log('Editor for:', singer.editorFor);
       
       // If user is not admin/editor and trying to view someone else's profile, show blank form
       if (!isAdmin && !isEditor && singer.id !== userId) {
@@ -105,11 +105,11 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
       setName(singer.name);
       setGender(singer.gender || '');
       setEmail(singer.email || '');
-      const singerCenters = singer.center_ids || [];
+      const singerCenters = singer.centerIds || [];
       setCenterIds(singerCenters);
       setOriginalCenterIds(singerCenters); // Store original centers
-      setSingerIsAdmin(singer.is_admin || false);
-      setEditorForCenters(singer.editor_for || []);
+      setSingerIsAdmin(singer.isAdmin || false);
+      setEditorForCenters(singer.editorFor || []);
       setAutoSelectApplied(true); // Already have centers from singer
     } else {
       setName('');
@@ -171,13 +171,13 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
         name: name.trim(),
         gender: gender as 'Male' | 'Female' | 'Boy' | 'Girl' | 'Other',
         email: email.trim() || undefined,
-        center_ids: centerIds.length > 0 ? centerIds : undefined,
+        centerIds: centerIds.length > 0 ? centerIds : undefined,
       };
       
       // If current user is admin and we're editing, pass admin fields
       const adminFields = (isAdmin && isEditMode) ? {
-        is_admin: singerIsAdmin,
-        editor_for: editorForCenters
+        isAdmin: singerIsAdmin,
+        editorFor: editorForCenters
       } : undefined;
       
       await onSubmit(input, adminFields);
@@ -209,7 +209,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ${
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 placeholder:text-gray-400 placeholder:italic dark:placeholder:text-gray-500 ${
             errors.name ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
           }`}
           placeholder="Enter singer name"
@@ -264,10 +264,10 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ${
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 placeholder:text-gray-400 placeholder:italic dark:placeholder:text-gray-500 ${
             errors.email ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
           }`}
-          placeholder="singer@example.com"
+          placeholder="e.g. singer@example.com"
           disabled={isSubmitting || isFormDisabled}
         />
         {errors.email && (
@@ -307,9 +307,9 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
                 </label>
               </div>
             ) : (
-              <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md">
-                <span className={`font-medium ${singer?.is_admin ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                  {singer?.is_admin ? 'Yes - Full system access' : 'No'}
+              <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md opacity-60 cursor-not-allowed">
+                <span className={`${singer?.isAdmin ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                  {singer?.isAdmin ? 'Yes - Full system access' : 'No'}
                 </span>
               </div>
             )}

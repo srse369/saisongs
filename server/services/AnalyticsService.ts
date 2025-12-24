@@ -1,4 +1,5 @@
-import { databaseService } from './DatabaseService.js';
+import { databaseReadService } from './DatabaseReadService.js';
+import { databaseWriteService } from './DatabaseWriteService.js';
 
 interface VisitorData {
   ipAddress: string;
@@ -89,25 +90,19 @@ class AnalyticsService {
     try {
       const geo = await this.getGeolocation(visitorData.ipAddress);
 
-      await databaseService.query(`
-        INSERT INTO visitor_analytics (
-          ip_address, country, country_code, region, city,
-          latitude, longitude, user_agent, page_path,
-          referrer, user_role
-        ) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9, :10, :11)
-      `, [
-        visitorData.ipAddress,
-        geo.country || null,
-        geo.countryCode || null,
-        geo.region || null,
-        geo.city || null,
-        geo.latitude || null,
-        geo.longitude || null,
-        visitorData.userAgent || null,
-        visitorData.pagePath || null,
-        visitorData.referrer || null,
-        visitorData.userRole || 'public'
-      ]);
+      await databaseWriteService.recordVisitorAnalytics({
+        ipAddress: visitorData.ipAddress,
+        country: geo.country,
+        countryCode: geo.countryCode,
+        region: geo.region,
+        city: geo.city,
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+        userAgent: visitorData.userAgent,
+        pagePath: visitorData.pagePath,
+        referrer: visitorData.referrer,
+        userRole: visitorData.userRole
+      });
     } catch (error) {
       // Don't fail the request if analytics fails
       console.error('[Analytics] ❌ Failed to track visitor:', error);
@@ -118,40 +113,18 @@ class AnalyticsService {
    * Get analytics summary
    */
   async getAnalyticsSummary(days: number = 30): Promise<AnalyticsSummary> {
-    
     // Get date range
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
     // Total visits
-    const totalVisitsResult = await databaseService.query(`
-      SELECT COUNT(*) as total
-      FROM visitor_analytics
-      WHERE visit_timestamp >= :1
-    `, [startDate]);
-    const totalVisits = Number(totalVisitsResult[0]?.TOTAL || 0);
+    const totalVisits = await databaseReadService.getTotalVisitsCount(startDate);
 
     // Unique visitors (by IP)
-    const uniqueVisitorsResult = await databaseService.query(`
-      SELECT COUNT(DISTINCT ip_address) as unique_count
-      FROM visitor_analytics
-      WHERE visit_timestamp >= :1
-    `, [startDate]);
-    const uniqueVisitors = Number(uniqueVisitorsResult[0]?.UNIQUE_COUNT || 0);
+    const uniqueVisitors = await databaseReadService.getUniqueVisitorsCount(startDate);
 
     // Top countries
-    const countriesResult = await databaseService.query(`
-      SELECT 
-        country, 
-        country_code,
-        COUNT(*) as visit_count
-      FROM visitor_analytics
-      WHERE visit_timestamp >= :1 AND country IS NOT NULL
-      GROUP BY country, country_code
-      ORDER BY visit_count DESC
-      FETCH FIRST 10 ROWS ONLY
-    `, [startDate]);
-    
+    const countriesResult = await databaseReadService.getTopCountries(startDate, 10);
     const countries = countriesResult.map((row: any) => ({
       country: row.COUNTRY,
       countryCode: row.COUNTRY_CODE,
@@ -159,39 +132,14 @@ class AnalyticsService {
     }));
 
     // Top pages
-    const topPagesResult = await databaseService.query(`
-      SELECT 
-        page_path as page,
-        COUNT(*) as visit_count
-      FROM visitor_analytics
-      WHERE visit_timestamp >= :1 AND page_path IS NOT NULL
-      GROUP BY page_path
-      ORDER BY visit_count DESC
-      FETCH FIRST 10 ROWS ONLY
-    `, [startDate]);
-    
+    const topPagesResult = await databaseReadService.getTopPages(startDate, 10);
     const topPages = topPagesResult.map((row: any) => ({
       page: row.PAGE,
       count: Number(row.VISIT_COUNT)
     }));
 
     // Recent visits
-    const recentVisitsResult = await databaseService.query(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        ip_address,
-        country,
-        city,
-        page_path,
-        user_role,
-        visit_timestamp,
-        TO_CHAR(visit_timestamp AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"') as timestamp_utc
-      FROM visitor_analytics
-      WHERE visit_timestamp >= :1
-      ORDER BY visit_timestamp DESC
-      FETCH FIRST 50 ROWS ONLY
-    `, [startDate]);
-    
+    const recentVisitsResult = await databaseReadService.getRecentVisits(startDate, 50);
     const recentVisits = recentVisitsResult.map((row: any) => ({
       id: row.ID,
       ipAddress: row.IP_ADDRESS,
@@ -199,25 +147,11 @@ class AnalyticsService {
       city: row.CITY,
       pagePath: row.PAGE_PATH,
       userRole: row.USER_ROLE,
-      timestamp: row.TIMESTAMP_UTC // Use UTC ISO string instead of raw timestamp
+      timestamp: row.TIMESTAMP_UTC
     }));
 
     // Location markers (grouped by city)
-    const locationsResult = await databaseService.query(`
-      SELECT 
-        latitude,
-        longitude,
-        city,
-        country,
-        COUNT(*) as visit_count
-      FROM visitor_analytics
-      WHERE visit_timestamp >= :1 
-        AND latitude IS NOT NULL 
-        AND longitude IS NOT NULL
-      GROUP BY latitude, longitude, city, country
-      ORDER BY visit_count DESC
-    `, [startDate]);
-    
+    const locationsResult = await databaseReadService.getVisitorLocations(startDate);
     const locationMarkers = locationsResult.map((row: any) => ({
       lat: Number(row.LATITUDE),
       lon: Number(row.LONGITUDE),
@@ -243,21 +177,7 @@ class AnalyticsService {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const result = await databaseService.query(`
-      SELECT 
-        latitude,
-        longitude,
-        city,
-        country,
-        country_code,
-        COUNT(*) as visit_count
-      FROM visitor_analytics
-      WHERE visit_timestamp >= :1 
-        AND latitude IS NOT NULL 
-        AND longitude IS NOT NULL
-      GROUP BY latitude, longitude, city, country, country_code
-      ORDER BY visit_count DESC
-    `, [startDate]);
+    const result = await databaseReadService.getVisitorLocationsWithCountryCode(startDate);
     
     return result.map((row: any) => ({
       lat: Number(row.LATITUDE),
@@ -271,4 +191,3 @@ class AnalyticsService {
 }
 
 export const analyticsService = new AnalyticsService();
-

@@ -99,7 +99,45 @@ const PITCH_MAPPINGS: Record<string, string> = {
   '3.5Madhyam': '3.5 Madhyam',
   '4.5Madhyam': '4.5 Madhyam',
   '5.5Madhyam': '5.5 Madhyam',
-  '6.5Madhyam': '6.5 Madhyam'
+  '6.5Madhyam': '6.5 Madhyam',
+
+  // Pancham format (e.g., "1 Pancham" = "1" = C, "2 Pancham" = "2" = D)
+  '1Pancham': 'C',
+  '2Pancham': 'D',
+  '3Pancham': 'E',
+  '4Pancham': 'F',
+  '5Pancham': 'G',
+  '6Pancham': 'A',
+  '7Pancham': 'B',
+  '1.5Pancham': 'C#',
+  '2.5Pancham': 'D#',
+  '3.5Pancham': 'F',
+  '4.5Pancham': 'F#',
+  '5.5Pancham': 'G#',
+  '6.5Pancham': 'A#',
+  '7.5Pancham': 'C',
+
+  // Combined Pancham / Western format (e.g., "2 Pancham / D")
+  '1Pancham/C': 'C',
+  '2Pancham/D': 'D',
+  '3Pancham/E': 'E',
+  '4Pancham/F': 'F',
+  '5Pancham/G': 'G',
+  '6Pancham/A': 'A',
+  '7Pancham/B': 'B',
+  '1.5Pancham/C#': 'C#',
+  '2.5Pancham/D#': 'D#',
+  '3.5Pancham/F': 'F',
+  '4.5Pancham/F#': 'F#',
+  '5.5Pancham/G#': 'G#',
+  '6.5Pancham/A#': 'A#',
+  '7.5Pancham/C': 'C',
+  // Also handle without the # symbol in combined format
+  '1Pancham/C#': 'C#',
+  '2Pancham/D#': 'D#',
+  '4Pancham/F#': 'F#',
+  '5Pancham/G#': 'G#',
+  '6Pancham/A#': 'A#'
 };
 
 /**
@@ -172,4 +210,42 @@ export function removePitchMapping(sourceFormat: string): void {
 export function getPitchMappings(): Record<string, string> {
   return { ...PITCH_MAPPINGS };
 }
+
+/**
+ * Format a pitch for display with normalization
+ * Returns format like "2M (D major)" or just "2 Madhyam" for Madhyam pitches (no redundant parenthetical)
+ */
+export function formatNormalizedPitch(inputPitch: string): string {
+  if (!inputPitch) return '';
+  
+  const normalized = normalizePitch(inputPitch) || inputPitch;
+  
+  // Convert to numeric format using PITCH_TO_NUMBER logic
+  let numericFormat: string;
+  if (normalized.includes('Madhyam')) {
+    // Madhyam pitches - just show as-is, no parenthetical needed
+    return normalized;
+  } else if (normalized.endsWith(' major')) {
+    const basePitch = normalized.replace(' major', '');
+    const number = PITCH_TO_NUMBER[basePitch];
+    numericFormat = number ? `${number}M` : normalized;
+  } else if (normalized.endsWith(' minor')) {
+    const basePitch = normalized.replace(' minor', '');
+    const number = PITCH_TO_NUMBER[basePitch];
+    numericFormat = number ? `${number}m` : normalized;
+  } else {
+    const number = PITCH_TO_NUMBER[normalized];
+    numericFormat = number || normalized;
+  }
+  
+  // For non-Madhyam pitches, show numeric format with note name in parentheses
+  const displayName = normalized.replace('#', '♯');
+  return `${numericFormat} (${displayName})`;
+}
+
+// Pitch to number mappings for formatNormalizedPitch
+const PITCH_TO_NUMBER: Record<string, string> = {
+  'C': '1', 'D': '2', 'E': '3', 'F': '4', 'G': '5', 'A': '6', 'B': '7',
+  'C#': '1.5', 'D#': '2.5', 'F#': '4.5', 'G#': '5.5', 'A#': '6.5'
+};
 

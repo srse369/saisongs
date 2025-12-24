@@ -221,7 +221,7 @@ export interface PresentationTemplate {
   text?: TextElement[];
   
   isDefault?: boolean;
-  center_ids?: number[];              // Centers that have access to this template (empty = all centers)
+  centerIds?: number[];              // Centers that have access to this template (empty = all centers)
   createdAt?: Date;
   updatedAt?: Date;
   yaml?: string;
@@ -261,7 +261,7 @@ export interface Song {
   createdAt: Date;
   updatedAt: Date;
   
-  pitch_count?: number;                // Number of pitch assignments for this song
+  pitchCount?: number;                // Number of pitch assignments for this song
 }
 
 export interface Singer {
@@ -269,10 +269,10 @@ export interface Singer {
   name: string;
   gender?: 'Male' | 'Female' | 'Boy' | 'Girl' | 'Other';
   email?: string;                      // Optional email for singer
-  center_ids?: number[];               // Centers that have access to this singer (empty = all centers)
-  editor_for?: number[];               // Centers this user can edit (if they have editor permissions)
-  is_admin?: boolean;                  // Whether this user is an admin
-  pitch_count?: number;                // Number of pitch assignments this singer has
+  centerIds?: number[];               // Centers that have access to this singer (empty = all centers)
+  editorFor?: number[];               // Centers this user can edit (if they have editor permissions)
+  isAdmin?: boolean;                  // Whether this user is an admin
+  pitchCount?: number;                // Number of pitch assignments this singer has
   createdAt: Date;
   updatedAt: Date;
 }
@@ -290,8 +290,8 @@ export interface NamedSession {
   id: string;
   name: string;
   description?: string;
-  center_ids?: number[];              // Centers that have access to this session (empty = all centers)
-  created_by?: string;                // Email of user who created the session
+  centerIds?: number[];              // Centers that have access to this session (empty = all centers)
+  createdBy?: string;                // Email of user who created the session
   createdAt: Date;
   updatedAt: Date;
 }
@@ -389,14 +389,14 @@ export interface CreateSingerInput {
   name: string;
   gender?: 'Male' | 'Female' | 'Boy' | 'Girl' | 'Other';
   email?: string;
-  center_ids?: number[];
+  centerIds?: number[];
 }
 
 export interface UpdateSingerInput {
   name?: string;
   gender?: 'Male' | 'Female' | 'Boy' | 'Girl' | 'Other';
   email?: string;
-  center_ids?: number[];
+  centerIds?: number[];
 }
 
 export interface CreatePitchInput {
@@ -412,13 +412,13 @@ export interface UpdatePitchInput {
 export interface CreateNamedSessionInput {
   name: string;
   description?: string;
-  center_ids?: number[];
+  centerIds?: number[];
 }
 
 export interface UpdateNamedSessionInput {
   name?: string;
   description?: string;
-  center_ids?: number[];
+  centerIds?: number[];
 }
 
 export interface CreateSessionItemInput {

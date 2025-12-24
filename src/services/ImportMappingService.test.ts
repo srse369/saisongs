@@ -69,7 +69,7 @@ describe('ImportMappingService', () => {
         expect(result).toBe(true);
         expect(apiClient.post).toHaveBeenCalledWith('/import-mappings/songs', {
           csv_song_name: 'amazing grace',
-          db_song_id: '1',
+          dbSongId: '1',
           db_song_name: 'Amazing Grace',
         });
       });
@@ -124,7 +124,7 @@ describe('ImportMappingService', () => {
         // Should re-save with normalized format
         expect(apiClient.post).toHaveBeenCalledWith('/import-mappings/songs', {
           csv_song_name: 'amazing grace',
-          db_song_id: '1',
+          dbSongId: '1',
           db_song_name: 'Amazing Grace',
         });
       });

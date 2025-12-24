@@ -522,7 +522,7 @@ class PptxExportService {
         w: this.sanitizeDimension(w, 2, 0.1),
         h: this.sanitizeDimension(h, 0.4, 0.1),
         align: 'left', // Current song is always left aligned
-        valign: 'top',
+        valign: 'middle',
         margin: [0.05, 0.1, 0.05, 0.1], // top, right, bottom, left padding
         fill: { color: '111827', transparency: 50 }, // bg-gray-900 with 50% transparency
         shape: 'roundRect',
@@ -1151,26 +1151,26 @@ class PptxExportService {
 
   /**
    * Parse font size to points (direct conversion for UI elements like current/next song)
-   * 1px ≈ 0.75pt (at 96dpi)
+   * Uses 0.5x scaling to get medium-sized text suitable for presentation overlays
    */
   private parseFontSizeDirect(fontSizeStr: string): number {
-    let fontSizePt = 12;
+    let fontSizePt = 10;
     
     if (fontSizeStr.endsWith('px')) {
       const px = parseFloat(fontSizeStr);
-      // Direct conversion: 1px = 0.75pt
-      fontSizePt = Math.round(px * 0.75);
+      // Scaled conversion: 1px = 0.5pt for medium-sized UI text
+      fontSizePt = Math.round(px * 0.5);
     } else if (fontSizeStr.endsWith('pt')) {
-      fontSizePt = parseFloat(fontSizeStr);
+      fontSizePt = parseFloat(fontSizeStr) * 0.67;
     } else if (fontSizeStr.endsWith('rem') || fontSizeStr.endsWith('em')) {
-      // 1rem = 16px = 12pt
-      fontSizePt = parseFloat(fontSizeStr) * 12;
+      // 1rem = 16px, scaled to ~8pt
+      fontSizePt = parseFloat(fontSizeStr) * 8;
     } else {
-      fontSizePt = parseFloat(fontSizeStr) || 12;
+      fontSizePt = parseFloat(fontSizeStr) * 0.5 || 10;
     }
 
-    // Clamp font size to reasonable range
-    return Math.max(8, Math.min(fontSizePt, 48));
+    // Clamp font size to reasonable range for overlay text
+    return Math.max(8, Math.min(fontSizePt, 24));
   }
 
   /**

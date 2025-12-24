@@ -1,6 +1,6 @@
 import express from 'express';
 import { cacheService } from '../services/CacheService.js';
-import { databaseService } from '../services/DatabaseService.js';
+import { databaseReadService } from '../services/DatabaseReadService.js';
 import { requireAuth, requireEditor, optionalAuth } from '../middleware/simpleAuth.js';
 import { handleSessionError } from '../utils/errorHandlers.js';
 
@@ -12,46 +12,8 @@ const router = express.Router();
 // Uses optionalAuth to populate req.user if logged in (for center-based filtering)
 router.get('/', optionalAuth, async (req, res) => {
   try {
-    // Bypass cache to always get fresh data (filtering is user-specific)
-    const db = await (cacheService as any).getDatabase();
-    const sessions = await db.query(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        description,
-        center_ids,
-        created_by,
-        created_at,
-        updated_at
-      FROM song_sessions 
-      ORDER BY name
-    `);
-
-    const mappedSessions = sessions.map((row: any) => {
-      let centerIds: number[] | undefined = undefined;
-      try {
-        if (row.CENTER_IDS) {
-          const parsed = JSON.parse(row.CENTER_IDS);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            centerIds = parsed;
-          }
-        }
-      } catch (e) {
-        console.error('[SESSIONS] Error parsing center_ids:', e);
-      }
-
-      return {
-        id: row.ID,
-        name: row.NAME,
-        description: row.DESCRIPTION,
-        center_ids: centerIds,
-        created_by: row.CREATED_BY,
-        createdAt: new Date(row.CREATED_AT).toISOString(),
-        updatedAt: new Date(row.UPDATED_AT).toISOString(),
-      };
-    });
-
-    const allSessions = mappedSessions;
+    // Get all sessions from database (fresh data, filtering is user-specific)
+    const allSessions = await databaseReadService.getAllSessions();
     const user = req.user;
     
     // Filter sessions based on user role and centers
@@ -59,7 +21,7 @@ router.get('/', optionalAuth, async (req, res) => {
     
     if (!user) {
       // Non-authenticated users see only public sessions (no center restriction)
-      filteredSessions = allSessions.filter(s => !s.center_ids || s.center_ids.length === 0);
+      filteredSessions = allSessions.filter(s => !s.centerIds || s.centerIds.length === 0);
     } else if (user.role === 'admin') {
       // Admins see all sessions
       filteredSessions = allSessions;
@@ -67,7 +29,7 @@ router.get('/', optionalAuth, async (req, res) => {
       // Editors see sessions for their centers + public sessions
       const editorCenterIds = user.editorFor || [];
       filteredSessions = allSessions.filter(s => {
-        const sessionCenterIds = s.center_ids || [];
+        const sessionCenterIds = s.centerIds || [];
         // Show if public OR if editor manages at least one of the session's centers
         return sessionCenterIds.length === 0 || 
           sessionCenterIds.some((cid: number) => editorCenterIds.includes(cid));
@@ -76,11 +38,11 @@ router.get('/', optionalAuth, async (req, res) => {
       // Viewers see sessions for their centers + public sessions + their own sessions
       const userCenterIds = user.centerIds || [];
       filteredSessions = allSessions.filter(s => {
-        const sessionCenterIds = s.center_ids || [];
+        const sessionCenterIds = s.centerIds || [];
         // Show if: public OR user's center OR created by user
         return sessionCenterIds.length === 0 || 
           sessionCenterIds.some((cid: number) => userCenterIds.includes(cid)) ||
-          s.created_by === user.email;
+          s.createdBy === user.email;
       });
     }
     
@@ -113,7 +75,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     }
 
     const user = req.user;
-    const sessionCenterIds = session.center_ids || [];
+    const sessionCenterIds = session.centerIds || [];
     
     // Check access based on user role and centers
     if (sessionCenterIds.length > 0) {
@@ -137,7 +99,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
         // Viewers must belong to one of the session's centers OR be the creator
         const userCenterIds = user.centerIds || [];
         const hasAccess = sessionCenterIds.some((cid: number) => userCenterIds.includes(cid)) ||
-          session.created_by === user.email;
+          session.createdBy === user.email;
         if (!hasAccess) {
           return res.status(403).json({ 
             error: 'Access denied', 
@@ -157,7 +119,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
 // Create session
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { name, description, center_ids } = req.body;
+    const { name, description } = req.body;
+    const centerIds = req.body.centerIds ?? req.body.center_ids;
 
     if (!name) {
       return res.status(400).json({ error: 'Session name is required' });
@@ -168,14 +131,14 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // For non-admins, auto-assign their center(s) if no center_ids specified
-    let sessionCenterIds = center_ids;
-    if (user.role !== 'admin' && (!center_ids || center_ids.length === 0)) {
+    // For non-admins, auto-assign their center(s) if no centerIds specified
+    let sessionCenterIds = centerIds;
+    if (user.role !== 'admin' && (!centerIds || centerIds.length === 0)) {
       // Use the user's primary center(s)
       sessionCenterIds = user.centerIds || [];
     }
 
-    const session = await cacheService.createSession(name, description, sessionCenterIds, user.email);
+    const session = await cacheService.createSession({ name, description, centerIds: sessionCenterIds, createdBy: user.email });
     res.status(201).json(session);
   } catch (error: any) {
     console.error('Error creating session:', error);
@@ -191,10 +154,11 @@ router.post('/', requireAuth, async (req, res) => {
 router.put('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, center_ids } = req.body;
+    const { name, description } = req.body;
+    const centerIds = req.body.centerIds ?? req.body.center_ids;
     const user = req.user;
 
-    if (name === undefined && description === undefined && center_ids === undefined) {
+    if (name === undefined && description === undefined && centerIds === undefined) {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
@@ -208,7 +172,7 @@ router.put('/:id', requireAuth, async (req, res) => {
     if (user.role !== 'admin') {
       // Viewers can only edit their own sessions
       if (user.role === 'viewer') {
-        if (existingSession.created_by !== user.email) {
+        if (existingSession.createdBy !== user.email) {
           return res.status(403).json({ 
             error: 'Access denied',
             message: 'You can only edit sessions that you created'
@@ -218,7 +182,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       // Editors can only edit sessions for centers they manage
       else if (user.role === 'editor') {
         const editorCenterIds = user.editorFor || [];
-        const sessionCenterIds = existingSession.center_ids || [];
+        const sessionCenterIds = existingSession.centerIds || [];
         
         // Check if editor manages at least one of the session's centers
         const hasAccess = sessionCenterIds.length === 0 || 
@@ -233,7 +197,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       }
     }
 
-    const session = await cacheService.updateSession(id, { name, description, center_ids, updated_by: user.email });
+    const session = await cacheService.updateSession(id, { name, description, centerIds, updatedBy: user.email });
     
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
@@ -274,7 +238,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     // Viewers can only delete their own sessions
     if (user.role === 'viewer') {
-      if (session.created_by !== user.email) {
+      if (session.createdBy !== user.email) {
         return res.status(403).json({ 
           error: 'Access denied',
           message: 'You can only delete sessions that you created'
@@ -287,7 +251,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     // Editors can only delete sessions for centers they manage
     if (user.role === 'editor') {
       const editorCenterIds = user.editorFor || [];
-      const sessionCenterIds = session.center_ids || [];
+      const sessionCenterIds = session.centerIds || [];
       
       // Check if editor manages at least one of the session's centers
       const hasAccess = sessionCenterIds.length === 0 || 
@@ -355,7 +319,7 @@ router.post('/:sessionId/items', requireAuth, async (req, res) => {
       if (!session) {
         return res.status(404).json({ error: 'Session not found' });
       }
-      if (session.created_by !== user.email) {
+      if (session.createdBy !== user.email) {
         return res.status(403).json({ 
           error: 'Access denied',
           message: 'You can only add items to sessions that you created'
@@ -387,17 +351,12 @@ router.put('/items/:id', requireAuth, async (req, res) => {
 
     // Viewers can only update items in their own sessions
     if (user.role === 'viewer') {
-      // Query database to get the session_id for this item
-      const result = await databaseService.query(
-        'SELECT RAWTOHEX(session_id) as session_id FROM song_session_items WHERE RAWTOHEX(id) = :1',
-        [id]
-      );
-      if (!result || result.length === 0) {
+      const sessionId = await databaseReadService.getSessionIdByItemId(id);
+      if (!sessionId) {
         return res.status(404).json({ error: 'Session item not found' });
       }
-      const sessionId = result[0].SESSION_ID || result[0].session_id;
       const session = await cacheService.getSession(sessionId);
-      if (!session || session.created_by !== user.email) {
+      if (!session || session.createdBy !== user.email) {
         return res.status(403).json({ 
           error: 'Access denied',
           message: 'You can only update items in sessions that you created'
@@ -424,17 +383,12 @@ router.delete('/items/:id', requireAuth, async (req, res) => {
 
     // Viewers can only delete items from their own sessions
     if (user.role === 'viewer') {
-      // Query database to get the session_id for this item
-      const result = await databaseService.query(
-        'SELECT RAWTOHEX(session_id) as session_id FROM song_session_items WHERE RAWTOHEX(id) = :1',
-        [id]
-      );
-      if (!result || result.length === 0) {
+      const sessionId = await databaseReadService.getSessionIdByItemId(id);
+      if (!sessionId) {
         return res.status(404).json({ error: 'Session item not found' });
       }
-      const sessionId = result[0].SESSION_ID || result[0].session_id;
       const session = await cacheService.getSession(sessionId);
-      if (!session || session.created_by !== user.email) {
+      if (!session || session.createdBy !== user.email) {
         return res.status(403).json({ 
           error: 'Access denied',
           message: 'You can only delete items from sessions that you created'
@@ -467,7 +421,7 @@ router.put('/:sessionId/reorder', requireAuth, async (req, res) => {
       if (!session) {
         return res.status(404).json({ error: 'Session not found' });
       }
-      if (session.created_by !== user.email) {
+      if (session.createdBy !== user.email) {
         return res.status(403).json({ 
           error: 'Access denied',
           message: 'You can only reorder items in sessions that you created'
@@ -500,7 +454,7 @@ router.put('/:sessionId/items', requireAuth, async (req, res) => {
       if (!session) {
         return res.status(404).json({ error: 'Session not found' });
       }
-      if (session.created_by !== user.email) {
+      if (session.createdBy !== user.email) {
         return res.status(403).json({ 
           error: 'Access denied',
           message: 'You can only set items in sessions that you created'

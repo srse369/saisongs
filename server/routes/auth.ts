@@ -1,9 +1,9 @@
 import express from 'express';
-import { databaseService } from '../services/DatabaseService.js';
+import { databaseReadService } from '../services/DatabaseReadService.js';
+import { databaseWriteService } from '../services/DatabaseWriteService.js';
 import { emailService } from '../services/EmailService.js';
 
 const router = express.Router();
-const db = databaseService;
 
 // Rate limiting state (in production, consider using Redis)
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -21,7 +21,7 @@ setInterval(() => {
   }
   
   // Clean up expired OTP codes from database
-  db.query('BEGIN cleanup_expired_otp_codes; END;').catch(err => {
+  databaseWriteService.cleanupExpiredOTPs().catch(err => {
     console.error('[AUTH] Error cleaning up OTP codes:', err);
   });
 }, 5 * 60 * 1000); // Clean up every 5 minutes
@@ -75,12 +75,9 @@ router.post('/request-otp', async (req, res) => {
 
   try {
     // Check if user exists with this email
-    const users = await db.query<any>(
-      'SELECT id, name, email FROM users WHERE LOWER(email) = LOWER(:1)',
-      [normalizedEmail]
-    );
+    const user = await databaseReadService.getUserBasicInfo(normalizedEmail);
 
-    if (users.length === 0) {
+    if (!user) {
       // User not found - inform them to contact their center
       console.log(`[AUTH] OTP requested for non-existent email: ${normalizedEmail}`);
       return res.status(404).json({ 
@@ -89,18 +86,12 @@ router.post('/request-otp', async (req, res) => {
       });
     }
 
-    const user = users[0];
-
     // Generate OTP code
     const otpCode = generateOTP();
     const expiresAt = new Date(Date.now() + OTP_EXPIRATION_MS);
 
     // Store OTP in database
-    await db.query<any>(
-      `INSERT INTO otp_codes (email, code, expires_at) 
-       VALUES (:1, :2, :3)`,
-      [normalizedEmail, otpCode, expiresAt]
-    );
+    await databaseWriteService.insertOTPCode(normalizedEmail, otpCode, expiresAt);
 
     // Send OTP email
     const emailSent = await emailService.sendOTPEmail(normalizedEmail, otpCode);
@@ -160,18 +151,10 @@ router.post('/verify-otp', async (req, res) => {
   });
 
   try {
-    // Find valid, unused OTP code (used = 0 for Oracle NUMBER)
-    const otpRecords = await db.query<any>(
-      `SELECT id, code, email, expires_at, used FROM otp_codes 
-       WHERE email = :1 AND code = :2 AND used = 0 
-       ORDER BY created_at DESC`,
-      [normalizedEmail, normalizedCode]
-    );
+    // Find valid, unused OTP code
+    const otpRecord = await databaseReadService.getValidOTPCode(normalizedEmail, normalizedCode);
 
-    // Only take the most recent one
-    const recentOtp = otpRecords.length > 0 ? [otpRecords[0]] : [];
-
-    if (recentOtp.length === 0) {
+    if (!otpRecord) {
       // Invalid code - increment attempts
       const current = loginAttempts.get(ip) || { count: 0, resetAt: 0 };
       loginAttempts.set(ip, {
@@ -185,8 +168,7 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    const otpRecord = recentOtp[0];
-    const expiresAt = new Date(otpRecord.expires_at || otpRecord.EXPIRES_AT); // Oracle returns uppercase column names
+    const expiresAt = new Date(otpRecord.expiresAt);
 
     // Check if OTP has expired
     if (expiresAt < new Date()) {
@@ -195,65 +177,26 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    // Mark OTP as used (1 = true for Oracle NUMBER)
-    await db.query<any>(
-      'UPDATE otp_codes SET used = 1 WHERE id = :1',
-      [otpRecord.id || otpRecord.ID]
-    );
+    // Mark OTP as used
+    await databaseWriteService.markOTPAsUsed(otpRecord.id);
 
-    // Get user details including editor_for and center_ids
-    // Use RAWTOHEX to get consistent hex string ID format (matches singer IDs)
-    const users = await db.query<any>(
-      'SELECT RAWTOHEX(id) as id, name, email, is_admin, editor_for, center_ids FROM users WHERE LOWER(email) = LOWER(:1)',
-      [normalizedEmail]
-    );
+    // Get user details including editorFor and centerIds
+    const user = await databaseReadService.getUserByEmail(normalizedEmail);
 
-    if (users.length === 0) {
+    if (!user) {
       return res.status(401).json({ error: 'User not found' });
     }
 
-    const user = users[0];
-
-    // User ID is now a hex string from RAWTOHEX (consistent with singer IDs)
-    const userId: string = user.id || user.ID;
-
     // Determine user role based on simplified system:
-    // 1. Admin: is_admin = 1 (full system access)
-    // 2. Editor: editor_for contains center IDs they can edit
-    // 3. Viewer: has access to centers via center_ids (viewer access only)
+    // 1. Admin: isAdmin = true (full system access)
+    // 2. Editor: editorFor contains center IDs they can edit
+    // 3. Viewer: has access to centers via centerIds (viewer access only)
     let role: 'admin' | 'editor' | 'viewer' = 'viewer';
-    let editorFor: number[] = [];
-    let centerIds: number[] = [];
     
-    // Check if user is an admin (is_admin = 1)
-    const isAdmin = (user.is_admin || user.IS_ADMIN) === 1;
-    
-    if (isAdmin) {
+    if (user.isAdmin) {
       role = 'admin';
-    } else {
-      // Parse editor_for JSON to check if user is an editor
-      const editorForJson = user.editor_for || user.EDITOR_FOR;
-      if (editorForJson) {
-        try {
-          editorFor = JSON.parse(editorForJson);
-          // If user has any centers they can edit, they're an editor
-          role = Array.isArray(editorFor) && editorFor.length > 0 ? 'editor' : 'viewer';
-        } catch (e) {
-          console.error('[AUTH] Error parsing editor_for:', e);
-          // If parsing fails, default to viewer
-          role = 'viewer';
-        }
-      }
-      
-      // Parse center_ids for viewer access
-      const centerIdsJson = user.center_ids || user.CENTER_IDS;
-      if (centerIdsJson) {
-        try {
-          centerIds = JSON.parse(centerIdsJson);
-        } catch (e) {
-          console.error('[AUTH] Error parsing center_ids:', e);
-        }
-      }
+    } else if (Array.isArray(user.editorFor) && user.editorFor.length > 0) {
+      role = 'editor';
     }
 
     // Success - clear rate limit
@@ -261,12 +204,12 @@ router.post('/verify-otp', async (req, res) => {
 
     // Create session
     if (req.session) {
-      req.session.userId = userId;
-      req.session.userEmail = user.email || user.EMAIL;
-      req.session.userName = user.name || user.NAME;
+      req.session.userId = user.id;
+      req.session.userEmail = user.email;
+      req.session.userName = user.name;
       req.session.userRole = role;
-      req.session.centerIds = centerIds;
-      req.session.editorFor = editorFor;
+      req.session.centerIds = user.centerIds;
+      req.session.editorFor = user.editorFor;
 
       // Force session save before sending response
       await new Promise<void>((resolve, reject) => {
@@ -286,17 +229,17 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    console.log(`[AUTH] Successful login: ${user.name || user.NAME} (${user.email || user.EMAIL}) as ${role}`);
+    console.log(`[AUTH] Successful login: ${user.name} (${user.email}) as ${role}`);
 
     return res.json({ 
       success: true, 
       role,
       user: {
-        id: user.id || user.ID,
-        name: user.name || user.NAME,
-        email: user.email || user.EMAIL,
-        centerIds: centerIds,
-        editorFor: editorFor
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        centerIds: user.centerIds,
+        editorFor: user.editorFor
       }
     });
   } catch (error) {
@@ -336,20 +279,8 @@ router.get('/admins', async (req, res) => {
   }
 
   try {
-    const admins = await db.query<any>(
-      `SELECT RAWTOHEX(id) as id, name, email 
-       FROM users 
-       WHERE is_admin = 1 
-       ORDER BY name`
-    );
-
-    const result = admins.map((admin: any) => ({
-      id: admin.id || admin.ID,
-      name: admin.name || admin.NAME,
-      email: admin.email || admin.EMAIL,
-    }));
-
-    return res.json({ admins: result });
+    const admins = await databaseReadService.getAdminUsers();
+    return res.json({ admins });
   } catch (error) {
     console.error('[AUTH] Error fetching admins:', error);
     return res.status(500).json({ error: 'Failed to fetch admin users' });
@@ -364,40 +295,12 @@ router.get('/session', async (req, res) => {
   if (req.session && req.session.userId && req.session.userEmail) {
     try {
       // Fetch fresh user data including centerIds and editorFor
-      // Use RAWTOHEX for consistent hex string ID format
-      const users = await db.query<any>(
-        'SELECT RAWTOHEX(id) as id, name, email, is_admin, editor_for, center_ids FROM users WHERE LOWER(email) = LOWER(:1)',
-        [req.session.userEmail]
-      );
+      const user = await databaseReadService.getUserByEmail(req.session.userEmail);
 
-      if (users.length > 0) {
-        const user = users[0];
-        
-        // Parse centerIds and editorFor from database
-        let centerIds: number[] = [];
-        let editorFor: number[] = [];
-        
-        try {
-          const centerIdsJson = user.center_ids || user.CENTER_IDS;
-          if (centerIdsJson) {
-            centerIds = JSON.parse(centerIdsJson);
-          }
-        } catch (e) {
-          console.error('[SESSION] Error parsing center_ids:', e);
-        }
-        
-        try {
-          const editorForJson = user.editor_for || user.EDITOR_FOR;
-          if (editorForJson) {
-            editorFor = JSON.parse(editorForJson);
-          }
-        } catch (e) {
-          console.error('[SESSION] Error parsing editor_for:', e);
-        }
-        
+      if (user) {
         // Update session with fresh data
-        req.session.centerIds = centerIds;
-        req.session.editorFor = editorFor;
+        req.session.centerIds = user.centerIds;
+        req.session.editorFor = user.editorFor;
         
         return res.json({
           authenticated: true,
@@ -406,8 +309,8 @@ router.get('/session', async (req, res) => {
             name: req.session.userName,
             email: req.session.userEmail,
             role: req.session.userRole,
-            centerIds: centerIds,
-            editorFor: editorFor
+            centerIds: user.centerIds,
+            editorFor: user.editorFor
           }
         });
       }

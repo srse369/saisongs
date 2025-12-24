@@ -1,6 +1,5 @@
 import express from 'express';
 import { cacheService } from '../services/CacheService.js';
-import { databaseService } from '../services/DatabaseService.js';
 import { requireAdmin, requireAuth } from '../middleware/simpleAuth.js';
 
 const router = express.Router();
@@ -78,7 +77,9 @@ router.get('/:id', async (req, res) => {
  * Create a new center (admin only - enforce in middleware)
  */
 router.post('/', requireAdmin, async (req, res) => {
-  const { name, badge_text_color, editor_ids } = req.body;
+  const { name } = req.body;
+  const badgeTextColor = req.body.badgeTextColor ?? req.body.badge_text_color;
+  const editorIds = req.body.editorIds ?? req.body.editor_ids;
 
   // Validate input
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -86,8 +87,8 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 
   const trimmedName = name.trim();
-  const color = badge_text_color || '#000000';
-  const editorIds = Array.isArray(editor_ids) ? editor_ids : [];
+  const color = badgeTextColor || '#000000';
+  const editorIdsArray = Array.isArray(editorIds) ? editorIds : [];
 
   // Validate hex color format
   if (!/^#[0-9A-Fa-f]{6}$/.test(color)) {
@@ -106,14 +107,14 @@ router.post('/', requireAdmin, async (req, res) => {
     // Create new center
     const created = await cacheService.createCenter({
       name: trimmedName,
-      badge_text_color: color,
-      editor_ids: editorIds,
-      created_by: req.user?.email
+      badgeTextColor: color,
+      editorIds: editorIdsArray,
+      createdBy: req.user?.email
     });
 
     // Add editor access for each specified user
-    if (created && editorIds.length > 0) {
-      for (const userId of editorIds) {
+    if (created && editorIdsArray.length > 0) {
+      for (const userId of editorIdsArray) {
         await cacheService.addUserEditorAccess(userId, created.id);
       }
     }
@@ -133,7 +134,9 @@ router.post('/', requireAdmin, async (req, res) => {
  */
 router.put('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const { name, badge_text_color, editor_ids } = req.body;
+  const { name } = req.body;
+  const badgeTextColor = req.body.badgeTextColor ?? req.body.badge_text_color;
+  const editorIds = req.body.editorIds ?? req.body.editor_ids;
 
   // Validate input
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -141,8 +144,8 @@ router.put('/:id', requireAdmin, async (req, res) => {
   }
 
   const trimmedName = name.trim();
-  const color = badge_text_color || '#000000';
-  const newEditorIds = Array.isArray(editor_ids) ? editor_ids : [];
+  const color = badgeTextColor || '#000000';
+  const newEditorIds = Array.isArray(editorIds) ? editorIds : [];
 
   // Validate hex color format
   if (!/^#[0-9A-Fa-f]{6}$/.test(color)) {
@@ -168,7 +171,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
     }
 
     const centerId = parseInt(id);
-    const currentEditorIds = center.editor_ids || [];
+    const currentEditorIds = center.editorIds || [];
     
     // Calculate which editors to add and remove (editor IDs are hex strings)
     const editorsToAdd = newEditorIds.filter((uid: string) => !currentEditorIds.includes(uid));
@@ -186,9 +189,9 @@ router.put('/:id', requireAdmin, async (req, res) => {
     // Update center
     const updated = await cacheService.updateCenter(id, {
       name: trimmedName,
-      badge_text_color: color,
-      editor_ids: newEditorIds,
-      updated_by: req.user?.email
+      badgeTextColor: color,
+      editorIds: newEditorIds,
+      updatedBy: req.user?.email
     });
 
     console.log(`[CENTERS] Updated center: ${trimmedName} (ID: ${id}), editors: ${newEditorIds.length}`);

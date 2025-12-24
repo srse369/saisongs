@@ -25,7 +25,7 @@ describe('TemplateService', () => {
           
           
           isDefault: false,
-          center_ids: [],
+          centerIds: [],
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -58,7 +58,7 @@ describe('TemplateService', () => {
         
         
         isDefault: false,
-        center_ids: [],
+        centerIds: [],
         createdAt: fixedDate,
         updatedAt: fixedDate,
       };
@@ -82,7 +82,7 @@ describe('TemplateService', () => {
         
         
         isDefault: true,
-        center_ids: [],
+        centerIds: [],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -114,7 +114,7 @@ describe('TemplateService', () => {
         
         
         isDefault: false,
-        center_ids: [],
+        centerIds: [],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -143,7 +143,7 @@ describe('TemplateService', () => {
         
         
         isDefault: false,
-        center_ids: [],
+        centerIds: [],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -180,7 +180,7 @@ describe('TemplateService', () => {
         
         
         isDefault: true,
-        center_ids: [],
+        centerIds: [],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -206,7 +206,7 @@ describe('TemplateService', () => {
         
         
         isDefault: true,
-        center_ids: [],
+        centerIds: [],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -229,7 +229,7 @@ describe('TemplateService', () => {
         
         
         isDefault: false,
-        center_ids: [1, 2],
+        centerIds: [1, 2],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -241,7 +241,7 @@ describe('TemplateService', () => {
       expect(result).toEqual(mockDuplicated);
       expect(apiClient.post).toHaveBeenCalledWith('/templates/1/duplicate', {
         name: 'Copy of Template',
-        center_ids: [1, 2],
+        centerIds: [1, 2],
       });
     });
   });
@@ -292,7 +292,7 @@ describe('TemplateService', () => {
           
           
           isDefault: true,
-          center_ids: [],
+          centerIds: [],
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -304,7 +304,7 @@ describe('TemplateService', () => {
           
           
           isDefault: false,
-          center_ids: [],
+          centerIds: [],
           createdAt: new Date(),
           updatedAt: new Date(),
         },

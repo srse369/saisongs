@@ -206,8 +206,8 @@ export const SingerMergeModal: React.FC<SingerMergeModalProps> = ({
                         {singer.gender}
                       </span>
                     )}
-                    <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-blue-600 dark:bg-blue-500 rounded-full" title={`${singer.pitch_count ?? 0} pitch assignments`}>
-                      {singer.pitch_count ?? 0}
+                    <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-blue-600 dark:bg-blue-500 rounded-full" title={`${singer.pitchCount ?? 0} pitch assignments`}>
+                      {singer.pitchCount ?? 0}
                     </span>
                   </div>
                   {singer.email && (
@@ -215,9 +215,9 @@ export const SingerMergeModal: React.FC<SingerMergeModalProps> = ({
                       {singer.email}
                     </p>
                   )}
-                  {singer.center_ids && singer.center_ids.length > 0 && (
+                  {singer.centerIds && singer.centerIds.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <CenterBadges centerIds={singer.center_ids} />
+                      <CenterBadges centerIds={singer.centerIds} />
                     </div>
                   )}
                 </div>
@@ -254,8 +254,8 @@ export const SingerMergeModal: React.FC<SingerMergeModalProps> = ({
                         <i className="fas fa-times text-xs"></i>
                         {singer.name}
                         {singer.gender && ` (${singer.gender})`}
-                        <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-blue-600 dark:bg-blue-500 rounded-full ml-auto" title={`${singer.pitch_count ?? 0} pitches`}>
-                          {singer.pitch_count ?? 0}
+                        <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-blue-600 dark:bg-blue-500 rounded-full ml-auto" title={`${singer.pitchCount ?? 0} pitches`}>
+                          {singer.pitchCount ?? 0}
                         </span>
                       </li>
                     ))}

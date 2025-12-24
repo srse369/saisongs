@@ -9,7 +9,7 @@ import apiClient from '../../services/ApiClient';
 interface Center {
   id: number;
   name: string;
-  badge_text_color: string;
+  badgeTextColor: string;
 }
 
 interface AdminUser {
@@ -164,7 +164,7 @@ export const UserDropdown: React.FC = () => {
                           key={centerId}
                           className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700"
                           style={{ 
-                            color: center.badge_text_color || '#3b82f6'
+                            color: center.badgeTextColor || '#3b82f6'
                           }}
                         >
                           {center.name}
@@ -193,7 +193,7 @@ export const UserDropdown: React.FC = () => {
                           key={centerId}
                           className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700"
                           style={{ 
-                            color: center.badge_text_color || '#10b981'
+                            color: center.badgeTextColor || '#10b981'
                           }}
                         >
                           {center.name}

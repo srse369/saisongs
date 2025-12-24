@@ -1,3 +1,14 @@
+/* CSS Variables for theme colors */
+:root {
+  --disabled-bg: #f3f4f6; /* gray-100 */
+  --disabled-text: #6b7280; /* gray-500 */
+}
+
+.dark {
+  --disabled-bg: #111827; /* gray-900 */
+  --disabled-text: #6b7280; /* gray-500 */
+}
+
 /* App-specific styles */
 #root {
   min-height: 100vh;
@@ -128,4 +139,15 @@
   select {
     font-size: 16px !important; /* Prevents iOS zoom on focus */
   }
+}
+
+/* Read-only and disabled form field styling - uses CSS variables for theme support */
+input:disabled,
+input:read-only:not([type="checkbox"]):not([type="radio"]),
+textarea:disabled,
+textarea:read-only,
+select:disabled {
+  cursor: not-allowed;
+  background-color: var(--disabled-bg);
+  color: var(--disabled-text);
 }

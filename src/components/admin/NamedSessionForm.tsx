@@ -22,7 +22,7 @@ export const NamedSessionForm: React.FC<NamedSessionFormProps> = ({
     if (session) {
       setName(session.name);
       setDescription(session.description || '');
-      setCenterIds(session.center_ids || []);
+      setCenterIds(session.centerIds || []);
     }
   }, [session]);
 
@@ -34,7 +34,7 @@ export const NamedSessionForm: React.FC<NamedSessionFormProps> = ({
       await onSubmit({ 
         name, 
         description: description || undefined,
-        center_ids: centerIds.length > 0 ? centerIds : undefined
+        centerIds: centerIds.length > 0 ? centerIds : undefined
       });
       // Reset form
       setName('');

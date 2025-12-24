@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { SongSingerPitch, Song, Singer } from '../../types';
 import { Modal, Tooltip } from '../common';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
-import { formatPitch, formatPitchWithName } from '../../utils/pitchUtils';
-import { toTitleCase } from '../../utils/textUtils';
-import { fetchCentersOnce } from '../common/CenterBadges';
+import { formatNormalizedPitch } from '../../utils/pitchNormalization';
+import { CenterBadges } from '../common/CenterBadges';
+import { SongMetadataCard } from '../common/SongMetadataCard';
 
 interface PitchWithDetails extends SongSingerPitch {
   songName?: string;
@@ -56,16 +56,6 @@ export const PitchList: React.FC<PitchListProps> = ({
     return entries.some(entry => entry.songId === songId && entry.singerId === singerId);
   };
 
-  // Create a map for quick lookups
-  const [centers, setCenters] = useState<Array<{id: number; name: string}>>([]);
-
-  // Fetch centers for display using shared cache
-  useEffect(() => {
-    fetchCentersOnce().then(data => {
-      setCenters(data);
-    });
-  }, []);
-
   // Memoize maps to prevent recreation on every render (performance optimization)
   const songMap = useMemo(() => new Map(songs.map(song => [song.id, { 
     name: song.name, 
@@ -78,7 +68,7 @@ export const PitchList: React.FC<PitchListProps> = ({
     raga: song.raga,
     beat: song.beat
   }])), [songs]);
-  const singerMap = useMemo(() => new Map(singers.map(singer => [singer.id, { name: singer.name, gender: singer.gender, center_ids: singer.center_ids }])), [singers]);
+  const singerMap = useMemo(() => new Map(singers.map(singer => [singer.id, { name: singer.name, gender: singer.gender, centerIds: singer.centerIds }])), [singers]);
 
   // Enrich pitches with song and singer names (memoized for performance)
   const enrichedPitches: PitchWithDetails[] = useMemo(() => pitches.map(pitch => ({
@@ -86,7 +76,7 @@ export const PitchList: React.FC<PitchListProps> = ({
     songName: songMap.get(pitch.songId)?.name || 'Unknown Song',
     singerName: singerMap.get(pitch.singerId)?.name || 'Unknown Singer',
     singerGender: singerMap.get(pitch.singerId)?.gender,
-    singerCenterIds: singerMap.get(pitch.singerId)?.center_ids,
+    singerCenterIds: singerMap.get(pitch.singerId)?.centerIds,
     externalSourceUrl: songMap.get(pitch.songId)?.externalSourceUrl,
     referenceGentsPitch: songMap.get(pitch.songId)?.referenceGentsPitch,
     referenceLadiesPitch: songMap.get(pitch.songId)?.referenceLadiesPitch,
@@ -162,58 +152,22 @@ export const PitchList: React.FC<PitchListProps> = ({
             <div className="flex flex-col gap-3">
               {/* Content Section */}
               <div className="flex-1 min-w-0">
-                {/* Song Name with External Link */}
-                <div className="flex items-center gap-1 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => handlePresent(pitch)}
-                    className="text-left text-base font-semibold text-blue-700 dark:text-blue-300 hover:underline"
-                    title={pitch.songName}
-                  >
-                    {pitch.songName}
-                  </button>
-                  {pitch.externalSourceUrl && (
-                    <Tooltip content="View song on external source (YouTube, etc.)">
-                      <a
-                        href={pitch.externalSourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-shrink-0 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <i className="fas fa-external-link-alt text-base"></i>
-                      </a>
-                    </Tooltip>
-                  )}
-                </div>
-
-                {/* Raga and Beat (without tempo) */}
-                {(pitch.raga || pitch.beat) && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                    {pitch.raga && <span>Raga: {toTitleCase(pitch.raga)}</span>}
-                    {pitch.raga && pitch.beat && <span className="mx-2">•</span>}
-                    {pitch.beat && <span>Beat: {toTitleCase(pitch.beat)}</span>}
-                  </p>
-                )}
-
-                {/* Deity, Language, and Tempo badges */}
-                <div className="flex flex-wrap gap-2 text-xs mb-2">
-                  {pitch.deity && (
-                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 rounded font-medium">
-                      {toTitleCase(pitch.deity)}
-                    </span>
-                  )}
-                  {pitch.language && (
-                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded font-medium">
-                      {toTitleCase(pitch.language)}
-                    </span>
-                  )}
-                  {pitch.tempo && (
-                    <span className="px-2 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded font-medium">
-                      {toTitleCase(pitch.tempo)}
-                    </span>
-                  )}
-                </div>
+                {/* Song Metadata Section - Reusable component */}
+                <SongMetadataCard
+                  song={{
+                    name: pitch.songName || '',
+                    externalSourceUrl: pitch.externalSourceUrl,
+                    raga: pitch.raga,
+                    beat: pitch.beat,
+                    deity: pitch.deity,
+                    language: pitch.language,
+                    tempo: pitch.tempo,
+                    referenceGentsPitch: pitch.referenceGentsPitch,
+                    referenceLadiesPitch: pitch.referenceLadiesPitch,
+                  }}
+                  onNameClick={() => handlePresent(pitch)}
+                  nameClickTitle={pitch.songName}
+                />
                 
                 {/* Singer and Pitch */}
                 <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -232,27 +186,13 @@ export const PitchList: React.FC<PitchListProps> = ({
                     {pitch.singerName}
                     {pitch.singerCenterIds && pitch.singerCenterIds.length > 0 && (
                       <span className="font-normal text-gray-500 dark:text-gray-400">
-                        {' '}({centers.filter(c => pitch.singerCenterIds!.includes(c.id)).map(c => c.name).join(', ')})
+                        {' '}<CenterBadges centerIds={pitch.singerCenterIds} />
                       </span>
                     )}
                   </span>
                   <span className="mx-2">•</span>
                   <span>Pitch: </span>
-                  <span className="font-bold text-gray-700 dark:text-gray-200">{formatPitch(pitch.pitch)}</span>
-                  <span className="ml-1">({pitch.pitch.replace('#', '♯')})</span>
-                  {(pitch.referenceGentsPitch || pitch.referenceLadiesPitch) && (
-                    <>
-                      <span className="mx-2">•</span>
-                      <span className="text-gray-500 dark:text-gray-500">Ref: </span>
-                      {pitch.referenceGentsPitch && (
-                        <span>Gents <span className="font-medium">{formatPitch(pitch.referenceGentsPitch)}</span> (<span className="font-medium">{pitch.referenceGentsPitch.replace('#', '♯')}</span>)</span>
-                      )}
-                      {pitch.referenceGentsPitch && pitch.referenceLadiesPitch && <span className="mx-1">/</span>}
-                      {pitch.referenceLadiesPitch && (
-                        <span>Ladies <span className="font-medium">{formatPitch(pitch.referenceLadiesPitch)}</span> (<span className="font-medium">{pitch.referenceLadiesPitch.replace('#', '♯')}</span>)</span>
-                      )}
-                    </>
-                  )}
+                  <span className="font-bold text-gray-700 dark:text-gray-200">{formatNormalizedPitch(pitch.pitch)}</span>
                 </div>
               </div>
               

@@ -264,8 +264,8 @@ export class PptxImportService {
       audios: referenceSlide.audios,
       text: referenceSlide.text,
       isDefault: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     // Clear cached media files

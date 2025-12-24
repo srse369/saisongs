@@ -174,7 +174,7 @@ class TemplateService {
       console.log('📊 Duplicating template:', id);
       const duplicated = await apiClient.post<PresentationTemplate>(
         `/templates/${id}/duplicate`,
-        { name, center_ids: centerIds }
+        { name, centerIds }
       );
       console.log('✅ Template duplicated successfully');
       return duplicated;

@@ -92,7 +92,7 @@ class SongService {
     try {
       return await apiClient.createSong({
         name: input.name.trim(),
-        external_source_url: input.externalSourceUrl.trim(),
+        externalSourceUrl: input.externalSourceUrl.trim(),
         lyrics: input.lyrics || null,
         meaning: input.meaning || null,
         language: input.language || null,
@@ -101,12 +101,12 @@ class SongService {
         beat: input.beat || null,
         raga: input.raga || null,
         level: input.level || null,
-        song_tags: input.songTags || null,
-        audio_link: input.audioLink || null,
-        video_link: input.videoLink || null,
-        golden_voice: input.goldenVoice ? 1 : 0,
-        reference_gents_pitch: input.referenceGentsPitch || null,
-        reference_ladies_pitch: input.referenceLadiesPitch || null,
+        songTags: input.songTags || null,
+        audioLink: input.audioLink || null,
+        videoLink: input.videoLink || null,
+        goldenVoice: input.goldenVoice,
+        referenceGentsPitch: input.referenceGentsPitch || null,
+        referenceLadiesPitch: input.referenceLadiesPitch || null,
       });
     } catch (error) {
       console.error('Error creating song:', error);
@@ -127,7 +127,7 @@ class SongService {
     try {
       const updateData = {
         name: input.name?.trim(),
-        external_source_url: input.externalSourceUrl?.trim(),
+        externalSourceUrl: input.externalSourceUrl?.trim(),
         lyrics: input.lyrics,
         meaning: input.meaning,
         language: input.language,
@@ -136,12 +136,12 @@ class SongService {
         beat: input.beat,
         raga: input.raga,
         level: input.level,
-        song_tags: input.songTags,
-        audio_link: input.audioLink,
-        video_link: input.videoLink,
-        golden_voice: input.goldenVoice ? 1 : 0,
-        reference_gents_pitch: input.referenceGentsPitch,
-        reference_ladies_pitch: input.referenceLadiesPitch,
+        songTags: input.songTags,
+        audioLink: input.audioLink,
+        videoLink: input.videoLink,
+        goldenVoice: input.goldenVoice,
+        referenceGentsPitch: input.referenceGentsPitch,
+        referenceLadiesPitch: input.referenceLadiesPitch,
       };
       await apiClient.updateSong(id, updateData);
       // Use nocache=true to ensure we get fresh data after the update

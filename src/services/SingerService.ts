@@ -23,10 +23,10 @@ class SingerService {
     const name = row.name ?? row.NAME;
     const gender = row.gender ?? row.GENDER;
     const email = row.email ?? row.EMAIL;
-    const centerIds = row.center_ids ?? row.CENTER_IDS;
-    const editorFor = row.editor_for ?? row.EDITOR_FOR;
-    const isAdmin = row.is_admin ?? row.IS_ADMIN;
-    const pitchCount = row.pitch_count ?? row.PITCH_COUNT;
+    const centerIds = row.centerIds ?? row.center_ids ?? row.CENTER_IDS;
+    const editorFor = row.editorFor ?? row.editor_for ?? row.EDITOR_FOR;
+    const isAdmin = row.isAdmin ?? row.is_admin ?? row.IS_ADMIN;
+    const pitchCount = row.pitchCount ?? row.pitch_count ?? row.PITCH_COUNT;
     const createdRaw = row.createdAt ?? row.created_at ?? row.CREATED_AT;
     const updatedRaw = row.updatedAt ?? row.updated_at ?? row.UPDATED_AT;
 
@@ -35,10 +35,10 @@ class SingerService {
       name,
       gender,
       email,
-      center_ids: centerIds,
-      editor_for: editorFor,
-      is_admin: isAdmin,
-      pitch_count: pitchCount !== undefined ? Number(pitchCount) : undefined,
+      centerIds: centerIds,
+      editorFor: editorFor,
+      isAdmin: isAdmin,
+      pitchCount: pitchCount !== undefined ? Number(pitchCount) : undefined,
       createdAt: createdRaw ? new Date(createdRaw) : new Date(),
       updatedAt: updatedRaw ? new Date(updatedRaw) : new Date(),
     };
@@ -126,7 +126,7 @@ class SingerService {
         name: input.name.trim(),
         gender: input.gender,
         email: input.email,
-        center_ids: input.center_ids,
+        centerIds: input.centerIds,
       });
 
       // Map and return the created singer
@@ -155,7 +155,7 @@ class SingerService {
         name: input.name?.trim(),
         gender: input.gender,
         email: input.email,
-        center_ids: input.center_ids,
+        centerIds: input.centerIds,
       });
       // Use nocache=true to ensure we get fresh data after the update
       return this.getSingerById(id, true);

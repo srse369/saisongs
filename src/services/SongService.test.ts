@@ -181,9 +181,9 @@ describe('SongService', () => {
       expect(result).toEqual(mockCreatedSong);
       expect(apiClient.createSong).toHaveBeenCalledWith(
         expect.objectContaining({
-          golden_voice: 1,
-          reference_gents_pitch: 'C',
-          reference_ladies_pitch: 'G',
+          goldenVoice: true,
+          referenceGentsPitch: 'C',
+          referenceLadiesPitch: 'G',
         })
       );
     });
@@ -277,7 +277,7 @@ describe('SongService', () => {
       expect(apiClient.createSong).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'Trimmed Song',
-          external_source_url: 'https://example.com',
+          externalSourceUrl: 'https://example.com',
         })
       );
     });

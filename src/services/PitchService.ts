@@ -146,8 +146,8 @@ class PitchService {
     try {
       // Create the association on the server and use the returned pitch directly
       const raw = await apiClient.createPitch({
-        song_id: input.songId.trim(),
-        singer_id: input.singerId.trim(),
+        songId: input.songId.trim(),
+        singerId: input.singerId.trim(),
         pitch: input.pitch.trim(),
       });
 

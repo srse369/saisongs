@@ -3,7 +3,8 @@
  * Handles CRUD operations, YAML parsing, and template validation
  */
 
-import { databaseService } from './DatabaseService.js';
+import { databaseReadService } from './DatabaseReadService.js';
+import { databaseWriteService } from './DatabaseWriteService.js';
 import { randomUUID } from 'crypto';
 import * as yaml from 'js-yaml';
 
@@ -185,7 +186,7 @@ export interface PresentationTemplate {
   name: string;
   description?: string;
   aspectRatio?: AspectRatio;          // Template aspect ratio: '16:9' (default) or '4:3'
-  center_ids?: number[];              // Centers that have access to this template
+  centerIds?: number[];              // Centers that have access to this template
   
   // Multi-slide structure (new format)
   slides?: TemplateSlide[];           // Array of slides in the template
@@ -294,11 +295,7 @@ class TemplateService {
    */
   async getAllTemplates(): Promise<PresentationTemplate[]> {
     try {
-      const result = await databaseService.query<any>(`
-        SELECT id, name, description, template_json, is_default, created_at, updated_at
-        FROM presentation_templates
-        ORDER BY is_default DESC, name ASC
-      `, []);
+      const result = await databaseReadService.getAllTemplates();
 
       return result.map((row: any) => {
         let templateJson: any = {};
@@ -375,17 +372,11 @@ class TemplateService {
    */
   async getTemplate(id: string): Promise<PresentationTemplate | null> {
     try {
-      const result = await databaseService.query<any>(`
-        SELECT id, name, description, template_json, is_default, created_at, updated_at
-        FROM presentation_templates
-        WHERE id = :1
-      `, [id]);
+      const row = await databaseReadService.getTemplateById(id);
 
-      if (!result || result.length === 0) {
+      if (!row) {
         return null;
       }
-
-      const row = result[0];
       let templateJson: any = {};
       try {
         templateJson = typeof row.TEMPLATE_JSON === 'string' ? JSON.parse(row.TEMPLATE_JSON) : row.TEMPLATE_JSON || {};
@@ -459,18 +450,12 @@ class TemplateService {
    */
   async getDefaultTemplate(): Promise<PresentationTemplate | null> {
     try {
-      const result = await databaseService.query<any>(`
-        SELECT id, name, description, template_json, is_default, created_at, updated_at
-        FROM presentation_templates
-        WHERE is_default = 1
-        FETCH FIRST 1 ROWS ONLY
-      `, []);
+      const row = await databaseReadService.getDefaultTemplate();
 
-      if (!result || result.length === 0) {
+      if (!row) {
         return null;
       }
 
-      const row = result[0];
       let templateJson: any = {};
       try {
         templateJson = typeof row.TEMPLATE_JSON === 'string' ? JSON.parse(row.TEMPLATE_JSON) : row.TEMPLATE_JSON || {};
@@ -579,29 +564,22 @@ class TemplateService {
 
       // If this is set as default, unset other defaults
       if (template.isDefault) {
-        await databaseService.query(
-          'UPDATE presentation_templates SET is_default = 0',
-          []
-        );
+        await databaseWriteService.unsetAllDefaultTemplates();
       }
 
-      // Prepare center_ids as JSON string
-      const centerIdsJson = template.center_ids && template.center_ids.length > 0 
-        ? JSON.stringify(template.center_ids) 
+      // Prepare centerIds as JSON string for DB column center_ids
+      const centerIdsJson = template.centerIds && template.centerIds.length > 0 
+        ? JSON.stringify(template.centerIds) 
         : null;
 
-      await databaseService.query(`
-        INSERT INTO presentation_templates
-        (id, name, description, template_json, center_ids, is_default, created_at, updated_at)
-        VALUES (:1, :2, :3, :4, :5, :6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `, [
+      await databaseWriteService.createTemplate(
         id,
         template.name,
         template.description || null,
         templateJson,
         centerIdsJson,
-        template.isDefault ? 1 : 0,
-      ]);
+        template.isDefault || false
+      );
 
       // Invalidate cache after create
       const { cacheService } = await import('./CacheService.js');
@@ -654,29 +632,22 @@ class TemplateService {
 
       // If this is set as default, unset other defaults
       if (template.isDefault && !existing.isDefault) {
-        await databaseService.query(
-          'UPDATE presentation_templates SET is_default = 0',
-          []
-        );
+        await databaseWriteService.unsetAllDefaultTemplates();
       }
 
-      // Prepare center_ids as JSON string
-      const centerIdsJson = updated.center_ids && updated.center_ids.length > 0 
-        ? JSON.stringify(updated.center_ids) 
+      // Prepare centerIds as JSON string for DB column center_ids
+      const centerIdsJson = updated.centerIds && updated.centerIds.length > 0 
+        ? JSON.stringify(updated.centerIds) 
         : null;
 
-      await databaseService.query(`
-        UPDATE presentation_templates
-        SET name = :1, description = :2, template_json = :3, is_default = :4, center_ids = :5, updated_at = CURRENT_TIMESTAMP
-        WHERE id = :6
-      `, [
+      await databaseWriteService.updateTemplate(
+        id,
         updated.name,
         updated.description || null,
         templateJson,
-        updated.isDefault ? 1 : 0,
-        centerIdsJson,
-        id,
-      ]);
+        updated.isDefault || false,
+        centerIdsJson
+      );
 
       // Invalidate cache after update
       const { cacheService } = await import('./CacheService.js');
@@ -695,16 +666,10 @@ class TemplateService {
   async setAsDefault(id: string): Promise<PresentationTemplate> {
     try {
       // First, unset all other templates as default
-      await databaseService.query(
-        'UPDATE presentation_templates SET is_default = 0',
-        []
-      );
+      await databaseWriteService.unsetAllDefaultTemplates();
 
       // Then set this one as default
-      await databaseService.query(
-        'UPDATE presentation_templates SET is_default = 1, updated_at = CURRENT_TIMESTAMP WHERE id = :1',
-        [id]
-      );
+      await databaseWriteService.setTemplateAsDefault(id);
 
       // Invalidate cache after update
       const { cacheService } = await import('./CacheService.js');
@@ -727,7 +692,7 @@ class TemplateService {
    */
   async deleteTemplate(id: string): Promise<void> {
     try {
-      await databaseService.query('DELETE FROM presentation_templates WHERE id = :1', [id]);
+      await databaseWriteService.deleteTemplate(id);
       
       // Invalidate cache after delete
       const { cacheService } = await import('./CacheService.js');

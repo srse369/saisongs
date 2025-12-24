@@ -282,8 +282,8 @@ export class CsvImportService {
         
         // Server expects snake_case field names
         const pitchDataForServer = {
-          song_id: item.songId,
-          singer_id: singerId,
+          songId: item.songId,
+          singerId: singerId,
           pitch: item.normalizedPitch,
         };
         

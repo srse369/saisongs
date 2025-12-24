@@ -148,9 +148,9 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose, inl
         level: s.level,
         songtags: s.songtags,
         // Handle arrays - convert to comma-separated string or take first element
-        audio_link: Array.isArray(s.audio_link) ? s.audio_link[0] : s.audio_link,
-        video_link: Array.isArray(s.video_link) ? s.video_link[0] : s.video_link,
-        golden_voice: Array.isArray(s.golden_voice) ? (s.golden_voice.length > 0 ? 'yes' : '') : s.golden_voice,
+        audioLink: Array.isArray(s.audio_link) ? s.audio_link[0] : s.audio_link,
+        videoLink: Array.isArray(s.video_link) ? s.video_link[0] : s.video_link,
+        goldenVoice: Array.isArray(s.golden_voice) ? (s.golden_voice.length > 0 ? 'yes' : '') : s.golden_voice,
       }));
       
       // Validate that we have at least name and url

@@ -100,7 +100,7 @@ describe('SingerService', () => {
       const result = await singerService.getAllSingers();
 
       expect(result).toHaveLength(1);
-      expect(result[0].is_admin).toBe(1);
+      expect(result[0].isAdmin).toBe(1);
     });
 
     it('should throw DatabaseError when API call fails', async () => {
@@ -188,7 +188,7 @@ describe('SingerService', () => {
         name: 'New Singer',
         gender: 'Male',
         email: undefined,
-        center_ids: undefined,
+        centerIds: undefined,
       });
     });
 
@@ -197,7 +197,7 @@ describe('SingerService', () => {
         name: 'Complete Singer',
         gender: 'Female',
         email: 'singer@example.com',
-        center_ids: [],
+        centerIds: [],
       };
 
       const mockCreatedSinger = {
@@ -218,7 +218,7 @@ describe('SingerService', () => {
 
       expect(result.name).toBe('Complete Singer');
       expect(result.email).toBe('singer@example.com');
-      expect(result.center_ids).toEqual([]);
+      expect(result.centerIds).toEqual([]);
     });
 
     it('should trim whitespace from name', async () => {
@@ -327,7 +327,7 @@ describe('SingerService', () => {
         name: 'Updated Name',
         email: 'updated@example.com',
         gender: undefined,
-        center_ids: undefined,
+        centerIds: undefined,
       });
       // After update, getSinger is called with nocache=true to get fresh data
       expect(apiClient.getSinger).toHaveBeenCalledWith('1', true);
@@ -363,7 +363,7 @@ describe('SingerService', () => {
         name: undefined,
         gender: 'Female',
         email: undefined,
-        center_ids: undefined,
+        centerIds: undefined,
       });
     });
 

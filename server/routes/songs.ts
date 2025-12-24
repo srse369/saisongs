@@ -1,6 +1,7 @@
 import express from 'express';
 import { cacheService } from '../services/CacheService.js';
-import { databaseService } from '../services/DatabaseService.js';
+import { databaseReadService } from '../services/DatabaseReadService.js';
+import { databaseWriteService } from '../services/DatabaseWriteService.js';
 import { extractFromHtml } from '../services/SongExtractor.js';
 import { requireAuth } from '../middleware/simpleAuth.js';
 
@@ -57,10 +58,10 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Lyrics are required' });
     }
     
-    // Add creator information (use email as it's unique and human-readable)
+    // Add creator information - CacheService handles camelCase to snake_case conversion
     const songWithCreator = {
       ...songData,
-      created_by: user.email
+      createdBy: user.email
     };
     
     console.log('📝 Creating song:', songData.name, 'by user:', user.email);
@@ -86,10 +87,10 @@ router.put('/:id', requireAuth, async (req, res) => {
     const songData = req.body;
     const user = req.user;
     
-    // Add updater information
+    // Add updater information - CacheService handles camelCase to snake_case conversion
     const songWithUpdater = {
       ...songData,
-      updated_by: user.email
+      updatedBy: user.email
     };
     
     console.log('📝 Updating song:', id, 'by user:', user.email);
@@ -125,9 +126,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
     
     // Check if song is used in pitches (applies to ALL users including admins)
-    const pitchQuery = 'SELECT COUNT(*) as count FROM song_singer_pitches WHERE song_id = HEXTORAW(:1)';
-    const pitchResult = await databaseService.query(pitchQuery, [id]);
-    const pitchCount = pitchResult[0]?.COUNT || 0;
+    const pitchCount = await databaseReadService.getSongPitchCount(id);
     
     if (pitchCount > 0) {
       return res.status(400).json({ 
@@ -137,9 +136,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
     
     // Check if song is used in sessions (applies to ALL users including admins)
-    const sessionQuery = 'SELECT COUNT(*) as count FROM song_session_items WHERE song_id = HEXTORAW(:1)';
-    const sessionResult = await databaseService.query(sessionQuery, [id]);
-    const sessionCount = sessionResult[0]?.COUNT || 0;
+    const sessionCount = await databaseReadService.getSongSessionItemCount(id);
     
     if (sessionCount > 0) {
       return res.status(400).json({ 
@@ -200,59 +197,15 @@ router.post('/:id/sync', async (req, res) => {
     // Extract metadata using SongExtractor
     const extracted = extractFromHtml(html, origin);
 
-    // Build conditional UPDATE statement for all found fields
-    const fieldsToUpdate: { column: string; value: any }[] = [];
+    // Update song with extracted data
+    const updates = await databaseWriteService.syncSongFromExtracted(id, extracted);
 
-    if (extracted.referenceGentsPitch) fieldsToUpdate.push({ column: 'reference_gents_pitch', value: extracted.referenceGentsPitch });
-    if (extracted.referenceLadiesPitch) fieldsToUpdate.push({ column: 'reference_ladies_pitch', value: extracted.referenceLadiesPitch });
-    if (extracted.lyrics) fieldsToUpdate.push({ column: 'lyrics', value: extracted.lyrics });
-    if (extracted.meaning) fieldsToUpdate.push({ column: 'meaning', value: extracted.meaning });
-    if (extracted.audioLink) fieldsToUpdate.push({ column: 'audio_link', value: extracted.audioLink });
-    if (extracted.videoLink) fieldsToUpdate.push({ column: 'video_link', value: extracted.videoLink });
-    if (extracted.deity) fieldsToUpdate.push({ column: 'deity', value: extracted.deity });
-    if (extracted.language) fieldsToUpdate.push({ column: 'language', value: extracted.language });
-    if (extracted.raga) fieldsToUpdate.push({ column: 'raga', value: extracted.raga });
-    if (extracted.beat) fieldsToUpdate.push({ column: 'beat', value: extracted.beat });
-    if (extracted.level) fieldsToUpdate.push({ column: 'level', value: extracted.level });
-    if (extracted.tempo) fieldsToUpdate.push({ column: 'tempo', value: extracted.tempo });
-    if (Array.isArray(extracted.songTags) && extracted.songTags.length) fieldsToUpdate.push({ column: 'song_tags', value: extracted.songTags.join(',') });
-    if (typeof extracted.goldenVoice === 'boolean') fieldsToUpdate.push({ column: 'golden_voice', value: extracted.goldenVoice ? 1 : 0 });
-
-    if (fieldsToUpdate.length) {
-      // Build conditional UPDATE with proper column quoting for Oracle reserved words
-      const setParts: string[] = [];
-      const params: any[] = [];
-      let idx = 1;
-
-      // Function to quote column names if they are Oracle reserved words
-      const quoteColumn = (col: string) => {
-        const reserved = ['language', 'level'];
-        if (reserved.includes(col.toLowerCase())) {
-          return `"${col.toUpperCase()}"`;
-        }
-        return col;
-      };
-
-      for (const f of fieldsToUpdate) {
-        setParts.push(`${quoteColumn(f.column)} = :${idx}`);
-        params.push(f.value);
-        idx++;
-      }
-
-      setParts.push('updated_at = CURRENT_TIMESTAMP');
-      const updateQuery = `UPDATE songs SET ${setParts.join(', ')} WHERE id = :${idx}`;
-      params.push(id);
-
-      await databaseService.query(updateQuery, params);
-
+    if (updates) {
       // Invalidate cache for song and all songs
       cacheService.invalidate('songs:all');
       cacheService.invalidate(`song:${id}`);
 
-      const updatesSummary: any = {};
-      for (const f of fieldsToUpdate) updatesSummary[f.column] = f.value;
-
-      res.json({ message: 'Song synced successfully', updates: updatesSummary });
+      res.json({ message: 'Song synced successfully', updates });
     } else {
       res.json({ message: 'Song synced but no data found to update', updates: {} });
     }

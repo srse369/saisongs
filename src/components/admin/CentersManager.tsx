@@ -7,9 +7,9 @@ import { RefreshIcon, Tooltip, Modal } from '../common';
 interface Center {
   id: number;
   name: string;
-  badge_text_color: string;
-  editor_ids?: string[];
-  created_at: string;
+  badgeTextColor: string;
+  editorIds?: string[];
+  createdAt: string;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || (
@@ -28,15 +28,15 @@ export const CentersManager: React.FC = () => {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
-    badge_text_color: '#1e40af', // default blue
-    editor_ids: [] as string[],
+    badgeTextColor: '#1e40af', // default blue
+    editorIds: [] as string[],
   });
 
   // Track original data for unsaved changes detection
   const [originalData, setOriginalData] = useState({
     name: '',
-    badge_text_color: '#1e40af',
-    editor_ids: [] as string[],
+    badgeTextColor: '#1e40af',
+    editorIds: [] as string[],
   });
   
   const hasFetchedRef = useRef(false);
@@ -88,13 +88,13 @@ export const CentersManager: React.FC = () => {
     const initialData = center
       ? { 
           name: center.name, 
-          badge_text_color: center.badge_text_color,
-          editor_ids: center.editor_ids || []
+          badgeTextColor: center.badgeTextColor,
+          editorIds: center.editorIds || []
         }
       : { 
           name: '', 
-          badge_text_color: '#1e40af',
-          editor_ids: []
+          badgeTextColor: '#1e40af',
+          editorIds: []
         };
 
     if (center) {
@@ -109,11 +109,11 @@ export const CentersManager: React.FC = () => {
   };
 
   const hasUnsavedChanges = () => {
-    const editorIdsChanged = JSON.stringify(formData.editor_ids.slice().sort()) !== 
-                             JSON.stringify(originalData.editor_ids.slice().sort());
+    const editorIdsChanged = JSON.stringify(formData.editorIds.slice().sort()) !== 
+                             JSON.stringify(originalData.editorIds.slice().sort());
     return (
       formData.name.trim() !== originalData.name.trim() ||
-      formData.badge_text_color !== originalData.badge_text_color ||
+      formData.badgeTextColor !== originalData.badgeTextColor ||
       editorIdsChanged
     );
   };
@@ -132,13 +132,13 @@ export const CentersManager: React.FC = () => {
     setEditingCenter(null);
     setFormData({
       name: '',
-      badge_text_color: '#1e40af',
-      editor_ids: [],
+      badgeTextColor: '#1e40af',
+      editorIds: [],
     });
     setOriginalData({
       name: '',
-      badge_text_color: '#1e40af',
-      editor_ids: [],
+      badgeTextColor: '#1e40af',
+      editorIds: [],
     });
   };
 
@@ -164,8 +164,8 @@ export const CentersManager: React.FC = () => {
         credentials: 'include',
         body: JSON.stringify({
           name: formData.name.trim(),
-          badge_text_color: formData.badge_text_color,
-          editor_ids: formData.editor_ids,
+          badgeTextColor: formData.badgeTextColor,
+          editorIds: formData.editorIds,
         }),
       });
 
@@ -316,8 +316,8 @@ export const CentersManager: React.FC = () => {
               <div 
                 className="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-full"
                 style={{ 
-                  backgroundColor: `${center.badge_text_color}20`,
-                  color: center.badge_text_color 
+                  backgroundColor: `${center.badgeTextColor}20`,
+                  color: center.badgeTextColor 
                 }}
               >
                 <i className="fas fa-building text-xl"></i>
@@ -331,7 +331,7 @@ export const CentersManager: React.FC = () => {
                   </h3>
                   <span
                     className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700"
-                    style={{ color: center.badge_text_color }}
+                    style={{ color: center.badgeTextColor }}
                   >
                     {center.name}
                   </span>
@@ -339,12 +339,12 @@ export const CentersManager: React.FC = () => {
                 <div className="flex items-center gap-4 mt-1 text-xs text-gray-500 dark:text-gray-400">
                   <span>
                     <i className="fas fa-calendar-alt mr-1"></i>
-                    Created {new Date(center.created_at).toLocaleDateString()}
+                    Created {new Date(center.createdAt).toLocaleDateString()}
                   </span>
-                  {center.editor_ids && center.editor_ids.length > 0 && (
+                  {center.editorIds && center.editorIds.length > 0 && (
                     <span>
                       <i className="fas fa-user-edit mr-1"></i>
-                      {center.editor_ids.length} editor{center.editor_ids.length !== 1 ? 's' : ''}
+                      {center.editorIds.length} editor{center.editorIds.length !== 1 ? 's' : ''}
                     </span>
                   )}
                 </div>
@@ -404,7 +404,7 @@ export const CentersManager: React.FC = () => {
 
           {/* Badge Text Color */}
           <div>
-            <label htmlFor="badge_text_color" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="badgeTextColor" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Badge Text Color
               <Tooltip content="Color used for this center's badge in the UI">
                 <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
@@ -414,17 +414,17 @@ export const CentersManager: React.FC = () => {
             </label>
             <div className="flex gap-3 items-center">
               <input
-                id="badge_text_color"
+                id="badgeTextColor"
                 type="color"
-                value={formData.badge_text_color}
-                onChange={(e) => setFormData({ ...formData, badge_text_color: e.target.value })}
+                value={formData.badgeTextColor}
+                onChange={(e) => setFormData({ ...formData, badgeTextColor: e.target.value })}
                 className="w-10 h-10 rounded cursor-pointer border border-gray-300 dark:border-gray-600"
                 disabled={isSubmitting}
               />
               <input
                 type="text"
-                value={formData.badge_text_color}
-                onChange={(e) => setFormData({ ...formData, badge_text_color: e.target.value })}
+                value={formData.badgeTextColor}
+                onChange={(e) => setFormData({ ...formData, badgeTextColor: e.target.value })}
                 className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono"
                 placeholder="#1e40af"
                 disabled={isSubmitting}
@@ -434,7 +434,7 @@ export const CentersManager: React.FC = () => {
               <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">Preview:</span>
               <span
                 className="inline-block px-3 py-1 text-sm font-medium rounded-full bg-gray-100 dark:bg-gray-700"
-                style={{ color: formData.badge_text_color }}
+                style={{ color: formData.badgeTextColor }}
               >
                 {formData.name || 'Center Name'}
               </span>
@@ -444,8 +444,8 @@ export const CentersManager: React.FC = () => {
           {/* Editors */}
           <div>
             <UserMultiSelect
-              selectedUserIds={formData.editor_ids}
-              onChange={(userIds) => setFormData({ ...formData, editor_ids: userIds })}
+              selectedUserIds={formData.editorIds}
+              onChange={(userIds) => setFormData({ ...formData, editorIds: userIds })}
               label="Center Editors"
               disabled={isSubmitting}
             />

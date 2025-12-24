@@ -205,11 +205,11 @@ const server = app.listen(PORT, async () => {
   setTimeout(async () => {
     try {
       console.log('🔌 Initializing database connection pool...');
-      const { databaseService } = await import('./services/DatabaseService.js');
+      const { databaseReadService } = await import('./services/DatabaseReadService.js');
       
       // Initialize pool and test connection
-      await databaseService.initialize();
-      const isConnected = await databaseService.testConnection();
+      await databaseReadService.initialize();
+      const isConnected = await databaseReadService.testConnection();
       
       if (!isConnected) {
         console.log('⚠️  Database connection test failed - skipping cache warmup');
@@ -240,8 +240,8 @@ const shutdown = async (signal: string) => {
     
     // Close database connection pool
     try {
-      const { databaseService } = await import('./services/DatabaseService.js');
-      await databaseService.disconnect();
+      const { databaseReadService } = await import('./services/DatabaseReadService.js');
+      await databaseReadService.disconnect();
       console.log('✅ Database connection pool closed');
     } catch (error) {
       console.error('Error closing database pool:', error);

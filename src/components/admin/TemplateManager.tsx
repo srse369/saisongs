@@ -266,7 +266,7 @@ export const TemplateManager: React.FC = () => {
   // Check if user can edit a template
   const canEditTemplate = useCallback((template: PresentationTemplate) => {
     if (isAdmin) return true;
-    const templateCenterIds = template.center_ids || [];
+    const templateCenterIds = template.centerIds || [];
     // Templates with no centers can only be edited by admins
     if (templateCenterIds.length === 0) return false;
     const userEditorFor = editorFor || [];
@@ -597,7 +597,7 @@ export const TemplateManager: React.FC = () => {
     
     setEditingTemplate(templateWithDefaults);
     setOriginalTemplate(clonedTemplate);
-    setCenterIds(template.center_ids || []); // Load existing center IDs
+    setCenterIds(template.centerIds || []); // Load existing center IDs
     setYamlContent(template.yaml || '');
     setValidationError('');
     setShowForm(true);
@@ -723,7 +723,7 @@ export const TemplateManager: React.FC = () => {
         ...templateWithDefaults,
         ...validation.template,
         yaml: finalYamlContent,
-        center_ids: centerIds, // Include center assignment
+        centerIds: centerIds, // Include center assignment
       } as PresentationTemplate;
 
       let result;
@@ -941,7 +941,7 @@ export const TemplateManager: React.FC = () => {
                       📑 {template.slides?.length || 1} slide{(template.slides?.length || 1) !== 1 ? 's' : ''} (ref: {(template.referenceSlideIndex ?? 0) + 1})
                         </span>
                     {/* Center badges - show actual centers for all users */}
-                    <CenterBadges centerIds={template.center_ids || []} />
+                    <CenterBadges centerIds={template.centerIds || []} />
                     </div>
                 </div>
 

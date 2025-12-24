@@ -7,16 +7,17 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import type { Song, PresentationTemplate } from '../../types';
 import { Modal } from '../common/Modal';
+import { Tooltip } from '../common/Tooltip';
 import { CenterBadges } from '../common/CenterBadges';
 import { CenterMultiSelect } from '../common/CenterMultiSelect';
+import { SongMetadataCard } from '../common/SongMetadataCard';
 import { SongDetails } from '../admin/SongDetails';
-import { formatPitch } from '../../utils/pitchUtils';
+import { formatNormalizedPitch } from '../../utils/pitchNormalization';
 import { generateSessionPresentationSlides } from '../../utils/slideUtils';
 import TemplateSelector from '../presentation/TemplateSelector';
 import templateService from '../../services/TemplateService';
 import { pptxExportService } from '../../services/PptxExportService';
 import ApiClient from '../../services/ApiClient';
-import { Tooltip } from '../common';
 
 export const SessionManager: React.FC = () => {
   const { entries, removeSong, clearSession, reorderSession, addSong } = useSession();
@@ -273,7 +274,7 @@ export const SessionManager: React.FC = () => {
       const newSession = await createSession({
         name: sessionName.trim(),
         description: sessionDescription.trim() || undefined,
-        center_ids: sessionCenterIds,
+        centerIds: sessionCenterIds,
       });
 
       if (!newSession) {
@@ -517,22 +518,19 @@ export const SessionManager: React.FC = () => {
                     {index + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    {/* Song Name - Click to preview with selected template */}
-                    <button
-                      type="button"
-                      onClick={() => handlePreviewSong(song.id)}
-                      className="text-left text-base sm:text-lg font-semibold text-blue-700 dark:text-blue-300 hover:underline mb-1"
-                      title="Click to preview"
-                    >
-                      {song.name}
-                    </button>
+                    {/* Song Metadata Section - Reusable component */}
+                    <SongMetadataCard
+                      song={song}
+                      onNameClick={() => handlePreviewSong(song.id)}
+                      nameClickTitle={song.name}
+                    />
                     
-                    {/* Singer and Pitch Info */}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    {/* Singer and Pitch */}
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
                       {singer && (
-                        <div className="flex items-center gap-1">
-                          <i className="fas fa-user text-base"></i>
-                          <span className={`font-medium ${
+                        <>
+                          <span className="font-medium">Singer: </span>
+                          <span className={`font-bold text-base ${
                             singer.gender?.toLowerCase() === 'male' 
                               ? 'text-blue-600 dark:text-blue-400' 
                               : singer.gender?.toLowerCase() === 'boy' 
@@ -542,39 +540,22 @@ export const SessionManager: React.FC = () => {
                                   : singer.gender?.toLowerCase() === 'girl' 
                                     ? 'text-pink-400 dark:text-pink-300' 
                                     : 'text-gray-600 dark:text-gray-400'
-                          }`}>{singer.name}</span>
-                        </div>
+                          }`}>
+                            {singer.name}
+                            {singer.centerIds && singer.centerIds.length > 0 && (
+                              <span className="font-normal text-gray-500 dark:text-gray-400">
+                                {' '}<CenterBadges centerIds={singer.centerIds} size="sm" showText />
+                              </span>
+                            )}
+                          </span>
+                          <span className="mx-2">•</span>
+                        </>
                       )}
                       {entry.pitch && (
-                        <div className="flex items-center gap-1">
-                          <i className="fas fa-music text-base"></i>
-                          <span className="font-bold text-gray-700 dark:text-gray-200">{formatPitch(entry.pitch)}</span>
-                          <span className="text-gray-500 dark:text-gray-400">({entry.pitch.replace('#', '♯')})</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Song Details - Deity, Language, Tempo, Raga */}
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      {song.deity && (
-                        <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 rounded font-medium">
-                          {song.deity}
-                        </span>
-                      )}
-                      {song.language && (
-                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded font-medium">
-                          {song.language}
-                        </span>
-                      )}
-                      {song.tempo && (
-                        <span className="px-2 py-1 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded font-medium">
-                          {song.tempo}
-                        </span>
-                      )}
-                      {song.raga && (
-                        <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 rounded font-medium">
-                          {song.raga}
-                        </span>
+                        <>
+                          <span>Pitch: </span>
+                          <span className="font-bold text-gray-700 dark:text-gray-200">{formatNormalizedPitch(entry.pitch)}</span>
+                        </>
                       )}
                     </div>
                   </div>
@@ -756,7 +737,7 @@ export const SessionManager: React.FC = () => {
                       <span className="text-xs text-gray-400 dark:text-gray-500">
                         Updated: {new Date(session.updatedAt).toLocaleString()}
                       </span>
-                      <CenterBadges centerIds={session.center_ids || []} showAllIfEmpty={true} />
+                      <CenterBadges centerIds={session.centerIds || []} showAllIfEmpty={true} />
                     </div>
                   </button>
                   

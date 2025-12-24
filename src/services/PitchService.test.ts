@@ -265,8 +265,8 @@ describe('PitchService', () => {
       expect(result.singerId).toBe('singer1');
       expect(result.pitch).toBe('C');
       expect(apiClient.createPitch).toHaveBeenCalledWith({
-        song_id: 'song1',
-        singer_id: 'singer1',
+        songId: 'song1',
+        singerId: 'singer1',
         pitch: 'C',
       });
     });
@@ -283,8 +283,8 @@ describe('PitchService', () => {
       await pitchService.createPitch(input);
 
       expect(apiClient.createPitch).toHaveBeenCalledWith({
-        song_id: 'song1',
-        singer_id: 'singer1',
+        songId: 'song1',
+        singerId: 'singer1',
         pitch: 'C',
       });
     });
