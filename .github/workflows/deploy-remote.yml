@@ -1,0 +1,152 @@
+name: Deploy to Remote Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_type:
+        description: 'Deployment type'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - backend-only
+          - frontend-only
+
+concurrency:
+  group: "deploy-remote"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Frontend
+        if: ${{ github.event.inputs.deploy_type != 'backend-only' }}
+        run: npm run build
+        env:
+          VITE_API_URL: /api
+
+      - name: Build Backend
+        if: ${{ github.event.inputs.deploy_type != 'frontend-only' }}
+        run: npm run build:server
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.REMOTE_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy Frontend
+        if: ${{ github.event.inputs.deploy_type != 'backend-only' }}
+        run: |
+          echo "📦 Deploying frontend..."
+          scp -i ~/.ssh/deploy_key -r dist/assets dist/index.html dist/*.js dist/*.css 2>/dev/null \
+            ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:${{ secrets.REMOTE_PATH }}/dist/ || \
+          scp -i ~/.ssh/deploy_key -r dist/* \
+            ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:${{ secrets.REMOTE_PATH }}/dist/
+          echo "✅ Frontend deployed"
+
+      - name: Deploy Backend
+        if: ${{ github.event.inputs.deploy_type != 'frontend-only' }}
+        run: |
+          echo "📦 Deploying backend..."
+          scp -i ~/.ssh/deploy_key -r dist/server \
+            ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:${{ secrets.REMOTE_PATH }}/dist/
+          
+          echo "📦 Uploading PM2 config..."
+          scp -i ~/.ssh/deploy_key deploy/remote/ecosystem.config.cjs \
+            ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:${{ secrets.REMOTE_PATH }}/
+          
+          echo "📦 Uploading package files..."
+          scp -i ~/.ssh/deploy_key package.json package-lock.json \
+            ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:${{ secrets.REMOTE_PATH }}/
+          echo "✅ Backend deployed"
+
+      - name: Install Dependencies & Restart
+        if: ${{ github.event.inputs.deploy_type != 'frontend-only' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }} << 'ENDSSH'
+            cd ${{ secrets.REMOTE_PATH }}
+            
+            echo "📦 Installing dependencies..."
+            npm install --production
+            
+            echo "🔄 Restarting backend..."
+            pm2 stop songstudio 2>/dev/null || true
+            sleep 3
+            pm2 start ecosystem.config.cjs --env production
+            pm2 save
+            
+            echo "⏳ Waiting for app to initialize..."
+            sleep 5
+          ENDSSH
+
+      - name: Health Check
+        run: |
+          echo "🧪 Verifying deployment..."
+          
+          echo "  → Testing API health..."
+          if curl -f -s -k https://${{ secrets.REMOTE_IP }}/api/health > /dev/null 2>&1; then
+            echo "  ✅ API health check passed (HTTPS)"
+          elif curl -f -s http://${{ secrets.REMOTE_IP }}/api/health > /dev/null 2>&1; then
+            echo "  ⚠️  API responding on HTTP (HTTPS not configured)"
+          else
+            echo "  ❌ API health check failed"
+            exit 1
+          fi
+          
+          echo "  → Testing frontend..."
+          if curl -f -s -k https://${{ secrets.REMOTE_IP }}/ > /dev/null 2>&1; then
+            echo "  ✅ Frontend loading (HTTPS)"
+          elif curl -f -s http://${{ secrets.REMOTE_IP }}/ > /dev/null 2>&1; then
+            echo "  ⚠️  Frontend responding on HTTP (HTTPS not configured)"
+          else
+            echo "  ❌ Frontend not responding"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ Deployment verified!"
+
+      - name: Cleanup SSH Key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
