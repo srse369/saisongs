@@ -3,10 +3,200 @@
 Complete deployment guide for Song Studio across different platforms.
 
 ## Table of Contents
-- [Production Deployment (saisongs.org)](#production-deployment)
+- [GitHub Environments & Secrets](#github-environments--secrets)
+  - [Oracle Wallet Setup](#oracle-wallet-setup)
+- [Local Development Deployment](#local-development-deployment)
+- [Production Deployment](#production-deployment)
 - [VPS Deployment](#vps-deployment)
 - [GitHub Pages (Frontend Only)](#github-pages)
 - [Common Issues](#common-issues)
+
+---
+
+## GitHub Environments & Secrets
+
+Song Studio uses **GitHub Environments** to securely manage secrets for different deployment targets. This keeps all sensitive configuration out of the codebase.
+
+### Why GitHub Environments?
+
+| Feature | Benefit |
+|---------|---------|
+| **No local secrets** | Secrets never touch your local machine |
+| **Environment isolation** | Different values for local vs production |
+| **Protection rules** | Require approvals before deploying to production |
+| **Audit trail** | GitHub logs who accessed/changed secrets |
+| **Easy rotation** | Update secrets in one place |
+
+### Setting Up Environments
+
+1. Go to your repository on GitHub
+2. Navigate to **Settings** → **Environments**
+3. Create two environments: `local` and `production`
+
+### Required Secrets by Environment
+
+#### Both Environments (local & production)
+
+| Secret | Description |
+|--------|-------------|
+| `ORACLE_USER` | Oracle database username |
+| `ORACLE_PASSWORD` | Oracle database password |
+| `ORACLE_CONNECT_STRING` | TNS connection string |
+| `ORACLE_WALLET_PASSWORD` | Wallet password (if using Oracle Cloud) |
+| `SESSION_SECRET` | Session cookie signing secret (min 32 chars) |
+| `BREVO_API_KEY` | Brevo (Sendinblue) API key for email OTP |
+| `BREVO_SENDER_EMAIL` | Email sender address |
+| `BREVO_SENDER_NAME` | Email sender name |
+
+#### Production Environment Only
+
+| Secret | Description |
+|--------|-------------|
+| `SSH_PRIVATE_KEY` | SSH private key for server access |
+| `REMOTE_IP` | Production server IP address |
+| `REMOTE_USER` | SSH username (e.g., `ubuntu`) |
+| `REMOTE_PATH` | Deployment path (e.g., `/var/www/songstudio`) |
+
+### Protection Rules (Recommended for Production)
+
+1. Go to **Settings** → **Environments** → **production**
+2. Enable **Required reviewers** - add yourself or team members
+3. Enable **Wait timer** (optional) - e.g., 5 minutes
+4. Restrict to **Selected branches** - only `main`
+
+### How Secrets Are Used
+
+**GitHub Actions workflows** automatically inject these secrets:
+
+```yaml
+# deploy-remote.yml uses production environment
+jobs:
+  deploy:
+    environment: production  # ← Loads production secrets
+    steps:
+      - run: |
+          # Secrets available as: ${{ secrets.SSH_PRIVATE_KEY }}
+```
+
+```yaml
+# deploy-local.yml uses local environment
+jobs:
+  deploy:
+    environment: local  # ← Loads local secrets
+    runs-on: self-hosted
+```
+
+### Local Development (Without GitHub Actions)
+
+For local development without using GitHub Actions, create a `.env.local` file:
+
+```bash
+# Copy the example file
+cp .env.example .env.local
+
+# Edit with your values
+nano .env.local
+```
+
+**Note:** `.env.local` is in `.gitignore` and will never be committed.
+
+### Oracle Wallet Setup
+
+The Oracle wallet contains SSL certificates for secure database connections. Unlike secrets, **the wallet is stored as files** and must be copied manually to each environment.
+
+#### Wallet Locations
+
+| Environment | Path | How It Gets There |
+|-------------|------|-------------------|
+| **Local Dev** | `./wallet/` | Already present (in `.gitignore`) |
+| **Production** | `/var/www/songstudio/wallet` | Manual one-time copy |
+
+#### Why Not Store Wallet in GitHub Secrets?
+
+- Wallet files are binary and would need base64 encoding
+- Multiple files to manage (7 files)
+- Adds complexity with little benefit
+- Wallet expires in 2030 - rarely needs updating
+
+#### First-Time Production Setup
+
+Copy your local wallet to the production server:
+
+```bash
+# Copy wallet directory to server
+scp -i ~/.ssh/your-deploy-key -r wallet/ ubuntu@YOUR_SERVER_IP:/var/www/songstudio/
+
+# SSH in and secure the files
+ssh -i ~/.ssh/your-deploy-key ubuntu@YOUR_SERVER_IP
+chmod 600 /var/www/songstudio/wallet/*
+chmod 700 /var/www/songstudio/wallet
+```
+
+#### Wallet Contents
+
+| File | Purpose |
+|------|---------|
+| `cwallet.sso` | Auto-login wallet (no password needed) |
+| `tnsnames.ora` | Connection string definitions |
+| `sqlnet.ora` | Network configuration |
+| `keystore.jks` | Java keystore |
+| `truststore.jks` | Trusted certificates |
+| `ojdbc.properties` | JDBC driver properties |
+| `README` | Wallet info and expiry date |
+
+#### Wallet Expiry
+
+Your current wallet expires **2030-11-25**. Set a calendar reminder to download a new wallet before then from the Oracle Cloud Console.
+
+---
+
+## Local Development Deployment
+
+Deploy to your local Mac using the GitHub Actions self-hosted runner.
+
+### Prerequisites
+
+1. **Self-hosted GitHub Actions runner** installed and running on your Mac
+2. **local** environment configured in GitHub with required secrets
+
+### Triggering a Local Deploy
+
+1. Go to **Actions** → **Deploy to Local Mac**
+2. Click **Run workflow**
+3. Select deployment type:
+   - `full` - Deploy frontend and backend
+   - `backend-only` - Deploy only backend
+   - `frontend-only` - Deploy only frontend
+4. Click **Run workflow**
+
+### What Happens
+
+The workflow will:
+1. Checkout the latest code
+2. Install dependencies
+3. Build frontend/backend as selected
+4. Restart the backend using PM2
+5. Run health checks
+
+### Manual Local Development
+
+For day-to-day development without GitHub Actions:
+
+```bash
+# Start services
+./deploy/local/dev.sh start
+
+# Check status
+./deploy/local/dev.sh status
+
+# View logs
+./deploy/local/dev.sh logs -f
+
+# Stop services
+./deploy/local/dev.sh stop
+```
+
+See [Local Development README](../deploy/local/README.md) for full documentation.
 
 ---
 

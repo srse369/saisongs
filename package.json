@@ -7,15 +7,24 @@
     "dev": "vite",
     "dev:server": "tsx watch server/index.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
-    "prebuild": "npm test -- --run",
-    "build": "tsc -b && vite build",
+
+    "build": "vite build",
     "build:server": "tsc --project config/tsconfig.server.json",
-    "start:server": "node dist/server/index.js",
-    "lint": "eslint .",
+    "build:all": "npm run build && npm run build:server",
+
+    "start": "node dist/server/index.js",
     "preview": "vite preview",
-    "predeploy": "npm test -- --run",
+
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint .",
+
     "deploy": "./deploy/remote/deploy.sh code",
-    "test": "vitest"
+    "deploy:backend": "./deploy/remote/deploy.sh code --backend-only",
+    "deploy:frontend": "./deploy/remote/deploy.sh code --frontend-only",
+    "deploy:status": "./deploy/remote/deploy.sh status",
+    "deploy:logs": "./deploy/remote/deploy.sh logs",
+    "deploy:restart": "./deploy/remote/deploy.sh restart"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.5.1",
