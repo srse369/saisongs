@@ -1,24 +1,20 @@
 {
   "name": "songstudio",
   "private": true,
-  "version": "5.8.6",
+  "version": "5.8.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "dev:server": "tsx watch server/index.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
-
     "build": "vite build",
     "build:server": "tsc --project config/tsconfig.server.json",
     "build:all": "npm run build && npm run build:server",
-
     "start": "node dist/server/index.js",
     "preview": "vite preview",
-
     "test": "vitest",
     "test:run": "vitest run",
     "lint": "eslint .",
-
     "deploy": "./deploy/remote/deploy.sh code",
     "deploy:backend": "./deploy/remote/deploy.sh code --backend-only",
     "deploy:frontend": "./deploy/remote/deploy.sh code --frontend-only",
