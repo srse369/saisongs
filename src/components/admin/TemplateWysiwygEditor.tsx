@@ -9,6 +9,41 @@ import { useSongs } from '../../contexts/SongContext';
 import { AVAILABLE_FONTS, getFontFamily, getFontsByCategory, FONT_CATEGORY_NAMES } from '../../utils/fonts';
 import { regenerateSlideElementIds } from '../../utils/templateUtils/idGenerator';
 import { Tooltip } from '../common';
+import { 
+  CANVAS_WIDTH, 
+  ELEMENT_MARGIN, 
+  OVERLAY_MAX_ATTEMPTS, 
+  OVERLAY_ATTEMPT_DELAY, 
+  VIDEO_LOAD_TIMEOUT,
+  SCALE_INCREMENT,
+  MIN_SCALE,
+  MAX_SCALE
+} from './TemplateWysiwygEditor/constants';
+import { type CanvasElement } from './TemplateWysiwygEditor/types';
+import { 
+  sanitizeHtmlContent, 
+  parsePosition, 
+  detectVideoAspectRatio, 
+  detectImageAspectRatio 
+} from './TemplateWysiwygEditor/utils';
+import { useLongPress, useLongPressDOM, useMultiSelect, useHistory, useKeyboardShortcuts, useDragHandlers, useTemplateUpdater, useSlideDragAndDrop, useSongContentStyles, useSlideContextMenu } from './TemplateWysiwygEditor/hooks';
+import { BackgroundImage, URLImage, DraggableText, VideoPlaceholder, AudioPlaceholder } from './TemplateWysiwygEditor/components';
+import { 
+  applyAlignment, 
+  bringToFront as bringElementToFront, 
+  sendToBack as sendElementToBack,
+  deleteElementsFromSlide,
+  type AlignmentType
+} from './TemplateWysiwygEditor/operations';
+import {
+  insertSlide as insertSlideOp,
+  duplicateSlide as duplicateSlideOp,
+  deleteSlide as deleteSlideOp,
+  moveSlideUp as moveSlideUpOp,
+  moveSlideDown as moveSlideDownOp,
+  setAsReferenceSlide,
+  reorderSlides as reorderSlidesOp,
+} from './TemplateWysiwygEditor/operations';
 
 // Preload Google Fonts for Konva canvas rendering
 const preloadFonts = async () => {
@@ -35,1238 +70,7 @@ function getSlideDimensions(aspectRatio: AspectRatio = '16:9') {
   return ASPECT_RATIO_DIMENSIONS[aspectRatio] || ASPECT_RATIO_DIMENSIONS['16:9'];
 }
 
-// Canvas display width (height calculated based on aspect ratio)
-const CANVAS_WIDTH = 640;
-
-/**
- * Detect video aspect ratio and return appropriate dimensions
- */
-const detectVideoAspectRatio = async (url: string): Promise<{ width: number; height: number } | null> => {
-  return new Promise((resolve) => {
-    // Check if it's a YouTube URL
-    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be') || url.includes('/shorts/');
-    
-    if (isYouTube) {
-      // YouTube videos - determine if it's a Short (vertical) or regular (horizontal)
-      if (url.includes('/shorts/')) {
-        // Shorts are vertical (9:16)
-        resolve({ width: 360, height: 640 });
-      } else {
-        // Regular YouTube videos are typically 16:9
-        resolve({ width: 640, height: 360 });
-      }
-      return;
-    }
-
-    // For regular video URLs, try to load and detect
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    
-    video.onloadedmetadata = () => {
-      const aspectRatio = video.videoWidth / video.videoHeight;
-      
-      let width: number;
-      let height: number;
-      
-      if (aspectRatio > 1.5) {
-        // Wide video (16:9 or wider)
-        width = 640;
-        height = 360;
-      } else if (aspectRatio < 0.7) {
-        // Vertical video (9:16 or taller)
-        width = 360;
-        height = 640;
-      } else {
-        // Square-ish video (1:1 or close)
-        width = 480;
-        height = 480;
-      }
-      
-      resolve({ width, height });
-      video.remove();
-    };
-    
-    video.onerror = () => {
-      // Default to 16:9 if we can't load
-      resolve({ width: 640, height: 360 });
-      video.remove();
-    };
-    
-    // Set a timeout in case video doesn't load
-    setTimeout(() => {
-      resolve({ width: 640, height: 360 });
-      video.remove();
-    }, 3000);
-    
-    video.src = url;
-  });
-};
-
-/**
- * Detect image aspect ratio and return appropriate dimensions
- */
-const detectImageAspectRatio = async (url: string): Promise<{ width: number; height: number } | null> => {
-  return new Promise((resolve) => {
-    let resolved = false;
-    let timeoutId: NodeJS.Timeout;
-    
-    const resolveOnce = (dimensions: { width: number; height: number }) => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeoutId);
-        resolve(dimensions);
-      }
-    };
-    
-    // Try WITHOUT CORS first (works better for most servers)
-    const img = new Image();
-    
-    img.onload = () => {
-      if (resolved) return;
-      
-      // Check if we can actually read the dimensions
-      if (img.naturalWidth === 0 || img.naturalHeight === 0) {
-        console.warn('⊗ Image loaded but dimensions unavailable (likely CORS blocked)');
-        resolveOnce({ width: 400, height: 400 });
-        return;
-      }
-      
-      const aspectRatio = img.naturalWidth / img.naturalHeight;
-      
-      let width: number;
-      let height: number;
-      
-      if (aspectRatio > 1.5) {
-        // Wide image (landscape)
-        width = 640;
-        height = Math.round(640 / aspectRatio);
-      } else if (aspectRatio < 0.7) {
-        // Tall image (portrait)
-        height = 640;
-        width = Math.round(640 * aspectRatio);
-      } else {
-        // Square-ish image
-        const size = 480;
-        width = size;
-        height = Math.round(size / aspectRatio);
-      }
-      
-      console.log(`✓ Image loaded: ${img.naturalWidth}x${img.naturalHeight}, aspect ratio: ${aspectRatio.toFixed(2)}, setting to ${width}x${height}`);
-      resolveOnce({ width, height });
-    };
-    
-    img.onerror = (e) => {
-      console.warn('✗ Failed to load image:', url);
-      // Default to reasonable size
-      resolveOnce({ width: 400, height: 400 });
-    };
-    
-    // Set a shorter timeout since we're not trying CORS
-    timeoutId = setTimeout(() => {
-      if (!resolved) {
-        console.warn('✗ Image load timeout for:', url);
-        resolveOnce({ width: 400, height: 400 });
-      }
-    }, 3000);
-    
-    // Load WITHOUT crossOrigin (better compatibility, but can't always read dimensions)
-    img.src = url;
-  });
-};
-
-// Helper to parse position (using full slide dimensions) - outside component for performance
-function parsePosition(
-  value: string | number | undefined, 
-  position: string | undefined, 
-  axis: 'x' | 'y',
-  slideSize: number,
-  elementSize: number,
-  slideWidth: number,
-  slideHeight: number
-): number {
-  if (value !== undefined && value !== null) {
-    // Handle numeric values
-    if (typeof value === 'number') {
-      return value;
-    }
-    // Handle string values
-    if (typeof value === 'string') {
-      if (value.endsWith('%')) {
-        return (parseFloat(value) / 100) * slideSize;
-      }
-      return parseFloat(value) || 0;
-    }
-  }
-  
-  // Use predefined position (based on full slide dimensions)
-  if (position) {
-    const margin = 40; // Margin from edges in slide coordinates
-    const positions: Record<string, { x: number; y: number }> = {
-      'top-left': { x: margin, y: margin },
-      'top-center': { x: (slideWidth - elementSize) / 2, y: margin },
-      'top-right': { x: slideWidth - elementSize - margin, y: margin },
-      'center-left': { x: margin, y: (slideHeight - elementSize) / 2 },
-      'center': { x: (slideWidth - elementSize) / 2, y: (slideHeight - elementSize) / 2 },
-      'center-right': { x: slideWidth - elementSize - margin, y: (slideHeight - elementSize) / 2 },
-      'bottom-left': { x: margin, y: slideHeight - elementSize - margin },
-      'bottom-center': { x: (slideWidth - elementSize) / 2, y: slideHeight - elementSize - margin },
-      'bottom-right': { x: slideWidth - elementSize - margin, y: slideHeight - elementSize - margin },
-    };
-    return positions[position]?.[axis] ?? 0;
-  }
-  
-  return 0;
-}
-
-// Element types for the canvas
-type CanvasElement = {
-  id: string;
-  type: 'image' | 'text' | 'video' | 'audio';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation?: number;
-  // For images
-  url?: string;
-  // For text
-  content?: string;
-  fontSize?: number;
-  fontFamily?: string;
-  fontWeight?: string;
-  fontStyle?: 'normal' | 'italic';
-  textAlign?: 'left' | 'center' | 'right';
-  color?: string;
-  // Common
-  opacity?: number;
-  zIndex?: number;
-  // For video/audio behavior
-  autoPlay?: boolean;
-  loop?: boolean;
-  hideVideo?: boolean;
-  hideAudio?: boolean;
-  visualHidden?: boolean;
-  volume?: number;
-  // Multi-slide audio (1-based slide numbers)
-  startSlide?: number;
-  endSlide?: number;
-};
-
-// Hook for detecting long-press on mobile devices (for Konva canvas elements)
-const useLongPress = (
-  onLongPress: (e: any) => void,
-  delay: number = 500
-) => {
-  const timerRef = useRef<number | null>(null);
-  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
-  const longPressTriggered = useRef(false);
-
-  const handleTouchStart = (e: any) => {
-    // Get the native event - Konva wraps it in evt property
-    const nativeEvent = e.evt;
-    const touch = nativeEvent?.touches?.[0];
-    
-    if (touch) {
-      // Prevent default iOS context menu behavior
-      if (nativeEvent?.preventDefault) {
-        nativeEvent.preventDefault();
-      }
-      
-      longPressTriggered.current = false;
-      touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-      
-      timerRef.current = window.setTimeout(() => {
-        longPressTriggered.current = true;
-        onLongPress(e);
-      }, delay);
-    }
-  };
-
-  const handleTouchMove = (e: any) => {
-    const nativeEvent = e.evt;
-    const touch = nativeEvent?.touches?.[0];
-    
-    if (touch && touchStartPos.current) {
-      const dx = touch.clientX - touchStartPos.current.x;
-      const dy = touch.clientY - touchStartPos.current.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      // Cancel long-press if finger moved more than 10px
-      if (distance > 10 && timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-        longPressTriggered.current = false;
-      }
-    }
-  };
-
-  const handleTouchEnd = (e: any) => {
-    // Clean up timer
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    
-    // Prevent click event if long-press was triggered
-    if (longPressTriggered.current) {
-      const nativeEvent = e.evt;
-      if (nativeEvent?.preventDefault) {
-        nativeEvent.preventDefault();
-      }
-      if (nativeEvent?.stopPropagation) {
-        nativeEvent.stopPropagation();
-      }
-    }
-    
-    touchStartPos.current = null;
-    longPressTriggered.current = false;
-  };
-
-  return {
-    onTouchStart: handleTouchStart,
-    onTouchMove: handleTouchMove,
-    onTouchEnd: handleTouchEnd,
-  };
-};
-
-// Hook for detecting long-press on DOM elements (for slide thumbnails)
-const useLongPressDOM = (
-  onLongPress: (e: React.TouchEvent) => void,
-  delay: number = 500
-) => {
-  const timerRef = useRef<number | null>(null);
-  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
-  const longPressTriggered = useRef(false);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches?.[0];
-    
-    if (touch) {
-      // Prevent default iOS context menu behavior
-      e.preventDefault();
-      
-      longPressTriggered.current = false;
-      touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-      
-      timerRef.current = window.setTimeout(() => {
-        longPressTriggered.current = true;
-        onLongPress(e);
-      }, delay);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const touch = e.touches?.[0];
-    
-    if (touch && touchStartPos.current) {
-      const dx = touch.clientX - touchStartPos.current.x;
-      const dy = touch.clientY - touchStartPos.current.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      // Cancel long-press if finger moved more than 10px
-      if (distance > 10 && timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-        longPressTriggered.current = false;
-      }
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    // Clean up timer
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    
-    // Prevent click event if long-press was triggered
-    if (longPressTriggered.current) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
-    touchStartPos.current = null;
-    longPressTriggered.current = false;
-  };
-
-  return {
-    onTouchStart: handleTouchStart,
-    onTouchMove: handleTouchMove,
-    onTouchEnd: handleTouchEnd,
-  };
-};
-
 // BackgroundImage component for slide background
-const BackgroundImage: React.FC<{
-  url: string;
-  width: number;
-  height: number;
-}> = ({ url, width, height }) => {
-  const [image] = useImage(url);
-
-  if (!image) {
-    return null;
-  }
-
-  return (
-    <KonvaImage
-      x={0}
-      y={0}
-      image={image}
-      width={width}
-      height={height}
-      listening={false}
-    />
-  );
-};
-
-// URLImage component for loading images
-// Try loading without CORS first, then fall back to anonymous mode
-const URLImage: React.FC<{
-  element: CanvasElement;
-  isSelected: boolean;
-  onSelect: () => void;
-  onChange: (attrs: Partial<CanvasElement>) => void;
-  onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
-}> = ({ element, isSelected, onSelect, onChange, onContextMenu }) => {
-  // Try loading without CORS mode first (works better with corporate proxies/firewalls)
-  const [image, imageStatus] = useImage(element.url || '');
-  const shapeRef = useRef<Konva.Image>(null);
-  const longPressHandlers = useLongPress(onContextMenu || (() => {}));
-
-  // Show a placeholder rectangle if image fails to load or is loading
-  if (!image || imageStatus === 'loading' || imageStatus === 'failed') {
-    return (
-      <Group
-        id={element.id}
-        x={element.x}
-        y={element.y}
-        draggable
-        onClick={onSelect}
-        onTap={onSelect}
-        onContextMenu={onContextMenu}
-        {...longPressHandlers}
-        onDragEnd={(e) => {
-          onChange({
-            x: Math.round(e.target.x()),
-            y: Math.round(e.target.y()),
-          });
-        }}
-      >
-        {/* Placeholder background */}
-        <Rect
-          width={element.width}
-          height={element.height}
-          fill="#374151"
-          stroke={isSelected ? '#3b82f6' : '#6b7280'}
-          strokeWidth={2}
-          cornerRadius={4}
-        />
-        {/* Image icon */}
-        <Text
-          text="🖼️"
-          fontSize={Math.min(element.width, element.height) * 0.3}
-          x={element.width / 2}
-          y={element.height / 2 - 20}
-          offsetX={Math.min(element.width, element.height) * 0.15}
-          align="center"
-        />
-        {/* Status text */}
-        <Text
-          text={imageStatus === 'loading' ? 'Loading...' : (element.url ? 'Failed to load' : 'No URL')}
-          fontSize={12}
-          fill="#9ca3af"
-          x={element.width / 2}
-          y={element.height / 2 + 10}
-          offsetX={40}
-          align="center"
-        />
-      </Group>
-    );
-  }
-
-  return (
-    <KonvaImage
-      ref={shapeRef}
-      id={element.id}
-      x={element.x}
-      y={element.y}
-      width={element.width}
-      height={element.height}
-      rotation={element.rotation || 0}
-      image={image}
-      opacity={element.opacity ?? 1}
-      draggable
-      onClick={onSelect}
-      onTap={onSelect}
-      onContextMenu={onContextMenu}
-      {...longPressHandlers}
-      onDragEnd={(e) => {
-        onChange({
-          x: Math.round(e.target.x()),
-          y: Math.round(e.target.y()),
-        });
-      }}
-      onTransformEnd={(e) => {
-        const node = shapeRef.current;
-        if (!node) return;
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
-        node.scaleX(1);
-        node.scaleY(1);
-        onChange({
-          x: Math.round(node.x()),
-          y: Math.round(node.y()),
-          width: Math.round(Math.max(20, node.width() * scaleX)),
-          height: Math.round(Math.max(20, node.height() * scaleY)),
-          rotation: Math.round(node.rotation()),
-        });
-      }}
-    />
-  );
-};
-
-// DraggableText component with inline editing support
-const DraggableText: React.FC<{
-  element: CanvasElement;
-  isSelected: boolean;
-  onSelect: () => void;
-  onChange: (attrs: Partial<CanvasElement>) => void;
-  stageRef: React.RefObject<Konva.Stage>;
-  scale: number;
-  onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
-  onEditingChange?: (isEditing: boolean) => void;
-  showFormattedOverlay?: boolean;
-}> = ({ element, isSelected, onSelect, onChange, stageRef, scale, onContextMenu, onEditingChange, showFormattedOverlay = true }) => {
-  const shapeRef = useRef<Konva.Text>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const overlayRef = useRef<HTMLDivElement | null>(null);
-  const longPressHandlers = useLongPress(onContextMenu || (() => {}));
-
-  // Create and position HTML overlay for rendered text
-  useEffect(() => {
-    if (!showFormattedOverlay || isEditing) {
-      // Remove overlay when not needed or when editing
-      if (overlayRef.current) {
-        document.body.removeChild(overlayRef.current);
-        overlayRef.current = null;
-      }
-      return;
-    }
-
-    const stage = stageRef.current;
-    if (!stage) return;
-
-    // Create overlay div
-    const overlay = document.createElement('div');
-    overlayRef.current = overlay;
-    
-    // Convert custom tags to HTML
-    const htmlContent = (element.content || 'Text')
-      .replace(/<c:([0-9a-fA-F]{6})>(.*?)<\/c:[0-9a-fA-F]{6}>/g, '<span style="color:#$1">$2</span>')
-      .replace(/<br\s*\/?>/gi, '<br>');
-    
-    overlay.innerHTML = htmlContent;
-    
-    // Get stage container position
-    const stageBox = stage.container().getBoundingClientRect();
-    
-    // Position overlay - use fixed positioning relative to viewport
-    overlay.style.position = 'fixed';
-    overlay.style.left = `${stageBox.left + element.x * scale}px`;
-    overlay.style.top = `${stageBox.top + element.y * scale}px`;
-    overlay.style.width = `${(element.width || 200) * scale}px`;
-    overlay.style.fontSize = `${(element.fontSize || 24) * scale}px`;
-    overlay.style.fontFamily = getFontFamily(element.fontFamily);
-    overlay.style.fontWeight = element.fontWeight || 'normal';
-    overlay.style.fontStyle = element.fontStyle || 'normal';
-    overlay.style.textAlign = element.textAlign || 'center';
-    overlay.style.color = element.color || '#ffffff';
-    overlay.style.lineHeight = '1';
-    overlay.style.whiteSpace = 'pre-wrap';
-    overlay.style.wordWrap = 'break-word';
-    overlay.style.pointerEvents = 'none'; // Allow clicks to pass through to Konva
-    overlay.style.transformOrigin = 'left top';
-    overlay.style.zIndex = '1000';
-    overlay.className = 'wysiwyg-text-overlay'; // Add class for easy identification
-    
-    if (element.rotation) {
-      overlay.style.transform = `rotate(${element.rotation}deg)`;
-    }
-    
-    document.body.appendChild(overlay);
-
-    // Function to update overlay position
-    const updateOverlayPosition = () => {
-      const stage = stageRef.current;
-      if (!stage || !overlay.parentElement) return;
-      
-      const stageBox = stage.container().getBoundingClientRect();
-      overlay.style.left = `${stageBox.left + element.x * scale}px`;
-      overlay.style.top = `${stageBox.top + element.y * scale}px`;
-    };
-
-    // Find the scrollable container (modal body)
-    const scrollContainer = stage.container().closest('.overflow-y-auto, .overflow-auto, [style*="overflow"]');
-    
-    // Add scroll listener to update position
-    if (scrollContainer) {
-      scrollContainer.addEventListener('scroll', updateOverlayPosition);
-    }
-    
-    // Also listen for window scroll and resize
-    window.addEventListener('scroll', updateOverlayPosition, true);
-    window.addEventListener('resize', updateOverlayPosition);
-
-    // Watch for PresentationModal opening and hide overlay
-    const checkForPresentationModal = () => {
-      // Look specifically for PresentationModal which has data-presentation-modal or specific structure
-      const hasPresentationModal = document.querySelector('.presentation-modal-backdrop, [data-presentation-modal="true"]') !== null;
-      if (hasPresentationModal && overlay.parentElement) {
-        overlay.style.display = 'none';
-      } else if (overlay.parentElement) {
-        overlay.style.display = 'block';
-      }
-    };
-
-    // Check immediately
-    checkForPresentationModal();
-
-    // Set up observer for modal changes
-    const observer = new MutationObserver(checkForPresentationModal);
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // Cleanup
-    return () => {
-      observer.disconnect();
-      
-      // Remove scroll listeners
-      if (scrollContainer) {
-        scrollContainer.removeEventListener('scroll', updateOverlayPosition);
-      }
-      window.removeEventListener('scroll', updateOverlayPosition, true);
-      window.removeEventListener('resize', updateOverlayPosition);
-      
-      if (overlayRef.current) {
-        document.body.removeChild(overlayRef.current);
-        overlayRef.current = null;
-      }
-    };
-  }, [element.content, element.x, element.y, element.width, element.fontSize, element.fontFamily, element.fontWeight, element.fontStyle, element.textAlign, element.color, element.rotation, scale, isEditing, showFormattedOverlay, stageRef]);
-
-  // Konva fontStyle combines bold and italic: "normal", "bold", "italic", "bold italic"
-  const getFontStyle = () => {
-    const isBold = element.fontWeight === 'bold';
-    const isItalic = element.fontStyle === 'italic';
-    if (isBold && isItalic) return 'bold italic';
-    if (isBold) return 'bold';
-    if (isItalic) return 'italic';
-    return 'normal';
-  };
-
-  // Strip HTML tags for plain text display
-  const getPlainText = () => {
-    return (element.content || 'Text')
-      .replace(/<br\s*\/?>/gi, '\n') // Convert <br> to newlines
-      .replace(/<[^>]+>/g, ''); // Remove all other HTML tags
-  };
-
-  // Handle double-click to start inline editing
-  const handleDblClick = () => {
-    const textNode = shapeRef.current;
-    const stage = stageRef.current;
-    if (!textNode || !stage) return;
-
-    // Hide text node while editing
-    textNode.hide();
-
-    // Get stage container position
-    const stageBox = stage.container().getBoundingClientRect();
-    
-    // Use element's x/y position (in slide coordinates) and multiply by scale
-    const areaPosition = {
-      x: stageBox.left + element.x * scale,
-      y: stageBox.top + element.y * scale,
-    };
-
-    // Create contentEditable div for rich text editing
-    const editor = document.createElement('div');
-    editor.contentEditable = 'true';
-    editor.spellcheck = false;
-    editor.setAttribute('data-wysiwyg-text-editor', 'true');
-    document.body.appendChild(editor);
-
-    // Convert our custom tags to HTML for editing
-    const htmlContent = (element.content || '')
-      .replace(/<c:([0-9a-fA-F]{6})>(.*?)<\/c:[0-9a-fA-F]{6}>/g, '<span style="color:#$1">$2</span>');
-    editor.innerHTML = htmlContent;
-    
-    editor.style.position = 'fixed';
-    editor.style.top = `${areaPosition.y}px`;
-    editor.style.left = `${areaPosition.x}px`;
-    editor.style.width = `${(element.width || 200) * scale}px`;
-    editor.style.minHeight = `${(element.fontSize || 24) * scale}px`;
-    editor.style.fontSize = `${(element.fontSize || 24) * scale}px`;
-    editor.style.fontFamily = getFontFamily(element.fontFamily);
-    editor.style.fontWeight = element.fontWeight || 'normal';
-    editor.style.fontStyle = element.fontStyle || 'normal';
-    editor.style.textAlign = element.textAlign || 'center';
-    editor.style.color = element.color || '#ffffff';
-    editor.style.background = 'rgba(0, 0, 0, 0.85)';
-    editor.style.border = '2px solid #3b82f6';
-    editor.style.borderRadius = '4px';
-    editor.style.padding = '0';
-    editor.style.margin = '0';
-    editor.style.overflow = 'auto';
-    editor.style.outline = 'none';
-    editor.style.lineHeight = '1';
-    editor.style.transformOrigin = 'left top';
-    editor.style.zIndex = '10000';
-    editor.style.boxSizing = 'border-box';
-    editor.style.whiteSpace = 'pre-wrap';
-    editor.style.wordWrap = 'break-word';
-    
-    // Handle rotation
-    if (element.rotation) {
-      editor.style.transform = `rotate(${element.rotation}deg)`;
-    }
-
-    // Create toolbar for formatting
-    const toolbar = document.createElement('div');
-    toolbar.style.position = 'fixed';
-    toolbar.style.top = `${areaPosition.y - 40}px`;
-    toolbar.style.left = `${areaPosition.x}px`;
-    toolbar.style.background = '#1f2937';
-    toolbar.style.border = '1px solid #3b82f6';
-    toolbar.style.borderRadius = '4px';
-    toolbar.style.padding = '4px';
-    toolbar.style.display = 'flex';
-    toolbar.style.gap = '4px';
-    toolbar.style.zIndex = '10001';
-    
-    const createButton = (label: string, command: string) => {
-      const btn = document.createElement('button');
-      btn.textContent = label;
-      btn.style.padding = '4px 8px';
-      btn.style.background = '#374151';
-      btn.style.color = '#fff';
-      btn.style.border = 'none';
-      btn.style.borderRadius = '3px';
-      btn.style.cursor = 'pointer';
-      btn.style.fontSize = '12px';
-      btn.onmousedown = (e) => {
-        e.preventDefault();
-        document.execCommand(command, false);
-        editor.focus();
-      };
-      return btn;
-    };
-
-    toolbar.appendChild(createButton('B', 'bold'));
-    toolbar.appendChild(createButton('I', 'italic'));
-    
-    const colorInput = document.createElement('input');
-    colorInput.type = 'color';
-    colorInput.value = element.color || '#ffffff';
-    colorInput.style.width = '30px';
-    colorInput.style.height = '24px';
-    colorInput.style.border = 'none';
-    colorInput.style.cursor = 'pointer';
-    
-    // Track selection info for color picker
-    // Store as text content and offsets to survive focus changes
-    let savedSelectionInfo: { startOffset: number; endOffset: number; selectedText: string } | null = null;
-    let colorSpan: HTMLSpanElement | null = null;
-    let colorPickerOpen = false;
-    
-    // Get text offset within the editor
-    const getTextOffset = (node: Node, offset: number): number => {
-      let totalOffset = 0;
-      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
-      let currentNode = walker.nextNode();
-      while (currentNode) {
-        if (currentNode === node) {
-          return totalOffset + offset;
-        }
-        totalOffset += currentNode.textContent?.length || 0;
-        currentNode = walker.nextNode();
-      }
-      return totalOffset + offset;
-    };
-    
-    // Save selection info before color picker opens
-    const saveSelectionInfo = () => {
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-        const range = sel.getRangeAt(0);
-        if (editor.contains(range.commonAncestorContainer)) {
-          const startOffset = getTextOffset(range.startContainer, range.startOffset);
-          const endOffset = getTextOffset(range.endContainer, range.endOffset);
-          const selectedText = range.toString();
-          if (selectedText.length > 0) {
-            savedSelectionInfo = { startOffset, endOffset, selectedText };
-          }
-        }
-      }
-    };
-    
-    // Apply color by wrapping selected text in a span
-    const applyColorToSelection = (color: string) => {
-      if (!savedSelectionInfo || savedSelectionInfo.selectedText.length === 0) return;
-      
-      // If we already created/found a color span this session, just update its color
-      if (colorSpan) {
-        colorSpan.style.color = color;
-        return;
-      }
-      
-      // Need to find and wrap the selected text
-      // Get all text content and find the selected portion
-      const fullText = editor.textContent || '';
-      const { startOffset, endOffset, selectedText } = savedSelectionInfo;
-      
-      // Verify the text at these offsets matches
-      const textAtOffsets = fullText.substring(startOffset, endOffset);
-      if (textAtOffsets !== selectedText) {
-        // Text has changed, can't apply color accurately
-        return;
-      }
-      
-      // Find the text node(s) containing the selection
-      let currentOffset = 0;
-      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
-      let currentNode = walker.nextNode();
-      
-      while (currentNode) {
-        const nodeLength = currentNode.textContent?.length || 0;
-        const nodeEnd = currentOffset + nodeLength;
-        
-        // Check if selection starts in this node
-        if (currentOffset <= startOffset && nodeEnd > startOffset) {
-          const textNode = currentNode as Text;
-          const relativeStart = startOffset - currentOffset;
-          const relativeEnd = Math.min(endOffset - currentOffset, nodeLength);
-          
-          // Check if this text node is already inside a color span
-          // and the entire selection is within that span
-          const parentSpan = textNode.parentElement;
-          if (parentSpan && parentSpan.tagName === 'SPAN' && parentSpan.style.color) {
-            // Check if the span contains exactly the selected text (or the selection is the whole span content)
-            const spanText = parentSpan.textContent || '';
-            if (spanText === selectedText || (relativeStart === 0 && relativeEnd === nodeLength)) {
-              // Just update the existing span's color
-              colorSpan = parentSpan as HTMLSpanElement;
-              colorSpan.style.color = color;
-              return;
-            }
-          }
-          
-          // Split the text node and wrap the middle part
-          if (relativeStart > 0) {
-            textNode.splitText(relativeStart);
-            currentNode = walker.nextNode();
-          }
-          
-          if (currentNode && relativeEnd - relativeStart < (currentNode.textContent?.length || 0)) {
-            (currentNode as Text).splitText(relativeEnd - relativeStart);
-          }
-          
-          // Check again if parent is a color span (after potential split)
-          const parent = currentNode?.parentElement;
-          if (parent && parent.tagName === 'SPAN' && parent.style.color) {
-            // The text is already in a span, update its color
-            colorSpan = parent as HTMLSpanElement;
-            colorSpan.style.color = color;
-            return;
-          }
-          
-          // Wrap the current node in a new span
-          if (currentNode) {
-            colorSpan = document.createElement('span');
-            colorSpan.style.color = color;
-            currentNode.parentNode?.insertBefore(colorSpan, currentNode);
-            colorSpan.appendChild(currentNode);
-          }
-          break;
-        }
-        
-        currentOffset = nodeEnd;
-        currentNode = walker.nextNode();
-      }
-    };
-    
-    // Track selection while editing
-    editor.addEventListener('mouseup', saveSelectionInfo);
-    editor.addEventListener('keyup', saveSelectionInfo);
-    
-    colorInput.onmousedown = () => {
-      if (!colorPickerOpen) {
-        saveSelectionInfo();
-        colorPickerOpen = true;
-        colorSpan = null; // Reset for new color operation
-      }
-    };
-    
-    colorInput.oninput = () => {
-      applyColorToSelection(colorInput.value);
-    };
-    
-    colorInput.onchange = () => {
-      applyColorToSelection(colorInput.value);
-      editor.focus();
-      colorPickerOpen = false;
-      colorSpan = null;
-      savedSelectionInfo = null;
-    };
-    
-    colorInput.onblur = () => {
-      // Small delay to allow onchange to fire first
-      setTimeout(() => {
-        colorPickerOpen = false;
-      }, 100);
-    };
-    
-    toolbar.appendChild(colorInput);
-    
-    document.body.appendChild(toolbar);
-
-    editor.focus();
-    // Select all text
-    const selection = window.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(editor);
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-    
-    setIsEditing(true);
-    onEditingChange?.(true);
-
-    // Convert HTML back to our custom format
-    const convertToCustomFormat = (html: string): string => {
-      let result = html;
-      
-      // Helper to convert RGB to hex
-      const rgbToHex = (r: number, g: number, b: number): string => {
-        return [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
-      };
-      
-      // Convert <font color="#RRGGBB"> to <c:RRGGBB>
-      result = result.replace(/<font color="#([0-9a-fA-F]{6})">(.*?)<\/font>/gi, '<c:$1>$2</c:$1>');
-      
-      // Convert <span style="color:#RRGGBB"> to <c:RRGGBB> (hex format, with optional semicolon)
-      result = result.replace(/<span style="color:\s*#([0-9a-fA-F]{6});?">(.*?)<\/span>/gi, '<c:$1>$2</c:$1>');
-      
-      // Convert <span style="color: rgb(r, g, b);"> to <c:RRGGBB> (RGB format, with optional semicolon)
-      result = result.replace(/<span style="color:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\);?">(.*?)<\/span>/gi, 
-        (match, r, g, b, content) => {
-          const hex = rgbToHex(parseInt(r), parseInt(g), parseInt(b));
-          return `<c:${hex}>${content}</c:${hex}>`;
-        });
-      
-      // Convert <font color="rgb(r, g, b)"> to <c:RRGGBB> (RGB format, some browsers use this)
-      result = result.replace(/<font color="rgb\((\d+),\s*(\d+),\s*(\d+)\);?">(.*?)<\/font>/gi, 
-        (match, r, g, b, content) => {
-          const hex = rgbToHex(parseInt(r), parseInt(g), parseInt(b));
-          return `<c:${hex}>${content}</c:${hex}>`;
-        });
-      
-      // Remove style attributes from b and i tags
-      result = result.replace(/<b\s+[^>]*>/gi, '<b>');
-      result = result.replace(/<i\s+[^>]*>/gi, '<i>');
-      
-      // Keep <b> and <i> tags, remove other formatting
-      result = result.replace(/<strong>/gi, '<b>').replace(/<\/strong>/gi, '</b>');
-      result = result.replace(/<em>/gi, '<i>').replace(/<\/em>/gi, '</i>');
-      
-      // Remove <div> and <p> tags, replace with <br>
-      result = result.replace(/<div>/gi, '<br>').replace(/<\/div>/gi, '');
-      result = result.replace(/<p>/gi, '').replace(/<\/p>/gi, '<br>');
-      
-      // Clean up extra <br> at the end
-      result = result.replace(/(<br>)+$/gi, '');
-      
-      return result;
-    };
-
-    // Handle keydown (Escape to cancel) - must be on window in capture phase to run before parent modal handler
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle if this editor is the target
-      if (e.target !== editor) return;
-      
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        
-        // Clean up editor and toolbar
-        try {
-          document.body.removeChild(editor);
-          document.body.removeChild(toolbar);
-        } catch (err) {
-          // Elements might already be removed
-        }
-        
-        textNode.show();
-        setIsEditing(false);
-        onEditingChange?.(false);
-        
-        // Remove this handler
-        window.removeEventListener('keydown', handleKeyDown, true);
-      }
-    };
-
-    // Handle blur (finish editing)
-    const handleBlur = (e: FocusEvent) => {
-      // Don't close if clicking on toolbar or color input
-      if (e.relatedTarget === toolbar || e.relatedTarget === colorInput || 
-          toolbar.contains(e.relatedTarget as Node)) {
-        return;
-      }
-      
-      const newContent = convertToCustomFormat(editor.innerHTML);
-      onChange({ content: newContent });
-      
-      try {
-        document.body.removeChild(editor);
-        document.body.removeChild(toolbar);
-      } catch (err) {
-        // Elements might already be removed
-      }
-      
-      textNode.show();
-      setIsEditing(false);
-      onEditingChange?.(false);
-      
-      // Remove keydown handler
-      window.removeEventListener('keydown', handleKeyDown, true);
-    };
-
-    editor.addEventListener('blur', handleBlur);
-    // Add to window in capture phase so it runs before parent modal's handler
-    window.addEventListener('keydown', handleKeyDown, true);
-    
-    // Focus the editor
-    editor.focus();
-  };
-
-  return (
-    <Text
-      ref={shapeRef}
-      id={element.id}
-      x={element.x}
-      y={element.y}
-      width={element.width}
-      text={getPlainText()}
-      fontSize={element.fontSize || 24}
-      fontFamily={getFontFamily(element.fontFamily)}
-      fontStyle={getFontStyle()}
-      align={element.textAlign || 'center'}
-      fill={element.color || '#ffffff'}
-      lineHeight={1}
-      opacity={showFormattedOverlay && !isEditing && !isDragging ? 0 : (element.opacity ?? 1)}
-      rotation={element.rotation || 0}
-      draggable={!isEditing}
-      onClick={onSelect}
-      onTap={onSelect}
-      onContextMenu={onContextMenu}
-      {...longPressHandlers}
-      onDblClick={handleDblClick}
-      onDblTap={handleDblClick}
-      onDragStart={() => setIsDragging(true)}
-      onDragEnd={(e) => {
-        setIsDragging(false);
-        const node = shapeRef.current;
-        onChange({
-          x: Math.round(e.target.x()),
-          y: Math.round(e.target.y()),
-          width: node ? Math.round(node.width()) : undefined,
-          height: node ? Math.round(node.height()) : undefined,
-        });
-      }}
-      onTransformEnd={(e) => {
-        const node = shapeRef.current;
-        if (!node) return;
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
-        node.scaleX(1);
-        node.scaleY(1);
-        const newWidth = Math.round(Math.max(20, node.width() * scaleX));
-        const newHeight = Math.round(Math.max(20, node.height() * scaleY));
-        onChange({
-          x: Math.round(node.x()),
-          y: Math.round(node.y()),
-          width: newWidth,
-          height: newHeight,
-          rotation: Math.round(node.rotation()),
-        });
-      }}
-    />
-  );
-};
-
-// VideoPlaceholder component for video elements
-const VideoPlaceholder: React.FC<{
-  element: CanvasElement;
-  isSelected: boolean;
-  onSelect: () => void;
-  onChange: (attrs: Partial<CanvasElement>) => void;
-  onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
-}> = ({ element, isSelected, onSelect, onChange, onContextMenu }) => {
-  const groupRef = useRef<Konva.Group>(null);
-  const longPressHandlers = useLongPress(onContextMenu || (() => {}));
-
-  return (
-    <Group
-      ref={groupRef}
-      id={element.id}
-      x={element.x}
-      y={element.y}
-      rotation={element.rotation || 0}
-      draggable
-      onClick={onSelect}
-      onTap={onSelect}
-      onContextMenu={onContextMenu}
-      {...longPressHandlers}
-      onDragEnd={(e) => {
-        onChange({
-          x: Math.round(e.target.x()),
-          y: Math.round(e.target.y()),
-        });
-      }}
-      onTransformEnd={() => {
-        const node = groupRef.current;
-        if (!node) return;
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
-        node.scaleX(1);
-        node.scaleY(1);
-        onChange({
-          x: Math.round(node.x()),
-          y: Math.round(node.y()),
-          width: Math.round(Math.max(40, (element.width || 0) * scaleX)),
-          height: Math.round(Math.max(40, (element.height || 0) * scaleY)),
-          rotation: Math.round(node.rotation()),
-        });
-      }}
-    >
-      <Rect
-        x={0}
-        y={0}
-        width={element.width}
-        height={element.height}
-        fill="#111827"
-        stroke={isSelected ? '#a855f7' : '#4b5563'}
-        strokeWidth={2}
-        cornerRadius={6}
-      />
-      <Text
-        text={element.hideVideo ? "🎵 Audio" : "▶ Video"}
-        fontSize={16}
-        fill="#e5e7eb"
-        x={8}
-        y={8}
-      />
-    </Group>
-  );
-};
-
-// AudioPlaceholder component for audio elements
-const AudioPlaceholder: React.FC<{
-  element: CanvasElement;
-  isSelected: boolean;
-  onSelect: () => void;
-  onChange: (attrs: Partial<CanvasElement>) => void;
-  onContextMenu?: (e: Konva.KonvaEventObject<PointerEvent>) => void;
-}> = ({ element, isSelected, onSelect, onChange, onContextMenu }) => {
-  const groupRef = useRef<Konva.Group>(null);
-  const longPressHandlers = useLongPress(onContextMenu || (() => {}));
-
-  return (
-    <Group
-      ref={groupRef}
-      id={element.id}
-      x={element.x}
-      y={element.y}
-      rotation={element.rotation || 0}
-      draggable
-      onClick={onSelect}
-      onTap={onSelect}
-      onContextMenu={onContextMenu}
-      {...longPressHandlers}
-      onDragEnd={(e) => {
-        onChange({
-          x: Math.round(e.target.x()),
-          y: Math.round(e.target.y()),
-        });
-      }}
-      onTransformEnd={() => {
-        const node = groupRef.current;
-        if (!node) return;
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
-        node.scaleX(1);
-        node.scaleY(1);
-        onChange({
-          x: Math.round(node.x()),
-          y: Math.round(node.y()),
-          width: Math.round(Math.max(40, (element.width || 0) * scaleX)),
-          height: Math.round(Math.max(40, (element.height || 0) * scaleY)),
-          rotation: Math.round(node.rotation()),
-        });
-      }}
-    >
-      {/* Background */}
-      <Rect
-        width={element.width}
-        height={element.height}
-        fill={element.visualHidden ? 'transparent' : '#7c3aed'}
-        stroke={isSelected ? '#3b82f6' : (element.visualHidden ? '#9333ea' : '#6b21a8')}
-        strokeWidth={2}
-        cornerRadius={4}
-        opacity={element.visualHidden ? 0.3 : 1}
-      />
-      {/* Audio icon - volume high from Font Awesome */}
-      <Text
-        text="🔊"
-        fontSize={Math.min(element.width, element.height) * 0.35}
-        fill="#ffffff"
-        x={element.width / 2}
-        y={element.height / 2 - 20}
-        offsetX={Math.min(element.width, element.height) * 0.175}
-        align="center"
-        opacity={element.visualHidden ? 0.5 : 1}
-      />
-      {/* Label */}
-      <Text
-        text={element.url ? (element.visualHidden ? 'Audio (Hidden)' : 'Audio') : 'No URL'}
-        fontSize={12}
-        fill="#ffffff"
-        x={element.width / 2}
-        y={element.height / 2 + 10}
-        offsetX={element.url ? (element.visualHidden ? 45 : 20) : 22}
-        align="center"
-        opacity={element.visualHidden ? 0.5 : 1}
-      />
-      {/* Dimensions */}
-      <Text
-        text={`${Math.round(element.width)}×${Math.round(element.height)}`}
-        fontSize={10}
-        fill="#a78bfa"
-        x={8}
-        y={8}
-        opacity={element.visualHidden ? 0.5 : 1}
-      />
-    </Group>
-  );
-};
-
-// Type for history state
-type HistoryState = {
-  slides: TemplateSlide[];
-  selectedSlideIndex: number;
-};
-
 export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   template,
   onTemplateChange,
@@ -1274,18 +78,33 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   onSlideIndexChange,
   onSwitchToYaml,
 }) => {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Multi-select support
+  const {
+    selectedIds,
+    firstSelectedId,
+    selectedId,
+    isDraggingMultiSelect,
+    dragStartPositions,
+    isElementSelected,
+    selectElement,
+    toggleElementSelection,
+    addToSelection,
+    handleElementSelect,
+    clearSelection,
+    setIsDraggingMultiSelect,
+    setSelectedIds,
+  } = useMultiSelect();
+  
   const [selectedSlideIndex, setSelectedSlideIndex] = useState(0);
   const [slideListHasFocus, setSlideListHasFocus] = useState(true);
   const [canvasHasFocus, setCanvasHasFocus] = useState(false);
   const [isTextEditing, setIsTextEditing] = useState(false);
+  const [overlayRefreshKey, setOverlayRefreshKey] = useState(0);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; slideIndex: number } | null>(null);
   const [elementContextMenu, setElementContextMenu] = useState<{ x: number; y: number; elementId: string } | null>(null);
   const [showSongPicker, setShowSongPicker] = useState(false);
   const [songSearchQuery, setSongSearchQuery] = useState('');
   const [fontsLoaded, setFontsLoaded] = useState(false);
-  const [draggedSlideIndex, setDraggedSlideIndex] = useState<number | null>(null);
-  const [dragOverSlideIndex, setDragOverSlideIndex] = useState<number | null>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -1295,20 +114,10 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   // On mount, ensure first slide is selected and canvas has focus
   useEffect(() => {
     setSelectedSlideIndex(0);
-    setSelectedId(null);
+    clearSelection();
     setSlideListHasFocus(false);
     setCanvasHasFocus(true);
-    
-    // Focus the first thumbnail so keyboard shortcuts work immediately
-    setTimeout(() => {
-      const firstThumbnail = thumbnailRefs.current[0];
-      if (firstThumbnail) {
-        firstThumbnail.focus();
-        setSlideListHasFocus(true);
-        setCanvasHasFocus(false);
-      }
-    }, 100);
-  }, []); // Run only once on mount
+  }, [clearSelection]); // Run only once on mount
   
   // Notify parent when selected slide index changes
   useEffect(() => {
@@ -1358,16 +167,40 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     }
   }, [template, fontsLoaded]);
   
-  // Undo/Redo history
-  const [history, setHistory] = useState<HistoryState[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const isUndoRedoAction = useRef(false);
+  // Clipboard for copy/paste (uses localStorage for cross-window support)
+  // Supports multi-element clipboard as an array
+  const CLIPBOARD_KEY = 'songstudio-template-clipboard-v2';
   
-  // Clipboard for copy/paste
-  const [clipboard, setClipboard] = useState<{
+  type ClipboardItem = {
     type: 'image' | 'text' | 'video';
     data: ImageElement | TextElement | VideoElement;
-  } | null>(null);
+  };
+  
+  const [clipboard, setClipboard] = useState<ClipboardItem[] | null>(() => {
+    // Initialize from localStorage
+    try {
+      const stored = localStorage.getItem(CLIPBOARD_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  
+  // Sync clipboard with localStorage and listen for changes from other windows
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === CLIPBOARD_KEY) {
+        try {
+          setClipboard(e.newValue ? JSON.parse(e.newValue) : null);
+        } catch {
+          setClipboard(null);
+        }
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
   
   // Access songs context for song picker
   const { songs, fetchSongs, getSongById, loading: songsLoading } = useSongs();
@@ -1396,179 +229,132 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   
   const referenceSlideIndex = template.referenceSlideIndex ?? 0;
 
-  // Track history for undo/redo (only when not triggered by undo/redo itself)
-  useEffect(() => {
-    if (isUndoRedoAction.current) {
-      isUndoRedoAction.current = false;
-      return;
-    }
-    
-    const newState: HistoryState = {
-      slides: JSON.parse(JSON.stringify(slides)),
-      selectedSlideIndex,
-    };
-    
-    setHistory(prev => {
-      // Remove any future states if we're not at the end
-      const newHistory = prev.slice(0, historyIndex + 1);
-      // Add new state, limit history to 50 entries
-      const updated = [...newHistory, newState].slice(-50);
-      return updated;
-    });
-    setHistoryIndex(prev => Math.min(prev + 1, 49));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(slides)]);
+  // Undo/Redo history
+  const { historyIndex, canUndo, canRedo, handleUndo, handleRedo } = useHistory({
+    slides,
+    selectedSlideIndex,
+    template,
+    referenceSlideIndex,
+    onTemplateChange,
+  });
 
-  // Undo handler
-  const handleUndo = useCallback(() => {
-    if (historyIndex <= 0) return;
-    
-    isUndoRedoAction.current = true;
-    const prevState = history[historyIndex - 1];
-    setHistoryIndex(historyIndex - 1);
-    
-    const refSlide = prevState.slides[referenceSlideIndex] || prevState.slides[0];
-    onTemplateChange({
-      ...template,
-      slides: prevState.slides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
-    });
-  }, [historyIndex, history, referenceSlideIndex, template, onTemplateChange]);
+  // Template updater helper to reduce onTemplateChange boilerplate
+  const { updateTemplateWithSlides } = useTemplateUpdater({
+    template,
+    onTemplateChange,
+  });
 
-  // Redo handler
-  const handleRedo = useCallback(() => {
-    if (historyIndex >= history.length - 1) return;
-    
-    isUndoRedoAction.current = true;
-    const nextState = history[historyIndex + 1];
-    setHistoryIndex(historyIndex + 1);
-    
-    const refSlide = nextState.slides[referenceSlideIndex] || nextState.slides[0];
-    onTemplateChange({
-      ...template,
-      slides: nextState.slides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
-    });
-  }, [historyIndex, history, referenceSlideIndex, template, onTemplateChange]);
-
-  // Copy selected element
+  // Copy selected elements (saves to localStorage for cross-window paste)
+  // Supports multi-select: copies all selected elements
   const handleCopy = useCallback(() => {
-    if (!selectedId) return;
+    if (selectedIds.size === 0) return;
     
     const slide = slides[selectedSlideIndex];
+    const clipboardItems: ClipboardItem[] = [];
     
-    // Find the element in the current slide
-    const image = slide.images?.find(img => img.id === selectedId);
-    if (image) {
-      setClipboard({ type: 'image', data: { ...image } });
-      return;
-    }
+    // Find all selected elements in the current slide
+    selectedIds.forEach(id => {
+      const image = slide.images?.find(img => img.id === id);
+      if (image) {
+        clipboardItems.push({ type: 'image', data: { ...image } });
+        return;
+      }
+      
+      const text = slide.text?.find(txt => txt.id === id);
+      if (text) {
+        clipboardItems.push({ type: 'text', data: { ...text } });
+        return;
+      }
+      
+      const video = slide.videos?.find(vid => vid.id === id);
+      if (video) {
+        clipboardItems.push({ type: 'video', data: { ...video } });
+        return;
+      }
+    });
     
-    const text = slide.text?.find(txt => txt.id === selectedId);
-    if (text) {
-      setClipboard({ type: 'text', data: { ...text } });
-      return;
+    if (clipboardItems.length > 0) {
+      // Save to localStorage for cross-window access
+      localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(clipboardItems));
+      setClipboard(clipboardItems);
     }
-    
-    const video = slide.videos?.find(vid => vid.id === selectedId);
-    if (video) {
-      setClipboard({ type: 'video', data: { ...video } });
-      return;
-    }
-  }, [selectedId, slides, selectedSlideIndex]);
+  }, [selectedIds, slides, selectedSlideIndex]);
 
-  // Paste from clipboard
+  // Paste from clipboard (reads from localStorage for cross-window support)
+  // Supports multi-element paste
   const handlePaste = useCallback(() => {
-    if (!clipboard) return;
+    // Read fresh from localStorage to ensure we have the latest
+    let pasteItems: ClipboardItem[] | null = clipboard;
+    try {
+      const stored = localStorage.getItem(CLIPBOARD_KEY);
+      if (stored) {
+        pasteItems = JSON.parse(stored);
+      }
+    } catch {
+      // Fall back to state
+    }
+    
+    if (!pasteItems || pasteItems.length === 0) return;
     
     const timestamp = Date.now();
     const newSlides = [...slides];
     const slideToUpdate = { ...newSlides[selectedSlideIndex] };
+    const newSelectedIds: string[] = [];
     
-    // Create new element with new ID and slightly offset position
-    if (clipboard.type === 'image') {
-      const original = clipboard.data as ImageElement;
-      const newImage: ImageElement = {
-        ...original,
-        id: `image-${timestamp}`,
-        x: typeof original.x === 'string' 
-          ? `${parseInt(original.x) + 20}px` 
-          : (original.x || 0) + 20,
-        y: typeof original.y === 'string' 
-          ? `${parseInt(original.y) + 20}px` 
-          : (original.y || 0) + 20,
-      };
-      slideToUpdate.images = [...(slideToUpdate.images || []), newImage];
-      newSlides[selectedSlideIndex] = slideToUpdate;
+    // Paste all clipboard items with new IDs and offset positions
+    pasteItems.forEach((item, index) => {
+      const itemTimestamp = timestamp + index; // Ensure unique IDs
       
-      const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
-      onTemplateChange({
-        ...template,
-        slides: newSlides,
-        background: refSlide?.background,
-        images: refSlide?.images || [],
-        videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-        text: refSlide?.text || [],
-      });
-      setSelectedId(newImage.id);
-    } else if (clipboard.type === 'text') {
-      const original = clipboard.data as TextElement;
-      const newText: TextElement = {
-        ...original,
-        id: `text-${timestamp}`,
-        x: typeof original.x === 'string' 
-          ? `${parseInt(original.x as string) + 20}px` 
-          : (original.x || 0) + 20,
-        y: typeof original.y === 'string' 
-          ? `${parseInt(original.y as string) + 20}px` 
-          : (original.y || 0) + 20,
-      };
-      slideToUpdate.text = [...(slideToUpdate.text || []), newText];
-      newSlides[selectedSlideIndex] = slideToUpdate;
-      
-      const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
-      onTemplateChange({
-        ...template,
-        slides: newSlides,
-        background: refSlide?.background,
-        images: refSlide?.images || [],
-        videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-        text: refSlide?.text || [],
-      });
-      setSelectedId(newText.id);
-    } else if (clipboard.type === 'video') {
-      const original = clipboard.data as VideoElement;
-      const newVideo: VideoElement = {
-        ...original,
-        id: `video-${timestamp}`,
-        x: typeof original.x === 'number' ? original.x + 20 : original.x,
-        y: typeof original.y === 'number' ? original.y + 20 : original.y,
-      };
-      slideToUpdate.videos = [...(slideToUpdate.videos || []), newVideo];
-      newSlides[selectedSlideIndex] = slideToUpdate;
-      
-      const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
-      onTemplateChange({
-        ...template,
-        slides: newSlides,
-        background: refSlide?.background,
-        images: refSlide?.images || [],
-        videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-        text: refSlide?.text || [],
-      });
-      setSelectedId(newVideo.id);
-    }
+      if (item.type === 'image') {
+        const original = item.data as ImageElement;
+        const newImage: ImageElement = {
+          ...original,
+          id: `image-${itemTimestamp}`,
+          x: typeof original.x === 'string' 
+            ? `${parseInt(original.x) + 20}px` 
+            : (original.x || 0) + 20,
+          y: typeof original.y === 'string' 
+            ? `${parseInt(original.y) + 20}px` 
+            : (original.y || 0) + 20,
+        };
+        slideToUpdate.images = [...(slideToUpdate.images || []), newImage];
+        newSelectedIds.push(newImage.id);
+      } else if (item.type === 'text') {
+        const original = item.data as TextElement;
+        const newText: TextElement = {
+          ...original,
+          id: `text-${itemTimestamp}`,
+          x: typeof original.x === 'string' 
+            ? `${parseInt(original.x as string) + 20}px` 
+            : (original.x || 0) + 20,
+          y: typeof original.y === 'string' 
+            ? `${parseInt(original.y as string) + 20}px` 
+            : (original.y || 0) + 20,
+        };
+        slideToUpdate.text = [...(slideToUpdate.text || []), newText];
+        newSelectedIds.push(newText.id);
+      } else if (item.type === 'video') {
+        const original = item.data as VideoElement;
+        const newVideo: VideoElement = {
+          ...original,
+          id: `video-${itemTimestamp}`,
+          x: typeof original.x === 'number' ? original.x + 20 : original.x,
+          y: typeof original.y === 'number' ? original.y + 20 : original.y,
+        };
+        slideToUpdate.videos = [...(slideToUpdate.videos || []), newVideo];
+        newSelectedIds.push(newVideo.id);
+      }
+    });
+    
+    newSlides[selectedSlideIndex] = slideToUpdate;
+    
+    updateTemplateWithSlides(newSlides, referenceSlideIndex, {
+      selectedSlideIndex,
+      useSelectedSlideAudios: true,
+    });
+    
+    // Select all pasted elements
+    setSelectedIds(new Set(newSelectedIds));
   }, [clipboard, slides, selectedSlideIndex, referenceSlideIndex, template, onTemplateChange]);
 
   // Convert template elements to canvas elements (using full slide coordinates)
@@ -1642,7 +428,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           width,
           height,
         content: txt.content,
-        fontSize: parseFloat(txt.fontSize) || 48,
+        fontSize: parseFloat(txt.fontSize || '48') || 48,
         fontFamily: txt.fontFamily,
         fontWeight: txt.fontWeight,
           fontStyle: txt.fontStyle,
@@ -1657,8 +443,58 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     return elements.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
   }, [currentSlide, SLIDE_WIDTH, SLIDE_HEIGHT]);
 
-  // Get selected element
+  // Drag handlers for multi-select support
+  const { handleMultiSelectDrag, createDragHandlers } = useDragHandlers({
+    selectedIds,
+    canvasElements,
+    slides,
+    selectedSlideIndex,
+    referenceSlideIndex,
+    template,
+    stageRef,
+    onTemplateChange,
+    setIsDraggingMultiSelect,
+  });
+
+  // Slide drag-and-drop handlers
+  const {
+    draggedSlideIndex,
+    dragOverSlideIndex,
+    handleSlideDragStart,
+    handleSlideDragEnd,
+    handleSlideDragOver,
+    handleSlideDragLeave,
+    handleSlideDrop,
+  } = useSlideDragAndDrop({
+    template,
+    referenceSlideIndex,
+    onTemplateChange,
+    setSelectedSlideIndex,
+  });
+
+  // Slide context menu handlers
+  const {
+    handleInsertSlide,
+    handleDuplicateSlide,
+    handleDeleteSlide,
+    handleMoveSlideUp,
+    handleMoveSlideDown,
+    handleSetAsReference,
+  } = useSlideContextMenu({
+    template,
+    referenceSlideIndex,
+    slidesLength: slides.length,
+    onTemplateChange,
+    setSelectedSlideIndex,
+    setContextMenu,
+  });
+
+  // Get selected element (primary selection for properties panel)
   const selectedElement = canvasElements.find(el => el.id === selectedId);
+  
+  // Get all selected elements for multi-select operations
+  const selectedElements = canvasElements.filter(el => selectedIds.has(el.id));
+  const isMultiSelect = selectedIds.size > 1;
   
   // Check if a song content element is selected (type only - style resolved later after songTitleStyle etc are defined)
   const selectedSongContentType = selectedId === 'song-title-element' ? 'songTitleStyle' as const :
@@ -1667,25 +503,36 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     selectedId === 'bottom-left-text-element' ? 'bottomLeftTextStyle' as const :
     selectedId === 'bottom-right-text-element' ? 'bottomRightTextStyle' as const : null;
 
-  // Update transformer when selection changes
+  // Update transformer when selection changes (supports multi-select)
   useEffect(() => {
     if (!transformerRef.current || !stageRef.current) return;
     
-    if (selectedId) {
+    if (selectedIds.size > 0) {
       // Use requestAnimationFrame to ensure elements are rendered before attaching transformer
       requestAnimationFrame(() => {
         if (!transformerRef.current || !stageRef.current) return;
-        const node = stageRef.current.findOne('#' + selectedId);
-        if (node) {
-          transformerRef.current.nodes([node]);
+        
+        // Find all selected nodes
+        const nodes: Konva.Node[] = [];
+        selectedIds.forEach(id => {
+          const node = stageRef.current?.findOne('#' + id);
+          if (node) {
+            nodes.push(node);
+          }
+        });
+        
+        if (nodes.length > 0) {
+          transformerRef.current.nodes(nodes);
           transformerRef.current.forceUpdate();
           transformerRef.current.getLayer()?.batchDraw();
+        } else {
+          transformerRef.current.nodes([]);
         }
       });
     } else {
       transformerRef.current.nodes([]);
     }
-  }, [selectedId, canvasElements, selectedSlideIndex]);
+  }, [selectedIds, canvasElements, selectedSlideIndex]);
 
   // Track mousedown globally to prevent deselection when clicking starts outside canvas
   useEffect(() => {
@@ -1709,7 +556,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   }, []);
 
   // Handle canvas click (focus canvas, optionally deselect)
-  const handleStageClick = (e: KonvaEventObject<MouseEvent>) => {
+  const handleStageClick = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
     // Any click on the stage should give focus to the canvas editor
     setCanvasHasFocus(true);
     setSlideListHasFocus(false);
@@ -1719,12 +566,14 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     
     // Check if mousedown originated from properties panel or outside stage
     if (clickedOnStage && mouseDownOnStageRef.current) {
-      setSelectedId(null);
+      setSelectedIds(new Set());
     }
     
     // Always reset the flag after handling click
     mouseDownOnStageRef.current = false;
   };
+
+
 
   // Update element in template
   const updateElement = useCallback(async (elementId: string, updates: Partial<CanvasElement>) => {
@@ -1903,20 +752,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
 
     newSlides[selectedSlideIndex] = slideToUpdate;
     
-    // Update template
-    const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
-    
-    // If we're updating the selected slide and it's the reference slide, use the updated slide
-    const audiosForTemplate = selectedSlideIndex === referenceSlideIndex ? slideToUpdate.audios : refSlide?.audios;
-    
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: audiosForTemplate || [],
-      text: refSlide?.text || [],
+    updateTemplateWithSlides(newSlides, referenceSlideIndex, {
+      selectedSlideIndex,
+      useSelectedSlideAudios: true,
     });
     
     // Force transformer update after dimension changes
@@ -1934,41 +772,21 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     }
   }, [canvasElements, slides, selectedSlideIndex, referenceSlideIndex, template, onTemplateChange, selectedId]);
 
-  // Delete selected element
+  // Delete selected elements (supports multi-select)
   const handleDeleteSelected = useCallback(() => {
-    if (!selectedId) return;
-
-    const element = canvasElements.find(el => el.id === selectedId);
-    if (!element) return;
+    if (selectedIds.size === 0) return;
 
     const newSlides = [...slides];
-    const slideToUpdate = { ...newSlides[selectedSlideIndex] };
-
-    if (element.type === 'image') {
-      slideToUpdate.images = (slideToUpdate.images || []).filter(img => img.id !== selectedId);
-    } else if (element.type === 'video') {
-      slideToUpdate.videos = (slideToUpdate.videos || []).filter(vid => vid.id !== selectedId);
-    } else if (element.type === 'audio') {
-      slideToUpdate.audios = (slideToUpdate.audios || []).filter(aud => aud.id !== selectedId);
-    } else if (element.type === 'text') {
-      slideToUpdate.text = (slideToUpdate.text || []).filter(txt => txt.id !== selectedId);
-    }
-
+    const slideToUpdate = deleteElementsFromSlide(newSlides[selectedSlideIndex], selectedIds, canvasElements);
     newSlides[selectedSlideIndex] = slideToUpdate;
 
-    const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
+    updateTemplateWithSlides(newSlides, referenceSlideIndex, {
+      selectedSlideIndex,
+      useSelectedSlideAudios: true,
     });
 
-    setSelectedId(null);
-  }, [selectedId, canvasElements, slides, selectedSlideIndex, referenceSlideIndex, template, onTemplateChange]);
+    setSelectedIds(new Set());
+  }, [selectedIds, canvasElements, slides, selectedSlideIndex, referenceSlideIndex, template, onTemplateChange]);
 
   const bringToFront = useCallback(() => {
     if (!selectedId) return;
@@ -1994,159 +812,58 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     updateElement(selectedId, { zIndex: minZIndex - 1 });
   }, [selectedId, canvasElements, updateElement]);
 
+  // Helper function to apply alignment and update template
+  const applyAlignmentAndUpdate = useCallback((alignmentType: AlignmentType) => {
+    if (selectedIds.size < 2 || !firstSelectedId) return;
+    
+    const selectedElements = canvasElements.filter(el => selectedIds.has(el.id));
+    
+    const newSlides = [...slides];
+    const slideToUpdate = applyAlignment(newSlides[selectedSlideIndex], selectedElements, firstSelectedId, alignmentType);
+    newSlides[selectedSlideIndex] = slideToUpdate;
+    
+    updateTemplateWithSlides(newSlides, referenceSlideIndex, {
+      selectedSlideIndex,
+      useSelectedSlideAudios: true,
+    });
+  }, [selectedIds, firstSelectedId, canvasElements, slides, selectedSlideIndex, referenceSlideIndex, template, onTemplateChange, updateTemplateWithSlides]);
+
+  // Alignment functions for multi-selection
+  const alignLeft = useCallback(() => applyAlignmentAndUpdate('left'), [applyAlignmentAndUpdate]);
+  const alignCenter = useCallback(() => applyAlignmentAndUpdate('center'), [applyAlignmentAndUpdate]);
+  const alignRight = useCallback(() => applyAlignmentAndUpdate('right'), [applyAlignmentAndUpdate]);
+  const alignTop = useCallback(() => applyAlignmentAndUpdate('top'), [applyAlignmentAndUpdate]);
+  const alignMiddle = useCallback(() => applyAlignmentAndUpdate('middle'), [applyAlignmentAndUpdate]);
+  const alignBottom = useCallback(() => applyAlignmentAndUpdate('bottom'), [applyAlignmentAndUpdate]);
+  const makeSameWidth = useCallback(() => applyAlignmentAndUpdate('sameWidth'), [applyAlignmentAndUpdate]);
+  const makeSameHeight = useCallback(() => applyAlignmentAndUpdate('sameHeight'), [applyAlignmentAndUpdate]);
+
   // Keyboard shortcuts for canvas (undo/redo/copy/paste/delete/move)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore when text is being edited (Konva text editor is open)
-      if (isTextEditing) {
-        return;
-      }
-      
-      // Ignore when typing in inputs/textareas/selects
-      const target = e.target as HTMLElement | null;
-      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
-        return;
-      }
-
-      // Don't handle shift+arrow if target is a slide thumbnail button - let it handle the event
-      if (target && target.hasAttribute('data-slide-thumbnail') && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-        return;
-      }
-
-      // Escape: Three-tier behavior - exit text edit → deselect element → close dialog
-      if (e.key === 'Escape') {
-        // Tier 1: If text is being edited, the textarea's handler will exit edit mode
-        // (that handler calls e.preventDefault() and e.stopPropagation())
-        if (isTextEditing) {
-          // Text editing handler will take care of it
-          return;
-        }
-        
-        // Tier 2: If an element is selected (but not editing), deselect it
-        if (selectedId) {
-          e.preventDefault();
-          e.stopPropagation();
-          setSelectedId(null);
-          return;
-        }
-        
-        // Tier 3: If nothing selected, let it propagate to Modal for exit handling
-        return;
-      }
-
-      // Undo: Ctrl/Cmd + Z (works even without canvas focus)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-        return;
-      }
-
-      // Redo: Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
-        e.preventDefault();
-        handleRedo();
-        return;
-      }
-
-      // Copy: Ctrl/Cmd + C (requires canvas focus and selection)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && canvasHasFocus && selectedId) {
-        e.preventDefault();
-        handleCopy();
-        return;
-      }
-
-      // Paste: Ctrl/Cmd + V (requires canvas focus)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && canvasHasFocus) {
-        e.preventDefault();
-        handlePaste();
-        return;
-      }
-
-      // Bold: Ctrl/Cmd + B (requires canvas focus and selected text element)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'b' && canvasHasFocus && selectedId) {
-        const element = canvasElements.find(el => el.id === selectedId);
-        if (element && element.type === 'text') {
-          e.preventDefault();
-          updateElement(selectedId, {
-            fontWeight: element.fontWeight === 'bold' ? 'normal' : 'bold'
-          });
-          return;
-        }
-      }
-
-      // Italic: Ctrl/Cmd + I (requires canvas focus and selected text element)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'i' && canvasHasFocus && selectedId) {
-        const element = canvasElements.find(el => el.id === selectedId);
-        if (element && element.type === 'text') {
-          e.preventDefault();
-          updateElement(selectedId, {
-            fontStyle: element.fontStyle === 'italic' ? 'normal' : 'italic'
-          });
-          return;
-        }
-      }
-
-      // The following shortcuts require canvas focus and a selected element
-      if (!canvasHasFocus || !selectedId) {
-        // Allow ArrowUp/ArrowDown to navigate slides when on canvas with no selection
-        if (canvasHasFocus && !selectedId && !e.shiftKey) {
-          if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            const prevIndex = Math.max(0, selectedSlideIndex - 1);
-            setSelectedSlideIndex(prevIndex);
-            return;
-          } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            const nextIndex = Math.min(slides.length - 1, selectedSlideIndex + 1);
-            setSelectedSlideIndex(nextIndex);
-            return;
-          }
-        }
-        // Don't handle shift+arrow when slide list has focus - let the thumbnail handler deal with it
-        return;
-      }
-
-      // Handle Delete/Backspace to delete selected element
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        handleDeleteSelected();
-        return;
-      }
-
-      const element = canvasElements.find(el => el.id === selectedId);
-      if (!element) return;
-
-      const step = e.shiftKey ? 5 : 1;
-      let dx = 0;
-      let dy = 0;
-
-      switch (e.key) {
-        case 'ArrowLeft':
-          dx = -step;
-          break;
-        case 'ArrowRight':
-          dx = step;
-          break;
-        case 'ArrowUp':
-          dy = -step;
-          break;
-        case 'ArrowDown':
-          dy = step;
-          break;
-        default:
-          return;
-      }
-
-      e.preventDefault();
-      updateElement(selectedId, {
-        x: (element.x || 0) + dx,
-        y: (element.y || 0) + dy,
-      });
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true); // Use capture phase to handle before Modal
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isTextEditing, canvasHasFocus, slideListHasFocus, selectedId, canvasElements, updateElement, handleDeleteSelected, handleUndo, handleRedo, handleCopy, handlePaste, selectedSlideIndex, slides.length]);
+  useKeyboardShortcuts({
+    isTextEditing,
+    canvasHasFocus,
+    slideListHasFocus,
+    selectedId,
+    selectedIds,
+    canvasElements,
+    slides,
+    selectedSlideIndex,
+    referenceSlideIndex,
+    template,
+    elementContextMenu,
+    contextMenu,
+    updateElement,
+    handleDeleteSelected,
+    handleUndo,
+    handleRedo,
+    handleCopy,
+    handlePaste,
+    setSelectedSlideIndex,
+    setSelectedIds,
+    setElementContextMenu,
+    setContextMenu,
+    onTemplateChange,
+  });
 
   // Add new image (using full slide coordinates)
   const handleAddImage = () => {
@@ -2166,18 +883,12 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     slideToUpdate.images = [...(slideToUpdate.images || []), newImage];
     newSlides[selectedSlideIndex] = slideToUpdate;
 
-    const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
+    updateTemplateWithSlides(newSlides, referenceSlideIndex, {
+      selectedSlideIndex,
+      useSelectedSlideAudios: true,
     });
 
-    setSelectedId(newImage.id);
+    selectElement(newImage.id);
   };
 
   // Add new video (using full slide coordinates)
@@ -2201,19 +912,12 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     slideToUpdate.videos = [...(slideToUpdate.videos || []), newVideo];
     newSlides[selectedSlideIndex] = slideToUpdate;
 
-    const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
+    updateTemplateWithSlides(newSlides, referenceSlideIndex, {
+      selectedSlideIndex,
+      useSelectedSlideAudios: true,
     });
 
-    setSelectedId(newVideo.id);
+    selectElement(newVideo.id);
   };
 
   // Add new audio (using full slide coordinates)
@@ -2241,19 +945,12 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     slideToUpdate.audios = [...(slideToUpdate.audios || []), newAudio];
     newSlides[selectedSlideIndex] = slideToUpdate;
 
-    const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
+    updateTemplateWithSlides(newSlides, referenceSlideIndex, {
+      selectedSlideIndex,
+      useSelectedSlideAudios: true,
     });
 
-    setSelectedId(newAudio.id);
+    selectElement(newAudio.id);
   };
 
   // Add new text (using full slide coordinates)
@@ -2277,18 +974,12 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     slideToUpdate.text = [...(slideToUpdate.text || []), newText];
     newSlides[selectedSlideIndex] = slideToUpdate;
 
-    const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
+    updateTemplateWithSlides(newSlides, referenceSlideIndex, {
+      selectedSlideIndex,
+      useSelectedSlideAudios: true,
     });
 
-    setSelectedId(newText.id);
+    selectElement(newText.id);
   };
 
   // Import song content as slides using reference slide styling
@@ -2432,14 +1123,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         ...slides.slice(selectedSlideIndex + 1),
       ];
       
-      onTemplateChange({
-        ...template,
-        slides: newSlides,
-      });
+      updateTemplateWithSlides(newSlides, referenceSlideIndex);
 
       // Select the first imported slide
       setSelectedSlideIndex(selectedSlideIndex + 1);
-      setSelectedId(null);
+      setSelectedIds(new Set());
       
       // Close the picker
       setShowSongPicker(false);
@@ -2471,17 +1159,26 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     } as BackgroundElement;
     newSlides[selectedSlideIndex] = slideToUpdate;
 
-    const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
+    updateTemplateWithSlides(newSlides, referenceSlideIndex, {
+      selectedSlideIndex,
+      useSelectedSlideAudios: true,
     });
   };
+
+  // Song content styles hook
+  const referenceSlide = slides[referenceSlideIndex] || slides[0];
+  const {
+    songTitleStyle,
+    songLyricsStyle,
+    songTranslationStyle,
+    bottomLeftTextStyle,
+    bottomRightTextStyle,
+    getDefaultStyle,
+  } = useSongContentStyles({
+    referenceSlide,
+    SLIDE_WIDTH,
+    SLIDE_HEIGHT,
+  });
 
   // Update song content style (only for reference slide)
   const handleSongContentStyleChange = useCallback((
@@ -2491,20 +1188,6 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     const newSlides = [...slides];
     const slideToUpdate = { ...newSlides[referenceSlideIndex] };
     
-    // Get current style or use defaults based on slide dimensions
-    const getDefaultStyle = (type: string): SongContentStyle => ({
-      x: type === 'bottomLeftTextStyle' ? 40 : type === 'bottomRightTextStyle' ? Math.round(SLIDE_WIDTH * 0.5) : 40,
-      y: type === 'songTitleStyle' ? Math.round(SLIDE_HEIGHT * 0.05) : 
-         type === 'songLyricsStyle' ? Math.round(SLIDE_HEIGHT * 0.20) : 
-         type === 'bottomLeftTextStyle' || type === 'bottomRightTextStyle' ? Math.round(SLIDE_HEIGHT * 0.92) :
-         Math.round(SLIDE_HEIGHT * 0.75),
-      width: type === 'bottomLeftTextStyle' || type === 'bottomRightTextStyle' ? Math.round((SLIDE_WIDTH - 120) / 2) : SLIDE_WIDTH - 80,
-      fontSize: type === 'songTitleStyle' ? '48px' : type === 'songLyricsStyle' ? '36px' : type === 'bottomLeftTextStyle' || type === 'bottomRightTextStyle' ? '20px' : '24px',
-      fontWeight: type === 'songTranslationStyle' || type === 'bottomLeftTextStyle' || type === 'bottomRightTextStyle' ? 'normal' : 'bold',
-      textAlign: 'center',
-      color: '#ffffff',
-    });
-    
     const currentStyle = slideToUpdate[styleType] || getDefaultStyle(styleType);
     
     slideToUpdate[styleType] = {
@@ -2513,98 +1196,10 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     };
     newSlides[referenceSlideIndex] = slideToUpdate;
 
-    const refSlide = newSlides[referenceSlideIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
-    });
-  }, [slides, referenceSlideIndex, SLIDE_WIDTH, SLIDE_HEIGHT, template, onTemplateChange]);
+    updateTemplateWithSlides(newSlides, referenceSlideIndex);
+  }, [slides, referenceSlideIndex, getDefaultStyle, updateTemplateWithSlides]);
 
-  // Get current song content styles from reference slide
-  // Default positions based on slide dimensions
-  const referenceSlide = slides[referenceSlideIndex] || slides[0];
-  const defaultTitleStyle: SongContentStyle = {
-    x: 40,
-    y: Math.round(SLIDE_HEIGHT * 0.05),
-    width: SLIDE_WIDTH - 80,
-    fontSize: '48px',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#ffffff',
-  };
-  const defaultLyricsStyle: SongContentStyle = {
-    x: 40,
-    y: Math.round(SLIDE_HEIGHT * 0.20),
-    width: SLIDE_WIDTH - 80,
-    fontSize: '36px',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#ffffff',
-  };
-  const defaultTranslationStyle: SongContentStyle = {
-    x: 40,
-    y: Math.round(SLIDE_HEIGHT * 0.75),
-    width: SLIDE_WIDTH - 80,
-    fontSize: '24px',
-    fontWeight: 'normal',
-    textAlign: 'center',
-    color: '#ffffff',
-  };
-  const defaultBottomLeftStyle: SongContentStyle = {
-    x: 40,
-    y: Math.round(SLIDE_HEIGHT * 0.92),
-    width: Math.round((SLIDE_WIDTH - 120) / 2),
-    fontSize: '20px',
-    fontWeight: 'normal',
-    textAlign: 'left',
-    color: '#ffffff',
-  };
-  const defaultBottomRightStyle: SongContentStyle = {
-    x: Math.round(SLIDE_WIDTH * 0.5),
-    y: Math.round(SLIDE_HEIGHT * 0.92),
-    width: Math.round((SLIDE_WIDTH - 120) / 2),
-    fontSize: '20px',
-    fontWeight: 'normal',
-    textAlign: 'right',
-    color: '#ffffff',
-  };
-  
-  // Merge with saved styles, converting legacy yPosition to y if needed
-  // Also ensures all required properties have valid values
-  const mergeSongStyle = (saved: Partial<SongContentStyle> | undefined, defaults: SongContentStyle): SongContentStyle => {
-    if (!saved) return defaults;
-    
-    // Calculate y value: prefer saved.y, then convert legacy yPosition, then use default
-    const yValue = saved.y ?? (saved.yPosition !== undefined ? Math.round(SLIDE_HEIGHT * (saved.yPosition / 100)) : defaults.y);
-    
-    // Merge with explicit fallbacks for all required properties
-    return {
-      x: saved.x ?? defaults.x,
-      y: yValue,
-      width: saved.width ?? defaults.width,
-      height: saved.height,
-      fontSize: saved.fontSize ?? defaults.fontSize,
-      fontWeight: saved.fontWeight ?? defaults.fontWeight,
-      fontStyle: saved.fontStyle,
-      fontFamily: saved.fontFamily,
-      textAlign: saved.textAlign ?? defaults.textAlign,
-      color: saved.color ?? defaults.color,
-      yPosition: saved.yPosition,
-    };
-  };
-  
-  const songTitleStyle = mergeSongStyle(referenceSlide?.songTitleStyle, defaultTitleStyle);
-  const songLyricsStyle = mergeSongStyle(referenceSlide?.songLyricsStyle, defaultLyricsStyle);
-  const songTranslationStyle = mergeSongStyle(referenceSlide?.songTranslationStyle, defaultTranslationStyle);
-  const bottomLeftTextStyle = mergeSongStyle(referenceSlide?.bottomLeftTextStyle, defaultBottomLeftStyle);
-  const bottomRightTextStyle = mergeSongStyle(referenceSlide?.bottomRightTextStyle, defaultBottomRightStyle);
-  
-  // Now we can resolve the selected song content style (after songTitleStyle etc are defined)
+  // Now we can resolve the selected song content style
   const selectedSongContentStyle = selectedSongContentType ? 
     (selectedSongContentType === 'songTitleStyle' ? songTitleStyle :
      selectedSongContentType === 'songLyricsStyle' ? songLyricsStyle :
@@ -2629,250 +1224,128 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     }
   }, [elementContextMenu]);
 
-  // Slide context menu handlers
-  const handleInsertSlide = (atIndex: number) => {
-    const newSlide: TemplateSlide = {
-      background: { type: 'color', value: '#1a1a2e' },
-      images: [],
-      videos: [],
-      text: [],
+  // Render context menus directly to body DOM for proper z-index stacking
+  useEffect(() => {
+    // Clean up any existing context menus
+    const existingMenus = document.querySelectorAll('.wysiwyg-context-menu');
+    existingMenus.forEach(menu => menu.remove());
+
+    // Escape key handler for context menus
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && (elementContextMenu || contextMenu)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setElementContextMenu(null);
+        setContextMenu(null);
+      }
     };
-    const newSlides = [...slides];
-    newSlides.splice(atIndex + 1, 0, newSlide);
-    
-    // Adjust reference slide index if inserting before it
-    const newRefIndex = atIndex < referenceSlideIndex ? referenceSlideIndex + 1 : referenceSlideIndex;
-    
-    const refSlide = newSlides[newRefIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      referenceSlideIndex: newRefIndex,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
-    });
-    setSelectedSlideIndex(atIndex + 1);
-    setContextMenu(null);
-  };
 
-  const handleDuplicateSlide = (atIndex: number) => {
-    const slideToDuplicate = slides[atIndex];
-    const duplicatedSlide: TemplateSlide = regenerateSlideElementIds(slideToDuplicate);
-    
-    const newSlides = [...slides];
-    newSlides.splice(atIndex + 1, 0, duplicatedSlide);
-    
-    // Adjust reference slide index if duplicating before it
-    const newRefIndex = atIndex < referenceSlideIndex ? referenceSlideIndex + 1 : referenceSlideIndex;
-    
-    const refSlide = newSlides[newRefIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      referenceSlideIndex: newRefIndex,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
-    });
-    setSelectedSlideIndex(atIndex + 1);
-    setContextMenu(null);
-  };
+    // Render element context menu if active
+    if (elementContextMenu) {
+      const menu = document.createElement('div');
+      menu.className = 'wysiwyg-context-menu fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-1 min-w-[160px]';
+      menu.style.left = `${elementContextMenu.x}px`;
+      menu.style.top = `${elementContextMenu.y}px`;
+      menu.style.zIndex = '99999';
+      menu.addEventListener('click', (e) => e.stopPropagation());
+      
+      // Add escape key listener
+      document.addEventListener('keydown', handleEscapeKey, true);
 
-  const handleDeleteSlide = (atIndex: number) => {
-    if (slides.length <= 1) {
-      // Can't delete the last slide
-      setContextMenu(null);
-      return;
-    }
-    
-    const newSlides = slides.filter((_, i) => i !== atIndex);
-    
-    // Adjust reference slide index
-    let newRefIndex = referenceSlideIndex;
-    if (atIndex === referenceSlideIndex) {
-      // If deleting the reference slide, set the first slide as reference
-      newRefIndex = 0;
-    } else if (atIndex < referenceSlideIndex) {
-      newRefIndex = referenceSlideIndex - 1;
-    }
-    
-    // Adjust selected slide index
-    let newSelectedIndex = selectedSlideIndex;
-    if (atIndex <= selectedSlideIndex) {
-      newSelectedIndex = Math.max(0, selectedSlideIndex - 1);
-    }
-    
-    const refSlide = newSlides[newRefIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      referenceSlideIndex: newRefIndex,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
-    });
-    setSelectedSlideIndex(newSelectedIndex);
-    setContextMenu(null);
-  };
+      const buttons = [
+        { icon: 'fa-arrow-up', text: 'Bring to Front', action: () => { bringToFront(); setElementContextMenu(null); } },
+        { icon: 'fa-arrow-down', text: 'Send to Back', action: () => { sendToBack(); setElementContextMenu(null); } },
+      ];
 
-  const handleMoveSlideUp = (atIndex: number) => {
-    if (atIndex <= 0) {
-      setContextMenu(null);
-      return;
-    }
-    
-    const newSlides = [...slides];
-    [newSlides[atIndex - 1], newSlides[atIndex]] = [newSlides[atIndex], newSlides[atIndex - 1]];
-    
-    // Adjust reference slide index
-    let newRefIndex = referenceSlideIndex;
-    if (atIndex === referenceSlideIndex) {
-      newRefIndex = referenceSlideIndex - 1;
-    } else if (atIndex - 1 === referenceSlideIndex) {
-      newRefIndex = referenceSlideIndex + 1;
-    }
-    
-    const refSlide = newSlides[newRefIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      referenceSlideIndex: newRefIndex,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
-    });
-    setSelectedSlideIndex(atIndex - 1);
-    setContextMenu(null);
-  };
+      // Add alignment options if multiple elements selected
+      if (selectedIds.size > 1) {
+        buttons.push(
+          { divider: true },
+          { icon: 'fa-align-left', text: 'Align Left', action: () => { alignLeft(); setElementContextMenu(null); } },
+          { icon: 'fa-align-center', text: 'Align Center', action: () => { alignCenter(); setElementContextMenu(null); } },
+          { icon: 'fa-align-right', text: 'Align Right', action: () => { alignRight(); setElementContextMenu(null); } },
+          { divider: true },
+          { icon: 'fa-arrow-up', text: 'Align Top', action: () => { alignTop(); setElementContextMenu(null); } },
+          { icon: 'fa-grip-lines', text: 'Align Middle', action: () => { alignMiddle(); setElementContextMenu(null); } },
+          { icon: 'fa-arrow-down', text: 'Align Bottom', action: () => { alignBottom(); setElementContextMenu(null); } },
+          { divider: true },
+          { icon: 'fa-arrows-alt-h', text: 'Make Same Width', action: () => { makeSameWidth(); setElementContextMenu(null); } },
+          { icon: 'fa-arrows-alt-v', text: 'Make Same Height', action: () => { makeSameHeight(); setElementContextMenu(null); } }
+        );
+      }
 
-  const handleMoveSlideDown = (atIndex: number) => {
-    if (atIndex >= slides.length - 1) {
-      setContextMenu(null);
-      return;
-    }
-    
-    const newSlides = [...slides];
-    [newSlides[atIndex], newSlides[atIndex + 1]] = [newSlides[atIndex + 1], newSlides[atIndex]];
-    
-    // Adjust reference slide index
-    let newRefIndex = referenceSlideIndex;
-    if (atIndex === referenceSlideIndex) {
-      newRefIndex = referenceSlideIndex + 1;
-    } else if (atIndex + 1 === referenceSlideIndex) {
-      newRefIndex = referenceSlideIndex - 1;
-    }
-    
-    const refSlide = newSlides[newRefIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      referenceSlideIndex: newRefIndex,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
-    });
-    setSelectedSlideIndex(atIndex + 1);
-    setContextMenu(null);
-  };
+      buttons.forEach(btn => {
+        if (btn.divider) {
+          const divider = document.createElement('div');
+          divider.className = 'border-t border-gray-600 my-1';
+          menu.appendChild(divider);
+        } else {
+          const button = document.createElement('button');
+          button.className = 'w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2';
+          button.innerHTML = `<i class="fas ${btn.icon} text-base"></i>${btn.text}`;
+          button.onclick = btn.action;
+          menu.appendChild(button);
+        }
+      });
 
-  const handleSetAsReference = (atIndex: number) => {
-    const refSlide = slides[atIndex] || slides[0];
-    onTemplateChange({
-      ...template,
-      referenceSlideIndex: atIndex,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
-    });
-    setContextMenu(null);
-  };
-
-  // Drag and drop handlers for slide reordering
-  const handleSlideDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedSlideIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', index.toString());
-    // Add a slight delay to show the dragging state
-    requestAnimationFrame(() => {
-      const target = e.target as HTMLElement;
-      target.style.opacity = '0.5';
-    });
-  };
-
-  const handleSlideDragEnd = (e: React.DragEvent) => {
-    const target = e.target as HTMLElement;
-    target.style.opacity = '1';
-    setDraggedSlideIndex(null);
-    setDragOverSlideIndex(null);
-  };
-
-  const handleSlideDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (draggedSlideIndex !== null && draggedSlideIndex !== index) {
-      setDragOverSlideIndex(index);
-    }
-  };
-
-  const handleSlideDragLeave = () => {
-    setDragOverSlideIndex(null);
-  };
-
-  const handleSlideDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault();
-    
-    if (draggedSlideIndex === null || draggedSlideIndex === dropIndex) {
-      setDraggedSlideIndex(null);
-      setDragOverSlideIndex(null);
-      return;
+      document.body.appendChild(menu);
     }
 
-    const newSlides = [...slides];
-    const [draggedSlide] = newSlides.splice(draggedSlideIndex, 1);
-    newSlides.splice(dropIndex, 0, draggedSlide);
+    // Render slide context menu if active
+    if (contextMenu) {
+      const menu = document.createElement('div');
+      menu.className = 'wysiwyg-context-menu fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-1 min-w-[180px]';
+      menu.style.left = `${contextMenu.x}px`;
+      menu.style.top = `${contextMenu.y}px`;
+      menu.style.zIndex = '99999';
+      menu.addEventListener('click', (e) => e.stopPropagation());
+      
+      // Add escape key listener
+      document.addEventListener('keydown', handleEscapeKey, true);
 
-    // Adjust reference slide index
-    let newRefIndex = referenceSlideIndex;
-    if (draggedSlideIndex === referenceSlideIndex) {
-      // The reference slide was moved
-      newRefIndex = dropIndex;
-    } else if (draggedSlideIndex < referenceSlideIndex && dropIndex >= referenceSlideIndex) {
-      // Dragged from before reference to after reference
-      newRefIndex = referenceSlideIndex - 1;
-    } else if (draggedSlideIndex > referenceSlideIndex && dropIndex <= referenceSlideIndex) {
-      // Dragged from after reference to before reference
-      newRefIndex = referenceSlideIndex + 1;
+      const slideIndex = contextMenu.slideIndex;
+      const buttons = [
+        { icon: 'fa-plus', text: 'Insert Slide After', action: () => handleInsertSlide(slideIndex) },
+        { icon: 'fa-copy', text: 'Duplicate Slide', action: () => handleDuplicateSlide(slideIndex) },
+        { divider: true },
+        { icon: 'fa-chevron-up', text: 'Move Up', action: () => handleMoveSlideUp(slideIndex), disabled: slideIndex === 0 },
+        { icon: 'fa-chevron-down', text: 'Move Down', action: () => handleMoveSlideDown(slideIndex), disabled: slideIndex === slides.length - 1 },
+        { divider: true },
+      ];
+
+      if (slideIndex !== referenceSlideIndex) {
+        buttons.push({ icon: 'fa-star', text: 'Set as Reference', action: () => handleSetAsReference(slideIndex), color: 'text-yellow-400' });
+      }
+
+      buttons.push({ icon: 'fa-trash', text: 'Delete Slide', action: () => handleDeleteSlide(slideIndex), disabled: slides.length <= 1, color: 'text-red-400' });
+
+      buttons.forEach(btn => {
+        if (btn.divider) {
+          const divider = document.createElement('div');
+          divider.className = 'border-t border-gray-600 my-1';
+          menu.appendChild(divider);
+        } else {
+          const button = document.createElement('button');
+          const disabledClass = btn.disabled ? ' disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent' : '';
+          button.className = `w-full px-4 py-2 text-left text-sm ${btn.color || 'text-gray-200'} hover:bg-gray-700 flex items-center gap-2${disabledClass}`;
+          button.disabled = btn.disabled || false;
+          button.innerHTML = `<i class="fas ${btn.icon} text-base"></i>${btn.text}`;
+          button.onclick = btn.action;
+          menu.appendChild(button);
+        }
+      });
+
+      document.body.appendChild(menu);
     }
 
-    const refSlide = newSlides[newRefIndex] || newSlides[0];
-    onTemplateChange({
-      ...template,
-      slides: newSlides,
-      referenceSlideIndex: newRefIndex,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
-    });
-
-    setSelectedSlideIndex(dropIndex);
-    setDraggedSlideIndex(null);
-    setDragOverSlideIndex(null);
-  };
+    return () => {
+      // Cleanup on unmount or when menus change
+      const menus = document.querySelectorAll('.wysiwyg-context-menu');
+      menus.forEach(menu => menu.remove());
+      document.removeEventListener('keydown', handleEscapeKey, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elementContextMenu, contextMenu, selectedIds.size, slides.length, referenceSlideIndex]);
 
   // Get background color/style
   const bgColor = (!currentSlide.background?.type || currentSlide.background?.type === 'color')
@@ -2910,7 +1383,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         
         if (!isFormElement && !isInPropertyPanel && !mouseDownWasInPropertyPanel) {
           // Clicked outside the stage and not on interactive elements - deselect and return focus to slide list
-          setSelectedId(null);
+          setSelectedIds(new Set());
           setSlideListHasFocus(true);
           setCanvasHasFocus(false);
         }
@@ -3013,7 +1486,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   }}
                   onClick={() => {
                     setSelectedSlideIndex(idx);
-                    setSelectedId(null);
+                    setSelectedIds(new Set());
                     setSlideListHasFocus(true);
                     setCanvasHasFocus(false);
                   }}
@@ -3048,7 +1521,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                         e.preventDefault();
                         const prevIndex = Math.max(0, idx - 1);
                         setSelectedSlideIndex(prevIndex);
-                        setSelectedId(null);
+                        setSelectedIds(new Set());
                         const prevBtn = thumbnailRefs.current[prevIndex];
                         if (prevBtn) {
                           prevBtn.focus();
@@ -3071,7 +1544,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                         e.preventDefault();
                         const nextIndex = Math.min(slides.length - 1, idx + 1);
                         setSelectedSlideIndex(nextIndex);
-                        setSelectedId(null);
+                        setSelectedIds(new Set());
                         const nextBtn = thumbnailRefs.current[nextIndex];
                         if (nextBtn) {
                           nextBtn.focus();
@@ -3105,8 +1578,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     <div className="absolute inset-0">
                       {/* Image elements */}
                       {(slide.images || []).map((img) => {
-                        const imgWidth = parseFloat(img.width) || 100;
-                        const imgHeight = parseFloat(img.height) || 100;
+                        const imgWidth = parseFloat(img.width || '100') || 100;
+                        const imgHeight = parseFloat(img.height || '100') || 100;
                         const x = parsePosition(
                           img.x,
                           img.position,
@@ -3286,127 +1759,6 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
             );
           })}
           </div>
-
-          {/* Context Menu */}
-          {contextMenu && (() => {
-            // Capture these values immediately in case contextMenu becomes null
-            const slideIndex = contextMenu.slideIndex;
-            const menuX = contextMenu.x;
-            const menuY = contextMenu.y;
-            
-            // Create wrapped handlers that capture slideIndex
-            const wrappedInsertSlide = () => {
-              handleInsertSlide(slideIndex);
-            };
-            
-            const wrappedDuplicateSlide = () => {
-              handleDuplicateSlide(slideIndex);
-            };
-            
-            const wrappedMoveSlideUp = () => {
-              handleMoveSlideUp(slideIndex);
-            };
-            
-            const wrappedMoveSlideDown = () => {
-              handleMoveSlideDown(slideIndex);
-            };
-            
-            const wrappedSetAsReference = () => {
-              handleSetAsReference(slideIndex);
-            };
-            
-            const wrappedDeleteSlide = () => {
-              handleDeleteSlide(slideIndex);
-            };
-            
-            return (
-              <div
-                className="fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-1 z-[9999] min-w-[180px]"
-                style={{ left: menuX, top: menuY }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={wrappedInsertSlide}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
-                >
-                  <i className="fas fa-plus text-base"></i>
-                  Insert Slide After
-                </button>
-                <button
-                  onClick={wrappedDuplicateSlide}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
-                >
-                  <i className="fas fa-copy text-base"></i>
-                  Duplicate Slide
-              </button>
-              <div className="border-t border-gray-600 my-1" />
-              <button
-                onClick={wrappedMoveSlideUp}
-                disabled={slideIndex === 0}
-                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-              >
-                <i className="fas fa-chevron-up text-base"></i>
-                Move Up
-              </button>
-              <button
-                onClick={wrappedMoveSlideDown}
-                disabled={slideIndex === slides.length - 1}
-                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-              >
-                <i className="fas fa-chevron-down text-base"></i>
-                Move Down
-              </button>
-              <div className="border-t border-gray-600 my-1" />
-              {slideIndex !== referenceSlideIndex && (
-                <button
-                  onClick={wrappedSetAsReference}
-                  className="w-full px-4 py-2 text-left text-sm text-yellow-400 hover:bg-gray-700 flex items-center gap-2"
-                >
-                  <i className="fas fa-star text-base"></i>
-                  Set as Reference
-                </button>
-              )}
-              <button
-                onClick={wrappedDeleteSlide}
-                disabled={slides.length <= 1}
-                className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-              >
-                <i className="fas fa-trash text-base"></i>
-                Delete Slide
-              </button>
-            </div>
-            );
-          })()}
-          
-          {/* Element context menu */}
-          {elementContextMenu && (
-            <div
-              className="fixed bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-1 z-[9999] min-w-[160px]"
-              style={{ left: elementContextMenu.x, top: elementContextMenu.y }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => {
-                  bringToFront();
-                  setElementContextMenu(null);
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
-              >
-                <i className="fas fa-arrow-up text-base"></i>
-                Bring to Front
-              </button>
-              <button
-                onClick={() => {
-                  sendToBack();
-                  setElementContextMenu(null);
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
-              >
-                <i className="fas fa-arrow-down text-base"></i>
-                Send to Back
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Canvas - Slide Preview (center) */}
@@ -3488,10 +1840,10 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 Import Song
               </button>
             </Tooltip>
-            <Tooltip content={!selectedId ? "Select an element first" : "Copy selected element (Ctrl+C)"}>
+            <Tooltip content={selectedIds.size === 0 ? "Select an element first" : selectedIds.size === 1 ? "Copy selected element (Ctrl+C)" : `Copy ${selectedIds.size} elements (Ctrl+C)`}>
               <button
                 onClick={handleCopy}
-                disabled={!selectedId}
+                disabled={selectedIds.size === 0}
                 className="flex items-center justify-center p-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <i className="fas fa-copy text-base"></i>
@@ -3506,10 +1858,10 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 <i className="fas fa-paste text-base"></i>
               </button>
             </Tooltip>
-            <Tooltip content={!selectedId ? "Select an element first" : "Delete selected element (Del key)"}>
+            <Tooltip content={selectedIds.size === 0 ? "Select an element first" : selectedIds.size === 1 ? "Delete selected element (Del key)" : `Delete ${selectedIds.size} elements (Del key)`}>
               <button
                 onClick={handleDeleteSelected}
-                disabled={!selectedId}
+                disabled={selectedIds.size === 0}
                 className="flex items-center justify-center p-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <i className="fas fa-trash text-base"></i>
@@ -3591,8 +1943,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       fill={songTitleStyle.color || '#ffffff'}
                       align={songTitleStyle.textAlign || 'center'}
                       draggable
-                      onClick={() => setSelectedId('song-title-element')}
-                      onTap={() => setSelectedId('song-title-element')}
+                      onClick={() => selectElement('song-title-element')}
+                      onTap={() => selectElement('song-title-element')}
                       onDragEnd={(e) => {
                         handleSongContentStyleChange('songTitleStyle', {
                           x: Math.round(e.target.x()),
@@ -3628,8 +1980,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       fill={songLyricsStyle.color}
                       align={songLyricsStyle.textAlign}
                       draggable
-                      onClick={() => setSelectedId('song-lyrics-element')}
-                      onTap={() => setSelectedId('song-lyrics-element')}
+                      onClick={() => selectElement('song-lyrics-element')}
+                      onTap={() => selectElement('song-lyrics-element')}
                       onDragEnd={(e) => {
                         handleSongContentStyleChange('songLyricsStyle', {
                           x: Math.round(e.target.x()),
@@ -3665,8 +2017,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       fill={songTranslationStyle.color}
                       align={songTranslationStyle.textAlign}
                       draggable
-                      onClick={() => setSelectedId('song-translation-element')}
-                      onTap={() => setSelectedId('song-translation-element')}
+                      onClick={() => selectElement('song-translation-element')}
+                      onTap={() => selectElement('song-translation-element')}
                       onDragEnd={(e) => {
                         handleSongContentStyleChange('songTranslationStyle', {
                           x: Math.round(e.target.x()),
@@ -3702,8 +2054,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       fill={bottomLeftTextStyle.color}
                       align={bottomLeftTextStyle.textAlign}
                       draggable
-                      onClick={() => setSelectedId('bottom-left-text-element')}
-                      onTap={() => setSelectedId('bottom-left-text-element')}
+                      onClick={() => selectElement('bottom-left-text-element')}
+                      onTap={() => selectElement('bottom-left-text-element')}
                       onDragEnd={(e) => {
                         handleSongContentStyleChange('bottomLeftTextStyle', {
                           x: Math.round(e.target.x()),
@@ -3739,8 +2091,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       fill={bottomRightTextStyle.color}
                       align={bottomRightTextStyle.textAlign}
                       draggable
-                      onClick={() => setSelectedId('bottom-right-text-element')}
-                      onTap={() => setSelectedId('bottom-right-text-element')}
+                      onClick={() => selectElement('bottom-right-text-element')}
+                      onTap={() => selectElement('bottom-right-text-element')}
                       onDragEnd={(e) => {
                         handleSongContentStyleChange('bottomRightTextStyle', {
                           x: Math.round(e.target.x()),
@@ -3766,15 +2118,31 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 {/* Elements - positioned in full slide coordinates */}
                 {canvasElements.map((element) => {
                   if (element.type === 'image') {
+                    const dragHandlers = createDragHandlers(element.id);
                     return (
                       <URLImage
                         key={element.id}
                         element={element}
-                        isSelected={selectedId === element.id}
-                        onSelect={() => setSelectedId(element.id)}
-                        onChange={(updates) => updateElement(element.id, updates)}
+                        isSelected={isElementSelected(element.id)}
+                        onSelect={(e) => handleElementSelect(element.id, e)}
+                        onChange={(updates) => {
+                          // Check if this is a drag operation (only x and y are being updated)
+                          const isDrag = updates.x !== undefined && updates.y !== undefined && 
+                                        Object.keys(updates).length === 2;
+                          if (isDrag && updates.x !== undefined && updates.y !== undefined) {
+                            handleMultiSelectDrag(element.id, updates.x, updates.y);
+                          } else {
+                            updateElement(element.id, updates);
+                          }
+                        }}
+                        onDragStart={dragHandlers.onDragStart}
+                        onDragMove={dragHandlers.onDragMove}
                         onContextMenu={(e) => {
                           e.evt.preventDefault();
+                          // If element is not in selection, add it to selection (don't clear others)
+                          if (!selectedIds.has(element.id)) {
+                            addToSelection(element.id);
+                          }
                           const stage = e.target.getStage();
                           if (stage) {
                             const pointerPos = stage.getPointerPosition();
@@ -3790,18 +2158,37 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       />
                     );
                   } else if (element.type === 'text') {
+                    const dragHandlers = createDragHandlers(element.id);
                     return (
                       <DraggableText
                         key={element.id}
                         element={element}
-                        isSelected={selectedId === element.id}
-                        onSelect={() => setSelectedId(element.id)}
-                        onChange={(updates) => updateElement(element.id, updates)}
+                        isSelected={isElementSelected(element.id)}
+                        onSelect={(e) => handleElementSelect(element.id, e)}
+                        onChange={(updates) => {
+                          // Check if this is a drag operation (x and y are being updated)
+                          const isDrag = updates.x !== undefined && updates.y !== undefined;
+                          if (isDrag && selectedIds.size > 1) {
+                            handleMultiSelectDrag(element.id, updates.x!, updates.y!);
+                          } else {
+                            updateElement(element.id, updates);
+                          }
+                        }}
+                        onDragStart={dragHandlers.onDragStart}
+                        onDragMove={dragHandlers.onDragMove}
+                        isBeingDragged={isDraggingMultiSelect && selectedIds.has(element.id)}
                         stageRef={stageRef}
                         scale={SCALE}
                         onEditingChange={setIsTextEditing}
+                        showFormattedOverlay={true}
+                        overlayRefreshKey={overlayRefreshKey}
+                        contextMenuOpen={!!elementContextMenu}
                         onContextMenu={(e) => {
                           e.evt.preventDefault();
+                          // If element is not in selection, add it to selection (don't clear others)
+                          if (!selectedIds.has(element.id)) {
+                            addToSelection(element.id);
+                          }
                           const stage = e.target.getStage();
                           if (stage) {
                             const pointerPos = stage.getPointerPosition();
@@ -3817,15 +2204,30 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       />
                     );
                   } else if (element.type === 'video') {
+                    const dragHandlers = createDragHandlers(element.id);
                     return (
                       <VideoPlaceholder
                         key={element.id}
                         element={element}
-                        isSelected={selectedId === element.id}
-                        onSelect={() => setSelectedId(element.id)}
-                        onChange={(updates) => updateElement(element.id, updates)}
+                        isSelected={isElementSelected(element.id)}
+                        onSelect={(e) => handleElementSelect(element.id, e)}
+                        onChange={(updates) => {
+                          // Check if this is a drag operation (x and y are being updated)
+                          const isDrag = updates.x !== undefined && updates.y !== undefined;
+                          if (isDrag && selectedIds.size > 1) {
+                            handleMultiSelectDrag(element.id, updates.x!, updates.y!);
+                          } else {
+                            updateElement(element.id, updates);
+                          }
+                        }}
+                        onDragStart={dragHandlers.onDragStart}
+                        onDragMove={dragHandlers.onDragMove}
                         onContextMenu={(e) => {
                           e.evt.preventDefault();
+                          // If element is not in selection, add it to selection (don't clear others)
+                          if (!selectedIds.has(element.id)) {
+                            addToSelection(element.id);
+                          }
                           const stage = e.target.getStage();
                           if (stage) {
                             const pointerPos = stage.getPointerPosition();
@@ -3841,15 +2243,30 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       />
                     );
                   } else if (element.type === 'audio') {
+                    const dragHandlers = createDragHandlers(element.id);
                     return (
                       <AudioPlaceholder
                         key={element.id}
                         element={element}
-                        isSelected={selectedId === element.id}
-                        onSelect={() => setSelectedId(element.id)}
-                        onChange={(updates) => updateElement(element.id, updates)}
+                        isSelected={isElementSelected(element.id)}
+                        onSelect={(e) => handleElementSelect(element.id, e)}
+                        onChange={(updates) => {
+                          // Check if this is a drag operation (x and y are being updated)
+                          const isDrag = updates.x !== undefined && updates.y !== undefined;
+                          if (isDrag && selectedIds.size > 1) {
+                            handleMultiSelectDrag(element.id, updates.x!, updates.y!);
+                          } else {
+                            updateElement(element.id, updates);
+                          }
+                        }}
+                        onDragStart={dragHandlers.onDragStart}
+                        onDragMove={dragHandlers.onDragMove}
                         onContextMenu={(e) => {
                           e.evt.preventDefault();
+                          // If element is not in selection, add it to selection (don't clear others)
+                          if (!selectedIds.has(element.id)) {
+                            addToSelection(element.id);
+                          }
                           const stage = e.target.getStage();
                           if (stage) {
                             const pointerPos = stage.getPointerPosition();
@@ -3888,7 +2305,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           
           {/* Canvas instructions */}
           <div className="mt-3 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-xs text-gray-600 dark:text-gray-400 text-center">
-            <span className="font-medium">Click</span> to select • <span className="font-medium">Drag</span> to move • <span className="font-medium">Corner handles</span> to resize
+            <span className="font-medium">Click</span> to select • <span className="font-medium">Ctrl+Click</span> to multi-select • <span className="font-medium">Drag</span> to move • <span className="font-medium">Corner handles</span> to resize
           </div>
         </div>
 
@@ -3962,15 +2379,26 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
           </div>
 
           {/* Selected Element Properties */}
-          {selectedElement ? (
+          {selectedIds.size > 0 ? (
             <div className="space-y-3">
               <h4 className="font-medium text-gray-700 dark:text-gray-300 text-sm">
-                Selected:{' '}
-                {selectedElement.type === 'image'
-                  ? 'Image'
-                  : selectedElement.type === 'video'
-                  ? 'Video'
-                  : 'Text'}
+                {isMultiSelect ? (
+                  <>
+                    <span className="text-blue-600 dark:text-blue-400">{selectedIds.size} elements</span> selected
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-normal">
+                      Ctrl+Click to add/remove • Move together • Del to delete all
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    Selected:{' '}
+                    {selectedElement?.type === 'image'
+                      ? 'Image'
+                      : selectedElement?.type === 'video'
+                      ? 'Video'
+                      : 'Text'}
+                  </>
+                )}
               </h4>
               
               {/* Common properties first: Position */}
@@ -3986,13 +2414,15 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   </label>
                     <input
                     type="number"
-                    value={Math.round(selectedElement.x)}
+                    value={isMultiSelect ? '' : Math.round(selectedElement?.x ?? 0)}
+                    placeholder={isMultiSelect ? 'Mixed' : ''}
+                    disabled={isMultiSelect}
                     onChange={(e) =>
-                      updateElement(selectedElement.id, {
+                      selectedElement && updateElement(selectedElement.id, {
                         x: Number.isNaN(parseInt(e.target.value, 10)) ? 0 : parseInt(e.target.value, 10),
                       })
                     }
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 <div>
@@ -4006,13 +2436,15 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   </label>
                   <input
                     type="number"
-                    value={Math.round(selectedElement.y)}
+                    value={isMultiSelect ? '' : Math.round(selectedElement.y)}
+                    placeholder={isMultiSelect ? 'Mixed' : ''}
+                    disabled={isMultiSelect}
                     onChange={(e) =>
                       updateElement(selectedElement.id, {
                         y: Number.isNaN(parseInt(e.target.value, 10)) ? 0 : parseInt(e.target.value, 10),
                       })
                     }
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -4029,13 +2461,15 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 </label>
                 <input
                   type="number"
-                  value={Math.round(selectedElement.rotation ?? 0)}
+                  value={isMultiSelect ? '' : Math.round(selectedElement.rotation ?? 0)}
+                  placeholder={isMultiSelect ? 'Mixed' : ''}
+                  disabled={isMultiSelect}
                   onChange={(e) =>
                     updateElement(selectedElement.id, {
                       rotation: Number.isNaN(parseInt(e.target.value, 10)) ? 0 : parseInt(e.target.value, 10),
                     })
                   }
-                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -4052,7 +2486,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       </label>
                       <input
                         type="number"
-                        value={Math.round(selectedElement.width)}
+                        value={isMultiSelect ? '' : Math.round(selectedElement.width)}
+                        placeholder={isMultiSelect ? 'Mixed' : ''}
+                        disabled={isMultiSelect}
                     onChange={(e) =>
                       updateElement(selectedElement.id, {
                         width: Number.isNaN(parseInt(e.target.value, 10))
@@ -4060,7 +2496,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                           : parseInt(e.target.value, 10),
                       })
                     }
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </div>
                     <div>
@@ -4074,7 +2510,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       </label>
                       <input
                         type="number"
-                        value={Math.round(selectedElement.height)}
+                        value={isMultiSelect ? '' : Math.round(selectedElement.height)}
+                        placeholder={isMultiSelect ? 'Mixed' : ''}
+                        disabled={isMultiSelect}
                     onChange={(e) =>
                       updateElement(selectedElement.id, {
                         height: Number.isNaN(parseInt(e.target.value, 10))
@@ -4082,7 +2520,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                           : parseInt(e.target.value, 10),
                       })
                     }
-                        className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
@@ -4090,7 +2528,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               {/* Opacity */}
               <div>
                 <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                  Opacity: {Math.round((selectedElement.opacity ?? 1) * 100)}%
+                  Opacity: {isMultiSelect ? 'Mixed' : `${Math.round((selectedElement.opacity ?? 1) * 100)}%`}
                   <Tooltip content="Transparency level - 0% is fully transparent, 100% is fully opaque">
                     <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
                       <i className="fas fa-info-circle text-xs"></i>
@@ -4101,14 +2539,15 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   type="range"
                   min="0"
                   max="100"
-                  value={Math.round((selectedElement.opacity ?? 1) * 100)}
+                  value={isMultiSelect ? 50 : Math.round((selectedElement.opacity ?? 1) * 100)}
+                  disabled={isMultiSelect}
                   onChange={(e) => updateElement(selectedElement.id, { opacity: parseInt(e.target.value) / 100 })}
-                  className="w-full"
+                  className="w-full disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
-              {/* Element-specific properties */}
-              {selectedElement.type === 'image' && (
+              {/* Element-specific properties - hide when multiple elements selected */}
+              {!isMultiSelect && selectedElement.type === 'image' && (
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                     <div>
@@ -4139,13 +2578,15 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={selectedElement.zIndex || 0}
+                      value={isMultiSelect ? '' : (selectedElement.zIndex || 0)}
+                      placeholder={isMultiSelect ? 'Mixed' : ''}
+                      disabled={isMultiSelect}
                       onChange={(e) => updateElement(selectedElement.id, { zIndex: parseInt(e.target.value) || 0 })}
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 </>
-              )}              {selectedElement.type === 'video' && (
+              )}              {!isMultiSelect && selectedElement.type === 'video' && (
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                     <div>
@@ -4233,15 +2674,17 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     </label>
                     <input
                       type="number"
-                      value={selectedElement.zIndex || 0}
+                      value={isMultiSelect ? '' : (selectedElement.zIndex || 0)}
+                      placeholder={isMultiSelect ? 'Mixed' : ''}
+                      disabled={isMultiSelect}
                       onChange={(e) => updateElement(selectedElement.id, { zIndex: parseInt(e.target.value) || 0 })}
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
                 </>
               )}
 
-              {selectedElement.type === 'audio' && (
+              {!isMultiSelect && selectedElement.type === 'audio' && (
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                   <div>
@@ -4402,7 +2845,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 </>
               )}
 
-              {selectedElement.type === 'text' && (
+              {!isMultiSelect && selectedElement.type === 'text' && (
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                   <div>

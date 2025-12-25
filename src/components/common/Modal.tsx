@@ -56,7 +56,7 @@ export const Modal: React.FC<ModalProps> = ({
       onClick={onClose}
     >
       <div 
-        className={`bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-lg shadow-xl w-full ${maxWidthClass} max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-slide-up sm:animate-fade-in`}
+        className={`bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-lg shadow-xl w-full ${maxWidthClass} max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col animate-fade-in`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with larger touch targets on mobile */}
