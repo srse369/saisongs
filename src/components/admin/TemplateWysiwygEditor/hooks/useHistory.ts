@@ -1,112 +1,114 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { PresentationTemplate, TemplateSlide } from '../../../../types';
 
-export interface HistoryState {
-  slides: TemplateSlide[];
-  selectedSlideIndex: number;
-}
-
-export interface UseHistoryReturn {
-  historyIndex: number;
-  canUndo: boolean;
-  canRedo: boolean;
-  handleUndo: () => void;
-  handleRedo: () => void;
-}
-
-interface UseHistoryOptions {
+interface UseHistoryProps {
   slides: TemplateSlide[];
   selectedSlideIndex: number;
   template: PresentationTemplate;
   referenceSlideIndex: number;
   onTemplateChange: (template: PresentationTemplate) => void;
-  maxHistorySize?: number;
 }
 
-/**
- * Custom hook for managing undo/redo history for template slides
- * Tracks changes and provides undo/redo functionality with a configurable history size
- */
+interface HistoryState {
+  slides: TemplateSlide[];
+  selectedSlideIndex: number;
+  template: PresentationTemplate;
+  referenceSlideIndex: number;
+}
+
 export function useHistory({
   slides,
   selectedSlideIndex,
   template,
   referenceSlideIndex,
   onTemplateChange,
-  maxHistorySize = 50,
-}: UseHistoryOptions): UseHistoryReturn {
-  const [history, setHistory] = useState<HistoryState[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const isUndoRedoAction = useRef(false);
-  
-  // Track history for undo/redo (only when not triggered by undo/redo itself)
+}: UseHistoryProps) {
+  const [history, setHistory] = useState<HistoryState[]>([{
+    slides,
+    selectedSlideIndex,
+    template,
+    referenceSlideIndex,
+  }]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const isApplyingHistoryRef = useRef(false);
+
+  // Update history when template changes (but not when applying history)
   useEffect(() => {
-    if (isUndoRedoAction.current) {
-      isUndoRedoAction.current = false;
+    if (isApplyingHistoryRef.current) {
       return;
     }
-    
+
     const newState: HistoryState = {
-      slides: JSON.parse(JSON.stringify(slides)),
+      slides,
       selectedSlideIndex,
+      template,
+      referenceSlideIndex,
     };
-    
+
     setHistory(prev => {
-      // Remove any future states if we're not at the end
+      // Remove any states after current index (when user made changes after undo)
       const newHistory = prev.slice(0, historyIndex + 1);
-      // Add new state, limit history to maxHistorySize entries
-      const updated = [...newHistory, newState].slice(-maxHistorySize);
-      return updated;
+      // Add new state
+      newHistory.push(newState);
+      // Limit history size to prevent memory issues (keep last 50 states)
+      return newHistory.slice(-50);
     });
-    setHistoryIndex(prev => Math.min(prev + 1, maxHistorySize - 1));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(slides)]);
+    setHistoryIndex(prev => {
+      const newHistoryLength = prev < prev ? prev + 1 : prev + 1;
+      // Limit to last 50 states
+      return Math.min(newHistoryLength, 49);
+    });
+  }, [slides, selectedSlideIndex, template, referenceSlideIndex, historyIndex]);
 
-  // Undo handler
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
+
   const handleUndo = useCallback(() => {
-    if (historyIndex <= 0) return;
-    
-    isUndoRedoAction.current = true;
-    const prevState = history[historyIndex - 1];
-    setHistoryIndex(historyIndex - 1);
-    
-    const refSlide = prevState.slides[referenceSlideIndex] || prevState.slides[0];
-    onTemplateChange({
-      ...template,
-      slides: prevState.slides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
-    });
-  }, [historyIndex, history, referenceSlideIndex, template, onTemplateChange]);
+    if (!canUndo) return;
 
-  // Redo handler
-  const handleRedo = useCallback(() => {
-    if (historyIndex >= history.length - 1) return;
+    const newIndex = historyIndex - 1;
+    const state = history[newIndex];
     
-    isUndoRedoAction.current = true;
-    const nextState = history[historyIndex + 1];
-    setHistoryIndex(historyIndex + 1);
-    
-    const refSlide = nextState.slides[referenceSlideIndex] || nextState.slides[0];
+    isApplyingHistoryRef.current = true;
+    setHistoryIndex(newIndex);
     onTemplateChange({
-      ...template,
-      slides: nextState.slides,
-      background: refSlide?.background,
-      images: refSlide?.images || [],
-      videos: refSlide?.videos || [],
-      audios: refSlide?.audios || [],
-      text: refSlide?.text || [],
+      ...state.template,
+      slides: state.slides,
+      referenceSlideIndex: state.referenceSlideIndex,
     });
-  }, [historyIndex, history, referenceSlideIndex, template, onTemplateChange]);
+    
+    // Reset flag after state update
+    setTimeout(() => {
+      isApplyingHistoryRef.current = false;
+    }, 0);
+  }, [canUndo, historyIndex, history, onTemplateChange]);
+
+  const handleRedo = useCallback(() => {
+    if (!canRedo) return;
+
+    const newIndex = historyIndex + 1;
+    const state = history[newIndex];
+    
+    isApplyingHistoryRef.current = true;
+    setHistoryIndex(newIndex);
+    onTemplateChange({
+      ...state.template,
+      slides: state.slides,
+      referenceSlideIndex: state.referenceSlideIndex,
+    });
+    
+    // Reset flag after state update
+    setTimeout(() => {
+      isApplyingHistoryRef.current = false;
+    }, 0);
+  }, [canRedo, historyIndex, history, onTemplateChange]);
 
   return {
     historyIndex,
-    canUndo: historyIndex > 0,
-    canRedo: historyIndex < history.length - 1,
+    canUndo,
+    canRedo,
     handleUndo,
     handleRedo,
+    history, // Export history for the disabled check in the UI
   };
 }

@@ -32,6 +32,7 @@ export const SongManager: React.FC = () => {
   const [editingSong, setEditingSong] = useState<Song | null>(null);
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'pitchCount'>('name');
   const [advancedFilters, setAdvancedFilters] = useState<SongSearchFilters>({});
   const [visibleCount, setVisibleCount] = useState(50);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -157,7 +158,7 @@ export const SongManager: React.FC = () => {
   }, [isFormModalOpen, viewingSong]);
 
   const filteredSongs = useMemo(() => {
-    let results = songs;
+    let results = [...songs]; // Create a copy instead of a reference
 
     // Helper function for case-sensitive comparison
     const matches = (value: string | undefined, filter: string, caseSensitive: boolean) => {
@@ -214,22 +215,33 @@ export const SongManager: React.FC = () => {
     const query = searchTerm.trim();
     
     if (!query) {
-      // If there's an advanced filter name, apply sorting to prioritize prefix matches
-      if (advancedFilters.name) {
-        const lowerQuery = advancedFilters.name.toLowerCase();
-        results = results.sort((a, b) => {
-          const aName = a.name.toLowerCase();
-          const bName = b.name.toLowerCase();
-          const aStartsWith = aName.startsWith(lowerQuery);
-          const bStartsWith = bName.startsWith(lowerQuery);
-          
-          // Prefix matches come first
-          if (aStartsWith && !bStartsWith) return -1;
-          if (!aStartsWith && bStartsWith) return 1;
-          
-          // If both start with query or neither does, sort alphabetically
+      // No search query - just apply sorting
+      if (sortBy === 'pitchCount') {
+        results.sort((a, b) => {
+          const pitchCompare = (b.pitchCount ?? 0) - (a.pitchCount ?? 0);
+          if (pitchCompare !== 0) return pitchCompare;
           return compareStringsIgnoringSpecialChars(a.name, b.name);
         });
+      } else {
+        // Sort by name
+        if (advancedFilters.name) {
+          const lowerQuery = advancedFilters.name.toLowerCase();
+          results = results.sort((a, b) => {
+            const aName = a.name.toLowerCase();
+            const bName = b.name.toLowerCase();
+            const aStartsWith = aName.startsWith(lowerQuery);
+            const bStartsWith = bName.startsWith(lowerQuery);
+            
+            // Prefix matches come first
+            if (aStartsWith && !bStartsWith) return -1;
+            if (!aStartsWith && bStartsWith) return 1;
+            
+            // If both start with query or neither does, sort alphabetically
+            return compareStringsIgnoringSpecialChars(a.name, b.name);
+          });
+        } else {
+          results.sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
+        }
       }
       return results;
     }
@@ -255,23 +267,39 @@ export const SongManager: React.FC = () => {
       results = results.filter(s => fuzzyIds.has(s.id));
     }
     
-    // Sort results: prioritize songs that start with the search term
-    results = results.sort((a, b) => {
-      const aName = a.name.toLowerCase();
-      const bName = b.name.toLowerCase();
-      const aStartsWith = aName.startsWith(lowerQuery);
-      const bStartsWith = bName.startsWith(lowerQuery);
-      
-      // Prefix matches come first
-      if (aStartsWith && !bStartsWith) return -1;
-      if (!aStartsWith && bStartsWith) return 1;
-      
-      // If both start with query or neither does, sort alphabetically
-      return compareStringsIgnoringSpecialChars(a.name, b.name);
-    });
+    // Apply sorting
+    if (sortBy === 'pitchCount') {
+      // Sort by pitch count (descending), then by name for ties
+      results.sort((a, b) => {
+        const pitchCompare = (b.pitchCount ?? 0) - (a.pitchCount ?? 0);
+        if (pitchCompare !== 0) return pitchCompare;
+        return compareStringsIgnoringSpecialChars(a.name, b.name);
+      });
+    } else {
+      // Sort by name
+      if (searchTerm.trim() || advancedFilters.name) {
+        const query = searchTerm.trim() || advancedFilters.name || '';
+        const lowerQuery = query.toLowerCase();
+        results.sort((a, b) => {
+          const aName = a.name.toLowerCase();
+          const bName = b.name.toLowerCase();
+          const aStartsWith = aName.startsWith(lowerQuery);
+          const bStartsWith = bName.startsWith(lowerQuery);
+          
+          // Prefix matches come first
+          if (aStartsWith && !bStartsWith) return -1;
+          if (!aStartsWith && bStartsWith) return 1;
+          
+          // If both start with query or neither does, sort alphabetically
+          return compareStringsIgnoringSpecialChars(a.name, b.name);
+        });
+      } else {
+        results.sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
+      }
+    }
 
     return results;
-  }, [songs, searchTerm, advancedFilters, fuzzySearch]);
+  }, [songs, searchTerm, advancedFilters, fuzzySearch, sortBy]);
 
   // Reset visible songs when search or underlying list changes
   useEffect(() => {
@@ -344,6 +372,16 @@ export const SongManager: React.FC = () => {
               placeholder='Ask AI: "Show me sai songs in sanskrit with fast tempo"...'
             />
             <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+              <Tooltip content="Sort songs by name or pitch count">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'name' | 'pitchCount')}
+                  className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                >
+                  <option value="name">Sort: Name</option>
+                  <option value="pitchCount">Sort: Pitch Count</option>
+                </select>
+              </Tooltip>
               <Tooltip content="Reload songs from the database to see the latest updates">
                 <button
                   type="button"

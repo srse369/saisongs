@@ -230,7 +230,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   const referenceSlideIndex = template.referenceSlideIndex ?? 0;
 
   // Undo/Redo history
-  const { historyIndex, canUndo, canRedo, handleUndo, handleRedo } = useHistory({
+  const { historyIndex, canUndo, canRedo, handleUndo, handleRedo, history } = useHistory({
     slides,
     selectedSlideIndex,
     template,
