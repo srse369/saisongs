@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Song Studio - Remote Deployment CLI
+# Sai Songs - Remote Deployment CLI
 # Single script for managing remote production deployments
 #
 # Usage: ./deploy/remote/deploy.sh <command> [options]
@@ -137,7 +137,7 @@ check_config() {
 cmd_code() {
     check_config
 
-    echo "🚀 Song Studio Deployment"
+    echo "🚀 Sai Songs Deployment"
     echo "========================="
     echo ""
 
@@ -254,7 +254,7 @@ ENDSSH
         
         ssh_exec << ENDSSH
             cd ${REMOTE_PATH}
-            pm2 stop songstudio 2>/dev/null || true
+            pm2 stop saisongs 2>/dev/null || true
             sleep 3
             pm2 start ecosystem.config.cjs --env production
             pm2 save
@@ -301,7 +301,7 @@ ENDSSH
     # Show Recent Logs
     echo "📝 Recent Logs (last 15 lines)"
     echo "------------------------------"
-    ssh_exec 'pm2 logs songstudio --nostream --lines 15'
+    ssh_exec 'pm2 logs saisongs --nostream --lines 15'
     echo ""
 
     # Summary
@@ -330,7 +330,7 @@ cmd_env() {
     LOCAL_ENV_LOCAL="$PROJECT_ROOT/.env.local"
     LOCAL_ENV_PROD="$PROJECT_ROOT/.env.production"
     REMOTE_ENV="${REMOTE_PATH}/.env"
-    TEMP_ENV="/tmp/songstudio_env_$$"
+    TEMP_ENV="/tmp/saisongs_env_$$"
 
     echo "🔐 Environment Upload"
     echo "====================="
@@ -348,7 +348,7 @@ cmd_env() {
     echo ""
     
     # Start with header
-    echo "# Song Studio Production Environment" > "$TEMP_ENV"
+    echo "# Sai Songs Production Environment" > "$TEMP_ENV"
     echo "# Generated: $(date)" >> "$TEMP_ENV"
     echo "# Source: .env.local + .env.production (merged, production overrides)" >> "$TEMP_ENV"
     echo "" >> "$TEMP_ENV"
@@ -533,28 +533,28 @@ cmd_nginx() {
     # Upload nginx configuration
     echo "📤 Uploading nginx configuration..."
     if [ -n "$SSH_OPTS" ]; then
-        eval scp $SSH_OPTS "$NGINX_CONFIG" "${REMOTE_USER}@${REMOTE_IP}:/tmp/songstudio.nginx.conf"
+        eval scp $SSH_OPTS "$NGINX_CONFIG" "${REMOTE_USER}@${REMOTE_IP}:/tmp/saisongs.nginx.conf"
     else
-        scp "$NGINX_CONFIG" "${REMOTE_USER}@${REMOTE_IP}:/tmp/songstudio.nginx.conf"
+        scp "$NGINX_CONFIG" "${REMOTE_USER}@${REMOTE_IP}:/tmp/saisongs.nginx.conf"
     fi
 
     # Backup existing config and install new one
     echo "🔧 Installing nginx configuration..."
     ssh_exec << 'ENDSSH'
 # Backup existing config if it exists
-if [ -f /etc/nginx/sites-available/songstudio ]; then
+if [ -f /etc/nginx/sites-available/saisongs ]; then
     echo "Creating backup of existing configuration..."
-    sudo cp /etc/nginx/sites-available/songstudio /etc/nginx/sites-available/songstudio.backup.$(date +%Y%m%d_%H%M%S)
+    sudo cp /etc/nginx/sites-available/saisongs /etc/nginx/sites-available/saisongs.backup.$(date +%Y%m%d_%H%M%S)
 fi
 
 # Move uploaded config to nginx directory
 echo "Installing new configuration..."
-sudo mv /tmp/songstudio.nginx.conf /etc/nginx/sites-available/songstudio
+sudo mv /tmp/saisongs.nginx.conf /etc/nginx/sites-available/saisongs
 
 # Create symlink if it doesn't exist
-if [ ! -L /etc/nginx/sites-enabled/songstudio ]; then
+if [ ! -L /etc/nginx/sites-enabled/saisongs ]; then
     echo "Creating symlink..."
-    sudo ln -s /etc/nginx/sites-available/songstudio /etc/nginx/sites-enabled/songstudio
+    sudo ln -s /etc/nginx/sites-available/saisongs /etc/nginx/sites-enabled/saisongs
 fi
 
 # Test nginx configuration
@@ -570,7 +570,7 @@ else
     echo ""
     echo "❌ Nginx configuration test failed!"
     echo "To restore previous configuration:"
-    echo "  sudo cp /etc/nginx/sites-available/songstudio.backup.* /etc/nginx/sites-available/songstudio"
+    echo "  sudo cp /etc/nginx/sites-available/saisongs.backup.* /etc/nginx/sites-available/saisongs"
     echo "  sudo systemctl reload nginx"
     exit 1
 fi
@@ -595,7 +595,7 @@ cmd_check() {
     check_config
 
     echo "=========================================="
-    echo "Song Studio Server Health Check"
+    echo "Sai Songs Studio Server Health Check"
     echo "=========================================="
     echo ""
 
@@ -616,23 +616,23 @@ echo "2. Checking PM2 processes..."
 pm2 list
 echo ""
 
-# Check if songstudio process is running
-echo "3. Checking songstudio process..."
-if pm2 list | grep -q "songstudio"; then
+# Check if saisongs process is running
+echo "3. Checking saisongs process..."
+if pm2 list | grep -q "saisongs"; then
     STATUS=$(pm2 jlist 2>/dev/null | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
     echo "Process status: ${STATUS:-unknown}"
     
     if [ "$STATUS" != "online" ]; then
         echo "⚠️  Process is not online. Attempting to restart..."
-        cd /var/www/songstudio
-        pm2 delete songstudio 2>/dev/null || true
+        cd /var/www/saisongs
+        pm2 delete saisongs 2>/dev/null || true
         pm2 start ecosystem.config.cjs --env production
     else
         echo "✅ Process is online"
     fi
 else
-    echo "❌ songstudio process not found. Starting it..."
-    cd /var/www/songstudio
+    echo "❌ saisongs process not found. Starting it..."
+    cd /var/www/saisongs
     pm2 start ecosystem.config.cjs --env production
 fi
 echo ""
@@ -660,18 +660,18 @@ echo ""
 
 # Check recent PM2 logs
 echo "6. Recent PM2 logs (last 20 lines)..."
-pm2 logs songstudio --nostream --lines 20
+pm2 logs saisongs --nostream --lines 20
 echo ""
 
 # Check if .env file exists
 echo "7. Checking environment configuration..."
-if [ -f /var/www/songstudio/.env ]; then
+if [ -f /var/www/saisongs/.env ]; then
     echo "✅ .env file exists"
     echo "Environment variables configured:"
-    grep -E "^(NODE_ENV|PORT|ORACLE)" /var/www/songstudio/.env | sed 's/=.*/=***/' || echo "No variables found"
+    grep -E "^(NODE_ENV|PORT|ORACLE)" /var/www/saisongs/.env | sed 's/=.*/=***/' || echo "No variables found"
 else
     echo "❌ .env file not found!"
-    echo "Please create /var/www/songstudio/.env with required variables"
+    echo "Please create /var/www/saisongs/.env with required variables"
 fi
 echo ""
 
@@ -680,8 +680,8 @@ echo "Health check complete!"
 echo "=========================================="
 echo ""
 echo "If issues persist, run:"
-echo "  pm2 logs songstudio --lines 50"
-echo "  sudo tail -f /var/log/nginx/songstudio_error.log"
+echo "  pm2 logs saisongs --lines 50"
+echo "  sudo tail -f /var/log/nginx/saisongs_error.log"
 ENDSSH
 }
 
@@ -692,15 +692,15 @@ ENDSSH
 cmd_restart() {
     check_config
 
-    echo "🔄 Restarting Song Studio backend..."
+    echo "🔄 Restarting Sai Songs backend..."
 
     ssh_exec << ENDSSH
 cd ${REMOTE_PATH}
 
 # Check if PM2 process exists
-if pm2 list | grep -q "songstudio"; then
+if pm2 list | grep -q "saisongs"; then
     echo "Restarting existing process..."
-    pm2 delete songstudio 2>/dev/null || true
+    pm2 delete saisongs 2>/dev/null || true
 fi
 
 echo "Starting process..."
@@ -717,7 +717,7 @@ if curl -f -s http://localhost:3111/api/health > /dev/null; then
     curl -s http://localhost:3111/api/health
 else
     echo "❌ Backend failed to start. Check logs:"
-    echo "   pm2 logs songstudio --lines 50"
+    echo "   pm2 logs saisongs --lines 50"
 fi
 
 # Save PM2 configuration
@@ -740,7 +740,7 @@ cmd_logs() {
     echo "============================="
     echo ""
 
-    ssh_exec "pm2 logs songstudio --nostream --lines $LINES"
+    ssh_exec "pm2 logs saisongs --nostream --lines $LINES"
 }
 
 # =============================================================================

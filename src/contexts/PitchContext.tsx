@@ -4,7 +4,7 @@ import type { SongSingerPitch, CreatePitchInput, UpdatePitchInput, ServiceError 
 import { pitchService } from '../services';
 import { useToast } from './ToastContext';
 
-const PITCHES_CACHE_KEY = 'songStudio:pitchesCache';
+const PITCHES_CACHE_KEY = 'saiSongs:pitchesCache';
 const PITCHES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface PitchContextState {
@@ -169,9 +169,19 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
         return [...prev, pitch];
       });
       
-      // Clear localStorage cache so fresh data is fetched next time
+      // Clear localStorage caches for pitches and singers
+      // Singer pitch count changes when a pitch is created, so we need to refresh singers
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(PITCHES_CACHE_KEY);
+        window.localStorage.removeItem('saiSongs:singersCache');
+        // Also clear songs cache since song pitch count may change
+        window.localStorage.removeItem('saiSongs:songsCache');
+        
+        // Dispatch custom event to notify SingerContext to update pitch count
+        // This allows optimistic update without direct context dependency
+        window.dispatchEvent(new CustomEvent('pitchCreated', { 
+          detail: { singerId: pitch.singerId, songId: pitch.songId } 
+        }));
       }
       
       toast.success('Pitch association created successfully');
@@ -219,12 +229,30 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
   const deletePitch = useCallback(async (id: string): Promise<void> => {
     setLoading(true);
     try {
+      // Get the pitch before deleting to know which singer/song to update
+      let pitchToDelete: SongSingerPitch | undefined;
+      setPitches(prev => {
+        pitchToDelete = prev.find(p => p.id === id);
+        return prev.filter(pitch => pitch.id !== id);
+      });
+      
       await pitchService.deletePitch(id);
-      setPitches(prev => prev.filter(pitch => pitch.id !== id));
-      // Clear localStorage cache so fresh data is fetched next time
+      
+      // Clear localStorage caches for pitches, singers, and songs
+      // Pitch counts change when a pitch is deleted
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(PITCHES_CACHE_KEY);
+        window.localStorage.removeItem('saiSongs:singersCache');
+        window.localStorage.removeItem('saiSongs:songsCache');
+        
+        // Dispatch custom event to notify SingerContext to update pitch count
+        if (pitchToDelete) {
+          window.dispatchEvent(new CustomEvent('pitchDeleted', { 
+            detail: { singerId: pitchToDelete.singerId, songId: pitchToDelete.songId } 
+          }));
+        }
       }
+      
       toast.success('Pitch association deleted successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete pitch';

@@ -104,7 +104,7 @@ export const SingerManager: React.FC = () => {
           });
           
           // Clear centers cache since editor assignments affect center data
-          window.localStorage.removeItem('songStudio:centersCache');
+          window.localStorage.removeItem('saiSongs:centersCache');
           
           // Refresh singers to get updated data
           await fetchSingers(true);

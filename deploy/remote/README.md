@@ -1,6 +1,6 @@
 # Remote Deployment Scripts
 
-Scripts for deploying and managing Song Studio on remote production servers.
+Scripts for deploying and managing Sai Songs on remote production servers.
 
 ## Quick Reference
 
@@ -145,7 +145,7 @@ bash /tmp/setup.sh ssl-ip
    - Automatically redirects HTTP → HTTPS
 
 2. **Domain Name Access (Let's Encrypt Certificate)**
-   - Use when you have a domain name (e.g., https://songstudio.example.com)
+   - Use when you have a domain name (e.g., https://saisongs.example.com)
    - No browser warnings - fully trusted certificate
    - Run: `./setup.sh ssl yourdomain.com`
    - Automatically redirects HTTP → HTTPS
@@ -159,7 +159,7 @@ Both configurations ensure all HTTP traffic is automatically redirected to HTTPS
 - PM2 process manager
 - Nginx web server
 - Oracle Instant Client
-- Application directories (`/var/www/songstudio`)
+- Application directories (`/var/www/saisongs`)
 - Environment template (`.env`)
 - Firewall configuration
 
@@ -188,9 +188,9 @@ Create this file for SSH and server connection settings:
 ```bash
 # .env.deploy - Deployment configuration (local use only)
 REMOTE_USER=ubuntu
-REMOTE_HOST=songstudio.example.com
+REMOTE_HOST=saisongs.example.com
 REMOTE_IP=123.45.67.89
-REMOTE_PATH=/var/www/songstudio
+REMOTE_PATH=/var/www/saisongs
 SSH_KEY=~/.ssh/my-server-key.pem
 ```
 
@@ -255,13 +255,13 @@ bash /tmp/setup.sh oracle    # Oracle Linux
 **2. Configure Nginx:**
 ```bash
 # On server - Ubuntu
-sudo cp /tmp/nginx.conf /etc/nginx/sites-available/songstudio
-sudo ln -s /etc/nginx/sites-available/songstudio /etc/nginx/sites-enabled/
+sudo cp /tmp/nginx.conf /etc/nginx/sites-available/saisongs
+sudo ln -s /etc/nginx/sites-available/saisongs /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 
 # On server - Oracle Linux
-sudo cp /tmp/nginx.conf /etc/nginx/conf.d/songstudio.conf
+sudo cp /tmp/nginx.conf /etc/nginx/conf.d/saisongs.conf
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -271,7 +271,7 @@ sudo nginx -t && sudo systemctl reload nginx
 cat > .env.deploy << 'EOF'
 REMOTE_USER=ubuntu
 REMOTE_HOST=your-server.com
-REMOTE_PATH=/var/www/songstudio
+REMOTE_PATH=/var/www/saisongs
 SSH_KEY=~/.ssh/your-key.pem
 EOF
 
@@ -356,7 +356,7 @@ PM2 process manager configuration.
 ```bash
 pm2 start ecosystem.config.cjs --env production
 pm2 reload ecosystem.config.cjs --env production
-pm2 stop songstudio
+pm2 stop saisongs
 ```
 
 ### `nginx.conf`
@@ -372,11 +372,11 @@ Nginx web server configuration.
 **Installation:**
 ```bash
 # Ubuntu/Debian
-sudo cp nginx.conf /etc/nginx/sites-available/songstudio
-sudo ln -s /etc/nginx/sites-available/songstudio /etc/nginx/sites-enabled/
+sudo cp nginx.conf /etc/nginx/sites-available/saisongs
+sudo ln -s /etc/nginx/sites-available/saisongs /etc/nginx/sites-enabled/
 
 # Oracle Linux
-sudo cp nginx.conf /etc/nginx/conf.d/songstudio.conf
+sudo cp nginx.conf /etc/nginx/conf.d/saisongs.conf
 ```
 
 ---

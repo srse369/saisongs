@@ -169,7 +169,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   
   // Clipboard for copy/paste (uses localStorage for cross-window support)
   // Supports multi-element clipboard as an array
-  const CLIPBOARD_KEY = 'songstudio-template-clipboard-v2';
+  const CLIPBOARD_KEY = 'saisongs-template-clipboard-v2';
   
   type ClipboardItem = {
     type: 'image' | 'text' | 'video';

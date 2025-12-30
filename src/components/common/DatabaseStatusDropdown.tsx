@@ -180,7 +180,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
     }
   };
 
-  const handleClearLocalStorage = () => {
+  const handleClearLocalStorage = async () => {
     // Check cooldown (2 minutes = 120000ms)
     const now = Date.now();
     const cooldownMs = 2 * 60 * 1000; // 2 minutes
@@ -192,7 +192,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
       return;
     }
 
-    if (!confirm('Clear local cache and reload page? This will fetch fresh data from the server.')) {
+    if (!confirm('Clear web page, JavaScript, and CSS cache? This will fetch fresh HTML/JS/CSS but preserve image caches.')) {
       return;
     }
 
@@ -202,32 +202,67 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
     try {
       // Clear app-specific localStorage caches
       const cacheKeys = [
-        'songStudio:songsCache',
-        'songStudio:singersCache',
-        'songStudio:pitchesCache',
-        'songStudio:templatesCache',
-        'songStudio:centersCache',
+        'saiSongs:songsCache',
+        'saiSongs:singersCache',
+        'saiSongs:pitchesCache',
+        'saiSongs:templatesCache',
+        'saiSongs:centersCache',
         'selectedSessionTemplateId', // Session template selection
-        'songstudio-template-clipboard-v2', // Template editor clipboard
+        'saisongs-template-clipboard-v2', // Template editor clipboard
       ];
       
       cacheKeys.forEach(key => {
         window.localStorage.removeItem(key);
       });
       
+      // Clear service worker caches for HTML, JavaScript, and CSS files (preserve images)
+      if ('caches' in window && 'serviceWorker' in navigator) {
+        try {
+          const cacheNames = await caches.keys();
+          const htmlPaths = ['/', '/index.html', '/help'];
+          
+          for (const cacheName of cacheNames) {
+            const cache = await caches.open(cacheName);
+            const requests = await cache.keys();
+            
+            // Delete HTML, JavaScript, and CSS files, preserve images
+            for (const request of requests) {
+              const url = new URL(request.url);
+              const pathname = url.pathname;
+              
+              // Check if this is an HTML, JavaScript, or CSS file
+              const isHtml = htmlPaths.includes(pathname) || pathname.endsWith('.html');
+              const isJs = pathname.endsWith('.js') || pathname.endsWith('.mjs');
+              const isCss = pathname.endsWith('.css');
+              
+              // Delete HTML, JS, and CSS files, preserve images and other assets
+              if (isHtml || isJs || isCss) {
+                await cache.delete(request);
+              }
+            }
+          }
+        } catch (swError) {
+          // Service worker cache clearing is optional, don't fail if it errors
+          console.warn('Could not clear service worker cache:', swError);
+        }
+      }
+      
       // Update last clear timestamp
       const timestamp = Date.now();
       setLastLocalStorageClear(timestamp);
       localStorage.setItem('lastLocalStorageClear', timestamp.toString());
       
-      setLocalStorageMessage('Local cache cleared successfully! Page will refresh...');
+      setLocalStorageMessage('Web page, JavaScript, and CSS cache cleared! Reloading...');
       
-      // Reload page after short delay to re-fetch fresh data
+      // Reload page with cache-busting query parameter to force fresh HTML, JS, and CSS
+      // Images will still use their cached versions (1 year cache)
       setTimeout(() => {
-        window.location.reload();
+        const url = new URL(window.location.href);
+        url.searchParams.set('_nocache', timestamp.toString());
+        window.location.href = url.toString();
       }, 1500);
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Failed to clear local cache';
+      const errorMsg = error instanceof Error ? error.message : 'Failed to clear cache';
       setLocalStorageMessage(`Error: ${errorMsg}`);
       setClearingLocalStorage(false);
     }
@@ -380,7 +415,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                     </p>
                   )}
                   <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
-                    Clears cached songs, singers, pitches, and templates. 2-minute cooldown.
+                    Clears web page (HTML), JavaScript, CSS cache, and localStorage data. Preserves images. 2-minute cooldown.
                   </p>
                 </div>
                 

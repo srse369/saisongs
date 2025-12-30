@@ -131,10 +131,10 @@ class PptxExportService {
     const pptx = new pptxgen();
 
     // Set presentation properties
-    pptx.author = 'Sai Devotional Song Studio';
+    pptx.author = 'Sai Songs';
     pptx.title = template.name;
     pptx.subject = template.description || 'Presentation Template';
-    pptx.company = 'Sai Devotional Song Studio';
+    pptx.company = 'Sai Songs';
 
     // Get aspect ratio and dimensions
     const aspectRatio: AspectRatio = template.aspectRatio || '16:9';
@@ -200,10 +200,10 @@ class PptxExportService {
     const pptx = new pptxgen();
 
     // Set presentation properties
-    pptx.author = 'Sai Devotional Song Studio';
+    pptx.author = 'Sai Songs';
     pptx.title = sessionName;
     pptx.subject = 'Session Presentation';
-    pptx.company = 'Sai Devotional Song Studio';
+    pptx.company = 'Sai Songs';
 
     // Get aspect ratio and dimensions from template
     const aspectRatio: AspectRatio = template?.aspectRatio || '16:9';

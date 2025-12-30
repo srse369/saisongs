@@ -1,6 +1,6 @@
-# Song Studio Documentation
+# Sai Songs Documentation
 
-Welcome to Song Studio! This documentation will help you get started, deploy, and use all features effectively.
+Welcome to Sai Songs! This documentation will help you get started, deploy, and use all features effectively.
 
 ## 📚 Documentation Structure
 
@@ -31,8 +31,8 @@ Welcome to Song Studio! This documentation will help you get started, deploy, an
 
 ```bash
 # Clone and setup
-git clone https://github.com/srse369/songstudio.git
-cd songstudio
+git clone https://github.com/srse369/saisongs.git
+cd saisongs
 npm install
 
 # Configure environment

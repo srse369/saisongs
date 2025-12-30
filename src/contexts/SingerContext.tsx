@@ -1,11 +1,11 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Singer, CreateSingerInput, UpdateSingerInput, ServiceError } from '../types';
 import { singerService } from '../services';
 import { useToast } from './ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../utils';
 
-const SINGERS_CACHE_KEY = 'songStudio:singersCache';
+const SINGERS_CACHE_KEY = 'saiSongs:singersCache';
 const SINGERS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface SingerContextState {
@@ -34,6 +34,75 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
   const [error, setError] = useState<ServiceError | null>(null);
   const [hasFetched, setHasFetched] = useState<boolean>(false);
   const toast = useToast();
+
+  // Listen for pitch creation/deletion events to update pitch counts optimistically
+  useEffect(() => {
+    const handlePitchCreated = (event: CustomEvent<{ singerId: string; songId: string }>) => {
+      const { singerId } = event.detail;
+      setSingers(prev => {
+        const updated = prev.map(singer => 
+          singer.id === singerId 
+            ? { ...singer, pitchCount: (singer.pitchCount ?? 0) + 1 }
+            : singer
+        );
+        
+        // Update localStorage cache to keep it in sync
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(
+              SINGERS_CACHE_KEY,
+              JSON.stringify({
+                timestamp: Date.now(),
+                singers: updated,
+              })
+            );
+          } catch (e) {
+            // Silently ignore storage errors (e.g., quota exceeded on iOS)
+            console.warn('Failed to update singers cache in localStorage:', e);
+          }
+        }
+        
+        return updated;
+      });
+    };
+
+    const handlePitchDeleted = (event: CustomEvent<{ singerId: string; songId: string }>) => {
+      const { singerId } = event.detail;
+      setSingers(prev => {
+        const updated = prev.map(singer => 
+          singer.id === singerId 
+            ? { ...singer, pitchCount: Math.max(0, (singer.pitchCount ?? 0) - 1) }
+            : singer
+        );
+        
+        // Update localStorage cache to keep it in sync
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(
+              SINGERS_CACHE_KEY,
+              JSON.stringify({
+                timestamp: Date.now(),
+                singers: updated,
+              })
+            );
+          } catch (e) {
+            // Silently ignore storage errors (e.g., quota exceeded on iOS)
+            console.warn('Failed to update singers cache in localStorage:', e);
+          }
+        }
+        
+        return updated;
+      });
+    };
+
+    window.addEventListener('pitchCreated', handlePitchCreated as EventListener);
+    window.addEventListener('pitchDeleted', handlePitchDeleted as EventListener);
+
+    return () => {
+      window.removeEventListener('pitchCreated', handlePitchCreated as EventListener);
+      window.removeEventListener('pitchDeleted', handlePitchDeleted as EventListener);
+    };
+  }, []);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -144,6 +213,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       const singer = await singerService.createSinger(input);
       
       // Add the singer to local state immediately for optimistic update
+      // Also update localStorage cache with the new singer included
       setSingers(prev => {
         // Check if singer already exists (duplicate prevention)
         if (prev.some(s => s.id === singer.id)) {
@@ -153,13 +223,26 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
         const newList = [...prev, singer].sort((a, b) => 
           compareStringsIgnoringSpecialChars(a.name, b.name)
         );
+        
+        // Update localStorage cache with the updated list
+        // This ensures the cache is up-to-date for other components/tabs
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(
+              SINGERS_CACHE_KEY,
+              JSON.stringify({
+                timestamp: Date.now(),
+                singers: newList,
+              })
+            );
+          } catch (e) {
+            // Silently ignore storage errors (e.g., quota exceeded on iOS)
+            console.warn('Failed to update singers cache in localStorage:', e);
+          }
+        }
+        
         return newList;
       });
-      
-      // Clear localStorage cache so fresh data is fetched next time
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(SINGERS_CACHE_KEY);
-      }
       
       toast.success('Singer created successfully');
       return singer;
@@ -235,7 +318,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       // The calling component (SingerManager) will refresh pitches after merge completes
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(SINGERS_CACHE_KEY);
-        window.localStorage.removeItem('songStudio:pitchesCache');
+        window.localStorage.removeItem('saiSongs:pitchesCache');
       }
       
       // Refresh singers list to get updated data (merged singers are deleted, target singer updated)

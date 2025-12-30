@@ -148,7 +148,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <Link to="/" className="flex items-center group">
               <img 
                 src="/logo.png" 
-                alt="Sai Devotional Song Studio" 
+                alt="Sai Songs" 
                 className="h-8 sm:h-10 md:h-12 w-auto object-contain group-hover:scale-105 transition-transform"
               />
             </Link>
@@ -513,7 +513,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">
         <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
           <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-            Sai Devotional Song Studio © {new Date().getFullYear()}
+          Sai Songs © {new Date().getFullYear()}
           </p>
           <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-1">
             Thanks 🙏 to sairhythms for Songs and Metadata.

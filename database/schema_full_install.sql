@@ -1,5 +1,5 @@
 -- ============================================================================
--- SongStudio Database - Complete Schema Installation
+-- SaiSongs Database - Complete Schema Installation
 -- Oracle Database Version
 -- ============================================================================
 -- This script creates a complete fresh database installation
@@ -22,7 +22,7 @@
 SET SERVEROUTPUT ON;
 
 PROMPT ============================================================================
-PROMPT SongStudio Database - Full Installation
+PROMPT SaiSongs Database - Full Installation
 PROMPT ============================================================================
 PROMPT WARNING: This will DROP all existing tables!
 PROMPT ============================================================================

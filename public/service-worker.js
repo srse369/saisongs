@@ -1,6 +1,6 @@
-// Service Worker for Song Studio PWA
-const CACHE_NAME = 'songstudio-v1';
-const RUNTIME_CACHE = 'songstudio-runtime-v1';
+// Service Worker for Sai Songs PWA
+const CACHE_NAME = 'saisongs-v2';
+const RUNTIME_CACHE = 'saisongs-runtime-v2';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
@@ -47,6 +47,36 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  const url = new URL(event.request.url);
+  const isJsFile = url.pathname.endsWith('.js') || url.pathname.endsWith('.mjs');
+  const isCssFile = url.pathname.endsWith('.css');
+  const isHtmlFile = url.pathname.endsWith('.html') || url.pathname === '/';
+
+  // For JavaScript and CSS files, use network-first strategy to ensure fresh code
+  // This prevents serving stale bundles after code changes
+  if (isJsFile || isCssFile) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // If network request succeeds, cache it and return
+          if (response && response.status === 200 && response.type === 'basic') {
+            const responseToCache = response.clone();
+            caches.open(RUNTIME_CACHE)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+          }
+          return response;
+        })
+        .catch(() => {
+          // If network fails, try cache as fallback
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // For HTML and other files, use cache-first strategy
   event.respondWith(
     caches.match(event.request)
       .then((cachedResponse) => {

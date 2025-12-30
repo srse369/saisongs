@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Song Studio - Server Setup CLI
+# Sai Songs - Server Setup CLI
 # Single script for server-side setup operations
 # Run this ON the remote server, not locally
 #
@@ -102,7 +102,7 @@ cmd_ubuntu() {
     check_not_root
 
     echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}  Song Studio Server Setup${NC}"
+    echo -e "${GREEN}  Sai Songs Server Setup${NC}"
     echo -e "${GREEN}  Ubuntu/Debian Edition${NC}"
     echo -e "${GREEN}========================================${NC}"
 
@@ -170,9 +170,9 @@ cmd_ubuntu() {
 
     # Step 6: Create application directory
     echo -e "\n${BLUE}Step 6: Creating application directories...${NC}"
-    sudo mkdir -p /var/www/songstudio
-    sudo mkdir -p /var/www/songstudio/logs
-    sudo chown -R $USER:$USER /var/www/songstudio
+    sudo mkdir -p /var/www/saisongs
+    sudo mkdir -p /var/www/saisongs/logs
+    sudo chown -R $USER:$USER /var/www/saisongs
     echo -e "${GREEN}✓ Directories created${NC}"
 
     # Step 7: Configure firewall
@@ -186,16 +186,16 @@ cmd_ubuntu() {
     # Step 8: Configure Nginx
     echo -e "\n${BLUE}Step 8: Configuring Nginx...${NC}"
     echo -e "${YELLOW}Please copy the nginx.conf file from the repository to:${NC}"
-    echo -e "${YELLOW}  /etc/nginx/sites-available/songstudio${NC}"
+    echo -e "${YELLOW}  /etc/nginx/sites-available/saisongs${NC}"
     echo -e "${YELLOW}Then run:${NC}"
-    echo -e "${YELLOW}  sudo ln -s /etc/nginx/sites-available/songstudio /etc/nginx/sites-enabled/${NC}"
+    echo -e "${YELLOW}  sudo ln -s /etc/nginx/sites-available/saisongs /etc/nginx/sites-enabled/${NC}"
     echo -e "${YELLOW}  sudo rm -f /etc/nginx/sites-enabled/default${NC}"
     echo -e "${YELLOW}  sudo nginx -t${NC}"
     echo -e "${YELLOW}  sudo systemctl reload nginx${NC}"
 
     # Step 9: Environment variables
     echo -e "\n${BLUE}Step 9: Environment variables...${NC}"
-    create_env_template "/var/www/songstudio" "your-domain.com" "/opt/oracle/instantclient_21_11"
+    create_env_template "/var/www/saisongs" "your-domain.com" "/opt/oracle/instantclient_21_11"
 
     echo -e "\n${GREEN}========================================${NC}"
     echo -e "${GREEN}  Setup Complete!${NC}"
@@ -203,12 +203,12 @@ cmd_ubuntu() {
 
     echo -e "\n${BLUE}Next Steps:${NC}"
     echo -e "1. Configure Nginx (see Step 8 above)"
-    echo -e "2. Edit /var/www/songstudio/.env with your database credentials"
+    echo -e "2. Edit /var/www/saisongs/.env with your database credentials"
     echo -e "3. Deploy the application from your local machine"
     echo -e "\n${BLUE}Useful Commands:${NC}"
     echo -e "  pm2 list                  - View running processes"
-    echo -e "  pm2 logs songstudio       - View application logs"
-    echo -e "  pm2 restart songstudio    - Restart application"
+    echo -e "  pm2 logs saisongs         - View application logs"
+    echo -e "  pm2 restart saisongs      - Restart application"
     echo -e "  sudo systemctl status nginx  - Check nginx status"
     echo -e "  sudo nginx -t             - Test nginx configuration"
 
@@ -223,7 +223,7 @@ cmd_oracle() {
     check_not_root
 
     echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}  Song Studio Server Setup${NC}"
+    echo -e "${GREEN}  Sai Songs Server Setup${NC}"
     echo -e "${GREEN}  Oracle Linux Edition${NC}"
     echo -e "${GREEN}========================================${NC}"
 
@@ -294,9 +294,9 @@ cmd_oracle() {
 
     # Step 7: Create application directory
     echo -e "\n${BLUE}Step 7: Creating application directories...${NC}"
-    sudo mkdir -p /var/www/songstudio
-    sudo mkdir -p /var/www/songstudio/logs
-    sudo chown -R $USER:$USER /var/www/songstudio
+    sudo mkdir -p /var/www/saisongs
+    sudo mkdir -p /var/www/saisongs/logs
+    sudo chown -R $USER:$USER /var/www/saisongs
     echo -e "${GREEN}✓ Directories created${NC}"
 
     # Step 8: Configure firewall (firewalld on Oracle Linux)
@@ -321,8 +321,8 @@ cmd_oracle() {
             echo -e "${YELLOW}SELinux is ${SELINUX_STATUS}. Configuring policies...${NC}"
             
             sudo setsebool -P httpd_can_network_connect 1
-            sudo semanage fcontext -a -t httpd_sys_content_t "/var/www/songstudio(/.*)?"
-            sudo restorecon -Rv /var/www/songstudio
+            sudo semanage fcontext -a -t httpd_sys_content_t "/var/www/saisongs(/.*)?"
+            sudo restorecon -Rv /var/www/saisongs
             
             echo -e "${GREEN}✓ SELinux configured${NC}"
         else
@@ -333,14 +333,14 @@ cmd_oracle() {
     # Step 10: Configure Nginx
     echo -e "\n${BLUE}Step 10: Configuring Nginx...${NC}"
     echo -e "${YELLOW}Please copy the nginx.conf file from the repository to:${NC}"
-    echo -e "${YELLOW}  /etc/nginx/conf.d/songstudio.conf${NC}"
+    echo -e "${YELLOW}  /etc/nginx/conf.d/saisongs.conf${NC}"
     echo -e "${YELLOW}Then run:${NC}"
     echo -e "${YELLOW}  sudo nginx -t${NC}"
     echo -e "${YELLOW}  sudo systemctl reload nginx${NC}"
 
     # Step 11: Environment variables
     echo -e "\n${BLUE}Step 11: Environment variables...${NC}"
-    create_env_template "/var/www/songstudio" "your-domain.com" "$IC_PATH"
+    create_env_template "/var/www/saisongs" "your-domain.com" "$IC_PATH"
 
     echo -e "\n${GREEN}========================================${NC}"
     echo -e "${GREEN}  Setup Complete!${NC}"
@@ -348,12 +348,12 @@ cmd_oracle() {
 
     echo -e "\n${BLUE}Next Steps:${NC}"
     echo -e "1. Configure Nginx (see Step 10 above)"
-    echo -e "2. Edit /var/www/songstudio/.env with your database credentials"
+    echo -e "2. Edit /var/www/saisongs/.env with your database credentials"
     echo -e "3. Deploy the application from your local machine"
     echo -e "\n${BLUE}Useful Commands:${NC}"
     echo -e "  pm2 list                  - View running processes"
-    echo -e "  pm2 logs songstudio       - View application logs"
-    echo -e "  pm2 restart songstudio    - Restart application"
+    echo -e "  pm2 logs saisongs         - View application logs"
+    echo -e "  pm2 restart saisongs      - Restart application"
     echo -e "  sudo systemctl status nginx  - Check nginx status"
     echo -e "  sudo nginx -t             - Test nginx configuration"
     echo -e "  sudo firewall-cmd --list-all  - Check firewall rules"
@@ -368,7 +368,7 @@ cmd_oracle() {
 cmd_ssl() {
     if [ -z "$1" ]; then
         echo "Usage: $0 ssl <domain-name> [email]"
-        echo "Example: $0 ssl songstudio.example.com"
+        echo "Example: $0 ssl saisongs.example.com"
         exit 1
     fi
 
@@ -398,7 +398,7 @@ cmd_ssl() {
 
     # Update Nginx configuration
     echo "⚙️  Updating Nginx configuration..."
-    sudo tee /etc/nginx/sites-available/songstudio > /dev/null <<EOF
+    sudo tee /etc/nginx/sites-available/saisongs > /dev/null <<EOF
 # HTTP - Redirect to HTTPS
 server {
     listen 80;
@@ -428,7 +428,7 @@ server {
     ssl_session_timeout 10m;
 
     # Root directory for static files
-    root /var/www/songstudio/dist;
+    root /var/www/saisongs/dist;
     index index.html;
 
     # Serve static files with caching
@@ -544,8 +544,8 @@ EOF
     # Generate self-signed certificate valid for 10 years
     echo "🔐 Generating self-signed certificate..."
     sudo openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-        -keyout /etc/ssl/private/songstudio-selfsigned.key \
-        -out /etc/ssl/certs/songstudio-selfsigned.crt \
+        -keyout /etc/ssl/private/saisongs-selfsigned.key \
+        -out /etc/ssl/certs/saisongs-selfsigned.crt \
         -config /tmp/openssl-san.cnf \
         -extensions v3_req
     
@@ -556,12 +556,12 @@ EOF
     echo ""
     
     # Set proper permissions
-    sudo chmod 600 /etc/ssl/private/songstudio-selfsigned.key
-    sudo chmod 644 /etc/ssl/certs/songstudio-selfsigned.crt
+    sudo chmod 600 /etc/ssl/private/saisongs-selfsigned.key
+    sudo chmod 644 /etc/ssl/certs/saisongs-selfsigned.crt
     
     echo "⚙️  Certificate files created at:"
-    echo "   Certificate: /etc/ssl/certs/songstudio-selfsigned.crt"
-    echo "   Private Key: /etc/ssl/private/songstudio-selfsigned.key"
+    echo "   Certificate: /etc/ssl/certs/saisongs-selfsigned.crt"
+    echo "   Private Key: /etc/ssl/private/saisongs-selfsigned.key"
     echo ""
     echo "⚠️  NOTE: This is a self-signed certificate."
     echo "   Browsers will show a security warning, which is expected."
@@ -570,7 +570,7 @@ EOF
     echo "✅ Self-signed SSL setup complete!"
     echo ""
     echo "Next steps:"
-    echo "1. Deploy your nginx configuration with: cd /path/to/songstudio && ./deploy.sh code"
+    echo "1. Deploy your nginx configuration with: cd /path/to/saisongs && ./deploy.sh code"
     echo "2. Access your site at: https://$SERVER_IP"
     echo "3. (Optional) Set up a domain name and use './setup.sh ssl <domain>' for a trusted certificate"
 }

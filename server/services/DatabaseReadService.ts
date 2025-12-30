@@ -28,7 +28,7 @@ class DatabaseReadService {
     let walletPath: string;
     
     if (process.env.NODE_ENV === 'production') {
-      walletPath = '/var/www/songstudio/wallet';
+      walletPath = '/var/www/saisongs/wallet';
     } else {
       walletPath = path.join(path.dirname(__filename), '../../wallet');
     }
@@ -54,7 +54,7 @@ class DatabaseReadService {
       connectTimeout: 20000,
       enableStatistics: true,
       _enableStats: true,
-      poolAlias: 'songstudio_pool',
+      poolAlias: 'saisongs_pool',
       stmtCacheSize: 0,
       poolPingInterval: -1,
       sessionCallback: undefined,
@@ -94,7 +94,7 @@ class DatabaseReadService {
 
         // Clean up existing pool from previous crashes
         try {
-          const existingPool = oracledb.getPool('songstudio_pool');
+          const existingPool = oracledb.getPool('saisongs_pool');
           console.log('🧹 Cleaning up existing pool from previous run...');
           await existingPool.close(0);
           console.log('✅ Cleaned up stale pool');
@@ -110,7 +110,7 @@ class DatabaseReadService {
           if (error.code === 'NJS-046') {
             console.log('⚠️  Pool created by another process, reusing...');
             try {
-              this.pool = oracledb.getPool('songstudio_pool');
+              this.pool = oracledb.getPool('saisongs_pool');
               console.log('♻️  Successfully reused pool after collision');
               return;
             } catch (reuseError) {

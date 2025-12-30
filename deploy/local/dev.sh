@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Song Studio - Local Development CLI
+# Sai Songs - Local Development CLI
 # Single script for managing local development services
 #
 # Usage: ./deploy/local/dev.sh <command> [options]
@@ -58,7 +58,7 @@ usage() {
 # =============================================================================
 
 cmd_start() {
-    echo -e "${BLUE}🚀 Starting Song Studio (Local Development)${NC}"
+    echo -e "${BLUE}🚀 Starting Sai Songs (Local Development)${NC}"
     echo "=========================================="
 
     cd "$PROJECT_ROOT"
@@ -160,7 +160,7 @@ cmd_start() {
 
     echo ""
     echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}✅ Song Studio is running!${NC}"
+    echo -e "${GREEN}✅ Sai Songs is running!${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo ""
     echo -e "${BLUE}🌐 URLs:${NC}"
@@ -196,7 +196,7 @@ cmd_start() {
 # =============================================================================
 
 cmd_stop() {
-    echo -e "${BLUE}🛑 Stopping Song Studio (Local Development)${NC}"
+    echo -e "${BLUE}🛑 Stopping Sai Songs (Local Development)${NC}"
     echo "=========================================="
 
     cd "$PROJECT_ROOT"
@@ -285,7 +285,7 @@ cmd_stop() {
 # =============================================================================
 
 cmd_restart() {
-    echo -e "${BLUE}🔄 Restarting Song Studio (Local Development)${NC}"
+    echo -e "${BLUE}🔄 Restarting Sai Songs (Local Development)${NC}"
     echo "=========================================="
 
     # Stop services (inline, don't call cmd_stop to avoid duplicate output)
@@ -307,7 +307,7 @@ cmd_restart() {
 # =============================================================================
 
 cmd_status() {
-    echo -e "${BLUE}📊 Song Studio Status (Local Development)${NC}"
+    echo -e "${BLUE}📊 Sai Songs Status (Local Development)${NC}"
     echo "=========================================="
 
     cd "$PROJECT_ROOT"

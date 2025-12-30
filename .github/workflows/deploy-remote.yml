@@ -172,7 +172,7 @@ jobs:
             npm install --production
             
             echo "🔄 Restarting backend..."
-            pm2 stop songstudio 2>/dev/null || true
+            pm2 stop saisongs 2>/dev/null || true
             sleep 3
             pm2 start ecosystem.config.cjs --env production
             pm2 save

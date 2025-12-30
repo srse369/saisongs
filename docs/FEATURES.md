@@ -1,6 +1,6 @@
 # Features Guide
 
-Comprehensive guide to Song Studio's features and functionality.
+Comprehensive guide to Sai Songs's features and functionality.
 
 ## Table of Contents
 - [User Roles & Permissions](#user-roles--permissions)
@@ -15,7 +15,7 @@ Comprehensive guide to Song Studio's features and functionality.
 
 ## User Roles & Permissions
 
-Song Studio supports three user roles with different access levels.
+Sai Songs supports three user roles with different access levels.
 
 ### 👁️ Viewer (Default)
 
@@ -768,7 +768,7 @@ The live session is the current working set of songs for presentation.
 
 ## Mobile Experience
 
-Song Studio is fully responsive and works on mobile devices.
+Sai Songs is fully responsive and works on mobile devices.
 
 ### Mobile Features
 

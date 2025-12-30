@@ -151,6 +151,8 @@ export const PitchManager: React.FC = () => {
     setEditingPitch(null);
     setShowForm(true);
     clearPitchError();
+    // Refresh singers list to include any newly created singers
+    fetchSingers(true);
   };
 
   const handleEditClick = (pitch: SongSingerPitch) => {

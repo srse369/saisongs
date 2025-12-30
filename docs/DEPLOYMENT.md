@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Complete deployment guide for Song Studio across different platforms.
+Complete deployment guide for Sai Songs across different platforms.
 
 ## Table of Contents
 - [GitHub Environments & Secrets](#github-environments--secrets)
@@ -15,7 +15,7 @@ Complete deployment guide for Song Studio across different platforms.
 
 ## GitHub Environments & Secrets
 
-Song Studio uses **GitHub Environments** to securely manage secrets for different deployment targets. This keeps all sensitive configuration out of the codebase.
+Sai Songs uses **GitHub Environments** to securely manage secrets for different deployment targets. This keeps all sensitive configuration out of the codebase.
 
 ### Why GitHub Environments?
 
@@ -55,7 +55,7 @@ Song Studio uses **GitHub Environments** to securely manage secrets for differen
 | `SSH_PRIVATE_KEY` | SSH private key for server access |
 | `REMOTE_IP` | Production server IP address |
 | `REMOTE_USER` | SSH username (e.g., `ubuntu`) |
-| `REMOTE_PATH` | Deployment path (e.g., `/var/www/songstudio`) |
+| `REMOTE_PATH` | Deployment path (e.g., `/var/www/saisongs`) |
 
 ### Protection Rules (Recommended for Production)
 
@@ -109,7 +109,7 @@ The Oracle wallet contains SSL certificates for secure database connections. Unl
 | Environment | Path | How It Gets There |
 |-------------|------|-------------------|
 | **Local Dev** | `./wallet/` | Already present (in `.gitignore`) |
-| **Production** | `/var/www/songstudio/wallet` | Manual one-time copy |
+| **Production** | `/var/www/saisongs/wallet` | Manual one-time copy |
 
 #### Why Not Store Wallet in GitHub Secrets?
 
@@ -124,12 +124,12 @@ Copy your local wallet to the production server:
 
 ```bash
 # Copy wallet directory to server
-scp -i ~/.ssh/your-deploy-key -r wallet/ ubuntu@YOUR_SERVER_IP:/var/www/songstudio/
+scp -i ~/.ssh/your-deploy-key -r wallet/ ubuntu@YOUR_SERVER_IP:/var/www/saisongs/
 
 # SSH in and secure the files
 ssh -i ~/.ssh/your-deploy-key ubuntu@YOUR_SERVER_IP
-chmod 600 /var/www/songstudio/wallet/*
-chmod 700 /var/www/songstudio/wallet
+chmod 600 /var/www/saisongs/wallet/*
+chmod 700 /var/www/saisongs/wallet
 ```
 
 #### Wallet Contents
@@ -211,7 +211,7 @@ See [Local Development README](../deploy/local/README.md) for full documentation
 ### Quick Deploy
 
 ```bash
-cd /Users/ssett2/Documents/github.com/srse369/songstudio
+cd /Users/ssett2/Documents/github.com/srse369/saisongs
 ./deploy/remote/deploy.sh production
 ```
 
@@ -235,15 +235,15 @@ This installs:
 
 **3. Configure Nginx:**
 ```bash
-sudo cp deploy/remote/nginx.conf /etc/nginx/sites-available/songstudio
-sudo ln -s /etc/nginx/sites-available/songstudio /etc/nginx/sites-enabled/
+sudo cp deploy/remote/nginx.conf /etc/nginx/sites-available/saisongs
+sudo ln -s /etc/nginx/sites-available/saisongs /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
 **4. Setup environment variables:**
 ```bash
-nano /var/www/songstudio/.env
+nano /var/www/saisongs/.env
 ```
 
 Required variables:
@@ -277,7 +277,7 @@ LD_LIBRARY_PATH=/opt/oracle/instantclient_21_13
 
 **5. Copy Oracle wallet to server:**
 ```bash
-scp -i /path/to/your/ssh-key.key -r wallet ubuntu@YOUR_SERVER_IP:/var/www/songstudio/
+scp -i /path/to/your/ssh-key.key -r wallet ubuntu@YOUR_SERVER_IP:/var/www/saisongs/
 ```
 
 **6. Deploy application:**
@@ -311,19 +311,19 @@ Internet → Nginx (Port 443 HTTPS / 80 HTTP)
 **Check status:**
 ```bash
 pm2 status
-pm2 logs songstudio
-pm2 logs songstudio --lines 100
+pm2 logs saisongs
+pm2 logs saisongs --lines 100
 ```
 
 **Restart application:**
 ```bash
-pm2 restart songstudio
+pm2 restart saisongs
 ```
 
 **View logs:**
 ```bash
-pm2 logs songstudio --lines 50
-pm2 logs songstudio --err  # Errors only
+pm2 logs saisongs --lines 50
+pm2 logs saisongs --err  # Errors only
 ```
 
 **Nginx management:**
@@ -432,7 +432,7 @@ npm run build
 npm run deploy
 ```
 
-Your site will be at: `https://[username].github.io/songstudio/`
+Your site will be at: `https://[username].github.io/saisongs/`
 
 ### Routing Fix
 
@@ -443,7 +443,7 @@ GitHub Pages doesn't support client-side routing. Add `public/404.html`:
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Song Studio</title>
+    <title>Sai Songs</title>
     <script>
       sessionStorage.redirect = location.href;
     </script>
@@ -480,7 +480,7 @@ npm run build:server
 
 **Check logs:**
 ```bash
-pm2 logs songstudio --lines 100
+pm2 logs saisongs --lines 100
 ```
 
 **Common causes:**
@@ -492,14 +492,14 @@ pm2 logs songstudio --lines 100
 **Fix:**
 ```bash
 # Verify environment
-cat /var/www/songstudio/.env
+cat /var/www/saisongs/.env
 
 # Check Oracle client
 echo $LD_LIBRARY_PATH
 ls -la /opt/oracle/instantclient_21_13/
 
 # Restart
-pm2 restart songstudio
+pm2 restart saisongs
 ```
 
 ### 502 Bad Gateway
@@ -512,12 +512,12 @@ curl http://localhost:3111/api/health
 
 **Check nginx logs:**
 ```bash
-sudo tail -f /var/log/nginx/songstudio_error.log
+sudo tail -f /var/log/nginx/saisongs_error.log
 ```
 
 **Restart services:**
 ```bash
-pm2 restart songstudio
+pm2 restart saisongs
 sudo systemctl reload nginx
 ```
 
@@ -525,7 +525,7 @@ sudo systemctl reload nginx
 
 **Pool already exists error:**
 ```bash
-pm2 restart songstudio  # Clear existing pools
+pm2 restart saisongs  # Clear existing pools
 ```
 
 **Quota exceeded errors:**
@@ -549,7 +549,7 @@ Verify built files:
 ```bash
 grep -o 'src="[^"]*"' dist/index.html
 # Should show: src="/assets/..." for VPS
-# Should show: src="/songstudio/assets/..." for GitHub Pages
+# Should show: src="/saisongs/assets/..." for GitHub Pages
 ```
 
 ---
@@ -559,9 +559,9 @@ grep -o 'src="[^"]*"' dist/index.html
 Automatic backups are created on each deployment:
 ```bash
 ssh ubuntu@YOUR_SERVER_IP
-ls -la /var/www/songstudio.backup.*
-sudo cp -r /var/www/songstudio.backup.20251119_120000/* /var/www/songstudio/
-pm2 restart songstudio
+ls -la /var/www/saisongs.backup.*
+sudo cp -r /var/www/saisongs.backup.20251119_120000/* /var/www/saisongs/
+pm2 restart saisongs
 ```
 
 ---
@@ -600,10 +600,10 @@ pm2 monit
 htop
 
 # Nginx access logs
-sudo tail -f /var/log/nginx/songstudio_access.log
+sudo tail -f /var/log/nginx/saisongs_access.log
 
 # Application logs
-pm2 logs songstudio
+pm2 logs saisongs
 ```
 
 ---

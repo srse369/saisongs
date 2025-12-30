@@ -1379,9 +1379,15 @@ class CacheService {
         this.invalidate('pitches:all');
       }
       
-      // Invalidate songs and singers cache since pitch_count changes
-      this.invalidate('songs:all');
-      this.invalidate('singers:all');
+      // Update specific song and singer in cache instead of invalidating everything
+      // This is more efficient than refetching all songs/singers
+      // Fire-and-forget: these are cache updates, not critical for the response
+      this.updateSongPitchCountInCache(normalizedPitch.songId).catch(() => {
+        // Silently fail - cache will be refreshed on next fetch
+      });
+      this.updateSingerPitchCountInCache(normalizedPitch.singerId).catch(() => {
+        // Silently fail - cache will be refreshed on next fetch
+      });
       
       return normalizedPitch;
     }
@@ -1457,7 +1463,86 @@ class CacheService {
     }
   }
 
+  /**
+   * Update pitch count for a specific song in the songs:all cache
+   * More efficient than invalidating the entire cache
+   * Returns a Promise that resolves when the cache is updated
+   */
+  private async updateSongPitchCountInCache(songId: string): Promise<void> {
+    const cached = this.get('songs:all');
+    if (cached && Array.isArray(cached)) {
+      try {
+        // Fetch updated pitch count from database
+        const result = await this.dbRead(`
+          SELECT COUNT(*) as pitch_count
+          FROM song_singer_pitches
+          WHERE RAWTOHEX(song_id) = :1
+        `, [songId]);
+        
+        if (result && result.length > 0) {
+          const newPitchCount = parseInt(result[0].PITCH_COUNT || result[0].pitch_count || '0', 10);
+          // Update the specific song in the cache array
+          const updated = cached.map((song: any) => 
+            song.id === songId ? { ...song, pitchCount: newPitchCount } : song
+          );
+          this.set('songs:all', updated, 5 * 60 * 1000);
+        }
+      } catch (err) {
+        // If update fails, invalidate cache as fallback
+        console.error('Failed to update song pitch count in cache:', err);
+        this.invalidate('songs:all');
+        throw err; // Re-throw so caller can handle if needed
+      }
+    }
+  }
+
+  /**
+   * Update pitch count for a specific singer in the singers:all cache
+   * More efficient than invalidating the entire cache
+   * Returns a Promise that resolves when the cache is updated
+   */
+  private async updateSingerPitchCountInCache(singerId: string): Promise<void> {
+    const cached = this.get('singers:all');
+    if (cached && Array.isArray(cached)) {
+      try {
+        // Fetch updated pitch count from database
+        const result = await this.dbRead(`
+          SELECT COUNT(*) as pitch_count
+          FROM song_singer_pitches
+          WHERE RAWTOHEX(singer_id) = :1
+        `, [singerId]);
+        
+        if (result && result.length > 0) {
+          const newPitchCount = parseInt(result[0].PITCH_COUNT || result[0].pitch_count || '0', 10);
+          // Update the specific singer in the cache array
+          const updated = cached.map((singer: any) => 
+            singer.id === singerId ? { ...singer, pitchCount: newPitchCount } : singer
+          );
+          this.set('singers:all', updated, 5 * 60 * 1000);
+        }
+      } catch (err) {
+        // If update fails, invalidate cache as fallback
+        console.error('Failed to update singer pitch count in cache:', err);
+        this.invalidate('singers:all');
+        throw err; // Re-throw so caller can handle if needed
+      }
+    }
+  }
+
   async deletePitch(id: string): Promise<void> {
+    // Get pitch info before deleting to know which song/singer to update
+    const cachedPitches = this.get('pitches:all');
+    let songId: string | null = null;
+    let singerId: string | null = null;
+    
+    if (cachedPitches && Array.isArray(cachedPitches)) {
+      const pitchToDelete = cachedPitches.find((p: any) => p.id === id);
+      if (pitchToDelete) {
+        songId = pitchToDelete.songId;
+        singerId = pitchToDelete.singerId;
+      }
+    }
+    
     await this.dbWrite(`DELETE FROM song_singer_pitches WHERE RAWTOHEX(id) = :1`, [id]);
     
     // Write-through cache: Remove from cached list
@@ -1471,9 +1556,19 @@ class CacheService {
     // Also invalidate individual pitch cache
     this.invalidate(`pitch:${id}`);
     
-    // Invalidate songs and singers cache since pitch_count changes
-    this.invalidate('songs:all');
-    this.invalidate('singers:all');
+    // Update specific song and singer in cache instead of invalidating everything
+    // This is more efficient than refetching all songs/singers
+    // Fire-and-forget: these are cache updates, not critical for the response
+    if (songId) {
+      this.updateSongPitchCountInCache(songId).catch(() => {
+        // Silently fail - cache will be refreshed on next fetch
+      });
+    }
+    if (singerId) {
+      this.updateSingerPitchCountInCache(singerId).catch(() => {
+        // Silently fail - cache will be refreshed on next fetch
+      });
+    }
   }
 
   // ==================== SESSIONS ====================

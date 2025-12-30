@@ -206,8 +206,8 @@ export const CentersManager: React.FC = () => {
       
       // Clear caches since centers data has changed
       clearCentersCache(); // Clear the CenterBadges module-level cache
-      window.localStorage.removeItem('songStudio:singersCache'); // Singers may have changed permissions
-      window.localStorage.removeItem('songStudio:centersCache'); // Clear any localStorage centers cache
+      window.localStorage.removeItem('saiSongs:singersCache'); // Singers may have changed permissions
+      window.localStorage.removeItem('saiSongs:centersCache'); // Clear any localStorage centers cache
       
       setError('');
       handleCloseForm(true); // Force close without unsaved changes check
@@ -257,8 +257,8 @@ export const CentersManager: React.FC = () => {
       
       // Clear caches since centers data has changed
       clearCentersCache();
-      window.localStorage.removeItem('songStudio:singersCache');
-      window.localStorage.removeItem('songStudio:centersCache');
+      window.localStorage.removeItem('saiSongs:singersCache');
+      window.localStorage.removeItem('saiSongs:centersCache');
       
       setError('');
     } catch (err: any) {

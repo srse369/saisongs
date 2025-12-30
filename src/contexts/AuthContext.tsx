@@ -90,11 +90,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const setAuthenticatedUser = useCallback((role: UserRole, id: number, email: string, name?: string, centersIds?: number[], editorsFor?: number[]) => {
     // Clear all app-specific localStorage caches on login to ensure fresh data
     const cacheKeys = [
-      'songStudio:songsCache',
-      'songStudio:singersCache',
-      'songStudio:pitchesCache',
-      'songStudio:templatesCache',
-      'songStudio:centersCache',
+      'saiSongs:songsCache',
+      'saiSongs:singersCache',
+      'saiSongs:pitchesCache',
+      'saiSongs:templatesCache',
+      'saiSongs:centersCache',
       'selectedSessionTemplateId'
     ];
     
@@ -132,11 +132,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Clear all data caches so logged-out users don't see cached center-restricted content
       if (typeof window !== 'undefined') {
-        window.localStorage.removeItem('songStudio:singersCache');
-        window.localStorage.removeItem('songStudio:pitchesCache');
-        window.localStorage.removeItem('songStudio:templatesCache');
-        window.localStorage.removeItem('songStudio:centersCache');
-        window.localStorage.removeItem('songStudio:songsCache'); // Songs are public but clear for consistency
+        window.localStorage.removeItem('saiSongs:singersCache');
+        window.localStorage.removeItem('saiSongs:pitchesCache');
+        window.localStorage.removeItem('saiSongs:templatesCache');
+        window.localStorage.removeItem('saiSongs:centersCache');
+        window.localStorage.removeItem('saiSongs:songsCache'); // Songs are public but clear for consistency
         window.localStorage.removeItem('selectedSessionTemplateId'); // May reference a center-restricted template
       }
       

@@ -45,15 +45,15 @@ jobs:
         run: |
           # Check if PM2 is available
           if command -v pm2 &> /dev/null; then
-            pm2 stop songstudio 2>/dev/null || true
+            pm2 stop saisongs 2>/dev/null || true
             pm2 start ecosystem.config.cjs --env production 2>/dev/null || \
-              pm2 start dist/server/index.js --name songstudio
+            pm2 start dist/server/index.js --name saisongs
             pm2 save
             echo "✅ Backend restarted with PM2"
           else
             echo "⚠️ PM2 not installed. Starting with node directly..."
             pkill -f "node dist/server/index.js" 2>/dev/null || true
-            nohup node dist/server/index.js > /tmp/songstudio.log 2>&1 &
+            nohup node dist/server/index.js > /tmp/saisongs.log 2>&1 &
             echo "✅ Backend started"
           fi
 

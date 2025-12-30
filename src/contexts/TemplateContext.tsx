@@ -4,7 +4,7 @@ import type { PresentationTemplate, ServiceError } from '../types';
 import templateService from '../services/TemplateService';
 import { useToast } from './ToastContext';
 
-const TEMPLATES_CACHE_KEY = 'songStudio:templatesCache';
+const TEMPLATES_CACHE_KEY = 'saiSongs:templatesCache';
 const TEMPLATES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface TemplateContextState {

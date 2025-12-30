@@ -4,7 +4,8 @@ import { Modal } from '../common/Modal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
-import { MusicIcon, Tooltip } from '../common';
+import { MusicIcon } from '../common';
+import { Tooltip } from '../common/Tooltip';
 import { SongMetadataCard } from '../common/SongMetadataCard';
 
 interface SongListProps {
@@ -167,7 +168,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                     className="relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
                   >
                     <div className="relative">
-                      <MusicIcon className="w-5 h-5" />
+                    <MusicIcon className="w-5 h-5" />
                       {/* Mobile: Badge overlay on icon */}
                       {(song.pitchCount ?? 0) > 0 && (
                         <span className="absolute -top-1 -right-1 sm:hidden flex items-center justify-center min-w-[16px] h-[16px] px-0.5 text-[9px] font-bold text-white bg-black rounded-full z-10">

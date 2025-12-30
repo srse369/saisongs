@@ -62,12 +62,12 @@ export const Help: React.FC = () => {
       id: 'overview',
       title: 'Overview',
       icon: 'fa-home',
-      description: 'Welcome to Sai Devotional Song Studio',
+      description: 'Welcome to Sai Songs',
       subsections: [
         {
-          title: 'What is Song Studio?',
+          title: 'What is Sai Songs?',
           content: [
-            'Song Studio is your all-in-one platform for managing devotional songs during Sai Bhajan sessions.',
+            'Sai Songs is your all-in-one platform for managing devotional songs during Sai Bhajan sessions.',
             '<strong>Key Features:</strong>',
             '• Store songs with lyrics, meanings, and musical details',
             '• Assign different pitches to different singers',
@@ -77,7 +77,7 @@ export const Help: React.FC = () => {
           ],
           screenshot: {
             src: '/help/songs-tab.png',
-            alt: 'Song Studio main interface',
+            alt: 'Sai Songs main interface',
             caption: 'The Songs tab showing the song management interface with search and browse capabilities'
           }
         },
@@ -243,7 +243,7 @@ export const Help: React.FC = () => {
           title: 'What are Pitches?',
           content: [
             '<strong>🎵 Definition:</strong> A pitch (or key) is the musical note on which a song starts. Different singers have different comfortable vocal ranges, so the same song may need different pitches for different singers.',
-            '<strong>🎹 Notation Systems:</strong> Song Studio supports Western notation (C, C#, D, D#, E, F, F#, G, G#, A, A#, B) and Madhyam positions (1-5) commonly used with harmonium in Indian classical music.',
+            '<strong>🎹 Notation Systems:</strong> Sai Songs supports Western notation (C, C#, D, D#, E, F, F#, G, G#, A, A#, B) and Madhyam positions (1-5) commonly used with harmonium in Indian classical music.',
             '<strong>👥 One Pitch Per Singer-Song:</strong> Each singer can have exactly one pitch assigned for each song. This ensures clarity during sessions about who sings which song in which key.'
           ]
         },
@@ -448,7 +448,7 @@ export const Help: React.FC = () => {
           title: 'What are Centers?',
           content: [
             '<strong>🏢 Organization Structure:</strong> Centers represent different locations, groups, or regions (e.g., "Bay Area", "Los Angeles", "Youth Group"). They organize content and control who can access or edit what.',
-            '<strong>🔐 Access Control:</strong> Content assigned to a center is only visible to users associated with that center. This lets multiple groups share the same Song Studio while maintaining separate content.',
+            '<strong>🔐 Access Control:</strong> Content assigned to a center is only visible to users associated with that center. This lets multiple groups share the same Sai Songs while maintaining separate content.',
             '<strong>🌐 Global Content:</strong> Content with no center assignment is "global" - visible and accessible to everyone. Use global for shared songs, common templates, and organization-wide content.',
             '<strong>👥 Multi-Center Support:</strong> Users and content can belong to multiple centers. A singer performing at two locations can be assigned to both centers. Songs used everywhere can be assigned to all relevant centers.'
           ]
@@ -545,7 +545,7 @@ export const Help: React.FC = () => {
             '<strong>Song Import:</strong> Admins can import songs from external sources using the Import Songs tool. Paste JSON data from external song databases, map fields to match system schema, validate before importing, and review import results. This is useful for initially populating the database or adding batches of new songs.',
             '<strong>CSV Import:</strong> The CSV Import tool (Admin only) allows importing singers and pitches from spreadsheet files. Prepare a CSV with required columns (Singer Name, Gender, Song Title, Pitch, etc.), upload the file, map columns to database fields, the system matches songs by title and creates missing singers, review and confirm before finalizing. This is efficient for migrating data from other systems.',
             '<strong>Bulk Import Pitches:</strong> Use CSV import to add many pitch assignments at once. Create a spreadsheet with columns: Song Name, Singer Name, Pitch. Upload and validate, the system matches existing songs and singers, creates pitch assignments for valid matches, and reports errors for unmatched entries.',
-            '<strong>Data Migration:</strong> When moving from legacy systems, use import tools to migrate data in bulk rather than manual entry. Export from old system to CSV or JSON, prepare data to match Song Studio schema, import in stages (songs first, then singers, then pitches), verify data integrity after each import, and clean up any duplicates or errors.'
+            '<strong>Data Migration:</strong> When moving from legacy systems, use import tools to migrate data in bulk rather than manual entry. Export from old system to CSV or JSON, prepare data to match Sai Songs schema, import in stages (songs first, then singers, then pitches), verify data integrity after each import, and clean up any duplicates or errors.'
           ]
         },
         {
@@ -575,7 +575,7 @@ export const Help: React.FC = () => {
         {
           title: 'Responsive Design',
           content: [
-            '<strong>Multi-Device Support:</strong> Song Studio is fully responsive, meaning it adapts to different screen sizes and devices. Use it on desktop computers (Windows, Mac, Linux), laptops, tablets (iPad, Android tablets), and smartphones (iOS, Android).',
+            '<strong>Multi-Device Support:</strong> Sai Songs is fully responsive, meaning it adapts to different screen sizes and devices. Use it on desktop computers (Windows, Mac, Linux), laptops, tablets (iPad, Android tablets), and smartphones (iOS, Android).',
             '<strong>Mobile Navigation:</strong> On small screens (phones, small tablets), the main navigation menu collapses into a hamburger menu icon. Tap the icon to reveal all navigation options in a slide-out menu.',
             '<strong>Touch Interfaces:</strong> On touch devices, all buttons and controls are sized for easy finger tapping. Drag-and-drop for reordering (like in sessions) works with touch gestures. Swipe gestures navigate presentations on mobile.',
             '<strong>Optimized Layouts:</strong> Content layouts adjust for screen size: card grids become single columns on narrow screens, forms stack vertically on mobile for easier scrolling, tables switch to card views on small screens, and text sizes scale appropriately for readability.',
@@ -596,7 +596,7 @@ export const Help: React.FC = () => {
           title: 'Login Issues',
           content: [
             '<strong>Correct Email:</strong> Ensure you are using the email address associated with your singer profile. OTPs are only sent to registered email addresses. If you are unsure which email is registered, contact your admin to verify.',
-            '<strong>OTP Not Received:</strong> Check your spam/junk folder - OTP emails sometimes get filtered. Verify the email address you entered is correct (no typos). Wait a few moments - email delivery can take 30 seconds to 2 minutes. Check your email server is not blocking emails from the Song Studio domain.',
+            '<strong>OTP Not Received:</strong> Check your spam/junk folder - OTP emails sometimes get filtered. Verify the email address you entered is correct (no typos). Wait a few moments - email delivery can take 30 seconds to 2 minutes. Check your email server is not blocking emails from the Sai Songs domain.',
             '<strong>OTP Expired:</strong> One-time passwords expire after 10 minutes for security. If your OTP expired, click "Resend OTP" or "Request New OTP" to generate a fresh code. Do not reuse old OTPs.',
             '<strong>Invalid OTP Error:</strong> Ensure you typed the OTP exactly as received (no extra spaces). OTPs are case-sensitive if they include letters. If copy-pasting, make sure no extra characters are included. Request a new OTP if the current one is not working.',
             '<strong>Cannot Receive OTPs:</strong> Your email account may have issues. Verify you can receive other emails. Check email server settings are not blocking automated emails. Contact your admin to verify your email is correctly registered in the system.',

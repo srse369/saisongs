@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-Solutions to common issues with Song Studio deployment and operation.
+Solutions to common issues with Sai Songs deployment and operation.
 
 ## Table of Contents
 - [Mobile "Load Failed" Errors](#mobile-load-failed-errors)
@@ -33,7 +33,7 @@ The frontend is trying to connect to `localhost:3111` instead of the production 
 **1. Create `.env.production`:**
 
 ```bash
-cd /Users/ssett2/Documents/github.com/srse369/songstudio
+cd /Users/ssett2/Documents/github.com/srse369/saisongs
 echo "VITE_API_URL=/api" > .env.production
 ```
 
@@ -71,7 +71,7 @@ curl https://YOUR_DOMAIN/api/health
 ```bash
 ssh ubuntu@YOUR_DOMAIN
 pm2 list
-pm2 logs songstudio --lines 50
+pm2 logs saisongs --lines 50
 ```
 
 ### Common Causes
@@ -79,8 +79,8 @@ pm2 logs songstudio --lines 50
 #### 1. Missing Environment Variables
 
 ```bash
-ls -la /var/www/songstudio/.env
-cat /var/www/songstudio/.env
+ls -la /var/www/saisongs/.env
+cat /var/www/saisongs/.env
 ```
 
 **Required variables:**
@@ -101,14 +101,14 @@ LD_LIBRARY_PATH=/opt/oracle/instantclient_21_13
 
 **Solution:**
 ```bash
-pm2 restart songstudio
+pm2 restart saisongs
 ```
 
 **Error:** `ORA-12154: TNS:could not resolve the connect identifier`
 
 **Check wallet files:**
 ```bash
-ls -la /var/www/songstudio/wallet/
+ls -la /var/www/saisongs/wallet/
 # Should see: cwallet.sso, tnsnames.ora, sqlnet.ora
 ```
 
@@ -123,28 +123,28 @@ ls -la /opt/oracle/instantclient_21_13/
 ```bash
 sudo lsof -i :3111
 sudo kill -9 <PID>
-pm2 restart songstudio
+pm2 restart saisongs
 ```
 
 #### 4. Missing Dependencies
 
 ```bash
-cd /var/www/songstudio
+cd /var/www/saisongs
 npm install
-pm2 restart songstudio
+pm2 restart saisongs
 ```
 
 ### Restart Backend
 
 **Simple restart:**
 ```bash
-pm2 restart songstudio
+pm2 restart saisongs
 ```
 
 **Full restart with environment:**
 ```bash
-pm2 delete songstudio
-cd /var/www/songstudio
+pm2 delete saisongs
+cd /var/www/saisongs
 pm2 start ecosystem.config.cjs --env production
 pm2 save
 ```
@@ -165,7 +165,7 @@ pm2 save
 #### Immediate Fix
 
 ```bash
-ssh ubuntu@YOUR_DOMAIN 'pm2 restart songstudio'
+ssh ubuntu@YOUR_DOMAIN 'pm2 restart saisongs'
 ```
 
 #### Long-term Solutions
@@ -173,7 +173,7 @@ ssh ubuntu@YOUR_DOMAIN 'pm2 restart songstudio'
 1. **Reduce connection pool size** (already implemented: poolMax=1)
 2. **Verify pool configuration:**
 ```bash
-cat /var/www/songstudio/dist/server/services/DatabaseService.js | grep -A 5 "poolMax"
+cat /var/www/saisongs/dist/server/services/DatabaseService.js | grep -A 5 "poolMax"
 ```
 
 3. **Monitor usage in Oracle Cloud Console:**
@@ -188,8 +188,8 @@ cat /var/www/songstudio/dist/server/services/DatabaseService.js | grep -A 5 "poo
 
 1. Check wallet files:
 ```bash
-ls -la /var/www/songstudio/wallet/
-chmod 600 /var/www/songstudio/wallet/*
+ls -la /var/www/saisongs/wallet/
+chmod 600 /var/www/saisongs/wallet/*
 ```
 
 2. Verify connection string in `.env`
@@ -201,11 +201,11 @@ node -e "const oracledb = require('oracledb'); console.log('OracleDB version:', 
 
 ### Pool Already Exists Error
 
-**Error:** `NJS-046: pool alias "songstudio_pool" already exists`
+**Error:** `NJS-046: pool alias "saisongs_pool" already exists`
 
 **Solution:**
 ```bash
-pm2 restart songstudio
+pm2 restart saisongs
 ```
 
 ---
@@ -270,7 +270,7 @@ const queryTimeout = setTimeout(() => {
 ### Monitoring Session Health
 
 ```bash
-ssh ubuntu@YOUR_DOMAIN 'pm2 logs songstudio | grep -i "pool health"'
+ssh ubuntu@YOUR_DOMAIN 'pm2 logs saisongs | grep -i "pool health"'
 
 # Look for:
 # 🔍 Pool health: 1 open, 0 in use, 1 available, 0 tracked
@@ -320,7 +320,7 @@ ssh -v -i /path/to/your/ssh-key.key ubuntu@YOUR_DOMAIN "echo 'Connected'"
 1. **Backend not running:**
 ```bash
 pm2 status
-pm2 restart songstudio
+pm2 restart saisongs
 ```
 
 2. **Backend not listening:**
@@ -330,7 +330,7 @@ curl http://localhost:3111/api/health
 
 3. **Check nginx logs:**
 ```bash
-sudo tail -f /var/log/nginx/songstudio_error.log
+sudo tail -f /var/log/nginx/saisongs_error.log
 ```
 
 4. **SELinux blocking (Oracle Linux):**
@@ -344,7 +344,7 @@ sudo setsebool -P httpd_can_network_connect 1
 ```bash
 grep -o 'src="[^"]*"' dist/index.html
 # For VPS: src="/assets/index-*.js"
-# NOT: src="/songstudio/assets/..."
+# NOT: src="/saisongs/assets/..."
 ```
 
 **Fix:**
@@ -361,7 +361,7 @@ npm run build:vps
 
 **Check server-side caching:**
 ```bash
-ssh ubuntu@YOUR_DOMAIN 'pm2 logs songstudio | grep -i cache'
+ssh ubuntu@YOUR_DOMAIN 'pm2 logs saisongs | grep -i cache'
 
 # Should see:
 # ✅ Cache hit for key: songs:all (age: 45s)
@@ -370,7 +370,7 @@ ssh ubuntu@YOUR_DOMAIN 'pm2 logs songstudio | grep -i cache'
 **Check frontend cache:**
 ```javascript
 // Browser console
-Object.keys(localStorage).filter(k => k.startsWith('songstudio_'))
+Object.keys(localStorage).filter(k => k.startsWith('saisongs_'))
 ```
 
 ### High Memory Usage
@@ -379,7 +379,7 @@ Object.keys(localStorage).filter(k => k.startsWith('songstudio_'))
 pm2 list  # Check memory column
 
 # If > 512MB:
-pm2 restart songstudio
+pm2 restart saisongs
 ```
 
 ### Slow Database Queries
@@ -453,7 +453,7 @@ Select "Cached images and files"
 ssh ubuntu@YOUR_DOMAIN
 
 # Stop everything
-pm2 stop songstudio
+pm2 stop saisongs
 sudo systemctl stop nginx
 
 # Wait 10 seconds
@@ -461,7 +461,7 @@ sleep 10
 
 # Start everything
 sudo systemctl start nginx
-pm2 restart songstudio
+pm2 restart saisongs
 
 # Check status
 pm2 status
@@ -475,20 +475,20 @@ curl http://localhost:3111/api/health
 ssh ubuntu@YOUR_DOMAIN
 
 # List backups
-ls -la /var/www/songstudio.backup.*
+ls -la /var/www/saisongs.backup.*
 
 # Restore from backup
-sudo cp -r /var/www/songstudio.backup.YYYYMMDD_HHMMSS/* /var/www/songstudio/
+sudo cp -r /var/www/saisongs.backup.YYYYMMDD_HHMMSS/* /var/www/saisongs/
 
 # Restart
-pm2 restart songstudio
+pm2 restart saisongs
 ```
 
 ### Clear All Caches
 
 **Server-side:**
 ```bash
-ssh ubuntu@YOUR_DOMAIN 'pm2 restart songstudio'
+ssh ubuntu@YOUR_DOMAIN 'pm2 restart saisongs'
 ```
 
 **Frontend:**
@@ -513,7 +513,7 @@ curl https://YOUR_DOMAIN/api/health
 ssh ubuntu@YOUR_DOMAIN 'pm2 status'
 
 # Backend logs
-ssh ubuntu@YOUR_DOMAIN 'pm2 logs songstudio --lines 20'
+ssh ubuntu@YOUR_DOMAIN 'pm2 logs saisongs --lines 20'
 
 # Nginx status
 ssh ubuntu@YOUR_DOMAIN 'sudo systemctl status nginx'
@@ -542,7 +542,7 @@ When reporting issues, include:
 
 **1. Error messages:**
 ```bash
-pm2 logs songstudio --lines 100 > logs.txt
+pm2 logs saisongs --lines 100 > logs.txt
 ```
 
 **2. System status:**
@@ -563,8 +563,8 @@ ssh ubuntu@YOUR_DOMAIN
 
 # Check backend
 pm2 status
-pm2 logs songstudio --lines 50
-pm2 restart songstudio
+pm2 logs saisongs --lines 50
+pm2 restart saisongs
 
 # Check nginx
 sudo systemctl status nginx
@@ -578,8 +578,8 @@ curl http://localhost:3111/api/health
 ./deploy/remote/deploy.sh code
 
 # View logs
-pm2 logs songstudio
-sudo tail -f /var/log/nginx/songstudio_error.log
+pm2 logs saisongs
+sudo tail -f /var/log/nginx/saisongs_error.log
 ```
 
 ---

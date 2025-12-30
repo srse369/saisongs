@@ -98,7 +98,7 @@ export const usePageTracking = () => {
     // Track page view
     const trackPageView = async () => {
       try {
-        const userRole = sessionStorage.getItem('songstudio_auth_role') || 'public';
+        const userRole = sessionStorage.getItem('saisongs_auth_role') || 'public';
         
         // Get public IP (cached after first call)
         const publicIp = await getPublicIp();

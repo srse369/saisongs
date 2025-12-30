@@ -1,6 +1,6 @@
 # Technical Architecture
 
-Song Studio's technical architecture, performance optimizations, and system design.
+Sai Songs's technical architecture, performance optimizations, and system design.
 
 ## Table of Contents
 - [System Overview](#system-overview)
@@ -43,7 +43,7 @@ Client Browser
     ↓
 HTTPS (443) → Nginx
     ↓
-├─ Static Assets → Served directly from /var/www/songstudio/dist
+├─ Static Assets → Served directly from /var/www/saisongs/dist
 │
 └─ API Requests (/api/*) → Proxied to Backend
         ↓
@@ -149,7 +149,7 @@ Quota Errors:     Rare
 
 **Server logs:**
 ```bash
-pm2 logs songstudio | grep -i cache
+pm2 logs saisongs | grep -i cache
 
 # Look for:
 # ✅ Cache hit for key: songs:all (age: 45s)
@@ -226,7 +226,7 @@ class ApiClient {
 
 ## Oracle Database Optimization
 
-Song Studio uses Oracle Autonomous Database Free Tier with strict limits.
+Sai Songs uses Oracle Autonomous Database Free Tier with strict limits.
 
 ### Free Tier Limits
 
@@ -258,7 +258,7 @@ const poolConfig = {
   queueTimeout: 30000,
   
   // Wallet configuration
-  walletLocation: '/var/www/songstudio/wallet',
+  walletLocation: '/var/www/saisongs/wallet',
   walletPassword: process.env.ORACLE_WALLET_PASSWORD
 };
 ```
@@ -309,7 +309,7 @@ async close(): Promise<void> {
 **Emergency fix:**
 ```bash
 # Restart backend to clear all connections
-pm2 restart songstudio
+pm2 restart saisongs
 ```
 
 ### Recursive SQL Prevention
@@ -462,7 +462,7 @@ useEffect(() => {
 
 ```typescript
 // src/contexts/SongContext.tsx
-const SONGS_CACHE_KEY = 'songstudio_songs';
+const SONGS_CACHE_KEY = 'saisongs_songs';
 const SONGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface CachedData<T> {
@@ -498,7 +498,7 @@ VITE_API_URL=/api  # Relative path - nginx proxies to backend
 # VPS deployment (base: '/')
 npm run build:vps
 
-# GitHub Pages (base: '/songstudio/')
+# GitHub Pages (base: '/saisongs/')
 npm run build
 ```
 
@@ -521,7 +521,7 @@ npm run build
 **Backend metrics:**
 ```bash
 pm2 monit  # CPU, memory usage
-pm2 logs songstudio | grep -i "cache\|query"
+pm2 logs saisongs | grep -i "cache\|query"
 ```
 
 **Frontend metrics:**
@@ -583,7 +583,7 @@ VITE_API_URL=/api
 ```javascript
 module.exports = {
   apps: [{
-    name: 'songstudio',
+    name: 'saisongs',
     script: './dist/server/index.js',
     instances: 1,  // Single instance for Free Tier
     exec_mode: 'cluster',
@@ -593,8 +593,8 @@ module.exports = {
       LD_LIBRARY_PATH: '/opt/oracle/instantclient_21_13:/usr/lib'
     },
     max_memory_restart: '512M',
-    error_file: '/var/www/songstudio/logs/error.log',
-    out_file: '/var/www/songstudio/logs/out.log',
+    error_file: '/var/www/saisongs/logs/error.log',
+    out_file: '/var/www/saisongs/logs/out.log',
     time: true
   }]
 };

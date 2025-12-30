@@ -30,8 +30,8 @@ class EmailService {
 
   constructor() {
     this.apiKey = process.env.BREVO_API_KEY || '';
-    this.senderEmail = process.env.BREVO_SENDER_EMAIL || 'noreply@songstudio.local';
-    this.senderName = process.env.BREVO_SENDER_NAME || 'Song Studio';
+    this.senderEmail = process.env.BREVO_SENDER_EMAIL || 'noreply@saisongs.local';
+    this.senderName = process.env.BREVO_SENDER_NAME || 'Sai Songs';
 
     if (!this.apiKey) {
       console.warn('⚠️  EmailService: BREVO_API_KEY not configured. Emails will be logged to console only.');
@@ -150,7 +150,7 @@ class EmailService {
    * Send OTP code email
    */
   async sendOTPEmail(email: string, code: string): Promise<boolean> {
-    const subject = 'Your Song Studio Login Code';
+    const subject = 'Your Sai Songs Login Code';
     
     const html = `
       <!DOCTYPE html>
@@ -206,17 +206,17 @@ class EmailService {
         </head>
         <body>
           <div class="header">
-            <h1 style="color: #4F46E5; margin: 0;">🎵 Song Studio</h1>
+            <h1 style="color: #4F46E5; margin: 0;">🎵 Sai Songs</h1>
           </div>
           
           <div class="content">
             <h2 style="color: #333;">Your Login Code</h2>
-            <p>Use this code to log in to Song Studio. This code will expire in <strong>1 minute</strong>.</p>
+            <p>Use this code to log in to Sai Songs. This code will expire in <strong>1 minute</strong>.</p>
             
             <div class="otp-code">${code}</div>
             
             <div class="warning">
-              <strong>⚠️ Security Notice:</strong> Never share this code with anyone. Song Studio staff will never ask for your login code.
+              <strong>⚠️ Security Notice:</strong> Never share this code with anyone. Sai Songs staff will never ask for your login code.
             </div>
             
             <p style="color: #666; font-size: 14px;">
@@ -225,26 +225,26 @@ class EmailService {
           </div>
           
           <div class="footer">
-            <p>This is an automated message from Song Studio.</p>
-            <p>© ${new Date().getFullYear()} Song Studio. All rights reserved.</p>
+            <p>This is an automated message from Sai Songs.</p>
+            <p>© ${new Date().getFullYear()} Sai Songs. All rights reserved.</p>
           </div>
         </body>
       </html>
     `;
 
     const text = `
-Song Studio - Your Login Code
+Sai Songs - Your Login Code
 
 Your one-time login code is: ${code}
 
 This code will expire in 1 minute.
 
-⚠️ Security Notice: Never share this code with anyone. Song Studio staff will never ask for your login code.
+⚠️ Security Notice: Never share this code with anyone. Sai Songs staff will never ask for your login code.
 
 If you didn't request this code, you can safely ignore this email.
 
 ---
-© ${new Date().getFullYear()} Song Studio. All rights reserved.
+© ${new Date().getFullYear()} Sai Songs. All rights reserved.
     `.trim();
 
     return this.sendEmail({ to: email, subject, html, text });

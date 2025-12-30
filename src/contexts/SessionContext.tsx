@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 // Use sessionStorage (tab-specific) instead of localStorage (shared across tabs)
 // This ensures each browser tab has its own independent live session
-const SESSION_STORAGE_KEY = 'songStudio:sessionSongs';
+const SESSION_STORAGE_KEY = 'saiSongs:sessionSongs';
 
 interface SessionEntry {
   songId: string;

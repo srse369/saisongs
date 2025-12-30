@@ -1,12 +1,12 @@
-// PM2 Configuration for Song Studio
+// PM2 Configuration for Sai Songs
 // Documentation: https://pm2.keymetrics.io/docs/usage/application-declaration/
 
 module.exports = {
   apps: [
     {
-      name: 'songstudio',
+      name: 'saisongs',
       script: './dist/server/index.js',
-      cwd: '/var/www/songstudio',
+      cwd: '/var/www/saisongs',
       instances: 1,
       exec_mode: 'cluster',
       autorestart: true,
@@ -22,17 +22,17 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: 3111,
-        TNS_ADMIN: '/var/www/songstudio/wallet',
+        TNS_ADMIN: '/var/www/saisongs/wallet',
         LD_LIBRARY_PATH: '/opt/oracle/instantclient_21_13:/usr/lib',
       },
       
       // Load environment variables from .env file
-      env_file: '/var/www/songstudio/.env',
+      env_file: '/var/www/saisongs/.env',
       
       // Logging
-      error_file: '/var/www/songstudio/logs/error.log',
-      out_file: '/var/www/songstudio/logs/out.log',
-      log_file: '/var/www/songstudio/logs/combined.log',
+      error_file: '/var/www/saisongs/logs/error.log',
+      out_file: '/var/www/saisongs/logs/out.log',
+      log_file: '/var/www/saisongs/logs/combined.log',
       time: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
@@ -52,8 +52,8 @@ module.exports = {
       user: 'ubuntu',
       host: 'your-server-ip',
       ref: 'origin/main',
-      repo: 'git@github.com:srse369/songstudio.git',
-      path: '/var/www/songstudio',
+      repo: 'git@github.com:srse369/saisongs.git',
+      path: '/var/www/saisongs',
       'pre-deploy-local': '',
       'post-deploy': 'npm install && npm run build && npm run build:server && pm2 reload ecosystem.config.cjs --env production',
       'pre-setup': ''

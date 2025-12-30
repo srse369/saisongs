@@ -16,6 +16,7 @@ import { SessionProvider, useSession } from './contexts/SessionContext';
 import { NamedSessionProvider, useNamedSessions } from './contexts/NamedSessionContext';
 import { useAdminShortcut } from './hooks';
 import { usePageTracking } from './hooks/usePageTracking';
+import { useVersionCheck } from './hooks/useVersionCheck';
 
 // Lazy load admin components for better initial load performance
 const SongManager = lazy(() => import('./components/admin/SongManager'));
@@ -55,6 +56,9 @@ function AppContent() {
   const { clearSession } = useSession();
   const initialLoadDone = useRef(false);
   const authFetchDone = useRef(false);
+  
+  // Check for version updates and auto-clear cache if needed
+  useVersionCheck();
   
   // Track page views for analytics
   usePageTracking();
@@ -293,7 +297,7 @@ function HomePage() {
         ) : (
           <div className="mt-8 space-y-4">
             <p className="text-xl sm:text-2xl text-gray-700 dark:text-gray-300">
-              Welcome to Sai Devotional Song Studio
+              Welcome to Sai Songs
             </p>
             <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">
               A comprehensive platform for managing and presenting devotional songs with lyrics, meanings, and pitch information.

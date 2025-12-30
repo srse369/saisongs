@@ -1,6 +1,6 @@
 # Local Development Scripts
 
-Single script for managing Song Studio in local development mode.
+Single script for managing Sai Songs in local development mode.
 
 ## Quick Start
 
@@ -61,7 +61,7 @@ Starts both frontend and backend servers in the background.
 
 **Example output:**
 ```
-🚀 Starting Song Studio (Local Development)
+🚀 Starting Sai Songs (Local Development)
 ==========================================
 🔧 Starting Backend Server...
    Port: 3111
@@ -74,7 +74,7 @@ Starts both frontend and backend servers in the background.
 ✅ Frontend started (PID: 12346)
 
 ========================================
-✅ Song Studio is running!
+✅ Sai Songs is running!
 ========================================
 
 🌐 URLs:
@@ -98,7 +98,7 @@ Stops all running services.
 
 **Example output:**
 ```
-🛑 Stopping Song Studio (Local Development)
+🛑 Stopping Sai Songs (Local Development)
 ==========================================
 🎨 Stopping Frontend (PID: 12346)...
 ✅ Frontend stopped
@@ -126,7 +126,7 @@ Shows the current status of all services.
 
 **Example output:**
 ```
-📊 Song Studio Status (Local Development)
+📊 Sai Songs Status (Local Development)
 ==========================================
 
 🎨 Frontend (Port 5111):
@@ -434,19 +434,19 @@ Add to `.vscode/tasks.json`:
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Start Song Studio",
+      "label": "Start Sai Songs",
       "type": "shell",
       "command": "./deploy/local/dev.sh start",
       "problemMatcher": []
     },
     {
-      "label": "Stop Song Studio",
+      "label": "Stop Sai Songs",
       "type": "shell",
       "command": "./deploy/local/dev.sh stop",
       "problemMatcher": []
     },
     {
-      "label": "Song Studio Status",
+      "label": "Sai Songs Status",
       "type": "shell",
       "command": "./deploy/local/dev.sh status",
       "problemMatcher": []

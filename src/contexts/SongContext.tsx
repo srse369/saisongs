@@ -1,11 +1,11 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Song, CreateSongInput, UpdateSongInput, ServiceError } from '../types';
 import { songService } from '../services';
 import { useToast } from './ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../utils';
 
-const SONGS_CACHE_KEY = 'songStudio:songsCache';
+const SONGS_CACHE_KEY = 'saiSongs:songsCache';
 const SONGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface SongContextState {
@@ -35,6 +35,75 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
   const [error, setError] = useState<ServiceError | null>(null);
   const [hasFetched, setHasFetched] = useState<boolean>(false);
   const toast = useToast();
+
+  // Listen for pitch creation/deletion events to update pitch counts optimistically
+  useEffect(() => {
+    const handlePitchCreated = (event: CustomEvent<{ singerId: string; songId: string }>) => {
+      const { songId } = event.detail;
+      setSongs(prev => {
+        const updated = prev.map(song => 
+          song.id === songId 
+            ? { ...song, pitchCount: (song.pitchCount ?? 0) + 1 }
+            : song
+        );
+        
+        // Update localStorage cache to keep it in sync
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(
+              SONGS_CACHE_KEY,
+              JSON.stringify({
+                timestamp: Date.now(),
+                songs: updated,
+              })
+            );
+          } catch (e) {
+            // Silently ignore storage errors (e.g., quota exceeded on iOS)
+            console.warn('Failed to update songs cache in localStorage:', e);
+          }
+        }
+        
+        return updated;
+      });
+    };
+
+    const handlePitchDeleted = (event: CustomEvent<{ singerId: string; songId: string }>) => {
+      const { songId } = event.detail;
+      setSongs(prev => {
+        const updated = prev.map(song => 
+          song.id === songId 
+            ? { ...song, pitchCount: Math.max(0, (song.pitchCount ?? 0) - 1) }
+            : song
+        );
+        
+        // Update localStorage cache to keep it in sync
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem(
+              SONGS_CACHE_KEY,
+              JSON.stringify({
+                timestamp: Date.now(),
+                songs: updated,
+              })
+            );
+          } catch (e) {
+            // Silently ignore storage errors (e.g., quota exceeded on iOS)
+            console.warn('Failed to update songs cache in localStorage:', e);
+          }
+        }
+        
+        return updated;
+      });
+    };
+
+    window.addEventListener('pitchCreated', handlePitchCreated as EventListener);
+    window.addEventListener('pitchDeleted', handlePitchDeleted as EventListener);
+
+    return () => {
+      window.removeEventListener('pitchCreated', handlePitchCreated as EventListener);
+      window.removeEventListener('pitchDeleted', handlePitchDeleted as EventListener);
+    };
+  }, []);
 
   const clearError = useCallback(() => {
     setError(null);

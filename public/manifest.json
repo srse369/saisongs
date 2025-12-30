@@ -1,6 +1,6 @@
 {
-  "name": "Sai Devotional Song Studio",
-  "short_name": "Song Studio",
+  "name": "Sai Songs",
+  "short_name": "Sai Songs",
   "description": "Manage and organize devotional songs, singers, and pitch assignments",
   "start_url": "/",
   "display": "standalone",

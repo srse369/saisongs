@@ -1,6 +1,6 @@
 # Configuration Directory
 
-This directory contains all build-time and development configuration files for the SongStudio project.
+This directory contains all build-time and development configuration files for the Sai Songs project.
 
 ## Files in this Directory
 

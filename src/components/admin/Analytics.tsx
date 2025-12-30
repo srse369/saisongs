@@ -29,7 +29,7 @@ export const Analytics: React.FC = () => {
     setError(null);
     
     try {
-      const userRole = sessionStorage.getItem('songstudio_auth_role');
+      const userRole = sessionStorage.getItem('saisongs_auth_role');
       const response = await fetch(`${API_BASE_URL}/analytics/summary?days=${timeRange}`, {
         headers: userRole ? { 'X-User-Role': userRole } : {}
       });

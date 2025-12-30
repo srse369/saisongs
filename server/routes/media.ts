@@ -141,7 +141,7 @@ router.get('/proxy-media', async (req: Request, res: Response) => {
     // Fetch the external resource
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; SongStudio/1.0)',
+        'User-Agent': 'Mozilla/5.0 (compatible; SaiSongs/1.0)',
         'Accept': '*/*',
       },
     });

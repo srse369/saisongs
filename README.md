@@ -1,4 +1,4 @@
-# Sai Devotional Song Studio
+# Sai Songs
 
 A web-based song presentation system for devotional songs (bhajans) with slideshow presentation, session management, and smart search capabilities.
 
@@ -35,7 +35,7 @@ A web-based song presentation system for devotional songs (bhajans) with slidesh
 ```bash
 # Clone and install
 git clone <repository-url>
-cd songstudio
+cd saisongs
 npm install
 
 # Set up environment
