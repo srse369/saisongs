@@ -3,7 +3,7 @@ import { feedbackService, type Feedback } from '../../services/FeedbackService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { Modal } from '../common/Modal';
-import { RefreshIcon, Tooltip } from '../common';
+import { RefreshIcon, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
 
 const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
   bug: { label: 'Bug Report', icon: '🐛' },
@@ -31,6 +31,18 @@ export const FeedbackManager: React.FC = () => {
   const [adminNotes, setAdminNotes] = useState('');
   const [newStatus, setNewStatus] = useState<Feedback['status']>('new');
   const [total, setTotal] = useState(0);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [selectedFeedbackId, setSelectedFeedbackId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     if (isAdmin) {
@@ -56,6 +68,15 @@ export const FeedbackManager: React.FC = () => {
     setSelectedFeedback(item);
     setAdminNotes(item.adminNotes || '');
     setNewStatus(item.status);
+    setIsPreviewMode(false);
+    setDetailsModalOpen(true);
+  };
+
+  const handlePreviewClick = (item: Feedback) => {
+    setSelectedFeedback(item);
+    setAdminNotes(item.adminNotes || '');
+    setNewStatus(item.status);
+    setIsPreviewMode(true);
     setDetailsModalOpen(true);
   };
 
@@ -108,33 +129,44 @@ export const FeedbackManager: React.FC = () => {
     );
   }
 
+  // Mobile actions for bottom bar
+  const mobileActions: MobileAction[] = [
+    {
+      label: 'Refresh',
+      icon: 'fas fa-sync-alt',
+      onClick: () => loadFeedback(),
+      variant: 'secondary',
+      disabled: loading,
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Feedback</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Feedback</h1>
             <a
               href="/help#overview"
               className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
               title="View help documentation"
             >
-              <i className="fas fa-question-circle text-xl"></i>
+              <i className="fas fa-question-circle text-lg sm:text-xl"></i>
             </a>
           </div>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="hidden sm:block mt-1 text-sm text-gray-500 dark:text-gray-400">
             {total} total submission{total !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
+      <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
         <select
           value={filter.status || ''}
           onChange={(e) => setFilter({ ...filter, status: e.target.value || undefined })}
-          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 sm:flex-none min-w-[140px] px-3 sm:px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">All Status</option>
           <option value="new">New</option>
@@ -146,7 +178,7 @@ export const FeedbackManager: React.FC = () => {
         <select
           value={filter.category || ''}
           onChange={(e) => setFilter({ ...filter, category: e.target.value || undefined })}
-          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 sm:flex-none min-w-[140px] px-3 sm:px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">All Categories</option>
           <option value="bug">🐛 Bug Report</option>
@@ -156,17 +188,20 @@ export const FeedbackManager: React.FC = () => {
           <option value="other">💬 Other</option>
         </select>
 
-        <Tooltip content="Refresh feedback list">
-          <button
-            type="button"
-            onClick={() => loadFeedback()}
-            disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-          >
-            <RefreshIcon className="w-4 h-4" />
-            Refresh
-          </button>
-        </Tooltip>
+        {/* Desktop refresh button - hidden on mobile */}
+        <div className="hidden md:block">
+          <Tooltip content="Refresh feedback list">
+            <button
+              type="button"
+              onClick={() => loadFeedback()}
+              disabled={loading}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            >
+              <RefreshIcon className="w-4 h-4" />
+              Refresh
+            </button>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Feedback List */}
@@ -175,25 +210,50 @@ export const FeedbackManager: React.FC = () => {
           <p className="text-gray-500 dark:text-gray-400">No feedback found</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {feedback.map((item) => (
+        <div className="space-y-2 md:space-y-4">
+          {feedback.map((item) => {
+            const isSelected = selectedFeedbackId === item.id;
+            return (
             <div
               key={item.id}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
+              onClick={() => {
+                // On mobile, toggle selection on row click
+                if (isMobile) {
+                  setSelectedFeedbackId(isSelected ? null : item.id);
+                }
+              }}
+              className={`bg-white dark:bg-gray-800 border rounded-lg p-2 md:p-4 hover:shadow-md transition-shadow ${
+                isSelected && isMobile
+                  ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                  : 'border-gray-200 dark:border-gray-700'
+              } ${isMobile ? 'cursor-pointer' : ''}`}
             >
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 md:gap-4">
                 <div className="flex-1 min-w-0">
                   {/* Category and Status */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">
-                      {CATEGORY_LABELS[item.category]?.icon || '💬'}
-                    </span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {CATEGORY_LABELS[item.category]?.label || 'Other'}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[item.status]}`}>
-                      {item.status.replace('-', ' ')}
-                    </span>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">
+                        {CATEGORY_LABELS[item.category]?.icon || '💬'}
+                      </span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {CATEGORY_LABELS[item.category]?.label || 'Other'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[item.status]}`}>
+                        {item.status.replace('-', ' ')}
+                      </span>
+                    </div>
+                    <Tooltip content="View feedback details">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePreviewClick(item);
+                        }}
+                        className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
+                      >
+                        <i className="fas fa-eye text-base"></i>
+                      </button>
+                    </Tooltip>
                   </div>
 
                   {/* Feedback Text */}
@@ -210,32 +270,40 @@ export const FeedbackManager: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex gap-2 sm:flex-col">
+                {/* Actions - Hidden on mobile until row is selected */}
+                <div className={`flex gap-1.5 sm:gap-2 sm:flex-col ${isMobile && !isSelected ? 'hidden' : ''}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     onClick={() => handleViewDetails(item)}
-                    className="px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-colors"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg sm:rounded-md transition-colors"
                   >
-                    View Details
+                    <i className="fas fa-eye text-lg"></i>
+                    <span className="hidden sm:inline">View Details</span>
                   </button>
                   <button
                     onClick={() => handleDelete(item.id)}
-                    className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-md transition-colors"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg sm:rounded-md transition-colors"
                   >
-                    Delete
+                    <i className="fas fa-trash text-lg"></i>
+                    <span className="hidden sm:inline">Delete</span>
                   </button>
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* Details Modal */}
       <Modal
         isOpen={detailsModalOpen}
-        onClose={() => setDetailsModalOpen(false)}
-        title="Feedback Details"
+        onClose={() => {
+          setDetailsModalOpen(false);
+          setIsPreviewMode(false);
+        }}
+        title={isPreviewMode ? 'View Feedback' : 'Feedback Details'}
       >
         {selectedFeedback && (
           <div className="space-y-4">
@@ -356,21 +424,31 @@ export const FeedbackManager: React.FC = () => {
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <button
-                onClick={() => setDetailsModalOpen(false)}
+                onClick={() => {
+                  setDetailsModalOpen(false);
+                  setIsPreviewMode(false);
+                }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               >
-                Cancel
+                {isPreviewMode ? 'Close' : 'Cancel'}
               </button>
-              <button
-                onClick={handleUpdateStatus}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-              >
-                Save Changes
-              </button>
+              {!isPreviewMode && (
+                <button
+                  onClick={handleUpdateStatus}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                >
+                  Save Changes
+                </button>
+              )}
             </div>
           </div>
         )}
       </Modal>
+
+      {/* Mobile Bottom Action Bar */}
+      <MobileBottomActionBar
+        actions={mobileActions}
+      />
     </div>
   );
 };

@@ -3,7 +3,7 @@ import { useTemplates } from '../../contexts/TemplateContext';
 import { useAuth } from '../../contexts/AuthContext';
 import type { PresentationTemplate, Slide, TemplateSlide, AspectRatio } from '../../types';
 import { ensureSongContentStyles } from '../../types';
-import { RefreshIcon, Modal, CenterMultiSelect, CenterBadges, Tooltip } from '../common';
+import { RefreshIcon, Modal, CenterMultiSelect, CenterBadges, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
 import { PresentationModal } from '../presentation/PresentationModal';
 import { TemplateWysiwygEditor } from './TemplateWysiwygEditor';
 import { MediaExportModal } from './MediaExportModal';
@@ -774,25 +774,52 @@ export const TemplateManager: React.FC = () => {
     setPreviewTemplate(template);
   }, []);
 
+  // Mobile actions for bottom bar
+  const mobileActions: MobileAction[] = [
+    {
+      label: 'Refresh',
+      icon: 'fas fa-sync-alt',
+      onClick: () => fetchTemplates(true),
+      variant: 'secondary',
+      disabled: loading,
+    },
+    ...(!showForm ? [
+      {
+        label: 'Create',
+        icon: 'fas fa-plus',
+        onClick: handleCreateClick,
+        variant: 'primary' as const,
+        disabled: loading,
+      },
+      {
+        label: 'Import',
+        icon: 'fas fa-upload',
+        onClick: () => pptxInputRef.current?.click(),
+        variant: 'secondary' as const,
+        disabled: loading || importingPptx,
+      },
+    ] : []),
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+    <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
       {/* Header Section */}
-      <div className="mb-4 sm:mb-8">
-        <div className="flex flex-col gap-4">
+      <div className="mb-2 sm:mb-4 md:mb-8">
+        <div className="flex flex-col gap-2 sm:gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Presentation Templates</h1>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Presentation Templates</h1>
               <Tooltip content="View help documentation for this tab">
                 <a
                   href="/help#templates"
                   className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
                   title="Help"
                 >
-                  <i className="fas fa-question-circle text-xl"></i>
+                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
                 </a>
               </Tooltip>
             </div>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
               Manage presentation templates for slide shows
             </p>
           </div>
@@ -806,12 +833,22 @@ export const TemplateManager: React.FC = () => {
                 placeholder="Search templates..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                autoFocus
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
+                className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                  aria-label="Clear search"
+                >
+                  <i className="fas fa-times text-sm"></i>
+                </button>
+              )}
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+            {/* Desktop action buttons - hidden on mobile */}
+            <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
               <Tooltip content="Reload templates from the database">
                 <button
                   type="button"
@@ -901,7 +938,7 @@ export const TemplateManager: React.FC = () => {
       )}
 
       {/* Templates List */}
-      <div className="space-y-3">
+      <div className="space-y-1.5 md:space-y-3">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
@@ -911,9 +948,9 @@ export const TemplateManager: React.FC = () => {
           filteredTemplates.map((template) => (
             <div
               key={template.id}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2 md:p-4 hover:shadow-md transition-shadow"
             >
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5 md:gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
@@ -948,12 +985,12 @@ export const TemplateManager: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Actions Row */}
-                <div className="flex flex-wrap items-center justify-start gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+                {/* Actions Row - Icon-only on mobile, text on desktop */}
+                <div className="flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700">
                   <Tooltip content="Preview this template with sample content">
                     <button
                       onClick={() => handlePreview(template)}
-                      className="p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors flex items-center justify-center"
                     >
                       <i className="fas fa-eye text-lg text-purple-600 dark:text-purple-400"></i>
                     </button>
@@ -962,10 +999,10 @@ export const TemplateManager: React.FC = () => {
                     <Tooltip content="Edit template layout, styling, and slide configuration">
                       <button
                         onClick={() => handleEditClick(template)}
-                        className="flex items-center gap-2 p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                       >
                         <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                        <span className="text-sm font-medium whitespace-nowrap">Edit</span>
+                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
                       </button>
                     </Tooltip>
                   )}
@@ -973,10 +1010,10 @@ export const TemplateManager: React.FC = () => {
                   <Tooltip content="Create a copy of this template that you can modify">
                     <button
                       onClick={() => handleDuplicateClick(template)}
-                      className="flex items-center gap-2 p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                     >
                       <i className="fas fa-copy text-lg text-green-600 dark:text-green-400"></i>
-                      <span className="text-sm font-medium whitespace-nowrap">Duplicate</span>
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Duplicate</span>
                     </button>
                   </Tooltip>
                   {/* Export PowerPoint */}
@@ -984,10 +1021,10 @@ export const TemplateManager: React.FC = () => {
                     <button
                       onClick={() => handleExportPptx(template)}
                       disabled={exportingPptx === template.id}
-                      className="flex items-center gap-2 p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <i className={`fas ${exportingPptx === template.id ? 'fa-spinner fa-spin' : 'fa-download'} text-lg text-purple-600 dark:text-purple-400`}></i>
-                      <span className="text-sm font-medium whitespace-nowrap">
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">
                         {exportingPptx === template.id ? 'Exporting...' : 'Export'}
                       </span>
                     </button>
@@ -997,10 +1034,10 @@ export const TemplateManager: React.FC = () => {
                     <Tooltip content="Make this the default template for new presentations">
                       <button
                         onClick={() => handleSetDefault(template.id!)}
-                        className="flex items-center gap-2 p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                       >
                         <i className="fas fa-star text-lg text-yellow-500 dark:text-yellow-400"></i>
-                        <span className="text-sm font-medium whitespace-nowrap">Set Default</span>
+                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Set Default</span>
                       </button>
                     </Tooltip>
                   )}
@@ -1008,10 +1045,10 @@ export const TemplateManager: React.FC = () => {
                     <Tooltip content="Permanently delete this template">
                       <button
                         onClick={() => handleDelete(template.id!)}
-                        className="flex items-center gap-2 p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                       >
                         <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                      <span className="text-sm font-medium whitespace-nowrap">Delete</span>
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
                     </button>
                     </Tooltip>
                   )}
@@ -1427,6 +1464,11 @@ export const TemplateManager: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Mobile Bottom Action Bar */}
+      <MobileBottomActionBar
+        actions={mobileActions}
+      />
     </div>
   );
 }

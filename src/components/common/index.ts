@@ -20,3 +20,6 @@ export { Tooltip } from './Tooltip';
 export { RefreshIcon, MusicIcon, PitchIcon, SongIcon } from './Icons';
 export type { SongSearchFilters } from './AdvancedSongSearch';
 export type { PitchSearchFilters } from './AdvancedPitchSearch';
+export { MobileBottomActionBar } from './MobileBottomActionBar';
+export type { MobileAction } from './MobileBottomActionBar';
+export { MobileBottomSheet } from './MobileBottomSheet';

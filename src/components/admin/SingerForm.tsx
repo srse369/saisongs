@@ -9,9 +9,10 @@ interface SingerFormProps {
   onSubmit: (input: CreateSingerInput, adminFields?: { isAdmin: boolean; editorFor: number[] }) => Promise<void>;
   onCancel: () => void;
   onUnsavedChangesRef?: React.MutableRefObject<(() => boolean) | null>;
+  readOnly?: boolean;
 }
 
-export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCancel, onUnsavedChangesRef }) => {
+export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCancel, onUnsavedChangesRef, readOnly = false }) => {
   const { isAdmin, isEditor, editorFor, userId } = useAuth();
   const [name, setName] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Boy' | 'Girl' | 'Other' | ''>('');
@@ -44,8 +45,8 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
     return singerCenters.some(centerId => editorFor.includes(centerId));
   }, [isAdmin, isEditMode, singer, editorFor, userId]);
   
-  // Determine if all fields should be disabled (no access at all)
-  const isFormDisabled = isEditMode && !hasEditorAccess;
+  // Determine if all fields should be disabled (no access at all, or read-only mode)
+  const isFormDisabled = readOnly || (isEditMode && !hasEditorAccess);
   
   // Track if form has unsaved changes
   const hasUnsavedChanges = useMemo(() => {
@@ -188,7 +189,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
-      {isFormDisabled && (
+      {isFormDisabled && !readOnly && (
         <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
             ⚠️ You do not have editor access to any of this singer's centers. All fields are read-only.
@@ -384,7 +385,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
             {isFormDisabled ? 'Close' : 'Cancel'}
           </button>
         </Tooltip>
-        {!isFormDisabled && (
+        {!isFormDisabled && !readOnly && (
           <Tooltip content={isEditMode ? "Save changes to this singer's profile" : "Create a new singer with these details"}>
             <button
               type="submit"

@@ -9,7 +9,7 @@ import { PitchForm } from './PitchForm';
 import { PitchList } from './PitchList';
 import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedPitchSearch, type PitchSearchFilters } from '../common/AdvancedPitchSearch';
-import { RefreshIcon, Tooltip } from '../common';
+import { RefreshIcon, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
 import type { SongSingerPitch, CreatePitchInput, Song } from '../../types';
 import { Modal } from '../common/Modal';
 import { SongDetails } from './SongDetails';
@@ -55,9 +55,7 @@ export const PitchManager: React.FC = () => {
 
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [visibleCount, setVisibleCount] = useState(100);
-  const [showMyPitchesModal, setShowMyPitchesModal] = useState(false);
-  const [showGridViewModal, setShowGridViewModal] = useState(false);
-  const [myPitchesSearchTerm, setMyPitchesSearchTerm] = useState('');
+  const [showMyPitches, setShowMyPitches] = useState(true);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastFetchedUserIdRef = useRef<string | null>(null);
@@ -244,29 +242,6 @@ export const PitchManager: React.FC = () => {
   const songMap = useMemo(() => new Map(songs.map(s => [s.id, s])), [songs]);
   const singerMap = useMemo(() => new Map(singers.map(s => [s.id, s])), [singers]);
 
-  // Get pitches for the current user
-  const myPitches = useMemo(() => {
-    if (!userSinger) return [];
-    return pitches
-      .filter(p => p.singerId === userSinger.id)
-      .sort((a, b) => (songMap.get(a.songId)?.name || '').localeCompare(songMap.get(b.songId)?.name || ''));
-  }, [pitches, userSinger, songMap]);
-
-  // Filter myPitches based on search term
-  const filteredMyPitches = useMemo(() => {
-    if (!myPitchesSearchTerm.trim()) return myPitches;
-    
-    const searchLower = myPitchesSearchTerm.toLowerCase();
-    return myPitches.filter((pitch) => {
-      const song = songMap.get(pitch.songId);
-      const songName = song?.name || '';
-      return (
-        songName.toLowerCase().includes(searchLower) ||
-        pitch.pitch.toLowerCase().includes(searchLower)
-      );
-    });
-  }, [myPitches, myPitchesSearchTerm, songMap]);
-
   // Memoize filtered pitches with debounced search for performance
   const filteredPitches = useMemo(() => {
     // Helper function for case-sensitive comparison
@@ -280,6 +255,11 @@ export const PitchManager: React.FC = () => {
 
     // Create a copy of the array to avoid mutating the original
     let filtered = [...pitches].filter((p) => {
+      // If "My Pitches" is enabled, only show pitches for the logged-in user's singer
+      if (showMyPitches && userSinger && p.singerId !== userSinger.id) {
+        return false;
+      }
+
       // If navigated here with a specific songId, only show pitches for that song
       if (songFilterId && p.songId !== songFilterId) {
         return false;
@@ -367,12 +347,12 @@ export const PitchManager: React.FC = () => {
     });
 
     return filtered;
-  }, [pitches, debouncedSearchTerm, advancedFilters, songFilterId, singerFilterId, songMap, singerMap, sortBy]);
+  }, [pitches, debouncedSearchTerm, advancedFilters, songFilterId, singerFilterId, songMap, singerMap, sortBy, showMyPitches, userSinger]);
 
   // Reset visible pitches when search or underlying list changes
   useEffect(() => {
     setVisibleCount(100);
-  }, [debouncedSearchTerm, advancedFilters, pitches.length, songFilterId, singerFilterId]);
+  }, [debouncedSearchTerm, advancedFilters, pitches.length, songFilterId, singerFilterId, showMyPitches]);
 
   // Only render a subset of pitches for performance
   const displayedPitches = useMemo(
@@ -405,40 +385,72 @@ export const PitchManager: React.FC = () => {
     return () => observer.disconnect();
   }, [filteredPitches.length]);
 
+  const activeFilterCount = Object.values(advancedFilters).filter(v => v && typeof v === 'string').length + (songFilterId ? 1 : 0) + (singerFilterId ? 1 : 0);
+
+  // Mobile actions for bottom bar
+  const mobileActions: MobileAction[] = [
+    {
+      label: 'Sort',
+      icon: 'fas fa-sort',
+      onClick: () => {
+        setSortBy(prev => prev === 'songName' ? 'singerName' : 'songName');
+      },
+      variant: 'secondary',
+    },
+    {
+      label: 'Refresh',
+      icon: 'fas fa-sync-alt',
+      onClick: () => {
+        fetchSongs(true);
+        fetchSingers(true);
+        fetchAllPitches(true);
+      },
+      variant: 'secondary',
+      disabled: pitchLoading || songsLoading || singersLoading,
+    },
+    ...(canCreatePitch && !showForm ? [{
+      label: 'Create',
+      icon: 'fas fa-plus',
+      onClick: handleCreateClick,
+      variant: 'primary' as const,
+      disabled: songs.length === 0 || singers.length === 0,
+    }] : []),
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-      <div className="mb-4 sm:mb-2">
-        <div className="flex flex-col gap-4">
+    <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
+      <div className="mb-2 sm:mb-4">
+        <div className="flex flex-col gap-2 sm:gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Pitch Management</h1>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Pitch Management</h1>
               <Tooltip content="View help documentation for this tab">
                 <a
                   href="/help#pitches"
                   className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
                   title="Help"
                 >
-                  <i className="fas fa-question-circle text-xl"></i>
+                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
                 </a>
               </Tooltip>
             </div>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
               Associate singers with songs and their pitch information
             </p>
             {(songFilterId || singerFilterId) && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
                 {songFilterId && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
-                    <span className="font-medium mr-1">Song:</span>
-                    <span>
+                  <span className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
+                    <span className="font-medium mr-1 hidden sm:inline">Song:</span>
+                    <span className="truncate max-w-[120px] sm:max-w-none">
                       {songs.find((s) => s.id === songFilterId)?.name || 'Unknown song'}
                     </span>
                   </span>
                 )}
                 {singerFilterId && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800">
-                    <span className="font-medium mr-1">Singer:</span>
-                    <span>
+                  <span className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800">
+                    <span className="font-medium mr-1 hidden sm:inline">Singer:</span>
+                    <span className="truncate max-w-[120px] sm:max-w-none">
                       {singers.find((s) => s.id === singerFilterId)?.name || 'Unknown singer'}
                     </span>
                   </span>
@@ -448,47 +460,50 @@ export const PitchManager: React.FC = () => {
                   onClick={() => {
                     handleClearFilters();
                   }}
-                  className="inline-flex items-center px-3 py-1 rounded-full border border-gray-300 dark:border-gray-600 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border border-gray-300 dark:border-gray-600 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
-                  Clear filters
+                  Clear
                 </button>
               </div>
             )}
           </div>
           <div className="flex flex-col lg:flex-row gap-3 w-full">
-            <WebLLMSearchInput
-              ref={searchInputRef}
-              value={searchTerm}
-              onChange={(value) => setSearchTerm(value)}
-              onFiltersExtracted={(filters) => {
-                // Type guard: since searchType is "pitch", filters should be PitchSearchFilters
-                const pitchFilters = filters as PitchSearchFilters;
-                
-                // If AI extracts songName/singerName filters, clear URL params to avoid conflicts
-                const next = new URLSearchParams(searchParams);
-                let urlChanged = false;
-                
-                if (pitchFilters.songName && songFilterId) {
-                  next.delete('songId');
-                  urlChanged = true;
-                }
-                
-                if (pitchFilters.singerName && singerFilterId) {
-                  next.delete('singerId');
-                  urlChanged = true;
-                }
-                
-                if (urlChanged) {
-                  setSearchParams(next);
-                }
-                
-                // Merge AI-extracted filters with existing advanced filters
-                setAdvancedFilters(prev => ({ ...prev, ...pitchFilters }));
-              }}
-              searchType="pitch"
-              placeholder='Ask AI: "Show me C# pitches for devi songs" or "Which singers have sanskrit songs?"...'
-            />
-            <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+            <div className="flex-1">
+              <WebLLMSearchInput
+                ref={searchInputRef}
+                value={searchTerm}
+                onChange={(value) => setSearchTerm(value)}
+                onFiltersExtracted={(filters) => {
+                  // Type guard: since searchType is "pitch", filters should be PitchSearchFilters
+                  const pitchFilters = filters as PitchSearchFilters;
+                  
+                  // If AI extracts songName/singerName filters, clear URL params to avoid conflicts
+                  const next = new URLSearchParams(searchParams);
+                  let urlChanged = false;
+                  
+                  if (pitchFilters.songName && songFilterId) {
+                    next.delete('songId');
+                    urlChanged = true;
+                  }
+                  
+                  if (pitchFilters.singerName && singerFilterId) {
+                    next.delete('singerId');
+                    urlChanged = true;
+                  }
+                  
+                  if (urlChanged) {
+                    setSearchParams(next);
+                  }
+                  
+                  // Merge AI-extracted filters with existing advanced filters
+                  setAdvancedFilters(prev => ({ ...prev, ...pitchFilters }));
+                }}
+                searchType="pitch"
+                placeholder='Ask AI: "Show me C# pitches for devi songs" or "Which singers have sanskrit songs?"...'
+              />
+            </div>
+            {/* Desktop action buttons - hidden on mobile */}
+            <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
               <Tooltip content="Sort pitches by song name or singer name">
                 <select
                   value={sortBy}
@@ -526,22 +541,10 @@ export const PitchManager: React.FC = () => {
                   </button>
                 </Tooltip>
               )}
-              {userSinger && (
-                <Tooltip content="View a list of all my assigned pitches">
-                  <button
-                    type="button"
-                    onClick={() => setShowMyPitchesModal(true)}
-                    className="w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors flex items-center justify-center gap-2 whitespace-nowrap bg-purple-600 text-white hover:bg-purple-700"
-                  >
-                    <i className="fas fa-user text-sm"></i>
-                    My Pitches
-                  </button>
-                </Tooltip>
-              )}
             </div>
           </div>
 
-          {/* Advanced Search */}
+          {/* Advanced Search - Shown directly on both mobile and desktop */}
           <AdvancedPitchSearch
             filters={advancedFilters}
             songs={songs}
@@ -579,6 +582,19 @@ export const PitchManager: React.FC = () => {
               setAdvancedFilters(newFilters);
             }}
             onClear={handleClearFilters}
+            rightContent={
+              userSinger ? (
+                <Tooltip content={showMyPitches ? "Show all pitches" : "Show only my assigned pitches"}>
+                  <button
+                    onClick={() => setShowMyPitches(!showMyPitches)}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors flex items-center gap-2 whitespace-nowrap text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
+                  >
+                    <i className={`fas ${showMyPitches ? 'fa-users' : 'fa-user'} text-sm text-blue-600 dark:text-blue-400`}></i>
+                    {showMyPitches ? 'All Pitches' : 'My Pitches'}
+                  </button>
+                </Tooltip>
+              ) : undefined
+            }
           />
         </div>
       </div>
@@ -600,9 +616,9 @@ export const PitchManager: React.FC = () => {
         </div>
       )}
 
-      {/* Pitch count status */}
+      {/* Pitch count */}
       {filteredPitches.length > 0 && (
-        <div className="mb-2 text-sm text-gray-600 dark:text-gray-400">
+        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
           {displayedPitches.length < filteredPitches.length
             ? `Showing ${displayedPitches.length} of ${filteredPitches.length} pitches`
             : `${filteredPitches.length} pitch${filteredPitches.length !== 1 ? 'es' : ''}`}
@@ -651,120 +667,6 @@ export const PitchManager: React.FC = () => {
         </Modal>
       )}
 
-      {/* Grid View Modal - Commented out until PitchGridView component is created */}
-      {/* {showGridViewModal && (
-        <Modal
-          isOpen={showGridViewModal}
-          onClose={() => setShowGridViewModal(false)}
-          title="Pitches Grid View"
-          size="large"
-        >
-          <PitchGridView
-            pitches={filteredPitches}
-            songs={songs}
-            singers={singers}
-          />
-        </Modal>
-      )} */}
-
-      {/* My Pitches Modal */}
-      {showMyPitchesModal && (
-        <Modal
-          isOpen={showMyPitchesModal}
-          onClose={() => {
-            setShowMyPitchesModal(false);
-            setMyPitchesSearchTerm(''); // Clear search when closing modal
-          }}
-          title="My Pitches"
-        >
-          <div className="mb-4">
-            <div className="relative">
-              <input
-                type="text"
-                value={myPitchesSearchTerm}
-                onChange={(e) => setMyPitchesSearchTerm(e.target.value)}
-                placeholder="Search by song name or pitch..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                autoFocus
-              />
-              <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
-            </div>
-          </div>
-          <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-            <table className="w-full divide-y divide-gray-300 dark:divide-gray-700 table-fixed">
-              <colgroup>
-                <col className="w-auto" />
-                <col className="w-20" />
-                <col className="w-16" />
-              </colgroup>
-              <thead className="bg-gray-50 dark:bg-gray-800">
-                <tr>
-                  <th scope="col" className="py-3.5 pl-4 pr-2 text-left text-sm font-semibold text-gray-900 dark:text-white">
-                    Song
-                  </th>
-                  <th scope="col" className="px-2 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">
-                    Pitch
-                  </th>
-                  <th scope="col" className="relative py-3.5 pl-2 pr-4 text-right text-sm font-medium">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-800 bg-white dark:bg-gray-900">
-                {filteredMyPitches.length > 0 ? (
-                  filteredMyPitches.map((pitch) => {
-                    const song = songMap.get(pitch.songId);
-                    return (
-                      <tr key={pitch.id}>
-                        <td className="py-4 pl-4 pr-2 text-sm font-medium text-gray-900 dark:text-white">
-                          <div className="truncate" title={song?.name || 'Unknown Song'}>
-                            {song?.name || 'Unknown Song'}
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-4 text-sm text-gray-500 dark:text-gray-400">
-                          {pitch.pitch}
-                        </td>
-                        <td className="relative whitespace-nowrap py-4 pl-2 pr-4 text-right text-sm font-medium">
-                          <button
-                            onClick={() => {
-                              setShowMyPitchesModal(false);
-                              setMyPitchesSearchTerm('');
-                              handleEditClick(pitch);
-                            }}
-                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
-                          >
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                      {myPitchesSearchTerm.trim() 
-                        ? 'No pitches found matching your search.'
-                        : 'You don\'t have any pitches assigned yet.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-4 flex justify-end">
-            <button
-              type="button"
-              className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:bg-blue-900/30 dark:text-blue-100 dark:hover:bg-blue-900/50"
-              onClick={() => {
-                setShowMyPitchesModal(false);
-                setMyPitchesSearchTerm(''); // Clear search when closing modal
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </Modal>
-      )}
 
       {/* Song Details Modal */}
       {viewingSong && (
@@ -776,6 +678,12 @@ export const PitchManager: React.FC = () => {
           <SongDetails song={viewingSong} />
         </Modal>
       )}
+
+      {/* Mobile Bottom Action Bar */}
+      <MobileBottomActionBar
+        actions={mobileActions}
+        filterCount={activeFilterCount}
+      />
     </div>
   );
 };

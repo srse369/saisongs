@@ -166,7 +166,7 @@ export const NamedSessionManager: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+    <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-4 sm:py-8">
       <div className="mb-4 sm:mb-8">
         <div className="flex flex-col gap-4 mb-4 sm:mb-6">
           {/* Header */}
@@ -197,9 +197,18 @@ export const NamedSessionManager: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search sessions..."
-                className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
+                className="w-full pl-10 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
               />
               <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                  aria-label="Clear search"
+                >
+                  <i className="fas fa-times text-sm"></i>
+                </button>
+              )}
             </div>
             <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
               {canEdit && (

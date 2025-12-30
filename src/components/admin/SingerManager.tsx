@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSingers } from '../../contexts/SingerContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
-import { RefreshIcon, Tooltip } from '../common';
+import { RefreshIcon, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
 import { SingerForm } from './SingerForm';
 import { SingerList } from './SingerList';
 import { Modal } from '../common/Modal';
@@ -13,6 +13,7 @@ export const SingerManager: React.FC = () => {
   const { isEditor, userId, logout } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSinger, setEditingSinger] = useState<Singer | null>(null);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'pitchCount'>('name');
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
@@ -46,12 +47,19 @@ export const SingerManager: React.FC = () => {
 
   const handleEditClick = (singer: Singer) => {
     setEditingSinger(singer);
+    setIsPreviewMode(false);
+    setIsFormOpen(true);
+  };
+
+  const handlePreviewClick = (singer: Singer) => {
+    setEditingSinger(singer);
+    setIsPreviewMode(true);
     setIsFormOpen(true);
   };
 
   const handleFormCancel = () => {
-    // Check for unsaved changes before closing
-    if (checkUnsavedChangesRef.current && checkUnsavedChangesRef.current()) {
+    // Check for unsaved changes before closing (only if not in preview mode)
+    if (!isPreviewMode && checkUnsavedChangesRef.current && checkUnsavedChangesRef.current()) {
       const confirmed = window.confirm(
         'You have unsaved changes. Are you sure you want to close without saving?'
       );
@@ -61,6 +69,7 @@ export const SingerManager: React.FC = () => {
     }
     setIsFormOpen(false);
     setEditingSinger(null);
+    setIsPreviewMode(false);
   };
 
   const handleFormSubmit = async (input: CreateSingerInput, adminFields?: { isAdmin: boolean; editorFor: number[] }) => {
@@ -184,24 +193,49 @@ export const SingerManager: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFormOpen]);
 
+  // Mobile actions for bottom bar
+  const mobileActions: MobileAction[] = [
+    {
+      label: 'Sort',
+      icon: 'fas fa-sort',
+      onClick: () => {
+        setSortBy(prev => prev === 'name' ? 'pitchCount' : 'name');
+      },
+      variant: 'secondary',
+    },
+    {
+      label: 'Refresh',
+      icon: 'fas fa-sync-alt',
+      onClick: () => fetchSingers(true),
+      variant: 'secondary',
+      disabled: loading,
+    },
+    ...(isEditor ? [{
+      label: 'Add',
+      icon: 'fas fa-plus',
+      onClick: handleCreateClick,
+      variant: 'primary' as const,
+    }] : []),
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-      <div className="mb-4 sm:mb-4">
-        <div className="flex flex-col gap-4">
+    <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
+      <div className="mb-2 sm:mb-4">
+        <div className="flex flex-col gap-2 sm:gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Singer Management</h1>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Singer Management</h1>
               <Tooltip content="View help documentation for this tab">
                 <a
                   href="/help#singers"
                   className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
                   title="Help"
                 >
-                  <i className="fas fa-question-circle text-xl"></i>
+                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
                 </a>
               </Tooltip>
             </div>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
               Manage singers and their profiles
             </p>
           </div>
@@ -213,12 +247,22 @@ export const SingerManager: React.FC = () => {
                 value={searchTerm}
                 onChange={handleSearchChange}
                 placeholder="Search singers by name..."
-                autoFocus
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
+                className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
+              {searchTerm && (
+                <button
+                  onClick={() => handleSearchChange({ target: { value: '' } } as React.ChangeEvent<HTMLInputElement>)}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                  aria-label="Clear search"
+                >
+                  <i className="fas fa-times text-sm"></i>
+                </button>
+              )}
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+            {/* Desktop action buttons - hidden on mobile */}
+            <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
               <Tooltip content="Sort singers by name or pitch count">
                 <select
                   value={sortBy}
@@ -262,21 +306,28 @@ export const SingerManager: React.FC = () => {
         onDelete={handleDelete}
         onMerge={handleMerge}
         onStartSelection={() => searchInputRef.current?.focus()}
+        onPreview={handlePreviewClick}
         loading={loading}
       />
 
       <Modal
         isOpen={isFormOpen}
         onClose={handleFormCancel}
-        title={editingSinger ? 'Edit Singer' : 'Create New Singer'}
+        title={isPreviewMode ? 'View Singer' : editingSinger ? 'Edit Singer' : 'Create New Singer'}
       >
         <SingerForm
           singer={editingSinger}
           onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
           onUnsavedChangesRef={checkUnsavedChangesRef}
+          readOnly={isPreviewMode}
         />
       </Modal>
+
+      {/* Mobile Bottom Action Bar */}
+      <MobileBottomActionBar
+        actions={mobileActions}
+      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Song, Singer } from '../../types';
 
 export interface PitchSearchFilters {
@@ -23,6 +23,7 @@ interface AdvancedPitchSearchProps {
   onClear: () => void;
   songs?: Song[];
   singers?: Singer[];
+  rightContent?: React.ReactNode;
 }
 
 export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
@@ -31,6 +32,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
   onClear,
   songs = [],
   singers = [],
+  rightContent,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -77,31 +79,56 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
   const hasActiveFilters = Object.values(filters).some(v => v);
   const activeFilterCount = Object.values(filters).filter(v => v).length;
 
+  // Close on Enter/Return key press on mobile
+  useEffect(() => {
+    if (!isExpanded) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle on mobile (screen width < 768px)
+      if (window.innerWidth >= 768) return;
+      
+      if (e.key === 'Enter' || e.key === 'Return') {
+        e.preventDefault();
+        setIsExpanded(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isExpanded]);
+
   return (
     <div className="space-y-3">
       {/* Toggle Button */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-        >
-          <i className="fas fa-sliders-h text-base"></i>
-          {isExpanded ? 'Hide' : 'Show'} Advanced Search
-          {activeFilterCount > 0 && !isExpanded && (
-            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full text-xs font-semibold">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-        {hasActiveFilters && (
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onClear}
-            className="text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
           >
-            Clear all filters
+            <i className="fas fa-sliders-h text-base"></i>
+            {isExpanded ? 'Hide' : 'Show'} Advanced Search
+            {activeFilterCount > 0 && !isExpanded && (
+              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full text-xs font-semibold">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+            >
+              Clear all filters
+            </button>
+          )}
+        </div>
+        {rightContent && (
+          <div className="flex items-center">
+            {rightContent}
+          </div>
         )}
       </div>
 
@@ -310,6 +337,24 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
               )}
             </div>
           )}
+
+          {/* Cancel and Apply Buttons */}
+          <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={() => setIsExpanded(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsExpanded(false)}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            >
+              Apply
+            </button>
+          </div>
         </div>
       )}
     </div>

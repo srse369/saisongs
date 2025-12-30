@@ -14,10 +14,11 @@ interface SingerListProps {
   onDelete: (id: string) => Promise<void>;
   onMerge?: (targetSingerId: string, singerIdsToMerge: string[]) => Promise<boolean>;
   onStartSelection?: () => void;
+  onPreview?: (singer: Singer) => void;
   loading?: boolean;
 }
 
-export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelete, onMerge, onStartSelection, loading = false }) => {
+export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelete, onMerge, onStartSelection, onPreview, loading = false }) => {
   const navigate = useNavigate();
   const { isEditor, isAdmin, userId } = useAuth();
   const { singers: allSingers } = useSingers();
@@ -27,6 +28,17 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
   const [selectedSingerIds, setSelectedSingerIds] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [mergeModalOpen, setMergeModalOpen] = useState(false);
+  const [selectedSingerId, setSelectedSingerId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleToggleSelection = (singerId: string) => {
     setSelectedSingerIds(prev => 
@@ -188,17 +200,26 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
         )}
       </div>
       {/* Card layout for all screen sizes - SAME AS SONGS */}
-      <div className="space-y-3">
-        {singers.map((singer) => (
+      <div className="space-y-1.5 md:space-y-3">
+        {singers.map((singer) => {
+          const isSelected = selectedSingerId === singer.id;
+          const isMergeSelected = selectedSingerIds.includes(singer.id);
+          return (
           <div
             key={singer.id}
-            className={`bg-white dark:bg-gray-800 border rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-200 ${
-              selectedSingerIds.includes(singer.id)
+            onClick={() => {
+              // On mobile, toggle selection on row click (only if not in merge selection mode)
+              if (isMobile && !isSelectionMode) {
+                setSelectedSingerId(isSelected ? null : singer.id);
+              }
+            }}
+            className={`bg-white dark:bg-gray-800 border rounded-lg shadow-md p-2 md:p-4 hover:shadow-lg transition-all duration-200 ${
+              isMergeSelected || (isMobile && isSelected && !isSelectionMode)
                 ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
                 : 'border-gray-200 dark:border-gray-700'
-            }`}
+            } ${isMobile && !isSelectionMode ? 'cursor-pointer' : ''}`}
           >
-            <div className="flex gap-3">
+            <div className="flex gap-1.5 md:gap-3">
               {/* Checkbox for selection */}
               {isEditor && onMerge && isSelectionMode && (
                 <div className="flex items-start pt-1">
@@ -211,52 +232,90 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                 </div>
               )}
               
-              <div className="flex-1 flex flex-col gap-3">
+              <div className="flex-1 flex flex-col gap-1.5 md:gap-3">
               {/* Singer Name (color-coded by gender) */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <h3 className={`text-lg font-semibold ${
-                  singer.gender?.toLowerCase() === 'male' 
-                    ? 'text-blue-600 dark:text-blue-400' 
-                    : singer.gender?.toLowerCase() === 'boy' 
-                      ? 'text-blue-400 dark:text-blue-300' 
-                      : singer.gender?.toLowerCase() === 'female' 
-                        ? 'text-pink-600 dark:text-pink-400' 
-                        : singer.gender?.toLowerCase() === 'girl' 
-                          ? 'text-pink-400 dark:text-pink-300' 
-                          : 'text-gray-600 dark:text-gray-400'
-                }`}>
-                  {singer.name}
-                </h3>
-                {!singer.email && (
-                  <Tooltip content="No email address - cannot grant login permissions">
-                    <span className="text-sm text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded border border-yellow-200 dark:border-yellow-800">
-                      <i className="fas fa-envelope-open text-xs mr-1"></i>
-                      No Email
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h3 className={`text-lg font-semibold ${
+                    singer.gender?.toLowerCase() === 'male' 
+                      ? 'text-blue-600 dark:text-blue-400' 
+                      : singer.gender?.toLowerCase() === 'boy' 
+                        ? 'text-blue-400 dark:text-blue-300' 
+                        : singer.gender?.toLowerCase() === 'female' 
+                          ? 'text-pink-600 dark:text-pink-400' 
+                          : singer.gender?.toLowerCase() === 'girl' 
+                            ? 'text-pink-400 dark:text-pink-300' 
+                            : 'text-gray-600 dark:text-gray-400'
+                  }`}>
+                    {singer.name}
+                  </h3>
+                  {/* Pitch count circle - to the right of singer name, only show on mobile when there are pitches */}
+                  {(singer.pitchCount ?? 0) > 0 && (
+                    <div className="flex-shrink-0 md:hidden">
+                      <div className="w-6 h-6 flex items-center justify-center rounded-full bg-black dark:bg-black text-white text-xs font-semibold">
+                        {singer.pitchCount}
+                      </div>
+                    </div>
+                  )}
+                  {/* Missing email icon - red email icon with X circle overlay */}
+                  {!singer.email && (
+                    <Tooltip content="No email address - cannot grant login permissions">
+                      <span className="flex-shrink-0 relative inline-flex items-center justify-center gap-1.5 text-red-600 dark:text-red-400">
+                        <span className="relative inline-flex items-center justify-center">
+                          <i className="fas fa-envelope text-base"></i>
+                          <i className="fas fa-circle-xmark absolute -top-1 -right-1 text-black dark:text-black text-base"></i>
+                        </span>
+                        <span className="hidden md:inline text-sm font-medium">No email</span>
+                      </span>
+                    </Tooltip>
+                  )}
+                </div>
+                {/* Center Badges and Preview Icon - right-aligned on both mobile and desktop */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <CenterBadges centerIds={singer.centerIds} showWarningIfEmpty={false} />
+                  {/* Warning for Missing Centers - Desktop only */}
+                  {(!singer.centerIds || singer.centerIds.length === 0) && (
+                    <span className="hidden md:inline text-xs text-yellow-600 dark:text-yellow-400 italic">
+                      (Needs center assignment)
                     </span>
-                  </Tooltip>
-                )}
+                  )}
+                  {onPreview && (
+                    <Tooltip content="Preview singer details">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPreview(singer);
+                        }}
+                        className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
+                      >
+                        <i className="fas fa-eye text-base"></i>
+                      </button>
+                    </Tooltip>
+                  )}
+                </div>
               </div>
               
-              {/* Center Badges with Warning for Missing Centers */}
-              <div className="flex items-center gap-2">
-                <CenterBadges centerIds={singer.centerIds} showWarningIfEmpty={true} />
-                {(!singer.centerIds || singer.centerIds.length === 0) && (
-                  <span className="text-xs text-yellow-600 dark:text-yellow-400 italic">
-                    (Needs center assignment)
-                  </span>
-                )}
-              </div>
-              
-              {/* Actions - Touch-friendly on mobile */}
-              <div className="flex flex-wrap items-center justify-start gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+              {/* Actions - Touch-friendly on mobile - Hidden on mobile until row is selected */}
+              <div className={`flex flex-wrap items-center justify-start gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected && !isSelectionMode ? 'hidden' : ''}`}
+                onClick={(e) => e.stopPropagation()}
+              >
                   <Tooltip content={`View ${singer.pitchCount ?? 0} pitch assignment${(singer.pitchCount ?? 0) !== 1 ? 's' : ''}`}>
                     <button
                       onClick={() => handleViewPitches(singer)}
-                      className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                      className="relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
                     >
-                      <MusicIcon className="w-5 h-5" />
-                      <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
-                      <span className={`inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold rounded-full ${
+                      <div className="relative">
+                        <MusicIcon className="w-5 h-5" />
+                        {/* Mobile: Badge overlay on icon */}
+                        {(singer.pitchCount ?? 0) > 0 && (
+                          <span className="absolute -top-1 -right-1 sm:hidden flex items-center justify-center min-w-[16px] h-[16px] px-0.5 text-[9px] font-bold text-white bg-black rounded-full z-10">
+                            {singer.pitchCount ?? 0}
+                          </span>
+                        )}
+                      </div>
+                      {/* Desktop: Text and inline badge */}
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Pitches</span>
+                      <span className={`hidden sm:inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold rounded-full ${
                         (singer.pitchCount ?? 0) > 0 
                           ? 'text-white bg-gray-900 dark:bg-black' 
                           : 'text-gray-500 bg-gray-300 dark:bg-gray-600 dark:text-gray-400'
@@ -270,10 +329,10 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     <Tooltip content="Edit singer profile (name, gender, centers)">
                       <button
                         onClick={() => onEdit(singer)}
-                        className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
                       >
                         <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                        <span className="text-sm font-medium whitespace-nowrap">Edit</span>
+                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
                       </button>
                     </Tooltip>
                   )}
@@ -282,10 +341,10 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     <Tooltip content="Delete singer and all their pitch assignments">
                       <button
                         onClick={() => handleDeleteClick(singer)}
-                        className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
                       >
                         <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                        <span className="text-sm font-medium whitespace-nowrap">Delete</span>
+                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
                       </button>
                     </Tooltip>
                   )}
@@ -293,7 +352,8 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <Modal

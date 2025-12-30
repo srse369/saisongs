@@ -129,7 +129,7 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={llmEnabled ? placeholder : 'Search (Enable AI for natural language)...'}
-          autoFocus
+          autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
           className={`
             w-full pl-10 pr-32 py-3 sm:py-2.5 text-base sm:text-sm border rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
             ${llmEnabled 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Song } from '../../types';
 
 export interface SongSearchFilters {
@@ -76,6 +76,24 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
 
   const hasActiveFilters = Object.values(filters).some(v => v);
   const activeFilterCount = Object.values(filters).filter(v => v).length;
+
+  // Close on Enter/Return key press on mobile
+  useEffect(() => {
+    if (!isExpanded) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle on mobile (screen width < 768px)
+      if (window.innerWidth >= 768) return;
+      
+      if (e.key === 'Enter' || e.key === 'Return') {
+        e.preventDefault();
+        setIsExpanded(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isExpanded]);
 
   return (
     <div className="space-y-3">
@@ -371,6 +389,24 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
               )}
             </div>
           )}
+
+          {/* Cancel and Apply Buttons */}
+          <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={() => setIsExpanded(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsExpanded(false)}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            >
+              Apply
+            </button>
+          </div>
         </div>
       )}
     </div>

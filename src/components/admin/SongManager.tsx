@@ -8,7 +8,7 @@ import { SongDetails } from './SongDetails';
 import { Modal } from '../common/Modal';
 import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedSongSearch, type SongSearchFilters } from '../common/AdvancedSongSearch';
-import { RefreshIcon, Tooltip } from '../common';
+import { RefreshIcon, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
 import { createSongFuzzySearch, parseNaturalQuery } from '../../utils/smartSearch';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
 import songService from '../../services/SongService';
@@ -336,13 +336,41 @@ export const SongManager: React.FC = () => {
     return () => observer.disconnect();
   }, [filteredSongs.length]);
 
+  const activeFilterCount = Object.values(advancedFilters).filter(v => v && typeof v === 'string').length;
+
+  // Mobile actions for bottom bar
+  const mobileActions: MobileAction[] = [
+    {
+      label: 'Sort',
+      icon: 'fas fa-sort',
+      onClick: () => {
+        // Cycle through sort options
+        setSortBy(prev => prev === 'name' ? 'pitchCount' : 'name');
+      },
+      variant: 'secondary',
+    },
+    {
+      label: 'Refresh',
+      icon: 'fas fa-sync-alt',
+      onClick: () => fetchSongs(true),
+      variant: 'secondary',
+      disabled: loading,
+    },
+    ...(isEditor ? [{
+      label: 'Create',
+      icon: 'fas fa-plus',
+      onClick: handleCreateClick,
+      variant: 'primary' as const,
+    }] : []),
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 animate-fade-in">
-      <div className="mb-4 sm:mb-2">
-        <div className="flex flex-col gap-4 mb-4 sm:mb-2">
+    <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8 animate-fade-in">
+      <div className="mb-2 sm:mb-4">
+        <div className="flex flex-col gap-2 sm:gap-4 mb-2 sm:mb-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-1">
                 Song Management
               </h1>
               <Tooltip content="View help documentation for this tab">
@@ -351,27 +379,30 @@ export const SongManager: React.FC = () => {
                   className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
                   title="Help"
                 >
-                  <i className="fas fa-question-circle text-xl"></i>
+                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
                 </a>
               </Tooltip>
             </div>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+            <p className="hidden sm:block text-sm sm:text-base text-gray-600 dark:text-gray-400">
               Create and manage your song library
             </p>
           </div>
           <div className="flex flex-col lg:flex-row gap-3 w-full">
-            <WebLLMSearchInput
-              ref={searchInputRef}
-              value={searchTerm}
-              onChange={handleSearchChange}
-              onFiltersExtracted={(filters) => {
-                // Merge AI-extracted filters with existing advanced filters
-                setAdvancedFilters(prev => ({ ...prev, ...filters }));
-              }}
-              searchType="song"
-              placeholder='Ask AI: "Show me sai songs in sanskrit with fast tempo"...'
-            />
-            <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+            <div className="flex-1">
+              <WebLLMSearchInput
+                ref={searchInputRef}
+                value={searchTerm}
+                onChange={handleSearchChange}
+                onFiltersExtracted={(filters) => {
+                  // Merge AI-extracted filters with existing advanced filters
+                  setAdvancedFilters(prev => ({ ...prev, ...filters }));
+                }}
+                searchType="song"
+                placeholder='Ask AI: "Show me sai songs in sanskrit with fast tempo"...'
+              />
+            </div>
+            {/* Desktop action buttons - hidden on mobile */}
+            <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
               <Tooltip content="Sort songs by name or pitch count">
                 <select
                   value={sortBy}
@@ -407,7 +438,7 @@ export const SongManager: React.FC = () => {
             </div>
           </div>
 
-          {/* Advanced Search */}
+          {/* Advanced Search - Shown directly on both mobile and desktop */}
           <AdvancedSongSearch
             filters={advancedFilters}
             onFiltersChange={setAdvancedFilters}
@@ -487,6 +518,13 @@ export const SongManager: React.FC = () => {
           <SongDetails song={viewingSong} />
         </Modal>
       )}
+
+      {/* Mobile Bottom Action Bar */}
+      <MobileBottomActionBar
+        actions={mobileActions}
+        filterCount={activeFilterCount}
+      />
+
     </div>
   );
 };

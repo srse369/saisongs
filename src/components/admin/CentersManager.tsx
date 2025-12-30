@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserMultiSelect } from '../common/UserMultiSelect';
 import { clearCentersCache } from '../common/CenterBadges';
-import { RefreshIcon, Tooltip, Modal } from '../common';
+import { RefreshIcon, Tooltip, Modal, MobileBottomActionBar, type MobileAction } from '../common';
 
 interface Center {
   id: number;
@@ -25,6 +25,18 @@ export const CentersManager: React.FC = () => {
   const [error, setError] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCenter, setEditingCenter] = useState<Center | null>(null);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [selectedCenterId, setSelectedCenterId] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -106,6 +118,20 @@ export const CentersManager: React.FC = () => {
     
     setFormData(initialData);
     setOriginalData(initialData);
+    setIsPreviewMode(false);
+    setIsFormOpen(true);
+  };
+
+  const handlePreviewClick = (center: Center) => {
+    const initialData = { 
+      name: center.name, 
+      badgeTextColor: center.badgeTextColor,
+      editorIds: center.editorIds || []
+    };
+    setEditingCenter(center);
+    setFormData(initialData);
+    setOriginalData(initialData);
+    setIsPreviewMode(true);
     setIsFormOpen(true);
   };
 
@@ -120,7 +146,7 @@ export const CentersManager: React.FC = () => {
   };
 
   const handleCloseForm = (force: boolean = false) => {
-    if (!force && hasUnsavedChanges()) {
+    if (!isPreviewMode && !force && hasUnsavedChanges()) {
       const confirmed = window.confirm(
         'You have unsaved changes. Are you sure you want to close without saving?'
       );
@@ -131,6 +157,7 @@ export const CentersManager: React.FC = () => {
 
     setIsFormOpen(false);
     setEditingCenter(null);
+    setIsPreviewMode(false);
     setFormData({
       name: '',
       badgeTextColor: '#1e40af',
@@ -249,29 +276,47 @@ export const CentersManager: React.FC = () => {
     );
   }
 
+  // Mobile actions for bottom bar
+  const mobileActions: MobileAction[] = [
+    {
+      label: 'Refresh',
+      icon: 'fas fa-sync-alt',
+      onClick: () => fetchCenters(),
+      variant: 'secondary',
+      disabled: loading,
+    },
+    {
+      label: 'Add',
+      icon: 'fas fa-plus',
+      onClick: () => handleOpenForm(),
+      variant: 'primary',
+    },
+  ];
+
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="max-w-6xl mx-auto px-1.5 sm:px-6 py-2 sm:py-4 md:py-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Centers</h1>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">Centers</h1>
             <Tooltip content="View help documentation for this tab">
               <a
                 href="/help#centers"
                 className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
                 title="Help"
               >
-                <i className="fas fa-question-circle text-xl"></i>
+                <i className="fas fa-question-circle text-lg sm:text-xl"></i>
               </a>
             </Tooltip>
           </div>
           {!loading && centers.length > 0 && (
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <p className="hidden sm:block mt-1 text-sm text-gray-500 dark:text-gray-400">
               {centers.length} center{centers.length !== 1 ? 's' : ''}
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        {/* Desktop action buttons - hidden on mobile */}
+        <div className="hidden md:flex gap-2">
           <Tooltip content="Refresh centers list">
             <button
               type="button"
@@ -307,25 +352,50 @@ export const CentersManager: React.FC = () => {
           <p className="text-gray-500 dark:text-gray-400">No centers found. Create your first center to get started.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {centers.map((center) => (
+        <div className="space-y-1.5 md:space-y-3">
+          {centers.map((center) => {
+            const isSelected = selectedCenterId === center.id;
+            return (
             <div
               key={center.id}
-              className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow"
+              onClick={() => {
+                // On mobile, toggle selection on row click
+                if (isMobile) {
+                  setSelectedCenterId(isSelected ? null : center.id);
+                }
+              }}
+              className={`p-2 md:p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border ${
+                isSelected && isMobile
+                  ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                  : 'border-gray-200 dark:border-gray-700'
+              } hover:shadow-lg transition-shadow ${isMobile ? 'cursor-pointer' : ''}`}
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 md:gap-4">
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {center.name}
-                    </h3>
-                    <span
-                      className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700"
-                      style={{ color: center.badgeTextColor }}
-                    >
-                      {center.name}
-                    </span>
+                  <div className="flex items-center justify-between gap-1.5 md:gap-3 flex-wrap">
+                    <div className="flex items-center gap-1.5 md:gap-3 flex-wrap">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {center.name}
+                      </h3>
+                      <span
+                        className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700"
+                        style={{ color: center.badgeTextColor }}
+                      >
+                        {center.name}
+                      </span>
+                    </div>
+                    <Tooltip content="View center details">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePreviewClick(center);
+                        }}
+                        className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
+                      >
+                        <i className="fas fa-eye text-base"></i>
+                      </button>
+                    </Tooltip>
                   </div>
                 <div className="flex items-center gap-3 mt-2 text-xs">
                   <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
@@ -346,25 +416,28 @@ export const CentersManager: React.FC = () => {
                 </div>
               </div>
               
-              {/* Actions */}
-              <div className="flex flex-wrap items-center gap-2 pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
+              {/* Actions - Hidden on mobile until row is selected */}
+              <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 mt-1 md:pt-3 md:mt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
                   onClick={() => handleOpenForm(center)}
-                  className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
+                  className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
                 >
                   <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                  <span className="text-sm font-medium whitespace-nowrap">Edit</span>
+                  <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
                 </button>
                 <button
                   onClick={() => handleDelete(center)}
-                  className="min-h-[44px] sm:min-h-0 inline-flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
+                  className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
                 >
                   <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                  <span className="text-sm font-medium whitespace-nowrap">Delete</span>
+                  <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -372,7 +445,7 @@ export const CentersManager: React.FC = () => {
       <Modal
         isOpen={isFormOpen}
         onClose={() => handleCloseForm()}
-        title={editingCenter ? 'Edit Center' : 'Create New Center'}
+        title={isPreviewMode ? 'View Center' : editingCenter ? 'Edit Center' : 'Create New Center'}
       >
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
           {/* Center Name */}
@@ -393,8 +466,8 @@ export const CentersManager: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
               placeholder="Enter center name"
               required
-              autoFocus
-              disabled={isSubmitting}
+              autoFocus={!isPreviewMode}
+              disabled={isSubmitting || isPreviewMode}
             />
           </div>
 
@@ -415,7 +488,7 @@ export const CentersManager: React.FC = () => {
                 value={formData.badgeTextColor}
                 onChange={(e) => setFormData({ ...formData, badgeTextColor: e.target.value })}
                 className="w-10 h-10 rounded cursor-pointer border border-gray-300 dark:border-gray-600"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isPreviewMode}
               />
               <input
                 type="text"
@@ -423,7 +496,7 @@ export const CentersManager: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, badgeTextColor: e.target.value })}
                 className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono"
                 placeholder="#1e40af"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isPreviewMode}
               />
             </div>
             <div className="mt-2">
@@ -443,7 +516,7 @@ export const CentersManager: React.FC = () => {
               selectedUserIds={formData.editorIds}
               onChange={(userIds) => setFormData({ ...formData, editorIds: userIds })}
               label="Center Editors"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isPreviewMode}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Users who can create and edit singers for this center
@@ -452,28 +525,35 @@ export const CentersManager: React.FC = () => {
 
           {/* Action Buttons */}
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <Tooltip content="Discard changes and close the form">
+            <Tooltip content={isPreviewMode ? "Close" : "Discard changes and close the form"}>
               <button
                 type="button"
                 onClick={() => handleCloseForm()}
                 disabled={isSubmitting}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
               >
-                Cancel
+                {isPreviewMode ? 'Close' : 'Cancel'}
               </button>
             </Tooltip>
-            <Tooltip content={editingCenter ? "Save changes to this center" : "Create a new center"}>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
-              >
-                {isSubmitting ? 'Saving...' : editingCenter ? 'Update Center' : 'Create Center'}
-              </button>
-            </Tooltip>
+            {!isPreviewMode && (
+              <Tooltip content={editingCenter ? "Save changes to this center" : "Create a new center"}>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
+                >
+                  {isSubmitting ? 'Saving...' : editingCenter ? 'Update Center' : 'Create Center'}
+                </button>
+              </Tooltip>
+            )}
           </div>
         </form>
       </Modal>
+
+      {/* Mobile Bottom Action Bar */}
+      <MobileBottomActionBar
+        actions={mobileActions}
+      />
     </div>
   );
 };

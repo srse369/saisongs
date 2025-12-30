@@ -48,6 +48,87 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
+  // Swipe navigation for mobile - navigate between main tabs
+  useEffect(() => {
+    // Only enable on mobile
+    if (window.innerWidth >= 768) return;
+
+    // Define tab order based on authentication
+    const tabs = [
+      { path: '/admin/songs', label: 'Songs' },
+      ...(isAuthenticated ? [
+        { path: '/admin/singers', label: 'Singers' },
+        { path: '/admin/pitches', label: 'Pitches' },
+      ] : []),
+      { path: '/session', label: 'Live' },
+    ];
+
+    let touchStartX: number | null = null;
+    let touchStartY: number | null = null;
+    const minSwipeDistance = 50; // Minimum distance for a swipe
+    const maxVerticalDistance = 100; // Maximum vertical movement to still count as horizontal swipe
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (touchStartX === null || touchStartY === null) return;
+
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+
+      // Check if it's primarily a horizontal swipe
+      if (Math.abs(deltaY) > maxVerticalDistance) {
+        touchStartX = null;
+        touchStartY = null;
+        return;
+      }
+
+      // Find current tab index
+      const currentPath = location.pathname;
+      const currentIndex = tabs.findIndex(tab => 
+        currentPath === tab.path || currentPath.startsWith(tab.path + '/')
+      );
+
+      if (currentIndex === -1) {
+        touchStartX = null;
+        touchStartY = null;
+        return;
+      }
+
+      // Navigate based on swipe direction
+      if (Math.abs(deltaX) > minSwipeDistance) {
+        if (deltaX > 0) {
+          // Swipe right - go to previous tab
+          if (currentIndex > 0) {
+            navigate(tabs[currentIndex - 1].path);
+          }
+        } else {
+          // Swipe left - go to next tab
+          if (currentIndex < tabs.length - 1) {
+            navigate(tabs[currentIndex + 1].path);
+          }
+        }
+      }
+
+      touchStartX = null;
+      touchStartY = null;
+    };
+
+    // Add touch event listeners to the document
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [location.pathname, navigate, isAuthenticated]);
+
   // Get link classes based on active state
   const getLinkClasses = (path: string) => {
     const baseClasses = "inline-flex items-center px-2 lg:px-3 py-2 text-sm font-medium rounded-md transition-colors";
@@ -62,13 +143,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Header with Navigation */}
       <header className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex justify-between items-center h-12 md:h-16">
             {/* Logo/Brand */}
             <Link to="/" className="flex items-center group">
               <img 
                 src="/logo.png" 
                 alt="Sai Devotional Song Studio" 
-                className="h-10 sm:h-12 w-auto object-contain group-hover:scale-105 transition-transform"
+                className="h-8 sm:h-10 md:h-12 w-auto object-contain group-hover:scale-105 transition-transform"
               />
             </Link>
 
@@ -152,8 +233,67 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </nav>
 
-            {/* Mobile menu button */}
-            <div className="md:hidden flex items-center">
+            {/* Mobile menu - 4 icon buttons + hamburger menu on same row */}
+            <div className="md:hidden flex items-center gap-1">
+              {/* Songs */}
+              <Link
+                to="/admin/songs"
+                className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md transition-colors ${
+                  isActive('/admin/songs')
+                    ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <SongIcon className="w-5 h-5" />
+                <span className="text-[9px] font-medium leading-tight">Songs</span>
+              </Link>
+              
+              {/* Singers and Pitches tabs visible to all authenticated users */}
+              {isAuthenticated && (
+                <>
+                  <Link
+                    to="/admin/singers"
+                    className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md transition-colors ${
+                      isActive('/admin/singers')
+                        ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <i className="fas fa-users text-lg"></i>
+                    <span className="text-[9px] font-medium leading-tight">Singers</span>
+                  </Link>
+                  <Link
+                    to="/admin/pitches"
+                    className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md transition-colors ${
+                      isActive('/admin/pitches')
+                        ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <MusicIcon className="w-5 h-5" />
+                    <span className="text-[9px] font-medium leading-tight">Pitches</span>
+                  </Link>
+                </>
+              )}
+              
+              {/* Live */}
+              <Link
+                to="/session"
+                className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md transition-colors ${
+                  isActive('/session')
+                    ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <i className="fas fa-play-circle text-lg"></i>
+                <span className="text-[9px] font-medium leading-tight">Live</span>
+              </Link>
+              
+              {/* Hamburger menu button */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -168,49 +308,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           </div>
 
-          {/* Mobile Navigation */}
+          {/* Mobile Navigation - Hamburger menu for other items */}
           {isMobileMenuOpen && (
             <nav className="md:hidden py-4 space-y-1 border-t border-gray-200 dark:border-gray-700 animate-fade-in">
-              <Link
-                to="/admin/songs"
-                className={`block ${getLinkClasses('/admin/songs')}`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <SongIcon className="w-5 h-5 mr-2 inline" />
-                Songs
-              </Link>
-              
-              {/* Singers and Pitches tabs visible to all authenticated users */}
-              {isAuthenticated && (
-                <>
-                  <Link
-                    to="/admin/singers"
-                    className={`block ${getLinkClasses('/admin/singers')}`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <i className="fas fa-users w-5 h-5 mr-2 inline"></i>
-                    Singers
-                  </Link>
-                  <Link
-                    to="/admin/pitches"
-                    className={`block ${getLinkClasses('/admin/pitches')}`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <MusicIcon className="w-5 h-5 mr-2 inline" />
-                    Pitches
-                  </Link>
-                </>
-              )}
-              
-              <Link
-                to="/session"
-                className={`block ${getLinkClasses('/session')}`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <i className="fas fa-play-circle w-5 h-5 mr-2 inline"></i>
-                Live Session
-              </Link>
-              
               {(userRole === 'admin' || userRole === 'editor') && (
                 <Link
                   to="/admin/templates"
@@ -398,7 +498,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-7xl mx-auto py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 w-full max-w-7xl mx-auto py-2 sm:py-4 md:py-6 lg:py-8 px-2 sm:px-6 lg:px-8">
         {children}
       </main>
 
@@ -421,7 +521,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Tooltip content="Send feedback, report bugs, or request new features">
         <button
           onClick={() => setIsFeedbackOpen(true)}
-          className="fixed bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+          className="fixed bottom-16 md:bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-30"
           aria-label="Send feedback"
         >
           <i className="fas fa-comment text-lg mx-auto"></i>

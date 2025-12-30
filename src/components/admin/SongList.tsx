@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Song } from '../../types';
 import { Modal } from '../common/Modal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
-import { MusicIcon } from '../common';
+import { MusicIcon, Tooltip } from '../common';
 import { SongMetadataCard } from '../common/SongMetadataCard';
 
 interface SongListProps {
@@ -24,6 +24,17 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [songToDelete, setSongToDelete] = useState<Song | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleDeleteClick = (song: Song) => {
     setSongToDelete(song);
@@ -86,26 +97,42 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
 
   return (
     <>
-      <div className="space-y-3">
-        {songs.map((song) => (
+      <div className="space-y-1.5 md:space-y-3">
+        {songs.map((song) => {
+          const isSelected = selectedSongId === song.id;
+          return (
           <div
             key={song.id}
-            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-200"
+            onClick={() => {
+              // On mobile, toggle selection on row click
+              if (isMobile) {
+                setSelectedSongId(isSelected ? null : song.id);
+              }
+            }}
+            className={`bg-white dark:bg-gray-800 border rounded-lg shadow-md p-2 md:p-4 hover:shadow-lg transition-all duration-200 ${
+              isSelected 
+                ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800' 
+                : 'border-gray-200 dark:border-gray-700'
+            } ${isMobile ? 'cursor-pointer' : ''}`}
           >
             {/* Unified layout for all screen sizes */}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5 md:gap-3">
               {/* Content Section - First */}
               <div className="flex-1 min-w-0">
                 {/* Song Metadata Section - Reusable component */}
                 <SongMetadataCard
                   song={song}
-                  onNameClick={() => handlePresent(song)}
-                  nameClickTitle="Click to preview"
+                  onNameClick={isMobile ? undefined : () => handlePresent(song)}
+                  nameClickTitle={isMobile ? undefined : "Click to preview"}
+                  showBackground={!isMobile}
+                  pitchCount={song.pitchCount}
+                  isSelected={isSelected}
+                  onPreviewClick={() => handlePresent(song)}
                 />
 
-                {/* Audio Player */}
+                {/* Audio Player - Hidden on mobile until row is selected */}
                 {song.audioLink && (
-                  <div className="mt-2">
+                  <div className={`mt-2 ${isMobile && !isSelected ? 'hidden' : ''}`}>
                     <audio
                       controls
                       preload="none"
@@ -119,34 +146,38 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                 )}
               </div>
 
-              {/* Action Icons - Touch-friendly on mobile */}
-              <div className="flex flex-wrap items-center justify-start gap-2 sm:gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
-                <button
-                  onClick={() => handlePresent(song)}
-                  title="Preview"
-                  className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors flex items-center justify-center"
-                >
-                  <i className="fas fa-eye text-lg text-purple-600 dark:text-purple-400"></i>
-                </button>
+              {/* Action Icons - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}
+              <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
                   onClick={() => addSong(song.id)}
                   disabled={songIds.includes(song.id)}
                   title={songIds.includes(song.id) ? 'In Live' : 'Add to Live'}
-                  className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <i className={`fas ${songIds.includes(song.id) ? 'fa-check' : 'fa-plus'} text-lg text-emerald-600 dark:text-emerald-400`}></i>
-                  <span className="text-sm font-medium whitespace-nowrap">Add to Session</span>
+                  <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Add to Session</span>
                 </button>
                 {/* Only show View Pitches button when authenticated (pitches contain private singer info) */}
                 {isAuthenticated && (
                   <button
                     onClick={() => handleViewPitches(song)}
                     title={`View ${song.pitchCount ?? 0} pitch assignment${(song.pitchCount ?? 0) !== 1 ? 's' : ''}`}
-                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+                    className="relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
                   >
-                    <MusicIcon className="w-5 h-5" />
-                    <span className="text-sm font-medium whitespace-nowrap">Pitches</span>
-                    <span className={`inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold rounded-full ${
+                    <div className="relative">
+                      <MusicIcon className="w-5 h-5" />
+                      {/* Mobile: Badge overlay on icon */}
+                      {(song.pitchCount ?? 0) > 0 && (
+                        <span className="absolute -top-1 -right-1 sm:hidden flex items-center justify-center min-w-[16px] h-[16px] px-0.5 text-[9px] font-bold text-white bg-black rounded-full z-10">
+                          {song.pitchCount ?? 0}
+                        </span>
+                      )}
+                    </div>
+                    {/* Desktop: Text and inline badge */}
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Pitches</span>
+                    <span className={`hidden sm:inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold rounded-full ${
                       (song.pitchCount ?? 0) > 0 
                         ? 'text-white bg-gray-900 dark:bg-black' 
                         : 'text-gray-500 bg-gray-300 dark:bg-gray-600 dark:text-gray-400'
@@ -155,14 +186,27 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                     </span>
                   </button>
                 )}
+                {song.externalSourceUrl && (
+                  <Tooltip content="View song on external source (YouTube, etc.)">
+                    <a
+                      href={song.externalSourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                    >
+                      <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400"></i>
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">External URL</span>
+                    </a>
+                  </Tooltip>
+                )}
                 {isEditor && (
                   <button
                     onClick={() => onEdit(song)}
                     title="Edit"
-                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                   >
                     <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                    <span className="text-sm font-medium whitespace-nowrap">Edit</span>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
                   </button>
                 )}
                 {isAdmin && song.externalSourceUrl && (
@@ -170,17 +214,17 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                     onClick={() => handleSyncClick(song.id)}
                     disabled={syncingSongId === song.id}
                     title="Sync from external source"
-                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {syncingSongId === song.id ? (
                       <>
                         <i className="fas fa-sync text-lg text-yellow-600 dark:text-yellow-400 animate-spin"></i>
-                        <span className="text-sm font-medium whitespace-nowrap">Syncing...</span>
+                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Syncing...</span>
                       </>
                     ) : (
                       <>
                         <i className="fas fa-sync text-lg text-yellow-600 dark:text-yellow-400"></i>
-                        <span className="text-sm font-medium whitespace-nowrap">Sync</span>
+                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Sync</span>
                       </>
                     )}
                   </button>
@@ -190,16 +234,17 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                   <button
                     onClick={() => handleDeleteClick(song)}
                     title="Delete"
-                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                   >
                     <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                    <span className="text-sm font-medium whitespace-nowrap">Delete</span>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
                   </button>
                 )}
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <Modal

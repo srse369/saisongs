@@ -10,6 +10,7 @@ import { Modal } from '../common/Modal';
 import { Tooltip } from '../common/Tooltip';
 import { CenterBadges } from '../common/CenterBadges';
 import { CenterMultiSelect } from '../common/CenterMultiSelect';
+import { MobileBottomActionBar, type MobileAction } from '../common';
 import { SongMetadataCard } from '../common/SongMetadataCard';
 import { SongDetails } from '../admin/SongDetails';
 import { formatNormalizedPitch } from '../../utils/pitchNormalization';
@@ -39,6 +40,17 @@ export const SessionManager: React.FC = () => {
   const [sessionToLoad, setSessionToLoad] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [selectedSessionItemKey, setSelectedSessionItemKey] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Fetch songs on mount (public data)
   // Fetch singers only when authenticated (protected data)
@@ -373,27 +385,65 @@ export const SessionManager: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionToLoad, currentSession]);
 
+
+  // Mobile actions for bottom bar
+  const mobileActions: MobileAction[] = [
+    {
+      label: 'Load',
+      icon: 'fas fa-folder-open',
+      onClick: () => setShowLoadModal(true),
+      variant: 'secondary',
+    },
+    ...(isAuthenticated ? [{
+      label: 'Save',
+      icon: 'fas fa-save',
+      onClick: () => setShowSaveModal(true),
+      variant: 'primary' as const,
+    }] : []),
+    {
+      label: 'Clear',
+      icon: 'fas fa-trash-alt',
+      onClick: clearSession,
+      variant: 'secondary',
+      disabled: sessionItems.length === 0,
+    },
+    {
+      label: 'Present',
+      icon: 'fas fa-play',
+      onClick: handlePresentSession,
+      variant: 'primary' as const,
+      disabled: sessionItems.length === 0,
+    },
+    {
+      label: 'Export',
+      icon: 'fas fa-download',
+      onClick: handleExportToPowerPoint,
+      variant: 'secondary',
+      disabled: exporting || sessionItems.length === 0,
+    },
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+    <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
+      <div className="mb-2 sm:mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <div className="flex items-center gap-2">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Session</h1>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Session</h1>
             <a
               href="/help#live"
               className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
               title="View help documentation for this tab"
             >
-              <i className="fas fa-question-circle text-xl"></i>
+              <i className="fas fa-question-circle text-lg sm:text-xl"></i>
             </a>
           </div>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
             Build a set of songs to present together. Add songs from the Songs or Pitches tabs, then
             present them as a continuous slideshow.
           </p>
         </div>
-        {/* Action buttons - Grid on mobile, flex on desktop */}
-        <div className="w-full sm:w-auto">
+        {/* Action buttons - Hidden on mobile, shown on desktop */}
+        <div className="hidden md:block w-full sm:w-auto">
           {/* When session is empty, only show Load Session */}
           {sessionItems.length === 0 ? (
             <Tooltip content="Load a previously saved session into this list">
@@ -407,7 +457,7 @@ export const SessionManager: React.FC = () => {
               </button>
             </Tooltip>
           ) : (
-            <div className="grid grid-cols-2 sm:flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {/* Load Session */}
           <Tooltip content="Load a previously saved session into this list">
             <button
@@ -452,37 +502,39 @@ export const SessionManager: React.FC = () => {
               </div>
               
               {/* Present Session */}
-              <div className="col-span-1">
+              <div>
                 <Tooltip content="Start full-screen presentation with all songs in order">
                   <button
                     type="button"
                     onClick={handlePresentSession}
-                    className="w-full min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg sm:rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors flex items-center justify-center gap-2"
+                    className="min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg sm:rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors flex items-center justify-center gap-2"
                   >
                     <i className="fas fa-play"></i>
-                    <span className="hidden sm:inline">Present</span>
-                    <span className="sm:hidden">Present</span>
+                    <span>Present</span>
                   </button>
                 </Tooltip>
               </div>
               
               {/* Export to PowerPoint */}
-              <div className="col-span-1">
+              <div>
                 <Tooltip content="Export session to PowerPoint file with all song slides">
                   <button
                     type="button"
                     onClick={handleExportToPowerPoint}
                     disabled={exporting}
-                    className="w-full min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-purple-600 rounded-lg sm:rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    className="min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-purple-600 rounded-lg sm:rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                   >
                     <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-download'}`}></i>
-                    <span className="hidden sm:inline">{exporting ? 'Exporting...' : 'Export'}</span>
-                    <span className="sm:hidden">{exporting ? '...' : 'Export'}</span>
+                    <span>{exporting ? 'Exporting...' : 'Export'}</span>
                   </button>
                 </Tooltip>
               </div>
             </div>
           )}
+        </div>
+        {/* Template selector for mobile - shown above bottom bar */}
+        <div className="md:hidden w-full">
+          <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
         </div>
       </div>
 
@@ -501,19 +553,32 @@ export const SessionManager: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {sessionItems.map(({ entry, song, singer }, index) => (
+        <div className="space-y-1.5 md:space-y-3">
+          {sessionItems.map(({ entry, song, singer }, index) => {
+            const itemKey = `${entry.songId}-${entry.singerId ?? 'none'}`;
+            const isSelected = selectedSessionItemKey === itemKey;
+            return (
             <div
-              key={`${entry.songId}-${entry.singerId ?? 'none'}`}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-200 cursor-move"
-              draggable
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => handleDrop(e, index)}
+              key={itemKey}
+              onClick={() => {
+                // On mobile, toggle selection on row click
+                if (isMobile) {
+                  setSelectedSessionItemKey(isSelected ? null : itemKey);
+                }
+              }}
+              className={`bg-white dark:bg-gray-800 border rounded-lg shadow-md p-2 md:p-4 hover:shadow-lg transition-all duration-200 ${
+                isSelected 
+                  ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800' 
+                  : 'border-gray-200 dark:border-gray-700'
+              } ${isMobile ? 'cursor-pointer' : 'cursor-move'}`}
+              draggable={!isMobile}
+              onDragStart={(e) => !isMobile && handleDragStart(e, index)}
+              onDragOver={(e) => !isMobile && e.preventDefault()}
+              onDrop={(e) => !isMobile && handleDrop(e, index)}
             >
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5 md:gap-3">
                 {/* Header with song number */}
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-1.5 md:gap-3">
                   <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full font-bold text-sm">
                     {index + 1}
                   </div>
@@ -521,15 +586,19 @@ export const SessionManager: React.FC = () => {
                     {/* Song Metadata Section - Reusable component */}
                     <SongMetadataCard
                       song={song}
-                      onNameClick={() => handlePreviewSong(song.id)}
-                      nameClickTitle={song.name}
+                      onNameClick={isMobile ? undefined : () => handlePreviewSong(song.id)}
+                      nameClickTitle={isMobile ? undefined : song.name}
+                      showBackground={!isMobile}
+                      isSelected={isSelected}
+                      alwaysShowDeityLanguage={true}
+                      onPreviewClick={() => handlePreviewSong(song.id)}
                     />
                     
                     {/* Singer and Pitch */}
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       {singer && (
                         <>
-                          <span className="font-medium">Singer: </span>
+                          <span className="hidden md:inline font-medium">Singer: </span>
                           <span className={`font-bold text-base ${
                             singer.gender?.toLowerCase() === 'male' 
                               ? 'text-blue-600 dark:text-blue-400' 
@@ -542,18 +611,13 @@ export const SessionManager: React.FC = () => {
                                     : 'text-gray-600 dark:text-gray-400'
                           }`}>
                             {singer.name}
-                            {singer.centerIds && singer.centerIds.length > 0 && (
-                              <span className="font-normal text-gray-500 dark:text-gray-400">
-                                {' '}<CenterBadges centerIds={singer.centerIds} size="sm" showText />
-                              </span>
-                            )}
                           </span>
                           <span className="mx-2">•</span>
                         </>
                       )}
                       {entry.pitch && (
                         <>
-                          <span>Pitch: </span>
+                          <span className="hidden md:inline">Pitch: </span>
                           <span className="font-bold text-gray-700 dark:text-gray-200">{formatNormalizedPitch(entry.pitch)}</span>
                         </>
                       )}
@@ -561,27 +625,36 @@ export const SessionManager: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Action buttons - Touch-friendly, aligned with song card */}
-                <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-gray-200 dark:border-gray-700 ml-11">
-                  <button
-                    onClick={() => handlePreviewSong(song.id)}
-                    title="Preview"
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors flex items-center justify-center"
-                  >
-                    <i className="fas fa-eye text-lg text-purple-600 dark:text-purple-400"></i>
-                  </button>
+                {/* Action buttons - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}
+                <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ml-11 ${isMobile && !isSelected ? 'hidden' : ''}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {song.externalSourceUrl && (
+                    <Tooltip content="View song on external source (YouTube, etc.)">
+                      <a
+                        href={song.externalSourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                      >
+                        <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400"></i>
+                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">External URL</span>
+                      </a>
+                    </Tooltip>
+                  )}
                   <button
                     onClick={() => removeSong(entry.songId, entry.singerId)}
                     title="Remove"
-                    className="min-h-[44px] sm:min-h-0 flex items-center gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                   >
                     <i className="fas fa-times text-lg text-red-600 dark:text-red-400"></i>
-                    <span className="text-sm font-medium whitespace-nowrap">Remove</span>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Remove</span>
                   </button>
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
       {viewingSong && (
@@ -776,6 +849,11 @@ export const SessionManager: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Mobile Bottom Action Bar - Always show so users can access Load button */}
+      <MobileBottomActionBar
+        actions={mobileActions}
+      />
     </div>
   );
 };

@@ -1,0 +1,57 @@
+{
+  "name": "Sai Devotional Song Studio",
+  "short_name": "Song Studio",
+  "description": "Manage and organize devotional songs, singers, and pitch assignments",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["music", "productivity", "utilities"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Songs",
+      "short_name": "Songs",
+      "description": "View and manage songs",
+      "url": "/admin/songs",
+      "icons": [{ "src": "/logo1.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Singers",
+      "short_name": "Singers",
+      "description": "View and manage singers",
+      "url": "/admin/singers",
+      "icons": [{ "src": "/logo1.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Pitches",
+      "short_name": "Pitches",
+      "description": "View and manage pitch assignments",
+      "url": "/admin/pitches",
+      "icons": [{ "src": "/logo1.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Live Session",
+      "short_name": "Live",
+      "description": "Manage live session",
+      "url": "/session",
+      "icons": [{ "src": "/logo1.png", "sizes": "192x192" }]
+    }
+  ]
+}
+
