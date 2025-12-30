@@ -38,7 +38,7 @@ export const MobileBottomActionBar: React.FC<MobileBottomActionBarProps> = ({
               className={`
                 flex-1 min-w-0 flex flex-row items-center justify-center gap-1 px-2 py-1 rounded
                 transition-colors touch-target border border-gray-300 dark:border-gray-600
-                g-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 disabled:bg-gray-100 disabled:text-gray-400
+                bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 disabled:bg-gray-100 disabled:text-gray-400
                 ${action.disabled ? 'opacity-50 cursor-not-allowed' : ''}
               `}
               aria-label={action.label}
