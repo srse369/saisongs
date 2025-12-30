@@ -101,6 +101,14 @@ export const PitchManager: React.FC = () => {
     }
   }, [songFilterId, singerFilterId, songs, singers]);
 
+  // When navigating from a singer's or song's pitches button, switch to "All Pitches" mode
+  // so the filter can work correctly (otherwise "My Pitches" filter would conflict)
+  useEffect(() => {
+    if (singerFilterId || songFilterId) {
+      setShowMyPitches(false);
+    }
+  }, [singerFilterId, songFilterId]);
+
   // Fetch songs, singers, and all existing pitch associations when needed.
   // Use cached data when switching tabs for better performance
   // Parallelize fetches for better performance

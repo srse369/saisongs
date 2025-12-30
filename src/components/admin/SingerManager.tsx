@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSingers } from '../../contexts/SingerContext';
+import { usePitches } from '../../contexts/PitchContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
 import { RefreshIcon, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
@@ -10,6 +11,7 @@ import type { Singer, CreateSingerInput } from '../../types';
 
 export const SingerManager: React.FC = () => {
   const { singers, loading, error, fetchSingers, createSinger, updateSinger, deleteSinger, mergeSingers } = useSingers();
+  const { fetchAllPitches } = usePitches();
   const { isEditor, userId, logout } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSinger, setEditingSinger] = useState<Singer | null>(null);
@@ -135,8 +137,12 @@ export const SingerManager: React.FC = () => {
   const handleMerge = async (targetSingerId: string, singerIdsToMerge: string[]): Promise<boolean> => {
     const success = await mergeSingers(targetSingerId, singerIdsToMerge);
     if (success) {
-      // Refresh singers to get updated data
-      await fetchSingers(true);
+      // Refresh singers and pitches to get updated data after merge
+      // (mergeSingers already refreshes singers, but we refresh pitches here)
+      await Promise.all([
+        fetchSingers(true),
+        fetchAllPitches(true)
+      ]);
     }
     return success;
   };

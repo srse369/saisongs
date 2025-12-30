@@ -207,6 +207,8 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
         'songStudio:pitchesCache',
         'songStudio:templatesCache',
         'songStudio:centersCache',
+        'selectedSessionTemplateId', // Session template selection
+        'songstudio-template-clipboard-v2', // Template editor clipboard
       ];
       
       cacheKeys.forEach(key => {

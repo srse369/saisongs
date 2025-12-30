@@ -231,12 +231,14 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       const result = await singerService.mergeSingers(targetSingerId, singerIdsToMerge);
       
       // Clear localStorage caches for singers and pitches
+      // Note: Pitches are also affected by merge (transferred/deleted), so we clear their cache too
+      // The calling component (SingerManager) will refresh pitches after merge completes
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(SINGERS_CACHE_KEY);
         window.localStorage.removeItem('songStudio:pitchesCache');
       }
       
-      // Refresh singers list to get updated data
+      // Refresh singers list to get updated data (merged singers are deleted, target singer updated)
       await fetchSingers(true);
       
       toast.success(`Successfully merged ${result.mergedCount} singer(s)`);
