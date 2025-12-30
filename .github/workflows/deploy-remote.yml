@@ -136,6 +136,13 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.REMOTE_IP }} >> ~/.ssh/known_hosts
 
+      - name: Create Remote Directories
+        run: |
+          echo "📁 Creating remote directories..."
+          ssh -i ~/.ssh/deploy_key ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }} \
+            "mkdir -p ${{ secrets.REMOTE_PATH }}/dist/server"
+          echo "✅ Remote directories created"
+
       - name: Deploy Frontend
         if: ${{ github.event.inputs.deploy_type != 'backend-only' }}
         run: |
