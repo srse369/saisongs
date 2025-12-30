@@ -4,6 +4,7 @@ import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../contexts/AuthContext';
 import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, CenterBadges, Tooltip, Modal } from './common';
 import { FeedbackDrawer } from './common/FeedbackDrawer';
+import { clearAllCaches, checkCacheClearCooldown, CACHE_KEYS } from '../utils/cacheUtils';
 import apiClient from '../services/ApiClient';
 
 interface AdminUser {
@@ -24,6 +25,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [showAdminsModal, setShowAdminsModal] = useState(false);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [clearingCache, setClearingCache] = useState(false);
   const { isConnected, connectionError, resetConnection } = useDatabase();
   const { isAuthenticated, userRole, userName, userEmail, logout, centerIds, editorFor, isAdmin } = useAuth();
 
@@ -40,6 +42,35 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       console.error('Error fetching admins:', error);
     } finally {
       setLoadingAdmins(false);
+    }
+  };
+
+  const handleRefreshLocalCache = async () => {
+    const cooldownSeconds = checkCacheClearCooldown(60000); // 60 second cooldown
+    if (cooldownSeconds > 0) {
+      alert(`Please wait ${cooldownSeconds} seconds before clearing cache again.`);
+      return;
+    }
+
+    if (!confirm('Clear web page, JavaScript, and CSS cache? This will fetch fresh HTML/JS/CSS but preserve image caches.')) {
+      return;
+    }
+
+    setClearingCache(true);
+    setIsMobileMenuOpen(false);
+    
+    try {
+      await clearAllCaches({
+        clearServiceWorkerCache: true,
+        reload: true,
+        reloadParam: '_nocache',
+        reloadDelay: 1500,
+        updateLastClearTimestamp: true,
+      });
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      setClearingCache(false);
+      alert('Failed to clear cache. Please try again.');
     }
   };
 
@@ -233,67 +264,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </nav>
 
-            {/* Mobile menu - 4 icon buttons + hamburger menu on same row */}
-            <div className="md:hidden flex items-center gap-1">
-              {/* Songs */}
-              <Link
-                to="/admin/songs"
-                className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md transition-colors ${
-                  isActive('/admin/songs')
-                    ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <SongIcon className="w-5 h-5" />
-                <span className="text-[9px] font-medium leading-tight">Songs</span>
-              </Link>
-              
-              {/* Singers and Pitches tabs visible to all authenticated users */}
-              {isAuthenticated && (
-                <>
-                  <Link
-                    to="/admin/singers"
-                    className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md transition-colors ${
-                      isActive('/admin/singers')
-                        ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <i className="fas fa-users text-lg"></i>
-                    <span className="text-[9px] font-medium leading-tight">Singers</span>
-                  </Link>
-                  <Link
-                    to="/admin/pitches"
-                    className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md transition-colors ${
-                      isActive('/admin/pitches')
-                        ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <MusicIcon className="w-5 h-5" />
-                    <span className="text-[9px] font-medium leading-tight">Pitches</span>
-                  </Link>
-                </>
-              )}
-              
-              {/* Live */}
-              <Link
-                to="/session"
-                className={`flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md transition-colors ${
-                  isActive('/session')
-                    ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <i className="fas fa-play-circle text-lg"></i>
-                <span className="text-[9px] font-medium leading-tight">Live</span>
-              </Link>
-              
-              {/* Hamburger menu button */}
+            {/* Mobile menu - hamburger menu only */}
+            <div className="md:hidden flex items-center">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -330,6 +302,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <i className="fas fa-question-circle w-5 h-5 mr-2 inline"></i>
                 Help
               </Link>
+              
+              <button
+                onClick={handleRefreshLocalCache}
+                disabled={clearingCache}
+                className={`block w-full text-left ${getLinkClasses('')} ${clearingCache ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <i className="fas fa-sync-alt w-5 h-5 mr-2 inline"></i>
+                {clearingCache ? 'Refreshing Cache...' : 'Refresh Local Cache'}
+              </button>
               
               {/* Database status and Auth controls in mobile menu */}
               <div className="px-3 py-2 space-y-3 border-t border-gray-200 dark:border-gray-700 mt-2 pt-3">
@@ -505,12 +486,75 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-7xl mx-auto py-2 sm:py-4 md:py-6 lg:py-8 px-2 sm:px-6 lg:px-8">
+      <main className="flex-1 w-full max-w-7xl mx-auto py-2 sm:py-4 md:py-6 lg:py-8 px-2 sm:px-6 lg:px-8 pb-24 md:pb-2">
         {children}
       </main>
 
+      {/* Mobile Bottom Navigation - Songs, Singers, Pitches, Live buttons */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-30">
+        <div className="flex items-center justify-around h-10 py-0.5">
+          {/* Songs */}
+          <Link
+            to="/admin/songs"
+            className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${
+              isActive('/admin/songs')
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-gray-600 dark:text-gray-400'
+            }`}
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <SongIcon />
+            <span className="text-[9px] font-medium leading-none">Songs</span>
+          </Link>
+          
+          {/* Singers and Pitches tabs visible to all authenticated users */}
+          {isAuthenticated && (
+            <>
+              <Link
+                to="/admin/singers"
+                className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${
+                  isActive('/admin/singers')
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-400'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <i className="fas fa-users text-lg"></i>
+                <span className="text-[9px] font-medium leading-none">Singers</span>
+              </Link>
+              <Link
+                to="/admin/pitches"
+                className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${
+                  isActive('/admin/pitches')
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-400'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <MusicIcon className="w-5 h-5" />
+                <span className="text-[9px] font-medium leading-none">Pitches</span>
+              </Link>
+            </>
+          )}
+          
+          {/* Live */}
+          <Link
+            to="/session"
+            className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${
+              isActive('/session')
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-gray-600 dark:text-gray-400'
+            }`}
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <i className="fas fa-play-circle text-lg"></i>
+            <span className="text-[9px] font-medium leading-none">Live</span>
+          </Link>
+        </div>
+      </nav>
+
       {/* Footer */}
-      <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto">
+      <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto hidden md:block">
         <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
           <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
           Sai Songs © {new Date().getFullYear()}
@@ -528,7 +572,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Tooltip content="Send feedback, report bugs, or request new features">
         <button
           onClick={() => setIsFeedbackOpen(true)}
-          className="fixed bottom-16 md:bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-30"
+          className="fixed bottom-20 md:bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-30"
           aria-label="Send feedback"
         >
           <i className="fas fa-comment text-lg mx-auto"></i>

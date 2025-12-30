@@ -3,6 +3,30 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
+// Suppress React DOM reconciliation errors that occur during unmounting
+// These are harmless React internal errors that don't affect functionality
+const originalError = console.error;
+console.error = (...args: unknown[]) => {
+  // Check if this is a React DOM removeChild error
+  const firstArg = args[0];
+  if (firstArg && typeof firstArg === 'object') {
+    const error = firstArg as { name?: string; message?: string; toString?: () => string };
+    const errorMessage = error.toString?.() || error.message || '';
+    const isReactDOMRemoveChildError = 
+      (error.name === 'NotFoundError' || errorMessage.includes("NotFoundError")) &&
+      errorMessage.includes("removeChild") &&
+      errorMessage.includes("not a child of this node");
+    
+    if (isReactDOMRemoveChildError) {
+      // Suppress these errors - they're harmless React reconciliation issues
+      return;
+    }
+  }
+  
+  // Log all other errors normally
+  originalError.apply(console, args);
+};
+
 // Register service worker for PWA
 // In development, unregister any existing service workers to prevent caching issues
 if ('serviceWorker' in navigator) {

@@ -4,6 +4,7 @@ import type { Song, CreateSongInput, UpdateSongInput, ServiceError } from '../ty
 import { songService } from '../services';
 import { useToast } from './ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../utils';
+import { safeSetLocalStorageItem } from '../utils/cacheUtils';
 
 const SONGS_CACHE_KEY = 'saiSongs:songsCache';
 const SONGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -49,18 +50,14 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
         
         // Update localStorage cache to keep it in sync
         if (typeof window !== 'undefined') {
-          try {
-            window.localStorage.setItem(
-              SONGS_CACHE_KEY,
-              JSON.stringify({
-                timestamp: Date.now(),
-                songs: updated,
-              })
-            );
-          } catch (e) {
-            // Silently ignore storage errors (e.g., quota exceeded on iOS)
-            console.warn('Failed to update songs cache in localStorage:', e);
-          }
+          const cacheData = JSON.stringify({
+            timestamp: Date.now(),
+            songs: updated,
+          });
+          safeSetLocalStorageItem(SONGS_CACHE_KEY, cacheData, {
+            clearOnQuotaError: true,
+            skipKeys: [SONGS_CACHE_KEY],
+          });
         }
         
         return updated;
@@ -78,18 +75,14 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
         
         // Update localStorage cache to keep it in sync
         if (typeof window !== 'undefined') {
-          try {
-            window.localStorage.setItem(
-              SONGS_CACHE_KEY,
-              JSON.stringify({
-                timestamp: Date.now(),
-                songs: updated,
-              })
-            );
-          } catch (e) {
-            // Silently ignore storage errors (e.g., quota exceeded on iOS)
-            console.warn('Failed to update songs cache in localStorage:', e);
-          }
+          const cacheData = JSON.stringify({
+            timestamp: Date.now(),
+            songs: updated,
+          });
+          safeSetLocalStorageItem(SONGS_CACHE_KEY, cacheData, {
+            clearOnQuotaError: true,
+            skipKeys: [SONGS_CACHE_KEY],
+          });
         }
         
         return updated;
@@ -160,18 +153,14 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
 
       // Persist to cache for subsequent loads
       if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.setItem(
-            SONGS_CACHE_KEY,
-            JSON.stringify({
-              timestamp: Date.now(),
-              songs: sortedSongs,
-            })
-          );
-        } catch (e) {
-          // Silently ignore storage errors (e.g., quota exceeded on iOS)
-          console.warn('Failed to cache songs to localStorage:', e);
-        }
+        const cacheData = JSON.stringify({
+          timestamp: Date.now(),
+          songs: sortedSongs,
+        });
+        safeSetLocalStorageItem(SONGS_CACHE_KEY, cacheData, {
+          clearOnQuotaError: true,
+          skipKeys: [SONGS_CACHE_KEY],
+        });
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch songs';

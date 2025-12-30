@@ -9,6 +9,7 @@ import { PitchForm } from './PitchForm';
 import { PitchList } from './PitchList';
 import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedPitchSearch, type PitchSearchFilters } from '../common/AdvancedPitchSearch';
+import { WebLLMService } from '../../services/WebLLMService';
 import { RefreshIcon, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
 import type { SongSingerPitch, CreatePitchInput, Song } from '../../types';
 import { Modal } from '../common/Modal';
@@ -100,6 +101,11 @@ export const PitchManager: React.FC = () => {
       });
     }
   }, [songFilterId, singerFilterId, songs, singers]);
+
+  // Extract available values for WebLLM
+  const availableValues = useMemo(() => {
+    return WebLLMService.extractAvailableValues(songs, singers);
+  }, [songs, singers]);
 
   // When navigating from a singer's or song's pitches button, switch to "All Pitches" mode
   // so the filter can work correctly (otherwise "My Pitches" filter would conflict)
@@ -510,6 +516,7 @@ export const PitchManager: React.FC = () => {
                 }}
                 searchType="pitch"
                 placeholder='Ask AI: "Show me C# pitches for devi songs" or "Which singers have sanskrit songs?"...'
+                availableValues={availableValues}
               />
             </div>
             {/* Desktop action buttons - hidden on mobile */}

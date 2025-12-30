@@ -1,5 +1,5 @@
 import React, { useState, useEffect, forwardRef } from 'react';
-import { getWebLLMService, checkWebGPUSupport, type LLMSearchResult, type SearchType } from '../../services/WebLLMService';
+import { getWebLLMService, checkWebGPUSupport, type LLMSearchResult, type SearchType, type AvailableValues } from '../../services/WebLLMService';
 import type { InitProgressReport } from '@mlc-ai/web-llm';
 import type { SongSearchFilters } from './AdvancedSongSearch';
 import type { PitchSearchFilters } from './AdvancedPitchSearch';
@@ -10,6 +10,7 @@ interface WebLLMSearchInputProps {
   onFiltersExtracted?: (filters: SongSearchFilters | PitchSearchFilters) => void;
   searchType: SearchType;
   placeholder?: string;
+  availableValues?: AvailableValues;
 }
 
 export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputProps>(({
@@ -18,6 +19,7 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
   onFiltersExtracted,
   searchType,
   placeholder = 'Ask me: "Show me sai songs in sanskrit with fast tempo"...',
+  availableValues,
 }, ref) => {
   const [llmEnabled, setLlmEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,6 +34,14 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
     setHasWebGPU(checkWebGPUSupport());
   }, []);
 
+  // Update available values when they change or when LLM is enabled
+  useEffect(() => {
+    if (availableValues) {
+      const service = getWebLLMService();
+      service.setAvailableValues(availableValues);
+    }
+  }, [availableValues]);
+
   const handleEnableLLM = async () => {
     if (!hasWebGPU) {
       setError('WebGPU not supported in your browser. Please use Chrome/Edge 113+ or Safari 17+');
@@ -43,11 +53,21 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
     
     const service = getWebLLMService();
     
+    // Set available values before or after initialization
+    if (availableValues) {
+      service.setAvailableValues(availableValues);
+    }
+    
     try {
       await service.initialize((report: InitProgressReport) => {
         setLoadProgress(report.text);
         setLoadPercentage(report.progress * 100);
       });
+      
+      // Ensure available values are set after initialization
+      if (availableValues) {
+        service.setAvailableValues(availableValues);
+      }
       
       setLlmEnabled(true);
       setIsLoading(false);
@@ -85,13 +105,35 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
       
       if (onFiltersExtracted) {
         if (Object.keys(result.filters).length > 0) {
-          console.log('✅ Applying filters:', result.filters);
-          onFiltersExtracted(result.filters);
+          // Check if only "name" filter is extracted (text search query)
+          const filterKeys = Object.keys(result.filters);
+          const isTextSearch = filterKeys.length === 1 && 
+            (filterKeys[0] === 'name' || filterKeys[0] === 'songName');
           
-          // Show success message
-          const filterCount = Object.keys(result.filters).length;
-          const filterNames = Object.keys(result.filters).join(', ');
-          setSuccessMessage(`✨ Applied ${filterCount} filter${filterCount > 1 ? 's' : ''}: ${filterNames}`);
+          if (isTextSearch) {
+            // For text search queries, use the search text instead of the name filter
+            // This allows fuzzy search to work properly
+            const nameValue = (result.filters as any).name || (result.filters as any).songName || '';
+            if (nameValue) {
+              // Set search text to the extracted name for fuzzy search
+              onChange(nameValue);
+              // Don't apply the name filter - just use search text
+              setSuccessMessage(`✨ Searching for: "${nameValue}"`);
+            } else {
+              // If no name value, keep the original search text
+              setSuccessMessage(`✨ Using text search`);
+            }
+          } else {
+            // For filter-based queries, apply filters and clear the search text
+            console.log('✅ Applying filters:', result.filters);
+            onFiltersExtracted(result.filters);
+            onChange('');
+            
+            // Show success message
+            const filterCount = Object.keys(result.filters).length;
+            const filterNames = Object.keys(result.filters).join(', ');
+            setSuccessMessage(`✨ Applied ${filterCount} filter${filterCount > 1 ? 's' : ''}: ${filterNames}`);
+          }
           
           // Clear success message after 5 seconds
           setTimeout(() => setSuccessMessage(null), 5000);

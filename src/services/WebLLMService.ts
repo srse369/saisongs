@@ -1,6 +1,8 @@
 import * as webllm from "@mlc-ai/web-llm";
 import type { SongSearchFilters } from '../components/common/AdvancedSongSearch';
 import type { PitchSearchFilters } from '../components/common/AdvancedPitchSearch';
+import { ALL_PITCH_OPTIONS } from '../utils/pitchUtils';
+import type { Song } from '../types';
 
 export type SearchType = 'song' | 'pitch';
 
@@ -10,17 +12,70 @@ export interface LLMSearchResult {
   confidence?: number;
 }
 
+export interface AvailableValues {
+  ragas?: string[];
+  deities?: string[];
+  languages?: string[];
+  tempos?: string[];
+  beats?: string[];
+  levels?: string[];
+  pitches?: string[];
+  singerNames?: string[];
+}
+
 export class WebLLMService {
   private engine: webllm.MLCEngine | null = null;
   private isInitializing = false;
   private isReady = false;
   private initPromise: Promise<void> | null = null;
+  private availableValues: AvailableValues = {};
   
   // Using the smallest available model for better performance and reliability
   // Qwen2-0.5B is the smallest model (~100-150MB) perfect for simple parsing tasks
   private readonly MODEL = "Qwen2-0.5B-Instruct-q4f16_1-MLC";
   
   constructor() {}
+  
+  /**
+   * Set available values from the database to help WebLLM make better classifications
+   */
+  setAvailableValues(values: AvailableValues): void {
+    this.availableValues = { ...values };
+    // Always include all pitch options
+    this.availableValues.pitches = ALL_PITCH_OPTIONS;
+  }
+  
+  /**
+   * Extract unique values from songs and singers arrays
+   */
+  static extractAvailableValues(songs: Song[] = [], singers: { name: string }[] = []): AvailableValues {
+    const getUniqueValues = (field: keyof Song): string[] => {
+      const values = new Set<string>();
+      songs.forEach(song => {
+        const value = song[field];
+        if (value && typeof value === 'string' && value.trim()) {
+          values.add(value.trim());
+        }
+      });
+      return Array.from(values).sort((a, b) => a.localeCompare(b));
+    };
+
+    const singerNames = singers
+      .map(s => s.name)
+      .filter(name => name && name.trim())
+      .sort((a, b) => a.localeCompare(b));
+
+    return {
+      ragas: getUniqueValues('raga'),
+      deities: getUniqueValues('deity'),
+      languages: getUniqueValues('language'),
+      tempos: getUniqueValues('tempo'),
+      beats: getUniqueValues('beat'),
+      levels: getUniqueValues('level'),
+      pitches: ALL_PITCH_OPTIONS,
+      singerNames: Array.from(new Set(singerNames)),
+    };
+  }
 
   async initialize(onProgress?: (report: webllm.InitProgressReport) => void): Promise<void> {
     if (this.isReady) return;
@@ -113,74 +168,127 @@ export class WebLLMService {
 
   private preprocessQuery(query: string, searchType: SearchType): string {
     // Add explicit hints when certain keywords are detected
-    let enhanced = query;
+    // Collect all hints first, then append them all at once
+    const hints: string[] = [];
+    const lowerQuery = query.toLowerCase();
     
     // Common ragas - if detected, add hint
     const commonRagas = [
       'hamsadhwani', 'mohanam', 'kalyani', 'shankarabharanam', 'kharaharapriya',
-      'bhairavi', 'sankarabharanam', 'todi', 'kambhoji', 'bilahari', 'dhanyasi'
+      'bhairavi', 'sankarabharanam', 'todi', 'kambhoji', 'bilahari', 'dhanyasi',
+      'bilawal', 'kapi', 'arabhi', 'natabhairavi', 'sahana', 'begada', 'mayamalavagowla'
     ];
     
     for (const raga of commonRagas) {
-      if (query.toLowerCase().includes(raga)) {
-        enhanced = `${query} [HINT: "${raga}" is a RAGA name]`;
-        break;
+      if (lowerQuery.includes(raga)) {
+        hints.push(`"${raga}" is a RAGA name`);
       }
     }
     
     // Common deities
     const deities = ['sai', 'devi', 'krishna', 'rama', 'shiva', 'ganesh', 'hanuman', 
-                     'durga', 'lakshmi', 'saraswati', 'ganesha', 'vishnu'];
+                     'durga', 'lakshmi', 'saraswati', 'ganesha', 'vishnu', 'muruga', 
+                     'murugan', 'ayyappa'];
     for (const deity of deities) {
-      if (query.toLowerCase().includes(deity) && !enhanced.includes('[HINT:')) {
-        enhanced = `${query} [HINT: "${deity}" is a DEITY name]`;
-        break;
+      if (lowerQuery.includes(deity)) {
+        hints.push(`"${deity}" is a DEITY name`);
       }
     }
     
     // Language detection
     const languages = ['sanskrit', 'hindi', 'telugu', 'tamil', 'kannada', 'malayalam', 
-                      'bengali', 'marathi'];
+                      'bengali', 'marathi', 'gujarati', 'punjabi', 'oriya'];
     for (const lang of languages) {
-      if (query.toLowerCase().includes(lang) && !enhanced.includes('[HINT:')) {
-        enhanced = `${query} [HINT: "${lang}" is a LANGUAGE]`;
-        break;
+      if (lowerQuery.includes(lang)) {
+        hints.push(`"${lang}" is a LANGUAGE`);
       }
     }
     
     // Tempo detection
     const tempos = ['slow', 'medium', 'fast', 'medium-fast', 'medium-slow'];
     for (const tempo of tempos) {
-      if (query.toLowerCase().includes(tempo) && !enhanced.includes('[HINT:')) {
-        enhanced = `${query} [HINT: "${tempo}" is a TEMPO]`;
-        break;
+      if (lowerQuery.includes(tempo)) {
+        hints.push(`"${tempo}" is a TEMPO`);
       }
     }
     
-    return enhanced;
+    // Level detection
+    const levels = ['simple', 'intermediate', 'advanced', 'beginner', 'difficult', 'hard', 'complex'];
+    for (const level of levels) {
+      if (lowerQuery.includes(level)) {
+        hints.push(`"${level}" is a LEVEL`);
+      }
+    }
+    
+    // If we found any hints, append them to the query
+    if (hints.length > 0) {
+      const hintsText = hints.map(hint => `[HINT: ${hint}]`).join(' ');
+      return `${query} ${hintsText}`;
+    }
+    
+    return query;
+  }
+
+  private formatValueList(values: string[] | undefined, maxItems: number = 50): string {
+    if (!values || values.length === 0) {
+      return 'none available';
+    }
+    if (values.length <= maxItems) {
+      return values.join(', ');
+    }
+    return `${values.slice(0, maxItems).join(', ')} ... (${values.length} total)`;
   }
 
   private getSystemPrompt(searchType: SearchType): string {
+    const { ragas, deities, languages, tempos, beats, levels, pitches, singerNames } = this.availableValues;
+    
+    // Format available values for the prompt
+    const availableRagas = this.formatValueList(ragas);
+    const availableDeities = this.formatValueList(deities);
+    const availableLanguages = this.formatValueList(languages);
+    const availableTempos = this.formatValueList(tempos);
+    const availableBeats = this.formatValueList(beats);
+    const availableLevels = this.formatValueList(levels);
+    const availablePitches = this.formatValueList(pitches);
+    const availableSingerNames = this.formatValueList(singerNames);
+    
     if (searchType === 'song') {
       return `You are a search query parser. Extract filters from natural language and output ONLY valid JSON.
 
 CRITICAL RULES FOR CLASSIFICATION:
-1. RAGA = Musical raga names like hamsadhwani, mohanam, kalyani, bhairavi, shankarabharanam, todi, kambhoji, bilahari
-2. DEITY = Gods/goddesses like sai, devi, krishna, rama, shiva, ganesh, hanuman, durga, lakshmi, saraswati, ganesha
-3. LANGUAGE = Languages like sanskrit, hindi, telugu, tamil, kannada, malayalam, bengali, marathi
-4. TEMPO = Speed like slow, medium, fast, medium-fast, medium-slow
-5. LEVEL = Difficulty like simple, intermediate, advanced
+1. RAGA = Musical raga names (see VALID RAGAS below)
+2. DEITY = Gods/goddesses (see VALID DEITIES below)
+3. LANGUAGE = Languages (see VALID LANGUAGES below)
+4. TEMPO = Speed (see VALID TEMPOS below)
+5. LEVEL = Difficulty (see VALID LEVELS below)
 6. NAME = Actual song title/name
+
+VALID RAGAS (use exact match from this list): ${availableRagas}
+
+VALID DEITIES (use exact match from this list): ${availableDeities}
+
+VALID LANGUAGES (use exact match from this list): ${availableLanguages}
+
+VALID TEMPOS (use exact match from this list): ${availableTempos}
+
+VALID BEATS (use exact match from this list): ${availableBeats}
+
+VALID LEVELS (use exact match from this list): ${availableLevels}
 
 AVAILABLE FILTERS:
 - name: song name/title
-- deity: ONLY deity names (not ragas!)
-- language: ONLY language names
-- raga: ONLY raga names (not deities!)
-- tempo: ONLY tempo values
-- beat: beat pattern
-- level: ONLY difficulty levels
+- deity: ONLY deity names from VALID DEITIES list (not ragas!)
+- language: ONLY language names from VALID LANGUAGES list
+- raga: ONLY raga names from VALID RAGAS list (not deities!)
+- tempo: ONLY tempo values from VALID TEMPOS list
+- beat: beat pattern from VALID BEATS list
+- level: ONLY difficulty levels from VALID LEVELS list
 - songTags: tags/categories
+
+TEXT SEARCH vs FILTERS:
+- If query asks to "find/search songs which have/contain the word X" or similar text search phrases, use name filter for text search
+- If query mentions a deity/raga/language directly (e.g., "rama songs", "hamsadhwani raga"), use the appropriate filter
+- Text search queries should extract the search term into the "name" field
 
 EXAMPLES:
 Input: "Find hamsadhwani raga songs"
@@ -201,25 +309,50 @@ Output: {"level":"simple","raga":"kalyani"}
 Input: "Bhairavi raga slow songs"
 Output: {"raga":"bhairavi","tempo":"slow"}
 
+Input: "rama songs in shankarabharanam / bilawal raga"
+Output: {"deity":"rama","raga":"shankarabharanam / bilawal raga"}
+
+Input: "find songs which have the word rama"
+Output: {"name":"rama"}
+
+Input: "search for songs containing krishna"
+Output: {"name":"krishna"}
+
+Input: "songs with the word devi in the name"
+Output: {"name":"devi"}
+
 PAY ATTENTION TO HINTS: If query contains [HINT: "word" is a TYPE], use that TYPE for classification.
+
+IMPORTANT: If multiple ragas are mentioned (e.g., "raga1 / raga2"), include the full raga string including the slash separator in the raga field.
 
 Output ONLY the JSON object, nothing else.`;
     } else {
       return `You are a search query parser. Extract filters from natural language and output ONLY valid JSON.
 
 CRITICAL RULES FOR CLASSIFICATION:
-1. PITCH = Musical notes like C, C#, D, D#, E, F, F#, G, G#, A, A#, B (with or without sharp/flat)
-2. RAGA = Musical raga names like hamsadhwani, mohanam, kalyani
-3. DEITY = Gods/goddesses like sai, devi, krishna, rama
-4. LANGUAGE = Languages like sanskrit, hindi, telugu
+1. PITCH = Musical notes (see VALID PITCHES below)
+2. RAGA = Musical raga names (see VALID RAGAS below)
+3. DEITY = Gods/goddesses (see VALID DEITIES below)
+4. LANGUAGE = Languages (see VALID LANGUAGES below)
+5. SINGER = Singer names (see VALID SINGER NAMES below)
+
+VALID PITCHES (use exact match from this list): ${availablePitches}
+
+VALID RAGAS (use exact match from this list): ${availableRagas}
+
+VALID DEITIES (use exact match from this list): ${availableDeities}
+
+VALID LANGUAGES (use exact match from this list): ${availableLanguages}
+
+VALID SINGER NAMES (use exact match from this list): ${availableSingerNames}
 
 AVAILABLE FILTERS:
 - songName: name of the song
-- singerName: name of the singer  
-- pitch: ONLY musical pitches (C, C#, D, etc.)
-- deity: ONLY deity names (not ragas!)
-- language: ONLY language names
-- raga: ONLY raga names (not deities!)
+- singerName: name of the singer from VALID SINGER NAMES list
+- pitch: ONLY musical pitches from VALID PITCHES list
+- deity: ONLY deity names from VALID DEITIES list (not ragas or languages!)
+- language: ONLY language names from VALID LANGUAGES list (NOT ragas! Languages like sanskrit, hindi, telugu are NEVER ragas)
+- raga: ONLY raga names from VALID RAGAS list (not deities or languages!)
 
 EXAMPLES:
 Input: "Show me C# pitches for sai songs"
@@ -237,7 +370,14 @@ Output: {"pitch":"C","raga":"mohanam"}
 Input: "D# pitch kalyani raga"
 Output: {"pitch":"D#","raga":"kalyani"}
 
+Input: "Show me D# devi songs in sanskrit"
+Output: {"pitch":"D#","deity":"devi","language":"sanskrit"}
+
+CRITICAL: Sanskrit, Hindi, Telugu, Tamil, Kannada, Malayalam, Bengali, Marathi, Gujarati, Punjabi, Oriya are LANGUAGES, NOT ragas. Never classify them as ragas.
+
 PAY ATTENTION TO HINTS: If query contains [HINT: "word" is a TYPE], use that TYPE for classification.
+
+IMPORTANT: Use exact matches from the VALID lists above. If a value is not in the list, do not include it in the output.
 
 Output ONLY the JSON object, nothing else.`;
     }
@@ -346,6 +486,20 @@ Output the JSON filter object:`;
       delete corrected.deity;
     }
     
+    // Check if raga value is actually a language
+    if (corrected.raga && knownLanguages.includes(corrected.raga)) {
+      console.warn(`⚠️ Correcting misclassification: "${corrected.raga}" is a language, not raga`);
+      corrected.language = corrected.raga;
+      delete corrected.raga;
+    }
+    
+    // Check if language value is actually a raga
+    if (corrected.language && knownRagas.includes(corrected.language)) {
+      console.warn(`⚠️ Correcting misclassification: "${corrected.language}" is a raga, not language`);
+      corrected.raga = corrected.language;
+      delete corrected.language;
+    }
+    
     return corrected;
   }
 
@@ -372,4 +526,5 @@ export function getWebLLMService(): WebLLMService {
 export function checkWebGPUSupport(): boolean {
   return 'gpu' in navigator;
 }
+
 

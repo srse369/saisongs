@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../services/ApiClient';
+import { clearAllCaches, CACHE_KEYS } from '../utils/cacheUtils';
 
-const VERSION_STORAGE_KEY = 'saiSongs:appVersion';
 const VERSION_CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
 
 interface HealthResponse {
@@ -19,60 +19,20 @@ export const useVersionCheck = () => {
 
   const clearCachesAndReload = async () => {
     try {
-      // Clear localStorage caches
-      const cacheKeys = [
-        'saiSongs:songsCache',
-        'saiSongs:singersCache',
-        'saiSongs:pitchesCache',
-        'saiSongs:templatesCache',
-        'saiSongs:centersCache',
-        'selectedSessionTemplateId',
-        'saisongs-template-clipboard-v2',
-      ];
-      
-      cacheKeys.forEach(key => {
-        window.localStorage.removeItem(key);
-      });
-
-      // Clear service worker caches for HTML, JavaScript, and CSS files
-      if ('caches' in window && 'serviceWorker' in navigator) {
-        try {
-          const cacheNames = await caches.keys();
-          const htmlPaths = ['/', '/index.html', '/help'];
-          
-          for (const cacheName of cacheNames) {
-            const cache = await caches.open(cacheName);
-            const requests = await cache.keys();
-            
-            for (const request of requests) {
-              const url = new URL(request.url);
-              const pathname = url.pathname;
-              
-              const isHtml = htmlPaths.includes(pathname) || pathname.endsWith('.html');
-              const isJs = pathname.endsWith('.js') || pathname.endsWith('.mjs');
-              const isCss = pathname.endsWith('.css');
-              
-              if (isHtml || isJs || isCss) {
-                await cache.delete(request);
-              }
-            }
-          }
-        } catch (swError) {
-          console.warn('Could not clear service worker cache:', swError);
-        }
-      }
-
-      // Update stored version
+      // Update stored version before clearing
       const serverVersion = await fetchServerVersion();
       if (serverVersion) {
-        localStorage.setItem(VERSION_STORAGE_KEY, serverVersion);
+        localStorage.setItem(CACHE_KEYS.APP_VERSION, serverVersion);
       }
 
-      // Reload with cache-busting
-      const timestamp = Date.now();
-      const url = new URL(window.location.href);
-      url.searchParams.set('_v', serverVersion || timestamp.toString());
-      window.location.href = url.toString();
+      // Clear all caches and reload
+      await clearAllCaches({
+        clearServiceWorkerCache: true,
+        reload: true,
+        reloadParam: '_v',
+        reloadDelay: 0, // No delay for version updates
+        updateLastClearTimestamp: false, // Don't update cooldown timestamp for version updates
+      });
     } catch (error) {
       console.error('Error clearing caches for version update:', error);
       // Still reload even if cache clearing fails
@@ -109,7 +69,7 @@ export const useVersionCheck = () => {
     isCheckingRef.current = true;
 
     try {
-      const storedVersion = localStorage.getItem(VERSION_STORAGE_KEY);
+      const storedVersion = localStorage.getItem(CACHE_KEYS.APP_VERSION);
       const serverVersion = await fetchServerVersion();
 
       if (!serverVersion) {
@@ -120,7 +80,7 @@ export const useVersionCheck = () => {
 
       // If this is the first time, just store the version
       if (!storedVersion) {
-        localStorage.setItem(VERSION_STORAGE_KEY, serverVersion);
+        localStorage.setItem(CACHE_KEYS.APP_VERSION, serverVersion);
         isCheckingRef.current = false;
         return;
       }

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../../services/ApiClient';
+import { clearAllCaches, checkCacheClearCooldown, CACHE_KEYS } from '../../utils/cacheUtils';
 
 // Cache health stats for 60 seconds
 let healthStatsCache: { stats: any; timestamp: number } | null = null;
@@ -46,7 +47,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
   const [clearingLocalStorage, setClearingLocalStorage] = useState(false);
   const [localStorageMessage, setLocalStorageMessage] = useState<string | null>(null);
   const [lastLocalStorageClear, setLastLocalStorageClear] = useState<number | null>(() => {
-    const saved = localStorage.getItem('lastLocalStorageClear');
+    const saved = localStorage.getItem(CACHE_KEYS.LAST_LOCAL_STORAGE_CLEAR);
     return saved ? parseInt(saved, 10) : null;
   });
   const [brevoStatus, setBrevoStatus] = useState<BrevoStatus | null>(null);
@@ -181,13 +182,10 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
   };
 
   const handleClearLocalStorage = async () => {
-    // Check cooldown (2 minutes = 120000ms)
-    const now = Date.now();
-    const cooldownMs = 2 * 60 * 1000; // 2 minutes
-    
-    if (lastLocalStorageClear && now - lastLocalStorageClear < cooldownMs) {
-      const remainingSeconds = Math.ceil((cooldownMs - (now - lastLocalStorageClear)) / 1000);
-      setLocalStorageMessage(`Please wait ${remainingSeconds} seconds before clearing again`);
+    // Check cooldown
+    const cooldown = checkCacheClearCooldown();
+    if (cooldown.isOnCooldown) {
+      setLocalStorageMessage(`Please wait ${cooldown.remainingSeconds} seconds before clearing again`);
       setTimeout(() => setLocalStorageMessage(null), 3000);
       return;
     }
@@ -200,67 +198,19 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
     setLocalStorageMessage(null);
     
     try {
-      // Clear app-specific localStorage caches
-      const cacheKeys = [
-        'saiSongs:songsCache',
-        'saiSongs:singersCache',
-        'saiSongs:pitchesCache',
-        'saiSongs:templatesCache',
-        'saiSongs:centersCache',
-        'selectedSessionTemplateId', // Session template selection
-        'saisongs-template-clipboard-v2', // Template editor clipboard
-      ];
-      
-      cacheKeys.forEach(key => {
-        window.localStorage.removeItem(key);
+      await clearAllCaches({
+        clearServiceWorkerCache: true,
+        reload: true,
+        reloadParam: '_nocache',
+        reloadDelay: 1500,
+        updateLastClearTimestamp: true,
       });
-      
-      // Clear service worker caches for HTML, JavaScript, and CSS files (preserve images)
-      if ('caches' in window && 'serviceWorker' in navigator) {
-        try {
-          const cacheNames = await caches.keys();
-          const htmlPaths = ['/', '/index.html', '/help'];
-          
-          for (const cacheName of cacheNames) {
-            const cache = await caches.open(cacheName);
-            const requests = await cache.keys();
-            
-            // Delete HTML, JavaScript, and CSS files, preserve images
-            for (const request of requests) {
-              const url = new URL(request.url);
-              const pathname = url.pathname;
-              
-              // Check if this is an HTML, JavaScript, or CSS file
-              const isHtml = htmlPaths.includes(pathname) || pathname.endsWith('.html');
-              const isJs = pathname.endsWith('.js') || pathname.endsWith('.mjs');
-              const isCss = pathname.endsWith('.css');
-              
-              // Delete HTML, JS, and CSS files, preserve images and other assets
-              if (isHtml || isJs || isCss) {
-                await cache.delete(request);
-              }
-            }
-          }
-        } catch (swError) {
-          // Service worker cache clearing is optional, don't fail if it errors
-          console.warn('Could not clear service worker cache:', swError);
-        }
-      }
-      
-      // Update last clear timestamp
+
+      // Update local state for cooldown tracking
       const timestamp = Date.now();
       setLastLocalStorageClear(timestamp);
-      localStorage.setItem('lastLocalStorageClear', timestamp.toString());
       
       setLocalStorageMessage('Web page, JavaScript, and CSS cache cleared! Reloading...');
-      
-      // Reload page with cache-busting query parameter to force fresh HTML, JS, and CSS
-      // Images will still use their cached versions (1 year cache)
-      setTimeout(() => {
-        const url = new URL(window.location.href);
-        url.searchParams.set('_nocache', timestamp.toString());
-        window.location.href = url.toString();
-      }, 1500);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to clear cache';
       setLocalStorageMessage(`Error: ${errorMsg}`);

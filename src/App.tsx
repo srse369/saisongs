@@ -17,6 +17,7 @@ import { NamedSessionProvider, useNamedSessions } from './contexts/NamedSessionC
 import { useAdminShortcut } from './hooks';
 import { usePageTracking } from './hooks/usePageTracking';
 import { useVersionCheck } from './hooks/useVersionCheck';
+import { clearLegacyCacheKeys } from './utils/cacheUtils';
 
 // Lazy load admin components for better initial load performance
 const SongManager = lazy(() => import('./components/admin/SongManager'));
@@ -56,6 +57,11 @@ function AppContent() {
   const { clearSession } = useSession();
   const initialLoadDone = useRef(false);
   const authFetchDone = useRef(false);
+  
+  // Clear legacy cache keys immediately on app load to free up localStorage space
+  useEffect(() => {
+    clearLegacyCacheKeys();
+  }, []);
   
   // Check for version updates and auto-clear cache if needed
   useVersionCheck();

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { PresentationTemplate, ServiceError } from '../types';
 import templateService from '../services/TemplateService';
 import { useToast } from './ToastContext';
+import { safeSetLocalStorageItem } from '../utils/cacheUtils';
 
 const TEMPLATES_CACHE_KEY = 'saiSongs:templatesCache';
 const TEMPLATES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -94,13 +95,19 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
 
       // Persist to cache for subsequent loads
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(
-          TEMPLATES_CACHE_KEY,
-          JSON.stringify({
-            timestamp: Date.now(),
-            templates: freshTemplates,
-          })
-        );
+        const cacheData = JSON.stringify({
+          timestamp: Date.now(),
+          templates: freshTemplates,
+        });
+        
+        const success = safeSetLocalStorageItem(TEMPLATES_CACHE_KEY, cacheData, {
+          clearOnQuotaError: true,
+          skipKeys: [TEMPLATES_CACHE_KEY], // Don't clear the template we're trying to set
+        });
+        
+        if (!success) {
+          console.warn('Failed to cache templates due to localStorage quota. Templates will be fetched from server on next load.');
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch templates';

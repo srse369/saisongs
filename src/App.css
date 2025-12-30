@@ -83,8 +83,8 @@
 
 /* Touch-friendly minimum sizes */
 .touch-target {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: 33px;
+  min-width: 33px;
 }
 
 /* Prevent text selection on touch UI elements */

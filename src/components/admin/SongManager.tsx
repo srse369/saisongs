@@ -8,6 +8,7 @@ import { SongDetails } from './SongDetails';
 import { Modal } from '../common/Modal';
 import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedSongSearch, type SongSearchFilters } from '../common/AdvancedSongSearch';
+import { WebLLMService } from '../../services/WebLLMService';
 import { RefreshIcon, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
 import { createSongFuzzySearch, parseNaturalQuery } from '../../utils/smartSearch';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
@@ -42,6 +43,11 @@ export const SongManager: React.FC = () => {
 
   // Create fuzzy search instance for fallback
   const fuzzySearch = useMemo(() => createSongFuzzySearch(songs), [songs]);
+
+  // Extract available values for WebLLM
+  const availableValues = useMemo(() => {
+    return WebLLMService.extractAvailableValues(songs, []);
+  }, [songs]);
 
   useEffect(() => {
     // Fetch songs when user changes to get correct filtered data
@@ -399,6 +405,7 @@ export const SongManager: React.FC = () => {
                 }}
                 searchType="song"
                 placeholder='Ask AI: "Show me sai songs in sanskrit with fast tempo"...'
+                availableValues={availableValues}
               />
             </div>
             {/* Desktop action buttons - hidden on mobile */}

@@ -245,12 +245,14 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
               <input
                 id="otp"
                 type="text"
+                inputMode="numeric"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl tracking-widest font-mono bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                 required
                 autoFocus
+                autoComplete="one-time-code"
                 disabled={loading}
                 maxLength={6}
               />
