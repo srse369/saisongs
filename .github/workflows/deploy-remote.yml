@@ -136,17 +136,20 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.REMOTE_IP }} >> ~/.ssh/known_hosts
 
-      - name: Create Remote Directories
-        run: |
-          echo "📁 Creating remote directories..."
-          ssh -i ~/.ssh/deploy_key ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }} \
-            "mkdir -p ${{ secrets.REMOTE_PATH }}/dist/server"
-          echo "✅ Remote directories created"
-
       - name: Deploy Frontend
         if: ${{ github.event.inputs.deploy_type != 'backend-only' }}
         run: |
           echo "📦 Deploying frontend..."
+          # Verify base path exists and create dist subdirectory
+          ssh -i ~/.ssh/deploy_key ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }} << ENDSSH
+            if [ ! -d "${{ secrets.REMOTE_PATH }}" ]; then
+              echo "❌ Error: Base path ${{ secrets.REMOTE_PATH }} does not exist"
+              echo "   Please create it first (may require sudo or different user)"
+              exit 1
+            fi
+            mkdir -p "${{ secrets.REMOTE_PATH }}/dist"
+          ENDSSH
+          # Deploy files
           scp -i ~/.ssh/deploy_key -r dist/assets dist/index.html dist/*.js dist/*.css 2>/dev/null \
             ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:${{ secrets.REMOTE_PATH }}/dist/ || \
           scp -i ~/.ssh/deploy_key -r dist/* \
@@ -157,6 +160,16 @@ jobs:
         if: ${{ github.event.inputs.deploy_type != 'frontend-only' }}
         run: |
           echo "📦 Deploying backend..."
+          # Verify base path exists and create dist subdirectory
+          ssh -i ~/.ssh/deploy_key ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }} << ENDSSH
+            if [ ! -d "${{ secrets.REMOTE_PATH }}" ]; then
+              echo "❌ Error: Base path ${{ secrets.REMOTE_PATH }} does not exist"
+              echo "   Please create it first (may require sudo or different user)"
+              exit 1
+            fi
+            mkdir -p "${{ secrets.REMOTE_PATH }}/dist/server"
+          ENDSSH
+          # Deploy backend files
           scp -i ~/.ssh/deploy_key -r dist/server \
             ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_IP }}:${{ secrets.REMOTE_PATH }}/dist/
           
