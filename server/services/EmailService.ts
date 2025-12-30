@@ -211,7 +211,11 @@ class EmailService {
           
           <div class="content">
             <h2 style="color: #333;">Your Login Code</h2>
-            <p>Use this code to log in to Sai Songs. This code will expire in <strong>1 minute</strong>.</p>
+            <p>Use this code to log in to Sai Songs. This code will expire in <strong>10 minutes</strong>.</p>
+            
+            <p style="text-align: center; margin: 20px 0; font-size: 18px; color: #333;">
+              Your verification code is: <strong style="font-size: 24px; letter-spacing: 4px; color: #4F46E5;">${code}</strong>
+            </p>
             
             <div class="otp-code">${code}</div>
             
@@ -235,9 +239,9 @@ class EmailService {
     const text = `
 Sai Songs - Your Login Code
 
-Your one-time login code is: ${code}
+Your verification code is: ${code}
 
-This code will expire in 1 minute.
+This code will expire in 10 minutes.
 
 ⚠️ Security Notice: Never share this code with anyone. Sai Songs staff will never ask for your login code.
 
