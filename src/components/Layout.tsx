@@ -492,6 +492,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </button>
                 )}
               </div>
+              
+              {/* Version display */}
+              <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-700 mt-2 pt-3">
+                <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                  Version {import.meta.env.VITE_APP_VERSION || 'dev'}
+                </p>
+              </div>
             </nav>
           )}
         </div>

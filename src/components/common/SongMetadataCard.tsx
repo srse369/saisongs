@@ -90,22 +90,25 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
           {song.deity && (
             <>
               <span>
-                Deity: <span className="px-1.5 py-0.5 bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 rounded font-medium">{toTitleCase(song.deity)}</span>
+                <span className={(isSelected || alwaysShowDeityLanguage) ? 'hidden md:inline' : ''}>Deity: </span>
+                <span className="px-1.5 py-0.5 bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 rounded font-medium">{toTitleCase(song.deity)}</span>
               </span>
-              {(song.language || song.tempo) && <span className="mx-2">•</span>}
+              {(song.language || song.tempo) && <span className="mx-1">•</span>}
             </>
           )}
           {song.language && (
             <>
               <span>
-                Language: <span className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded font-medium">{toTitleCase(song.language)}</span>
+                <span className={(isSelected || alwaysShowDeityLanguage) ? 'hidden md:inline' : ''}>Language: </span>
+                <span className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded font-medium">{toTitleCase(song.language)}</span>
               </span>
-              {song.tempo && <span className="mx-2">•</span>}
+              {song.tempo && <span className="mx-1">•</span>}
             </>
           )}
           {song.tempo && (
             <span>
-              Tempo: <span className="px-1.5 py-0.5 bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 rounded font-medium">{toTitleCase(song.tempo)}</span>
+              <span className={(isSelected || alwaysShowDeityLanguage) ? 'hidden md:inline' : ''}>Tempo: </span>
+              <span className="px-1.5 py-0.5 bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 rounded font-medium">{toTitleCase(song.tempo)}</span>
             </span>
           )}
         </div>
@@ -114,27 +117,37 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
       {/* Raga and Beat - Show on mobile when selected */}
       {(song.raga || song.beat) && (
         <div className={`${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center text-xs text-gray-600 dark:text-gray-400`}>
-          {song.raga && <span>Raga: {toTitleCase(song.raga)}</span>}
-          {song.raga && song.beat && <span className="mx-2">•</span>}
-          {song.beat && <span>Beat: {toTitleCase(song.beat)}</span>}
+          {song.raga && (
+            <span>
+              <span className={isSelected ? 'hidden md:inline' : ''}>Raga: </span>
+              {toTitleCase(song.raga)}
+            </span>
+          )}
+          {song.raga && song.beat && <span className="mx-1">•</span>}
+          {song.beat && (
+            <span>
+              <span className={isSelected ? 'hidden md:inline' : ''}>Beat: </span>
+              {toTitleCase(song.beat)}
+            </span>
+          )}
         </div>
       )}
 
       {/* Reference Pitches - Show on mobile when selected */}
       {hasReferencePitches && (
         <div className={`${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center text-xs text-gray-600 dark:text-gray-400`}>
-          <span>Ref:</span>
+          <span className={isSelected ? 'hidden md:inline' : ''}>Ref:</span>
           {song.referenceGentsPitch && (
-            <span className="ml-4">
-              <span className="text-blue-600 dark:text-blue-400 font-medium">Gents</span>
-              <span className="ml-1 font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.referenceGentsPitch)}</span>
+            <span className={isSelected ? 'ml-0 md:ml-2' : 'ml-2'}>
+              <span className={`text-blue-600 dark:text-blue-400 font-medium ${isSelected ? 'hidden md:inline' : ''}`}>Gents </span>
+              <span className="font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.referenceGentsPitch)}</span>
             </span>
           )}
-          {song.referenceGentsPitch && song.referenceLadiesPitch && <span className="mx-2">•</span>}
+          {song.referenceGentsPitch && song.referenceLadiesPitch && <span className="mx-1">•</span>}
           {song.referenceLadiesPitch && (
-            <span className={song.referenceGentsPitch ? '' : 'ml-4'}>
-              <span className="text-pink-600 dark:text-pink-400 font-medium">Ladies</span>
-              <span className="ml-1 font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.referenceLadiesPitch)}</span>
+            <span className={song.referenceGentsPitch ? (isSelected ? 'ml-0 md:ml-0' : '') : (isSelected ? 'ml-0 md:ml-2' : 'ml-2')}>
+              <span className={`text-pink-600 dark:text-pink-400 font-medium ${isSelected ? 'hidden md:inline' : ''}`}>Ladies </span>
+              <span className="font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.referenceLadiesPitch)}</span>
             </span>
           )}
         </div>
