@@ -65,6 +65,11 @@ const Toast: React.FC<ToastProps> = ({ toast }) => {
 export const ToastContainer: React.FC = () => {
   const { toasts } = useToast();
 
+  // Don't render container if there are no toasts to avoid unnecessary DOM manipulation
+  if (toasts.length === 0) {
+    return null;
+  }
+
   return (
     <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2">
       {toasts.map(toast => (

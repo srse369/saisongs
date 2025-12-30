@@ -13,6 +13,7 @@ export const usePageTracking = () => {
   const publicIpCache = useRef<string | null>(null);
   const lastTrackedPath = useRef<string | null>(null);
   const trackingInProgress = useRef<boolean>(false);
+  const abortControllersRef = useRef<AbortController[]>([]);
 
   useEffect(() => {
     // Prevent duplicate tracking for the same path
@@ -21,6 +22,7 @@ export const usePageTracking = () => {
     }
     
     trackingInProgress.current = true;
+    
     // Detect client's public IP address with multiple fallback services
     const getPublicIp = async (): Promise<string | null> => {
       // Return cached IP if available
@@ -35,10 +37,14 @@ export const usePageTracking = () => {
         { url: 'https://ifconfig.me/ip', parser: (text: string) => text.trim() }
       ];
 
+      const isDevelopment = import.meta.env.DEV;
+
       for (const service of ipServices) {
+        const controller = new AbortController();
+        abortControllersRef.current.push(controller);
+        
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
           
           const response = await fetch(service.url, {
             method: 'GET',
@@ -54,18 +60,38 @@ export const usePageTracking = () => {
             
             if (ip && typeof ip === 'string' && ip.length > 0) {
               publicIpCache.current = ip;
-              console.log('[Analytics] Public IP detected:', ip);
+              if (isDevelopment) {
+                console.log('[Analytics] Public IP detected:', ip);
+              }
               return ip;
             }
           }
         } catch (error) {
-          // Try next service
-          console.warn(`[Analytics] Failed to detect IP from ${service.url}:`, error);
+          // Only log unexpected errors (not timeouts or aborts)
+          const isAbortError = error instanceof Error && 
+            (error.name === 'AbortError' || error.message.includes('aborted'));
+          const isNetworkError = error instanceof TypeError && 
+            error.message.includes('Failed to fetch');
+          
+          // AbortError is expected when timeout expires or component unmounts
+          // Network errors are common (CORS, ad blockers, service down) - only log in dev
+          if (!isAbortError && isDevelopment && isNetworkError) {
+            console.debug(`[Analytics] IP detection service unavailable: ${service.url}`);
+          } else if (!isAbortError && !isNetworkError && isDevelopment) {
+            // Log unexpected errors in development only
+            console.warn(`[Analytics] Unexpected error from ${service.url}:`, error);
+          }
           continue;
+        } finally {
+          // Remove controller from ref array
+          abortControllersRef.current = abortControllersRef.current.filter(c => c !== controller);
         }
       }
       
-      console.warn('[Analytics] All IP detection services failed');
+      // Only log in development mode
+      if (isDevelopment) {
+        console.debug('[Analytics] All IP detection services failed - continuing without IP');
+      }
       return null;
     };
 
@@ -105,6 +131,14 @@ export const usePageTracking = () => {
     };
 
     trackPageView();
+
+    // Cleanup: abort any in-flight requests when component unmounts or path changes
+    return () => {
+      abortControllersRef.current.forEach(controller => {
+        controller.abort();
+      });
+      abortControllersRef.current = [];
+    };
   }, [location.pathname]); // Only track on pathname change, not userRole
 };
 

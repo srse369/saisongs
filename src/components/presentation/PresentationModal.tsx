@@ -23,6 +23,9 @@ interface PresentationModalProps {
   disableKeyboardNavigation?: boolean;
   /** Scale factor for song content (title, lyrics, translation). Default is 1.0 */
   contentScale?: number;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onZoomReset?: () => void;
 }
 
 export interface PresentationModalHandle {
@@ -47,6 +50,9 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
   topRightControls,
   disableKeyboardNavigation = false,
   contentScale = 1.0,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
 }, ref) => {
   const [scale, setScale] = useState(1);
   const [cssFullscreenMode, setCssFullscreenMode] = useState(false); // Fallback for iOS
@@ -315,8 +321,8 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
           src={template.backgroundAudio.url}
           autoPlay={template.backgroundAudio.autoPlay ?? true}
           loop={template.backgroundAudio.loop ?? true}
-          volume={template.backgroundAudio.volume ?? 0.5}
           style={{ display: 'none' }}
+          ref={(el) => { if (el && template.backgroundAudio) el.volume = template.backgroundAudio.volume ?? 0.5; }}
         />
       )}
       
@@ -663,7 +669,14 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
 
         {/* Footer with Close Button - Hidden in fullscreen or CSS fullscreen mode */}
         {!isFullscreen && !cssFullscreenMode && (
-          <div className="flex gap-2 justify-end p-2 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
+          <div className="flex gap-2 justify-end items-center p-2 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
+          {onZoomIn && onZoomOut && onZoomReset && (
+            <div className="flex items-center gap-1 md:hidden mr-auto">
+              <button onClick={(e) => { e.stopPropagation(); onZoomOut(); }} className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md" aria-label="Zoom out"><i className="fas fa-minus text-sm"></i></button>
+              <button onClick={(e) => { e.stopPropagation(); onZoomReset(); }} className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md min-w-[28px] flex items-center justify-center" aria-label="Reset zoom"><span className="text-sm font-semibold">0</span></button>
+              <button onClick={(e) => { e.stopPropagation(); onZoomIn(); }} className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md" aria-label="Zoom in"><i className="fas fa-plus text-sm"></i></button>
+            </div>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();

@@ -298,6 +298,10 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     }
   }, [onExit]);
 
+  const handleZoomIn = useCallback(() => setContentScale(prev => Math.min(MAX_CONTENT_SCALE, prev + CONTENT_SCALE_STEP)), []);
+  const handleZoomOut = useCallback(() => setContentScale(prev => Math.max(MIN_CONTENT_SCALE, prev - CONTENT_SCALE_STEP)), []);
+  const handleZoomReset = useCallback(() => setContentScale(1.0), []);
+
   const handleNavigate = (index: number) => {
     setCurrentSlideIndex(index);
     setShowOverlay(true); // Show overlay when clicking navigation buttons
@@ -340,6 +344,9 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
       isFullscreen={isFullScreen}
       disableKeyboardNavigation={true}
       contentScale={contentScale}
+      onZoomIn={handleZoomIn}
+      onZoomOut={handleZoomOut}
+      onZoomReset={handleZoomReset}
       topRightControls={
         <TemplateSelector 
           currentTemplateId={selectedTemplateId}

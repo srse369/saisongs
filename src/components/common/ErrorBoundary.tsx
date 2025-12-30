@@ -24,16 +24,30 @@ export class ErrorBoundary extends Component<
     };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> | null {
+    // Ignore NotFoundError during unmounting - these are React reconciliation issues
+    if (error.name === 'NotFoundError' && error.message.includes('removeChild')) {
+      return null; // Don't update state, let React continue
+    }
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    this.setState({
-      error,
-      errorInfo,
-    });
+    // Only update state if we're not already in an error state to prevent infinite loops
+    if (!this.state.hasError) {
+      // Ignore NotFoundError during unmounting - these are React reconciliation issues
+      // that don't actually break functionality, just console noise
+      if (error.name === 'NotFoundError' && error.message.includes('removeChild')) {
+        console.warn('Ignoring NotFoundError during unmount (React reconciliation issue):', error.message);
+        return;
+      }
+      
+      console.error('ErrorBoundary caught an error:', error, errorInfo);
+      this.setState({
+        error,
+        errorInfo,
+      });
+    }
   }
 
   handleReload = (): void => {
