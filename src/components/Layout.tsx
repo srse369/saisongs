@@ -46,9 +46,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const handleRefreshLocalCache = async () => {
-    const cooldownSeconds = checkCacheClearCooldown(60000); // 60 second cooldown
-    if (cooldownSeconds > 0) {
-      alert(`Please wait ${cooldownSeconds} seconds before clearing cache again.`);
+    const cooldown = checkCacheClearCooldown(60000); // 60 second cooldown
+    if (cooldown.isOnCooldown && cooldown.remainingSeconds > 0) {
+      alert(`Please wait ${cooldown.remainingSeconds} seconds before clearing cache again.`);
       return;
     }
 
@@ -491,8 +491,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </main>
 
       {/* Mobile Bottom Navigation - Songs, Singers, Pitches, Live buttons */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-30">
-        <div className="flex items-center justify-around h-10 py-0.5">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-30" style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
+        <div className="flex items-center justify-around h-12 py-1">
           {/* Songs */}
           <Link
             to="/admin/songs"

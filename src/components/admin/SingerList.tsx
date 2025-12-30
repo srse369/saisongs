@@ -249,15 +249,10 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                   }`}>
                     {singer.name}
                   </h3>
-                  {/* Pitch count circle - to the right of singer name, only show on mobile when there are pitches */}
-                  {(singer.pitchCount ?? 0) > 0 && (
-                    <div className="flex-shrink-0 md:hidden">
-                      <div className="w-6 h-6 flex items-center justify-center rounded-full bg-black dark:bg-black text-white text-xs font-semibold">
-                        {singer.pitchCount}
-                      </div>
-                    </div>
-                  )}
-                  {/* Missing email icon - red email icon with X circle overlay */}
+                </div>
+                {/* Center Badges, Pitches Circle, and Preview Icon - right-aligned on both mobile and desktop */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {/* Missing email icon - red email icon with X circle overlay - to the left of center badges */}
                   {!singer.email && (
                     <Tooltip content="No email address - cannot grant login permissions">
                       <span className="flex-shrink-0 relative inline-flex items-center justify-center gap-1.5 text-red-600 dark:text-red-400">
@@ -269,16 +264,19 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                       </span>
                     </Tooltip>
                   )}
-                </div>
-                {/* Center Badges and Preview Icon - right-aligned on both mobile and desktop */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <CenterBadges centerIds={singer.centerIds} showWarningIfEmpty={false} />
+                  <CenterBadges centerIds={singer.centerIds || []} showWarningIfEmpty={false} />
                   {/* Warning for Missing Centers - Desktop only */}
                   {(!singer.centerIds || singer.centerIds.length === 0) && (
                     <span className="hidden md:inline text-xs text-yellow-600 dark:text-yellow-400 italic">
                       (Needs center assignment)
                     </span>
                   )}
+                  {/* Pitches count circle - just left of preview icon */}
+                  <Tooltip content={`${singer.pitchCount ?? 0} pitch assignment${(singer.pitchCount ?? 0) !== 1 ? 's' : ''}`}>
+                    <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-black dark:bg-black text-white text-xs font-semibold">
+                      {singer.pitchCount ?? 0}
+                    </div>
+                  </Tooltip>
                   {onPreview && (
                     <Tooltip content="Preview singer details">
                       <button

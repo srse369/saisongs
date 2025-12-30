@@ -22,7 +22,7 @@ export const MobileBottomActionBar: React.FC<MobileBottomActionBarProps> = ({
 
   return (
     <div
-      className="fixed bottom-10 left-0 right-0 md:hidden z-40"
+      className="fixed bottom-12 left-0 right-0 md:hidden z-40"
       style={{
         paddingBottom: 0,
       }}

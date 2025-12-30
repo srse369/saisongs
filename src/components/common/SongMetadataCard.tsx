@@ -135,18 +135,16 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
 
       {/* Reference Pitches - Show on mobile when selected */}
       {hasReferencePitches && (
-        <div className={`${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center text-xs text-gray-600 dark:text-gray-400`}>
-          <span className={isSelected ? 'hidden md:inline' : ''}>Ref:</span>
+        <div className={`${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400`}>
           {song.referenceGentsPitch && (
-            <span className={isSelected ? 'ml-0 md:ml-2' : 'ml-2'}>
-              <span className={`text-blue-600 dark:text-blue-400 font-medium ${isSelected ? 'hidden md:inline' : ''}`}>Gents </span>
+            <span>
+              <span className="text-blue-600 dark:text-blue-400 font-medium">Gents: </span>
               <span className="font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.referenceGentsPitch)}</span>
             </span>
           )}
-          {song.referenceGentsPitch && song.referenceLadiesPitch && <span className="mx-1">•</span>}
           {song.referenceLadiesPitch && (
-            <span className={song.referenceGentsPitch ? (isSelected ? 'ml-0 md:ml-0' : '') : (isSelected ? 'ml-0 md:ml-2' : 'ml-2')}>
-              <span className={`text-pink-600 dark:text-pink-400 font-medium ${isSelected ? 'hidden md:inline' : ''}`}>Ladies </span>
+            <span>
+              <span className="text-pink-600 dark:text-pink-400 font-medium">Ladies: </span>
               <span className="font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.referenceLadiesPitch)}</span>
             </span>
           )}
