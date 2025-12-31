@@ -3,7 +3,7 @@ import { useTemplates } from '../../contexts/TemplateContext';
 import { useAuth } from '../../contexts/AuthContext';
 import type { PresentationTemplate, Slide, TemplateSlide, AspectRatio } from '../../types';
 import { ensureSongContentStyles } from '../../types';
-import { RefreshIcon, Modal, CenterMultiSelect, CenterBadges, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
+import { RefreshIcon, Modal, CenterMultiSelect, CenterBadges, MobileBottomActionBar, type MobileAction } from '../common';
 import { PresentationModal } from '../presentation/PresentationModal';
 import { TemplateWysiwygEditor } from './TemplateWysiwygEditor';
 import { MediaExportModal } from './MediaExportModal';
@@ -809,15 +809,13 @@ export const TemplateManager: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Presentation Templates</h1>
-              <Tooltip content="View help documentation for this tab">
-                <a
-                  href="/help#templates"
-                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                  title="Help"
-                >
-                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-                </a>
-              </Tooltip>
+              <a
+                href="/help#templates"
+                className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                title="View help documentation for this tab"
+              >
+                <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+              </a>
             </div>
             <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
               Manage presentation templates for slide shows
@@ -849,41 +847,38 @@ export const TemplateManager: React.FC = () => {
             </div>
             {/* Desktop action buttons - hidden on mobile */}
             <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-              <Tooltip content="Reload templates from the database">
-                <button
-                  type="button"
-                  onClick={() => fetchTemplates(true)}
-                  disabled={loading}
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                >
-                  <RefreshIcon className="w-4 h-4" />
-                  Refresh
-                </button>
-              </Tooltip>
+              <button
+                type="button"
+                onClick={() => fetchTemplates(true)}
+                disabled={loading}
+                title="Reload templates from the database"
+                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+              >
+                <RefreshIcon className="w-4 h-4" />
+                Refresh
+              </button>
               {!showForm && (
                 <>
-                  <Tooltip content="Create a new presentation template with custom slides and styling">
-                    <button
-                      onClick={handleCreateClick}
-                      disabled={loading}
-                      className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                    >
-                      <i className="fas fa-plus text-lg"></i>
-                      Create Template
-                    </button>
-                  </Tooltip>
+                  <button
+                    onClick={handleCreateClick}
+                    disabled={loading}
+                    title="Create a new presentation template with custom slides and styling"
+                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                  >
+                    <i className="fas fa-plus text-lg"></i>
+                    Create Template
+                  </button>
                   
                   {/* Import PowerPoint Button */}
-                  <Tooltip content="Import slides from a PowerPoint file (.pptx) to create a new template">
-                    <button
-                      onClick={() => pptxInputRef.current?.click()}
-                      disabled={loading || importingPptx}
-                      className="w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                    >
-                      <i className="fas fa-upload text-lg"></i>
-                      {importingPptx ? 'Importing...' : 'Import PowerPoint'}
-                    </button>
-                  </Tooltip>
+                  <button
+                    onClick={() => pptxInputRef.current?.click()}
+                    disabled={loading || importingPptx}
+                    title="Import slides from a PowerPoint file (.pptx) to create a new template"
+                    className="w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                  >
+                    <i className="fas fa-upload text-lg"></i>
+                    {importingPptx ? 'Importing...' : 'Import PowerPoint'}
+                  </button>
                   
                   {/* Hidden file input for PowerPoint import */}
                   <input
@@ -987,70 +982,64 @@ export const TemplateManager: React.FC = () => {
 
                 {/* Actions Row - Icon-only on mobile, text on desktop */}
                 <div className="flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700">
-                  <Tooltip content="Preview this template with sample content">
-                    <button
-                      onClick={() => handlePreview(template)}
-                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors flex items-center justify-center"
-                    >
-                      <i className="fas fa-eye text-lg text-purple-600 dark:text-purple-400"></i>
-                    </button>
-                  </Tooltip>
+                  <button
+                    onClick={() => handlePreview(template)}
+                    title="Preview this template with sample content"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors flex items-center justify-center"
+                  >
+                    <i className="fas fa-eye text-lg text-purple-600 dark:text-purple-400"></i>
+                  </button>
                   {canEditTemplate(template) && (
-                    <Tooltip content="Edit template layout, styling, and slide configuration">
-                      <button
-                        onClick={() => handleEditClick(template)}
-                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                      >
-                        <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
-                      </button>
-                    </Tooltip>
-                  )}
-                  {/* Anyone can duplicate a template */}
-                  <Tooltip content="Create a copy of this template that you can modify">
                     <button
-                      onClick={() => handleDuplicateClick(template)}
+                      onClick={() => handleEditClick(template)}
+                      title="Edit template layout, styling, and slide configuration"
                       className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                     >
-                      <i className="fas fa-copy text-lg text-green-600 dark:text-green-400"></i>
-                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Duplicate</span>
+                      <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
                     </button>
-                  </Tooltip>
+                  )}
+                  {/* Anyone can duplicate a template */}
+                  <button
+                    onClick={() => handleDuplicateClick(template)}
+                    title="Create a copy of this template that you can modify"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                  >
+                    <i className="fas fa-copy text-lg text-green-600 dark:text-green-400"></i>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Duplicate</span>
+                  </button>
                   {/* Export PowerPoint */}
-                  <Tooltip content="Download this template as a PowerPoint file (.pptx)">
-                    <button
-                      onClick={() => handleExportPptx(template)}
-                      disabled={exportingPptx === template.id}
-                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <i className={`fas ${exportingPptx === template.id ? 'fa-spinner fa-spin' : 'fa-download'} text-lg text-purple-600 dark:text-purple-400`}></i>
-                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">
-                        {exportingPptx === template.id ? 'Exporting...' : 'Export'}
-                      </span>
-                    </button>
-                  </Tooltip>
+                  <button
+                    onClick={() => handleExportPptx(template)}
+                    disabled={exportingPptx === template.id}
+                    title="Download this template as a PowerPoint file (.pptx)"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <i className={`fas ${exportingPptx === template.id ? 'fa-spinner fa-spin' : 'fa-download'} text-lg text-purple-600 dark:text-purple-400`}></i>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">
+                      {exportingPptx === template.id ? 'Exporting...' : 'Export'}
+                    </span>
+                  </button>
                   {/* Set Default - only for admins */}
                   {isAdmin && canEditTemplate(template) && !template.isDefault && (
-                    <Tooltip content="Make this the default template for new presentations">
-                      <button
-                        onClick={() => handleSetDefault(template.id!)}
-                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                      >
-                        <i className="fas fa-star text-lg text-yellow-500 dark:text-yellow-400"></i>
-                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Set Default</span>
-                      </button>
-                    </Tooltip>
+                    <button
+                      onClick={() => handleSetDefault(template.id!)}
+                      title="Make this the default template for new presentations"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                    >
+                      <i className="fas fa-star text-lg text-yellow-500 dark:text-yellow-400"></i>
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Set Default</span>
+                    </button>
                   )}
                   {canEditTemplate(template) && (
-                    <Tooltip content="Permanently delete this template">
-                      <button
-                        onClick={() => handleDelete(template.id!)}
-                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                      >
-                        <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
+                    <button
+                      onClick={() => handleDelete(template.id!)}
+                      title="Permanently delete this template"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                    >
+                      <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
                       <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
                     </button>
-                    </Tooltip>
                   )}
                 </div>
               </div>
@@ -1075,33 +1064,31 @@ export const TemplateManager: React.FC = () => {
         <div className="space-y-4">
           {/* Editor Mode Tabs (WYSIWYG + YAML) */}
           <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
-            <Tooltip content="Visual drag-and-drop editor - design your template with a live preview">
-              <button
-                onClick={async () => {
-                  // When clicking WYSIWYG button, check if we're coming FROM YAML mode
-                  if (editorMode === 'yaml' && yamlContent.trim()) {
-                    // Sync YAML changes before switching - await to ensure template is updated first
-                    const validation = await validateYaml(yamlContent);
-                      if (validation.valid && validation.template && editingTemplate) {
-                        setEditingTemplate({
-                          ...editingTemplate,
-                          ...validation.template,
-                        });
-                      }
-                  }
-                  setEditorMode('wysiwyg');
-                }}
-                className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-                  editorMode === 'wysiwyg'
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
-                }`}
-              >
-                🖱️ WYSIWYG
-              </button>
-            </Tooltip>
-            <Tooltip content="Advanced text-based editor - directly edit template configuration as YAML code">
-              <button
+            <button
+              onClick={async () => {
+                // When clicking WYSIWYG button, check if we're coming FROM YAML mode
+                if (editorMode === 'yaml' && yamlContent.trim()) {
+                  // Sync YAML changes before switching - await to ensure template is updated first
+                  const validation = await validateYaml(yamlContent);
+                    if (validation.valid && validation.template && editingTemplate) {
+                      setEditingTemplate({
+                        ...editingTemplate,
+                        ...validation.template,
+                      });
+                    }
+                }
+                setEditorMode('wysiwyg');
+              }}
+              title="Visual drag-and-drop editor - design your template with a live preview"
+              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                editorMode === 'wysiwyg'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+              }`}
+            >
+              🖱️ WYSIWYG
+            </button>
+            <button
               onClick={() => {
                 // When clicking YAML editor button, check if we're coming FROM WYSIWYG mode
                 if (editorMode === 'wysiwyg' && editingTemplate) {
@@ -1110,6 +1097,7 @@ export const TemplateManager: React.FC = () => {
                 }
                 setEditorMode('yaml');
               }}
+              title="Advanced text-based editor - directly edit template configuration as YAML code"
               className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
                 editorMode === 'yaml'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -1118,7 +1106,6 @@ export const TemplateManager: React.FC = () => {
             >
               ⚙️ YAML
             </button>
-            </Tooltip>
           </div>
 
           {/* WYSIWYG Editor Mode */}
@@ -1213,11 +1200,12 @@ export const TemplateManager: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                   Template Name
-                  <Tooltip content="Unique name to identify this template">
-                    <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                      <i className="fas fa-info-circle text-xs"></i>
-                    </span>
-                  </Tooltip>
+                  <span 
+                    title="Unique name to identify this template"
+                    className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+                  >
+                    <i className="fas fa-info-circle text-xs"></i>
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -1236,11 +1224,12 @@ export const TemplateManager: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                   Description
-                  <Tooltip content="Brief description of this template's purpose or style">
-                    <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                      <i className="fas fa-info-circle text-xs"></i>
-                    </span>
-                  </Tooltip>
+                  <span 
+                    title="Brief description of this template's purpose or style"
+                    className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+                  >
+                    <i className="fas fa-info-circle text-xs"></i>
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -1259,11 +1248,12 @@ export const TemplateManager: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                 Aspect Ratio
-                <Tooltip content="Slide dimensions - 16:9 for widescreen displays, 4:3 for older projectors">
-                  <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                    <i className="fas fa-info-circle text-xs"></i>
-                  </span>
-                </Tooltip>
+                <span 
+                  title="Slide dimensions - 16:9 for widescreen displays, 4:3 for older projectors"
+                  className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+                >
+                  <i className="fas fa-info-circle text-xs"></i>
+                </span>
                 </label>
               <select
                 value={editingTemplate?.aspectRatio || '16:9'}
@@ -1287,11 +1277,12 @@ export const TemplateManager: React.FC = () => {
             <div className="mb-2">
               <label className="block text-sm font-medium text-gray-900 dark:text-white">
                 {isAdmin ? "Centers" : "Centers"}
-                <Tooltip content={isAdmin ? "Assign this template to specific centers, or leave empty to make it available to all centers" : "Select which centers can use this template"}>
-                  <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                    <i className="fas fa-info-circle text-xs"></i>
-                  </span>
-                </Tooltip>
+                <span 
+                  title={isAdmin ? "Assign this template to specific centers, or leave empty to make it available to all centers" : "Select which centers can use this template"}
+                  className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+                >
+                  <i className="fas fa-info-circle text-xs"></i>
+                </span>
               </label>
             </div>
             <CenterMultiSelect
@@ -1303,38 +1294,35 @@ export const TemplateManager: React.FC = () => {
           </div>
 
           <div className="flex gap-2 justify-between pt-2">
-            <Tooltip content="Preview how this template will look with sample content">
-              <button
-                onClick={() => {
-                  if (editingTemplate) {
-                    setPreviewSlideIndex(editorSelectedSlideIndex);
-                    setPreviewTemplate(editingTemplate);
-                  }
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
-              >
-                <i className="fas fa-eye text-base"></i>
-                Preview
-              </button>
-            </Tooltip>
+            <button
+              onClick={() => {
+                if (editingTemplate) {
+                  setPreviewSlideIndex(editorSelectedSlideIndex);
+                  setPreviewTemplate(editingTemplate);
+                }
+              }}
+              title="Preview how this template will look with sample content"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+            >
+              <i className="fas fa-eye text-base"></i>
+              Preview
+            </button>
             <div className="flex gap-2">
-              <Tooltip content="Discard changes and close the editor">
-                <button
-                  onClick={handleFormCancel}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                >
-                  Cancel
-                </button>
-              </Tooltip>
-              <Tooltip content={editingTemplate?.id ? "Save changes to this template" : "Create a new template with these settings"}>
-                <button
-                  onClick={handleFormSubmit}
-                  disabled={loading}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {editingTemplate?.id ? 'Update Template' : 'Create Template'}
-                </button>
-              </Tooltip>
+              <button
+                onClick={handleFormCancel}
+                title="Discard changes and close the editor"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleFormSubmit}
+                disabled={loading}
+                title={editingTemplate?.id ? "Save changes to this template" : "Create a new template with these settings"}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {editingTemplate?.id ? 'Update Template' : 'Create Template'}
+              </button>
             </div>
           </div>
         </div>

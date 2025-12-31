@@ -16,7 +16,6 @@ export { CenterBadges } from './CenterBadges';
 export { RoleBadge } from './RoleBadge';
 export { UserDropdown } from './UserDropdown';
 export { DatabaseStatusDropdown } from './DatabaseStatusDropdown';
-export { Tooltip } from './Tooltip';
 export { RefreshIcon, MusicIcon, PitchIcon, SongIcon } from './Icons';
 export type { SongSearchFilters } from './AdvancedSongSearch';
 export type { PitchSearchFilters } from './AdvancedPitchSearch';

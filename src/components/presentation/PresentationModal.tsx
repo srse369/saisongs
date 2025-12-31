@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, f
 import { SlideView } from './SlideView';
 import { getSlideBackgroundStyles, SlideBackground, SlideImages, SlideVideos, SlideAudios, SlideText } from '../../utils/templateUtils';
 import type { Slide, TemplateSlide, PresentationTemplate } from '../../types';
-import { Tooltip } from '../common';
 
 interface PresentationModalProps {
   isOpen: boolean;
@@ -611,21 +610,18 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
               const isReferenceDot = referenceSlideIndex !== undefined && idx === referenceSlideIndex;
               
               return (
-                <Tooltip
+                <button
                   key={idx}
-                  content={isReferenceDot ? `Slide ${idx + 1} (Reference) - Click to jump` : `Slide ${idx + 1}${slideTitle ? ` - ${slideTitle}` : ''} - Click to jump`}
-                >
-                  <button
-                    onClick={() => onSlideChange(idx)}
-                    className={`w-3 h-3 rounded-full transition-colors ${
-                      idx === currentSlideIndex
-                        ? 'bg-blue-500'
-                        : isReferenceDot
-                          ? 'bg-yellow-400 hover:bg-yellow-500'
-                          : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
-                    }`}
-                  />
-                </Tooltip>
+                  onClick={() => onSlideChange(idx)}
+                  title={isReferenceDot ? `Slide ${idx + 1} (Reference) - Click to jump` : `Slide ${idx + 1}${slideTitle ? ` - ${slideTitle}` : ''} - Click to jump`}
+                  className={`w-3 h-3 rounded-full transition-colors ${
+                    idx === currentSlideIndex
+                      ? 'bg-blue-500'
+                      : isReferenceDot
+                        ? 'bg-yellow-400 hover:bg-yellow-500'
+                        : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+                  }`}
+                />
               );
             })}
           </div>

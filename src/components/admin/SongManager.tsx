@@ -9,7 +9,7 @@ import { Modal } from '../common/Modal';
 import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedSongSearch, type SongSearchFilters } from '../common/AdvancedSongSearch';
 import { WebLLMService } from '../../services/WebLLMService';
-import { RefreshIcon, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
+import { RefreshIcon, MobileBottomActionBar, type MobileAction } from '../common';
 import { createSongFuzzySearch, parseNaturalQuery } from '../../utils/smartSearch';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
 import songService from '../../services/SongService';
@@ -379,15 +379,13 @@ export const SongManager: React.FC = () => {
               <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-1">
                 Song Management
               </h1>
-              <Tooltip content="View help documentation for this tab">
-                <a
-                  href="/help#songs"
-                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                  title="Help"
-                >
-                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-                </a>
-              </Tooltip>
+              <a
+                href="/help#songs"
+                className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                title="View help documentation for this tab"
+              >
+                <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+              </a>
             </div>
             <p className="hidden sm:block text-sm sm:text-base text-gray-600 dark:text-gray-400">
               Create and manage your song library
@@ -410,37 +408,34 @@ export const SongManager: React.FC = () => {
             </div>
             {/* Desktop action buttons - hidden on mobile */}
             <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-              <Tooltip content="Sort songs by name or pitch count">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'name' | 'pitchCount')}
-                  className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                >
-                  <option value="name">Sort: Name</option>
-                  <option value="pitchCount">Sort: Pitch Count</option>
-                </select>
-              </Tooltip>
-              <Tooltip content="Reload songs from the database to see the latest updates">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'name' | 'pitchCount')}
+                title="Sort songs by name or pitch count"
+                className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              >
+                <option value="name">Sort: Name</option>
+                <option value="pitchCount">Sort: Pitch Count</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => fetchSongs(true)}
+                disabled={loading}
+                title="Reload songs from the database to see the latest updates"
+                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+              >
+                <RefreshIcon className="w-4 h-4" />
+                Refresh
+              </button>
+              {isEditor && (
                 <button
-                  type="button"
-                  onClick={() => fetchSongs(true)}
-                  disabled={loading}
+                  onClick={handleCreateClick}
+                  title="Add a new song to the library with name, lyrics, translation, and metadata"
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                 >
-                  <RefreshIcon className="w-4 h-4" />
-                  Refresh
+                  <i className="fas fa-plus text-lg"></i>
+                  Create New Song
                 </button>
-              </Tooltip>
-              {isEditor && (
-                <Tooltip content="Add a new song to the library with name, lyrics, translation, and metadata">
-                  <button
-                    onClick={handleCreateClick}
-                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    <i className="fas fa-plus text-lg"></i>
-                    Create New Song
-                  </button>
-                </Tooltip>
               )}
             </div>
           </div>

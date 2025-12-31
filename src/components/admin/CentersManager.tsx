@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserMultiSelect } from '../common/UserMultiSelect';
 import { clearCentersCache } from '../common/CenterBadges';
-import { RefreshIcon, Tooltip, Modal, MobileBottomActionBar, type MobileAction } from '../common';
+import { RefreshIcon, Modal, MobileBottomActionBar, type MobileAction } from '../common';
 
 interface Center {
   id: number;
@@ -299,15 +299,13 @@ export const CentersManager: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">Centers</h1>
-            <Tooltip content="View help documentation for this tab">
-              <a
-                href="/help#centers"
-                className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                title="Help"
-              >
-                <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-              </a>
-            </Tooltip>
+            <a
+              href="/help#centers"
+              className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+              title="View help documentation for this tab"
+            >
+              <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+            </a>
           </div>
           {!loading && centers.length > 0 && (
             <p className="hidden sm:block mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -317,17 +315,16 @@ export const CentersManager: React.FC = () => {
         </div>
         {/* Desktop action buttons - hidden on mobile */}
         <div className="hidden md:flex gap-2">
-          <Tooltip content="Refresh centers list">
-            <button
-              type="button"
-              onClick={() => fetchCenters()}
-              disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-            >
-              <RefreshIcon className="w-4 h-4" />
-              Refresh
-            </button>
-          </Tooltip>
+          <button
+            type="button"
+            onClick={() => fetchCenters()}
+            disabled={loading}
+            title="Refresh centers list"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          >
+            <RefreshIcon className="w-4 h-4" />
+            Refresh
+          </button>
           <button
             onClick={() => handleOpenForm()}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
@@ -385,17 +382,16 @@ export const CentersManager: React.FC = () => {
                         {center.name}
                       </span>
                     </div>
-                    <Tooltip content="View center details">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePreviewClick(center);
-                        }}
-                        className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
-                      >
-                        <i className="fas fa-eye text-base"></i>
-                      </button>
-                    </Tooltip>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePreviewClick(center);
+                      }}
+                      title="View center details"
+                      className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
+                    >
+                      <i className="fas fa-eye text-base"></i>
+                    </button>
                   </div>
                 <div className="flex items-center gap-3 mt-2 text-xs">
                   <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
@@ -452,11 +448,12 @@ export const CentersManager: React.FC = () => {
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Center Name <span className="text-red-500 dark:text-red-400">*</span>
-              <Tooltip content="Name of the center that will be displayed throughout the app">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="Name of the center that will be displayed throughout the app"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="name"
@@ -475,11 +472,12 @@ export const CentersManager: React.FC = () => {
           <div>
             <label htmlFor="badgeTextColor" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Badge Text Color
-              <Tooltip content="Color used for this center's badge in the UI">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="Color used for this center's badge in the UI"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <div className="flex gap-3 items-center">
               <input
@@ -525,26 +523,24 @@ export const CentersManager: React.FC = () => {
 
           {/* Action Buttons */}
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <Tooltip content={isPreviewMode ? "Close" : "Discard changes and close the form"}>
-              <button
-                type="button"
-                onClick={() => handleCloseForm()}
-                disabled={isSubmitting}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
-              >
-                {isPreviewMode ? 'Close' : 'Cancel'}
-              </button>
-            </Tooltip>
+            <button
+              type="button"
+              onClick={() => handleCloseForm()}
+              disabled={isSubmitting}
+              title={isPreviewMode ? "Close" : "Discard changes and close the form"}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
+            >
+              {isPreviewMode ? 'Close' : 'Cancel'}
+            </button>
             {!isPreviewMode && (
-              <Tooltip content={editingCenter ? "Save changes to this center" : "Create a new center"}>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
-                >
-                  {isSubmitting ? 'Saving...' : editingCenter ? 'Update Center' : 'Create Center'}
-                </button>
-              </Tooltip>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                title={editingCenter ? "Save changes to this center" : "Create a new center"}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
+              >
+                {isSubmitting ? 'Saving...' : editingCenter ? 'Update Center' : 'Create Center'}
+              </button>
             )}
           </div>
         </form>

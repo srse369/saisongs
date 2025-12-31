@@ -3,7 +3,7 @@ import { useSingers } from '../../contexts/SingerContext';
 import { usePitches } from '../../contexts/PitchContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
-import { RefreshIcon, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
+import { RefreshIcon, MobileBottomActionBar, type MobileAction } from '../common';
 import { SingerForm } from './SingerForm';
 import { SingerList } from './SingerList';
 import { Modal } from '../common/Modal';
@@ -231,15 +231,13 @@ export const SingerManager: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Singer Management</h1>
-              <Tooltip content="View help documentation for this tab">
-                <a
-                  href="/help#singers"
-                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                  title="Help"
-                >
-                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-                </a>
-              </Tooltip>
+              <a
+                href="/help#singers"
+                className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                title="View help documentation for this tab"
+              >
+                <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+              </a>
             </div>
             <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
               Manage singers and their profiles
@@ -269,37 +267,34 @@ export const SingerManager: React.FC = () => {
             </div>
             {/* Desktop action buttons - hidden on mobile */}
             <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-              <Tooltip content="Sort singers by name or pitch count">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'name' | 'pitchCount')}
-                  className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                >
-                  <option value="name">Sort: Name</option>
-                  <option value="pitchCount">Sort: Pitch Count</option>
-                </select>
-              </Tooltip>
-              <Tooltip content="Reload singers from the database to see the latest changes">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'name' | 'pitchCount')}
+                title="Sort singers by name or pitch count"
+                className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              >
+                <option value="name">Sort: Name</option>
+                <option value="pitchCount">Sort: Pitch Count</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => fetchSingers(true)}
+                disabled={loading}
+                title="Reload singers from the database to see the latest changes"
+                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+              >
+                <RefreshIcon className="w-4 h-4" />
+                Refresh
+              </button>
+              {isEditor && (
                 <button
-                  type="button"
-                  onClick={() => fetchSingers(true)}
-                  disabled={loading}
+                  onClick={handleCreateClick}
+                  title="Create a new singer profile with name, gender, and pitch information"
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                 >
-                  <RefreshIcon className="w-4 h-4" />
-                  Refresh
+                  <i className="fas fa-plus text-lg"></i>
+                  Add Singer
                 </button>
-              </Tooltip>
-              {isEditor && (
-                <Tooltip content="Create a new singer profile with name, gender, and pitch information">
-                  <button
-                    onClick={handleCreateClick}
-                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    <i className="fas fa-plus text-lg"></i>
-                    Add Singer
-                  </button>
-                </Tooltip>
               )}
             </div>
           </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../contexts/AuthContext';
-import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, CenterBadges, Tooltip, Modal } from './common';
+import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, CenterBadges, Modal } from './common';
 import { FeedbackDrawer } from './common/FeedbackDrawer';
 import { clearAllCaches, checkCacheClearCooldown, CACHE_KEYS } from '../utils/cacheUtils';
 import apiClient from '../services/ApiClient';
@@ -219,14 +219,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               
               {/* Help, Database connection indicator + Auth controls */}
               <div className="ml-2 flex items-center space-x-2">
-                <Tooltip content="Help & Documentation">
-                  <Link 
-                    to="/help" 
-                    className="p-2 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200"
-                  >
-                    <i className="fas fa-question-circle text-lg"></i>
-                  </Link>
-                </Tooltip>
+                <Link 
+                  to="/help" 
+                  title="Help & Documentation"
+                  className="p-2 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200"
+                >
+                  <i className="fas fa-question-circle text-lg"></i>
+                </Link>
                 
                 {/* Only show database status to authenticated users */}
                 {isAuthenticated && (
@@ -492,7 +491,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Mobile Bottom Navigation - Songs, Singers, Pitches, Live buttons */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-30" style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
-        <div className="flex items-center justify-around h-12 py-1">
+        <div className="flex items-center justify-around pt-2 pb-1">
           {/* Songs */}
           <Link
             to="/admin/songs"
@@ -569,15 +568,14 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </footer>
 
       {/* Feedback Button - Almost Hidden */}
-      <Tooltip content="Send feedback, report bugs, or request new features">
-        <button
-          onClick={() => setIsFeedbackOpen(true)}
-          className="fixed bottom-20 md:bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-30"
-          aria-label="Send feedback"
-        >
-          <i className="fas fa-comment text-lg mx-auto"></i>
-        </button>
-      </Tooltip>
+      <button
+        onClick={() => setIsFeedbackOpen(true)}
+        title="Send feedback, report bugs, or request new features"
+        className="fixed bottom-20 md:bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-30"
+        aria-label="Send feedback"
+      >
+        <i className="fas fa-comment text-lg mx-auto"></i>
+      </button>
 
       {/* Feedback Drawer */}
       <FeedbackDrawer isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />

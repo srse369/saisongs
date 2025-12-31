@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Song, CreateSongInput } from '../../types';
-import { Tooltip } from '../common';
 
 interface SongFormProps {
   song?: Song | null;
@@ -236,11 +235,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
       <div>
         <label htmlFor="song-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Song Name <span className="text-red-500 dark:text-red-400">*</span>
-          <Tooltip content="Unique name to identify this song">
-            <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-              <i className="fas fa-info-circle text-xs"></i>
-            </span>
-          </Tooltip>
+          <span 
+            title="Unique name to identify this song"
+            className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+          >
+            <i className="fas fa-info-circle text-xs"></i>
+          </span>
         </label>
         <input
           id="song-name"
@@ -262,11 +262,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
       <div>
         <label htmlFor="external-source-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           External Source URL
-          <Tooltip content="Link to external source - lyrics and metadata will be auto-synced from this URL">
-            <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-              <i className="fas fa-info-circle text-xs"></i>
-            </span>
-          </Tooltip>
+          <span 
+            title="Link to external source - lyrics and metadata will be auto-synced from this URL"
+            className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+          >
+            <i className="fas fa-info-circle text-xs"></i>
+          </span>
         </label>
         <input
           id="external-source-url"
@@ -296,11 +297,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
           <div>
             <label htmlFor="language" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Language <span className="text-red-500 dark:text-red-400">*</span>
-              <Tooltip content="Primary language of the song lyrics (e.g., Sanskrit, Hindi, Telugu)">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="Primary language of the song lyrics (e.g., Sanskrit, Hindi, Telugu)"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="language"
@@ -322,11 +324,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
           <div>
             <label htmlFor="deity" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Deity <span className="text-red-500 dark:text-red-400">*</span>
-              <Tooltip content="Deity or spiritual figure this song is dedicated to (used for searching and organization)">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="Deity or spiritual figure this song is dedicated to (used for searching and organization)"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="deity"
@@ -348,11 +351,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
           <div>
             <label htmlFor="tempo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Tempo
-              <Tooltip content="Speed of the song - helps with searching and filtering (e.g., slow, medium, fast)">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="Speed of the song - helps with searching and filtering (e.g., slow, medium, fast)"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="tempo"
@@ -369,11 +373,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
           <div>
             <label htmlFor="beat" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Beat
-              <Tooltip content="Rhythmic pattern or tala (e.g., 8 beat, keherwa, adi)">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="Rhythmic pattern or tala (e.g., 8 beat, keherwa, adi)"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="beat"
@@ -390,11 +395,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
           <div>
             <label htmlFor="raga" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Raga
-              <Tooltip content="Musical scale or raga (e.g., hamsadhwani, bhairavi)">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="Musical scale or raga (e.g., hamsadhwani, bhairavi)"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="raga"
@@ -411,11 +417,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
           <div>
             <label htmlFor="level" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Level
-              <Tooltip content="Difficulty level for singers (e.g., simple, intermediate, advanced)">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="Difficulty level for singers (e.g., simple, intermediate, advanced)"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="level"
@@ -433,11 +440,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
         <div className="mt-4">
           <label htmlFor="lyrics" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Lyrics <span className="text-red-500 dark:text-red-400">*</span>
-            <Tooltip content="Song lyrics will be split into slides for presentation. Use line breaks to organize stanzas.">
-              <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                <i className="fas fa-info-circle text-xs"></i>
-              </span>
-            </Tooltip>
+            <span 
+              title="Song lyrics will be split into slides for presentation. Use line breaks to organize stanzas."
+              className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+            >
+              <i className="fas fa-info-circle text-xs"></i>
+            </span>
           </label>
           <textarea
             id="lyrics"
@@ -459,11 +467,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
         <div className="mt-4">
           <label htmlFor="meaning" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Meaning / Translation
-            <Tooltip content="English translation or explanation of the song's meaning">
-              <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                <i className="fas fa-info-circle text-xs"></i>
-              </span>
-            </Tooltip>
+            <span 
+              title="English translation or explanation of the song's meaning"
+              className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+            >
+              <i className="fas fa-info-circle text-xs"></i>
+            </span>
           </label>
           <textarea
             id="meaning"
@@ -481,11 +490,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
           <div>
             <label htmlFor="audioLink" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Audio Link
-              <Tooltip content="URL to audio recording of this song">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="URL to audio recording of this song"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="audioLink"
@@ -502,11 +512,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
           <div>
             <label htmlFor="videoLink" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Video Link
-              <Tooltip content="URL to video recording of this song">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="URL to video recording of this song"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="videoLink"
@@ -523,11 +534,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
           <div>
             <label htmlFor="songTags" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Tags
-              <Tooltip content="Comma-separated tags for categorization (e.g., bhajan, aarti, festival)">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="Comma-separated tags for categorization (e.g., bhajan, aarti, festival)"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="songTags"
@@ -552,11 +564,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
               disabled={isSubmitting}
             />
             <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Golden Voice</span>
-            <Tooltip content="Mark as 'Golden Voice' if this song has a professional-quality recording from an ideal singer">
-              <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                <i className="fas fa-info-circle text-xs"></i>
-              </span>
-            </Tooltip>
+            <span 
+              title="Mark as 'Golden Voice' if this song has a professional-quality recording from an ideal singer"
+              className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+            >
+              <i className="fas fa-info-circle text-xs"></i>
+            </span>
           </label>
         </div>
 
@@ -566,11 +579,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
           <div>
             <label htmlFor="referenceGentsPitch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Reference Gents Pitch
-              <Tooltip content="Recommended pitch/key for male singers - helps singers choose their starting pitch">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="Recommended pitch/key for male singers - helps singers choose their starting pitch"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="referenceGentsPitch"
@@ -590,11 +604,12 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
           <div>
             <label htmlFor="referenceLadiesPitch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Reference Ladies Pitch
-              <Tooltip content="Recommended pitch/key for female singers - helps singers choose their starting pitch">
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title="Recommended pitch/key for female singers - helps singers choose their starting pitch"
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <input
               id="referenceLadiesPitch"
@@ -614,25 +629,23 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
 
       {/* Form Actions */}
       <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <Tooltip content="Discard changes and close the form">
-          <button
-            type="button"
-            onClick={handleCancel}
-            disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
-          >
-            Cancel
-          </button>
-        </Tooltip>
-        <Tooltip content={isEditMode ? "Save changes to this song" : "Create a new song with these details"}>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
-          >
-            {isSubmitting ? 'Saving...' : isEditMode ? 'Update Song' : 'Create Song'}
-          </button>
-        </Tooltip>
+        <button
+          type="button"
+          onClick={handleCancel}
+          disabled={isSubmitting}
+          title="Discard changes and close the form"
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          title={isEditMode ? "Save changes to this song" : "Create a new song with these details"}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
+        >
+          {isSubmitting ? 'Saving...' : isEditMode ? 'Update Song' : 'Create Song'}
+        </button>
       </div>
     </form>
   );

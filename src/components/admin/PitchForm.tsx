@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { SongSingerPitch, CreatePitchInput, Song, Singer } from '../../types';
 import { ALL_PITCH_OPTIONS, formatPitchWithName } from '../../utils/pitchUtils';
 import { formatNormalizedPitch } from '../../utils/pitchNormalization';
-import { Tooltip } from '../common';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchCentersOnce } from '../common/CenterBadges';
 
@@ -149,11 +148,12 @@ export const PitchForm: React.FC<PitchFormProps> = ({
       <div>
         <label htmlFor="pitch-song" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Song <span className="text-red-500 dark:text-red-400">*</span>
-          <Tooltip content="Select which song this pitch assignment is for">
-            <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-              <i className="fas fa-info-circle text-xs"></i>
-            </span>
-          </Tooltip>
+          <span 
+            title="Select which song this pitch assignment is for"
+            className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+          >
+            <i className="fas fa-info-circle text-xs"></i>
+          </span>
         </label>
         <select
           id="pitch-song"
@@ -183,11 +183,12 @@ export const PitchForm: React.FC<PitchFormProps> = ({
       <div>
         <label htmlFor="pitch-singer" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Singer <span className="text-red-500 dark:text-red-400">*</span>
-          <Tooltip content="Select which singer this pitch is for">
-            <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-              <i className="fas fa-info-circle text-xs"></i>
-            </span>
-          </Tooltip>
+          <span 
+            title="Select which singer this pitch is for"
+            className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+          >
+            <i className="fas fa-info-circle text-xs"></i>
+          </span>
         </label>
         <select
           id="pitch-singer"
@@ -253,11 +254,12 @@ export const PitchForm: React.FC<PitchFormProps> = ({
       <div>
         <label htmlFor="pitch-value" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Pitch <span className="text-red-500 dark:text-red-400">*</span>
-          <Tooltip content="Musical key/pitch this singer uses for this song (e.g., C, D, F, 2 Madhyam)">
-            <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-              <i className="fas fa-info-circle text-xs"></i>
-            </span>
-          </Tooltip>
+          <span 
+            title="Musical key/pitch this singer uses for this song (e.g., C, D, F, 2 Madhyam)"
+            className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+          >
+            <i className="fas fa-info-circle text-xs"></i>
+          </span>
         </label>
         <select
           id="pitch-value"
@@ -281,25 +283,23 @@ export const PitchForm: React.FC<PitchFormProps> = ({
       </div>
 
       <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <Tooltip content="Discard changes and close the form">
-          <button
-            type="button"
-            onClick={handleCancel}
-            disabled={isSubmitting}
+        <button
+          type="button"
+          onClick={handleCancel}
+          disabled={isSubmitting}
+          title="Discard changes and close the form"
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
           >
             Cancel
           </button>
-        </Tooltip>
-        <Tooltip content={isEditMode ? "Save changes to this pitch assignment" : "Create a new pitch assignment for this song-singer combination"}>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
-          >
-            {isSubmitting ? 'Saving...' : isEditMode ? 'Update Pitch' : 'Create Pitch'}
-          </button>
-        </Tooltip>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          title={isEditMode ? "Save changes to this pitch assignment" : "Create a new pitch assignment for this song-singer combination"}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
+        >
+          {isSubmitting ? 'Saving...' : isEditMode ? 'Update Pitch' : 'Create Pitch'}
+        </button>
       </div>
     </form>
   );

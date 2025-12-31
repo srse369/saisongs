@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
 import { MusicIcon } from '../common';
-import { Tooltip } from '../common/Tooltip';
 import { SongMetadataCard } from '../common/SongMetadataCard';
 
 interface SongListProps {
@@ -188,17 +187,16 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                   </button>
                 )}
                 {song.externalSourceUrl && (
-                  <Tooltip content="View song on external source (YouTube, etc.)">
-                    <a
-                      href={song.externalSourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                    >
-                      <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400"></i>
-                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">External URL</span>
-                    </a>
-                  </Tooltip>
+                  <a
+                    href={song.externalSourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="View song on external source (YouTube, etc.)"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                  >
+                    <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400"></i>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">External URL</span>
+                  </a>
                 )}
                 {isEditor && (
                   <button

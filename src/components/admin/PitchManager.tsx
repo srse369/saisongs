@@ -10,7 +10,7 @@ import { PitchList } from './PitchList';
 import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedPitchSearch, type PitchSearchFilters } from '../common/AdvancedPitchSearch';
 import { WebLLMService } from '../../services/WebLLMService';
-import { RefreshIcon, Tooltip, MobileBottomActionBar, type MobileAction } from '../common';
+import { RefreshIcon, MobileBottomActionBar, type MobileAction } from '../common';
 import type { SongSingerPitch, CreatePitchInput, Song } from '../../types';
 import { Modal } from '../common/Modal';
 import { SongDetails } from './SongDetails';
@@ -440,15 +440,13 @@ export const PitchManager: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Pitch Management</h1>
-              <Tooltip content="View help documentation for this tab">
-                <a
-                  href="/help#pitches"
-                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                  title="Help"
-                >
-                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-                </a>
-              </Tooltip>
+              <a
+                href="/help#pitches"
+                className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                title="View help documentation for this tab"
+              >
+                <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+              </a>
             </div>
             <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
               Associate singers with songs and their pitch information
@@ -521,42 +519,39 @@ export const PitchManager: React.FC = () => {
             </div>
             {/* Desktop action buttons - hidden on mobile */}
             <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-              <Tooltip content="Sort pitches by song name or singer name">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'songName' | 'singerName')}
-                  className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                >
-                  <option value="songName">Sort: Song</option>
-                  <option value="singerName">Sort: Singer</option>
-                </select>
-              </Tooltip>
-              <Tooltip content="Reload pitches, songs, and singers to see the latest changes">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'songName' | 'singerName')}
+                title="Sort pitches by song name or singer name"
+                className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              >
+                <option value="songName">Sort: Song</option>
+                <option value="singerName">Sort: Singer</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  fetchSongs(true);
+                  fetchSingers(true);
+                  fetchAllPitches(true);
+                }}
+                disabled={loading}
+                title="Reload pitches, songs, and singers to see the latest changes"
+                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+              >
+                <RefreshIcon className="w-4 h-4" />
+                Refresh
+              </button>
+              {!showForm && canCreatePitch && (
                 <button
-                  type="button"
-                  onClick={() => {
-                    fetchSongs(true);
-                    fetchSingers(true);
-                    fetchAllPitches(true);
-                  }}
-                  disabled={loading}
+                  onClick={handleCreateClick}
+                  disabled={loading || songs.length === 0 || singers.length === 0}
+                  title={songs.length === 0 || singers.length === 0 ? "Load songs and singers first" : userSinger && !isEditor ? "Assign pitches to yourself" : "Assign a pitch/key to a singer for a specific song"}
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                 >
-                  <RefreshIcon className="w-4 h-4" />
-                  Refresh
+                  <i className="fas fa-plus text-lg"></i>
+                  Create New Pitch
                 </button>
-              </Tooltip>
-              {!showForm && canCreatePitch && (
-                <Tooltip content={songs.length === 0 || singers.length === 0 ? "Load songs and singers first" : userSinger && !isEditor ? "Assign pitches to yourself" : "Assign a pitch/key to a singer for a specific song"}>
-                  <button
-                    onClick={handleCreateClick}
-                    disabled={loading || songs.length === 0 || singers.length === 0}
-                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    <i className="fas fa-plus text-lg"></i>
-                    Create New Pitch
-                  </button>
-                </Tooltip>
               )}
             </div>
           </div>
@@ -601,15 +596,14 @@ export const PitchManager: React.FC = () => {
             onClear={handleClearFilters}
             rightContent={
               userSinger ? (
-                <Tooltip content={showMyPitches ? "Show all pitches" : "Show only my assigned pitches"}>
-                  <button
-                    onClick={() => setShowMyPitches(!showMyPitches)}
-                    className="px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors flex items-center gap-2 whitespace-nowrap text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
-                  >
-                    <i className={`fas ${showMyPitches ? 'fa-users' : 'fa-user'} text-sm text-blue-600 dark:text-blue-400`}></i>
-                    {showMyPitches ? 'All Pitches' : 'My Pitches'}
-                  </button>
-                </Tooltip>
+                <button
+                  onClick={() => setShowMyPitches(!showMyPitches)}
+                  title={showMyPitches ? "Show all pitches" : "Show only my assigned pitches"}
+                  className="px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors flex items-center gap-2 whitespace-nowrap text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                  <i className={`fas ${showMyPitches ? 'fa-users' : 'fa-user'} text-sm text-blue-600 dark:text-blue-400`}></i>
+                  {showMyPitches ? 'All Pitches' : 'My Pitches'}
+                </button>
               ) : undefined
             }
           />

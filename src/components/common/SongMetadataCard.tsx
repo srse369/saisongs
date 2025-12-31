@@ -1,5 +1,4 @@
 import React from 'react';
-import { Tooltip } from './index';
 import { formatNormalizedPitch } from '../../utils/pitchNormalization';
 import { toTitleCase } from '../../utils/textUtils';
 
@@ -69,18 +68,17 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
           </div>
         )}
         {onPreviewClick && (
-          <Tooltip content="Preview song">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onPreviewClick();
-              }}
-              className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
-            >
-              <i className="fas fa-eye text-base"></i>
-            </button>
-          </Tooltip>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPreviewClick();
+            }}
+            title="Preview song"
+            className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
+          >
+            <i className="fas fa-eye text-base"></i>
+          </button>
         )}
       </div>
 

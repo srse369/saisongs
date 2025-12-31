@@ -9,7 +9,6 @@ import { NamedSessionList } from './NamedSessionList';
 import { Modal } from '../common/Modal';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { SearchBar } from '../common/SearchBar';
-import { Tooltip } from '../common';
 import { ALL_PITCH_OPTIONS, formatPitchWithName } from '../../utils/pitchUtils';
 import type { NamedSession, Song, Singer } from '../../types';
 
@@ -212,15 +211,14 @@ export const NamedSessionManager: React.FC = () => {
             </div>
             <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
               {canEdit && (
-                <Tooltip content="Create a new named session to save a set of songs with singers and pitches">
-                  <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    <i className="fas fa-plus text-lg"></i>
-                    Create Session
-                  </button>
-                </Tooltip>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  title="Create a new named session to save a set of songs with singers and pitches"
+                  className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                >
+                  <i className="fas fa-plus text-lg"></i>
+                  Create Session
+                </button>
               )}
             </div>
           </div>
@@ -298,24 +296,22 @@ export const NamedSessionManager: React.FC = () => {
             {sessionItems.map((item, index) => (
               <div key={index} className="flex gap-2 items-start p-3 bg-gray-50 rounded-md">
                 <div className="flex flex-col gap-1">
-                  <Tooltip content="Move song earlier in the session">
-                    <button
-                      onClick={() => handleMoveItem(index, 'up')}
-                      disabled={index === 0}
-                      className="p-1 text-gray-600 hover:bg-gray-200 rounded disabled:opacity-30"
-                    >
-                      <i className="fas fa-chevron-up text-base"></i>
-                    </button>
-                  </Tooltip>
-                  <Tooltip content="Move song later in the session">
-                    <button
-                      onClick={() => handleMoveItem(index, 'down')}
-                      disabled={index === sessionItems.length - 1}
-                      className="p-1 text-gray-600 hover:bg-gray-200 rounded disabled:opacity-30"
-                    >
-                      <i className="fas fa-chevron-down text-base"></i>
-                    </button>
-                  </Tooltip>
+                  <button
+                    onClick={() => handleMoveItem(index, 'up')}
+                    disabled={index === 0}
+                    title="Move song earlier in the session"
+                    className="p-1 text-gray-600 hover:bg-gray-200 rounded disabled:opacity-30"
+                  >
+                    <i className="fas fa-chevron-up text-base"></i>
+                  </button>
+                  <button
+                    onClick={() => handleMoveItem(index, 'down')}
+                    disabled={index === sessionItems.length - 1}
+                    title="Move song later in the session"
+                    className="p-1 text-gray-600 hover:bg-gray-200 rounded disabled:opacity-30"
+                  >
+                    <i className="fas fa-chevron-down text-base"></i>
+                  </button>
                 </div>
 
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -361,14 +357,13 @@ export const NamedSessionManager: React.FC = () => {
                   </select>
                 </div>
 
-                <Tooltip content="Remove this song from the session">
-                  <button
-                    onClick={() => handleRemoveSongFromSession(index)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-md"
-                  >
-                    <i className="fas fa-times text-lg"></i>
-                  </button>
-                </Tooltip>
+                <button
+                  onClick={() => handleRemoveSongFromSession(index)}
+                  title="Remove this song from the session"
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-md"
+                >
+                  <i className="fas fa-times text-lg"></i>
+                </button>
               </div>
             ))}
           </div>

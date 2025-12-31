@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { Singer, CreateSingerInput } from '../../types';
 import { CenterMultiSelect } from '../common/CenterMultiSelect';
 import { useAuth } from '../../contexts/AuthContext';
-import { Tooltip } from '../common';
 
 interface SingerFormProps {
   singer?: Singer | null;
@@ -199,11 +198,12 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
       <div>
         <label htmlFor="singer-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Singer Name <span className="text-red-500 dark:text-red-400">*</span>
-          <Tooltip content="Full name of the singer">
-            <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-              <i className="fas fa-info-circle text-xs"></i>
-            </span>
-          </Tooltip>
+          <span 
+            title="Full name of the singer"
+            className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+          >
+            <i className="fas fa-info-circle text-xs"></i>
+          </span>
         </label>
         <input
           id="singer-name"
@@ -224,11 +224,12 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
       <div>
         <label htmlFor="singer-gender" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Gender <span className="text-red-500 dark:text-red-400">*</span>
-          <Tooltip content="Gender affects pitch range recommendations and display colors">
-            <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-              <i className="fas fa-info-circle text-xs"></i>
-            </span>
-          </Tooltip>
+          <span 
+            title="Gender affects pitch range recommendations and display colors"
+            className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+          >
+            <i className="fas fa-info-circle text-xs"></i>
+          </span>
         </label>
         <select
           id="singer-gender"
@@ -254,11 +255,12 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
       <div>
         <label htmlFor="singer-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Email {isEditMode ? '(Required for Admin/Editor/Viewer)' : '(Optional)'}
-          <Tooltip content={isEditMode ? "Valid email is required to grant admin privileges or editor permissions" : "Contact email for notifications and communication"}>
-            <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-              <i className="fas fa-info-circle text-xs"></i>
-            </span>
-          </Tooltip>
+          <span 
+            title={isEditMode ? "Valid email is required to grant admin privileges or editor permissions" : "Contact email for notifications and communication"}
+            className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+          >
+            <i className="fas fa-info-circle text-xs"></i>
+          </span>
         </label>
         <input
           id="singer-email"
@@ -286,11 +288,12 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Is Admin {isAdmin ? '' : '(Read-only)'}
-              <Tooltip content={!email.trim() ? "Email required to grant admin privileges - admins have full access to all centers" : "Admins have full access to all centers and can manage all features"}>
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title={!email.trim() ? "Email required to grant admin privileges - admins have full access to all centers" : "Admins have full access to all centers and can manage all features"}
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             {isAdmin ? (
               <div className="flex items-center gap-3">
@@ -322,11 +325,12 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Editor For Centers {isAdmin ? '' : '(Read-only)'}
-              <Tooltip content={!email.trim() ? "Email required to grant editor permissions" : "Centers where this user has editing permissions for songs, singers, and pitches"}>
-                <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-                  <i className="fas fa-info-circle text-xs"></i>
-                </span>
-              </Tooltip>
+              <span 
+                title={!email.trim() ? "Email required to grant editor permissions" : "Centers where this user has editing permissions for songs, singers, and pitches"}
+                className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+              >
+                <i className="fas fa-info-circle text-xs"></i>
+              </span>
             </label>
             <CenterMultiSelect
               selectedCenterIds={editorForCenters}
@@ -347,11 +351,12 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Singer's Centers <span className="text-red-500 dark:text-red-400">*</span>
-          <Tooltip content="Centers this singer is associated with - at least one center is required">
-            <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help">
-              <i className="fas fa-info-circle text-xs"></i>
-            </span>
-          </Tooltip>
+          <span 
+            title="Centers this singer is associated with - at least one center is required"
+            className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+          >
+            <i className="fas fa-info-circle text-xs"></i>
+          </span>
         </label>
         <CenterMultiSelect
           selectedCenterIds={centerIds}
@@ -375,26 +380,24 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
       </div>
 
       <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <Tooltip content={isFormDisabled ? "Close form" : "Discard changes and close the form"}>
-          <button
-            type="button"
-            onClick={handleCancel}
-            disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
-          >
-            {isFormDisabled ? 'Close' : 'Cancel'}
-          </button>
-        </Tooltip>
+        <button
+          type="button"
+          onClick={handleCancel}
+          disabled={isSubmitting}
+          title={isFormDisabled ? "Close form" : "Discard changes and close the form"}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
+        >
+          {isFormDisabled ? 'Close' : 'Cancel'}
+        </button>
         {!isFormDisabled && !readOnly && (
-          <Tooltip content={isEditMode ? "Save changes to this singer's profile" : "Create a new singer with these details"}>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
-            >
-              {isSubmitting ? 'Saving...' : isEditMode ? 'Update Singer' : 'Create Singer'}
-            </button>
-          </Tooltip>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            title={isEditMode ? "Save changes to this singer's profile" : "Create a new singer with these details"}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
+          >
+            {isSubmitting ? 'Saving...' : isEditMode ? 'Update Singer' : 'Create Singer'}
+          </button>
         )}
       </div>
     </form>

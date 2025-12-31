@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { SongSingerPitch, Song, Singer } from '../../types';
-import { Modal, Tooltip } from '../common';
+import { Modal } from '../common';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
@@ -226,54 +226,50 @@ export const PitchList: React.FC<PitchListProps> = ({
               <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
                 onClick={(e) => e.stopPropagation()}
               >
-                <Tooltip content={isInLiveSession(pitch.songId, pitch.singerId) ? 'Already in live session' : 'Add this song with singer and pitch to the live session'}>
-                  <button
-                    onClick={() => addSong(pitch.songId, pitch.singerId, pitch.pitch)}
-                    disabled={isInLiveSession(pitch.songId, pitch.singerId)}
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isInLiveSession(pitch.songId, pitch.singerId) ? (
-                      <i className="fas fa-check text-lg text-emerald-600 dark:text-emerald-400"></i>
-                    ) : (
-                      <i className="fas fa-plus text-lg text-emerald-600 dark:text-emerald-400"></i>
-                    )}
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Add to Session</span>
-                  </button>
-                </Tooltip>
+                <button
+                  onClick={() => addSong(pitch.songId, pitch.singerId, pitch.pitch)}
+                  disabled={isInLiveSession(pitch.songId, pitch.singerId)}
+                  title={isInLiveSession(pitch.songId, pitch.singerId) ? 'Already in live session' : 'Add this song with singer and pitch to the live session'}
+                  className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isInLiveSession(pitch.songId, pitch.singerId) ? (
+                    <i className="fas fa-check text-lg text-emerald-600 dark:text-emerald-400"></i>
+                  ) : (
+                    <i className="fas fa-plus text-lg text-emerald-600 dark:text-emerald-400"></i>
+                  )}
+                  <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Add to Session</span>
+                </button>
                 {pitch.externalSourceUrl && (
-                  <Tooltip content="View song on external source (YouTube, etc.)">
-                    <a
-                      href={pitch.externalSourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                    >
-                      <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400"></i>
-                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">External URL</span>
-                    </a>
-                  </Tooltip>
+                  <a
+                    href={pitch.externalSourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="View song on external source (YouTube, etc.)"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                  >
+                    <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400"></i>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">External URL</span>
+                  </a>
                 )}
                 {(isEditor || pitch.singerId === userSingerId) && (
-                  <Tooltip content="Edit the pitch/key for this singer's performance">
-                    <button
-                      onClick={() => onEdit(pitch)}
-                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                    >
-                      <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
-                    </button>
-                  </Tooltip>
+                  <button
+                    onClick={() => onEdit(pitch)}
+                    title="Edit the pitch/key for this singer's performance"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                  >
+                    <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
+                  </button>
                 )}
                 {(isEditor || pitch.singerId === userSingerId) && (
-                  <Tooltip content="Remove this pitch association permanently">
-                    <button
-                      onClick={() => handleDeleteClick(pitch)}
-                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                    >
-                      <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
-                    </button>
-                  </Tooltip>
+                  <button
+                    onClick={() => handleDeleteClick(pitch)}
+                    title="Remove this pitch association permanently"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                  >
+                    <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
+                  </button>
                 )}
               </div>
             </div>

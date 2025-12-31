@@ -7,7 +7,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import type { Song, PresentationTemplate } from '../../types';
 import { Modal } from '../common/Modal';
-import { Tooltip } from '../common/Tooltip';
 import { CenterBadges } from '../common/CenterBadges';
 import { CenterMultiSelect } from '../common/CenterMultiSelect';
 import { MobileBottomActionBar, type MobileAction } from '../common';
@@ -446,55 +445,51 @@ export const SessionManager: React.FC = () => {
         <div className="hidden md:block w-full sm:w-auto">
           {/* When session is empty, only show Load Session */}
           {sessionItems.length === 0 ? (
-            <Tooltip content="Load a previously saved session into this list">
-              <button
-                type="button"
-                onClick={() => setShowLoadModal(true)}
-                className="w-full sm:w-auto min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center"
-              >
-                <i className="fas fa-folder-open mr-2"></i>
-                Load
-              </button>
-            </Tooltip>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {/* Load Session */}
-          <Tooltip content="Load a previously saved session into this list">
             <button
               type="button"
               onClick={() => setShowLoadModal(true)}
-                  className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center flex items-center justify-center gap-1.5"
+              title="Load a previously saved session into this list"
+              className="w-full sm:w-auto min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center"
             >
-                  <i className="fas fa-folder-open mr-1"></i>
-                  <span>Load</span>
+              <i className="fas fa-folder-open mr-2"></i>
+              Load
             </button>
-          </Tooltip>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {/* Load Session */}
+          <button
+            type="button"
+            onClick={() => setShowLoadModal(true)}
+            title="Load a previously saved session into this list"
+            className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center flex items-center justify-center gap-1.5"
+          >
+            <i className="fas fa-folder-open mr-1"></i>
+            <span>Load</span>
+          </button>
               
               {/* Save Session (only for authenticated users) */}
               {isAuthenticated && (
-                <Tooltip content="Save the current session with all songs, singers, and pitches for later use">
-                  <button
-                    type="button"
-                    onClick={() => setShowSaveModal(true)}
-                    className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg sm:rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <i className="fas fa-save mr-1"></i>
-                    <span>Save</span>
-                  </button>
-                </Tooltip>
+                <button
+                  type="button"
+                  onClick={() => setShowSaveModal(true)}
+                  title="Save the current session with all songs, singers, and pitches for later use"
+                  className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg sm:rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <i className="fas fa-save mr-1"></i>
+                  <span>Save</span>
+                </button>
               )}
               
               {/* Clear Session */}
-              <Tooltip content="Remove all songs from the current session">
-                <button
-                  type="button"
-                  onClick={clearSession}
-                  className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <i className="fas fa-trash-alt mr-1"></i>
-                  <span>Clear</span>
-                </button>
-              </Tooltip>
+              <button
+                type="button"
+                onClick={clearSession}
+                title="Remove all songs from the current session"
+                className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <i className="fas fa-trash-alt mr-1"></i>
+                <span>Clear</span>
+              </button>
               
               {/* Template */}
               <div className="min-h-[48px] sm:min-h-0">
@@ -503,31 +498,29 @@ export const SessionManager: React.FC = () => {
               
               {/* Present Session */}
               <div>
-                <Tooltip content="Start full-screen presentation with all songs in order">
-                  <button
-                    type="button"
-                    onClick={handlePresentSession}
-                    className="min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg sm:rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <i className="fas fa-play"></i>
-                    <span>Present</span>
-                  </button>
-                </Tooltip>
+                <button
+                  type="button"
+                  onClick={handlePresentSession}
+                  title="Start full-screen presentation with all songs in order"
+                  className="min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg sm:rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors flex items-center justify-center gap-2"
+                >
+                  <i className="fas fa-play"></i>
+                  <span>Present</span>
+                </button>
               </div>
               
               {/* Export to PowerPoint */}
               <div>
-                <Tooltip content="Export session to PowerPoint file with all song slides">
-                  <button
-                    type="button"
-                    onClick={handleExportToPowerPoint}
-                    disabled={exporting}
-                    className="min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-purple-600 rounded-lg sm:rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                  >
-                    <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-download'}`}></i>
-                    <span>{exporting ? 'Exporting...' : 'Export'}</span>
-                  </button>
-                </Tooltip>
+                <button
+                  type="button"
+                  onClick={handleExportToPowerPoint}
+                  disabled={exporting}
+                  title="Export session to PowerPoint file with all song slides"
+                  className="min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-purple-600 rounded-lg sm:rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-download'}`}></i>
+                  <span>{exporting ? 'Exporting...' : 'Export'}</span>
+                </button>
               </div>
             </div>
           )}
@@ -630,17 +623,16 @@ export const SessionManager: React.FC = () => {
                   onClick={(e) => e.stopPropagation()}
                 >
                   {song.externalSourceUrl && (
-                    <Tooltip content="View song on external source (YouTube, etc.)">
-                      <a
-                        href={song.externalSourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                      >
-                        <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400"></i>
-                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">External URL</span>
-                      </a>
-                    </Tooltip>
+                    <a
+                      href={song.externalSourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="View song on external source (YouTube, etc.)"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                    >
+                      <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400"></i>
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">External URL</span>
+                    </a>
                   )}
                   <button
                     onClick={() => removeSong(entry.songId, entry.singerId)}

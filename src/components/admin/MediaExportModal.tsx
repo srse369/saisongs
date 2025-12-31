@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
-import { Tooltip } from '../common';
 import type { CloudProvider, CloudStorageConfig } from '../../services/CloudStorageService';
 import { cloudStorageService } from '../../services/CloudStorageService';
 
