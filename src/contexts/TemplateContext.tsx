@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { PresentationTemplate, ServiceError } from '../types';
 import templateService from '../services/TemplateService';
 import { useToast } from './ToastContext';
-import { safeSetLocalStorageItem } from '../utils/cacheUtils';
+import { safeSetLocalStorageItem, getLocalStorageItem } from '../utils/cacheUtils';
 
 const TEMPLATES_CACHE_KEY = 'saiSongs:templatesCache';
 const TEMPLATES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -68,7 +68,7 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
       // Try to hydrate from browser cache first to speed up page load,
       // unless the caller explicitly requested a forced refresh.
       if (!forceRefresh && typeof window !== 'undefined') {
-        const cachedRaw = window.localStorage.getItem(TEMPLATES_CACHE_KEY);
+        const cachedRaw = getLocalStorageItem(TEMPLATES_CACHE_KEY);
         if (cachedRaw) {
           try {
             const cached = JSON.parse(cachedRaw) as {

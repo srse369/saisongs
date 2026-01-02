@@ -1,7 +1,11 @@
 /**
  * Utility functions for clearing application caches
  * Handles both localStorage and service worker caches
+ * Includes compression support to reduce storage size
  */
+
+// Import lz-string for compression (small library, ~3KB gzipped)
+import LZString from 'lz-string';
 
 // Common cache keys used across the application
 export const CACHE_KEYS = {
@@ -108,8 +112,57 @@ export function getLocalStorageSize(): number {
 }
 
 /**
+ * Compress a string using lz-string compression
+ * Falls back to original string if compression fails or is unavailable
+ * Uses synchronous compression for better performance
+ */
+export function compressString(data: string): string {
+  if (!data || data.length < 1000) {
+    return data; // Don't compress small strings
+  }
+  
+  try {
+    if (typeof window !== 'undefined' && LZString) {
+      // Use compressToUTF16 for better browser compatibility
+      const compressed = LZString.compressToUTF16(data);
+      // Only use compression if it actually reduces size (at least 10% reduction)
+      if (compressed && compressed.length < data.length * 0.9) {
+        return 'C' + compressed; // Prefix 'C' to indicate compressed
+      }
+    }
+  } catch (error) {
+    // Silently fail - compression is optional
+  }
+  return data; // Return original if compression fails or doesn't help
+}
+
+/**
+ * Decompress a string if it was compressed
+ * Returns original string if not compressed or decompression fails
+ */
+export function decompressString(data: string): string {
+  if (!data || !data.startsWith('C')) {
+    return data; // Not compressed
+  }
+  
+  try {
+    if (typeof window !== 'undefined' && LZString) {
+      const compressed = data.substring(1); // Remove 'C' prefix
+      const decompressed = LZString.decompressFromUTF16(compressed);
+      if (decompressed) {
+        return decompressed;
+      }
+    }
+  } catch (error) {
+    console.warn('Decompression failed, returning original data:', error);
+  }
+  return data;
+}
+
+/**
  * Safely set a localStorage item with quota exceeded error handling
  * If quota is exceeded, attempts to clear old caches and retry
+ * Automatically compresses large data to reduce storage size
  * @param key - The key to set
  * @param value - The value to set
  * @param options - Options for handling quota errors
@@ -121,12 +174,19 @@ export function safeSetLocalStorageItem(
   options: {
     clearOnQuotaError?: boolean;
     skipKeys?: string[];
+    compress?: boolean;
   } = {}
 ): boolean {
-  const { clearOnQuotaError = true, skipKeys = [] } = options;
+  const { clearOnQuotaError = true, skipKeys = [], compress = true } = options;
+
+  // Compress if enabled and data is large (>10KB)
+  let dataToStore = value;
+  if (compress && value.length > 10000) {
+    dataToStore = compressString(value);
+  }
 
   try {
-    localStorage.setItem(key, value);
+    localStorage.setItem(key, dataToStore);
     return true;
   } catch (error) {
     // Check if it's a quota exceeded error
@@ -165,8 +225,8 @@ export function safeSetLocalStorageItem(
         }
       });
 
-      // Retry setting the item
-      localStorage.setItem(key, value);
+      // Retry setting the item (use compressed version if we have it)
+      localStorage.setItem(key, dataToStore);
       console.log(`Successfully set "${key}" after clearing old caches`);
       return true;
     } catch (retryError) {
@@ -192,6 +252,22 @@ export function clearLegacyCacheKeys(): void {
       console.warn(`Failed to clear legacy cache key "${key}":`, error);
     }
   });
+}
+
+/**
+ * Get a localStorage item and automatically decompress if needed
+ * @param key - The key to retrieve
+ * @returns The decompressed value or null if not found
+ */
+export function getLocalStorageItem(key: string): string | null {
+  try {
+    const value = window.localStorage.getItem(key);
+    if (!value) return null;
+    return decompressString(value);
+  } catch (error) {
+    console.warn(`Failed to get localStorage key "${key}":`, error);
+    return null;
+  }
 }
 
 /**

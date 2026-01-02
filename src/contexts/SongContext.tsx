@@ -4,7 +4,7 @@ import type { Song, CreateSongInput, UpdateSongInput, ServiceError } from '../ty
 import { songService } from '../services';
 import { useToast } from './ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../utils';
-import { safeSetLocalStorageItem } from '../utils/cacheUtils';
+import { safeSetLocalStorageItem, getLocalStorageItem } from '../utils/cacheUtils';
 
 const SONGS_CACHE_KEY = 'saiSongs:songsCache';
 const SONGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -125,7 +125,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
       // Try to hydrate from browser cache first to speed up page load,
       // unless the caller explicitly requested a forced refresh.
       if (!forceRefresh && typeof window !== 'undefined') {
-        const cachedRaw = window.localStorage.getItem(SONGS_CACHE_KEY);
+        const cachedRaw = getLocalStorageItem(SONGS_CACHE_KEY);
         if (cachedRaw) {
           try {
             const cached = JSON.parse(cachedRaw) as {

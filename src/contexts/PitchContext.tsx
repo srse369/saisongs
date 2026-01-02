@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { SongSingerPitch, CreatePitchInput, UpdatePitchInput, ServiceError } from '../types';
 import { pitchService } from '../services';
 import { useToast } from './ToastContext';
-import { safeSetLocalStorageItem } from '../utils/cacheUtils';
+import { safeSetLocalStorageItem, getLocalStorageItem } from '../utils/cacheUtils';
 
 const PITCHES_CACHE_KEY = 'saiSongs:pitchesCache';
 const PITCHES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -65,7 +65,7 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
       // Try to hydrate from browser cache first to speed up page load,
       // unless the caller explicitly requested a forced refresh.
       if (!forceRefresh && typeof window !== 'undefined') {
-        const cachedRaw = window.localStorage.getItem(PITCHES_CACHE_KEY);
+        const cachedRaw = getLocalStorageItem(PITCHES_CACHE_KEY);
         if (cachedRaw) {
           try {
             const cached = JSON.parse(cachedRaw) as {

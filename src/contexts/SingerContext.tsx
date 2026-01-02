@@ -4,7 +4,7 @@ import type { Singer, CreateSingerInput, UpdateSingerInput, ServiceError } from 
 import { singerService } from '../services';
 import { useToast } from './ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../utils';
-import { safeSetLocalStorageItem } from '../utils/cacheUtils';
+import { safeSetLocalStorageItem, getLocalStorageItem } from '../utils/cacheUtils';
 
 const SINGERS_CACHE_KEY = 'saiSongs:singersCache';
 const SINGERS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -130,7 +130,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       // Try to hydrate from browser cache first to speed up page load,
       // unless the caller explicitly requested a forced refresh.
       if (!forceRefresh && typeof window !== 'undefined') {
-        const cachedRaw = window.localStorage.getItem(SINGERS_CACHE_KEY);
+        const cachedRaw = getLocalStorageItem(SINGERS_CACHE_KEY);
         if (cachedRaw) {
           try {
             const cached = JSON.parse(cachedRaw) as {
@@ -157,17 +157,20 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
 
       // Persist to cache for subsequent loads
       if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.setItem(
-            SINGERS_CACHE_KEY,
-            JSON.stringify({
-              timestamp: Date.now(),
-              singers: fetchedSingers,
-            })
-          );
-        } catch (e) {
-          // Silently ignore storage errors (e.g., quota exceeded on iOS)
-          console.warn('Failed to cache singers to localStorage:', e);
+        const cacheData = JSON.stringify({
+          timestamp: Date.now(),
+          singers: fetchedSingers,
+        });
+        
+        const success = safeSetLocalStorageItem(SINGERS_CACHE_KEY, cacheData, {
+          clearOnQuotaError: true,
+          skipKeys: [SINGERS_CACHE_KEY], // Don't clear the singers cache we're trying to set
+        });
+        
+        if (!success) {
+          // Silently ignore storage errors (e.g., quota exceeded on mobile)
+          // Singers will be fetched from server on next load
+          console.warn('Failed to cache singers to localStorage due to quota. Singers will be fetched from server on next load.');
         }
       }
     } catch (err) {
@@ -223,17 +226,19 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
         // Update localStorage cache with the updated list
         // This ensures the cache is up-to-date for other components/tabs
         if (typeof window !== 'undefined') {
-          try {
-            window.localStorage.setItem(
-              SINGERS_CACHE_KEY,
-              JSON.stringify({
-                timestamp: Date.now(),
-                singers: newList,
-              })
-            );
-          } catch (e) {
-            // Silently ignore storage errors (e.g., quota exceeded on iOS)
-            console.warn('Failed to update singers cache in localStorage:', e);
+          const cacheData = JSON.stringify({
+            timestamp: Date.now(),
+            singers: newList,
+          });
+          
+          const success = safeSetLocalStorageItem(SINGERS_CACHE_KEY, cacheData, {
+            clearOnQuotaError: true,
+            skipKeys: [SINGERS_CACHE_KEY],
+          });
+          
+          if (!success) {
+            // Silently ignore storage errors (e.g., quota exceeded on mobile)
+            console.warn('Failed to update singers cache in localStorage due to quota.');
           }
         }
         
