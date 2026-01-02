@@ -54,8 +54,6 @@ class PitchService {
     const id = row.id ?? row.ID;
     const songId = row.songId ?? row.song_id ?? row.SONG_ID;
     const singerId = row.singerId ?? row.singer_id ?? row.SINGER_ID;
-    const createdRaw = row.createdAt ?? row.created_at ?? row.CREATED_AT;
-    const updatedRaw = row.updatedAt ?? row.updated_at ?? row.UPDATED_AT;
 
     return {
       id,
@@ -63,8 +61,6 @@ class PitchService {
       singerId,
       // Oracle / driver may expose this as `pitch` or `PITCH`
       pitch: row.pitch ?? row.PITCH,
-      createdAt: createdRaw ? new Date(createdRaw) : new Date(),
-      updatedAt: updatedRaw ? new Date(updatedRaw) : new Date(),
     };
   }
 
