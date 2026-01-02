@@ -211,37 +211,43 @@ export function clearLocalStorageCache(keys?: string[]): void {
 }
 
 /**
- * Clear service worker caches for HTML, JavaScript, and CSS files
- * Preserves images and other assets
+ * Unregister all service workers
  */
-export async function clearServiceWorkerCache(): Promise<void> {
-  if (!('caches' in window) || !('serviceWorker' in navigator)) {
+export async function unregisterServiceWorkers(): Promise<void> {
+  if (!('serviceWorker' in navigator)) {
     return;
   }
 
   try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(
+      registrations.map(registration => registration.unregister())
+    );
+    console.log(`Unregistered ${registrations.length} service worker(s)`);
+  } catch (error) {
+    console.warn('Could not unregister service workers:', error);
+  }
+}
+
+/**
+ * Clear all service worker cache storage entries completely
+ * This deletes entire cache storage entries, not just specific files
+ */
+export async function clearServiceWorkerCache(): Promise<void> {
+  if (!('caches' in window)) {
+    return;
+  }
+
+  try {
+    // Get all cache names
     const cacheNames = await caches.keys();
-    const htmlPaths = ['/', '/index.html', '/help'];
-
-    for (const cacheName of cacheNames) {
-      const cache = await caches.open(cacheName);
-      const requests = await cache.keys();
-
-      for (const request of requests) {
-        const url = new URL(request.url);
-        const pathname = url.pathname;
-
-        // Check if this is an HTML, JavaScript, or CSS file
-        const isHtml = htmlPaths.includes(pathname) || pathname.endsWith('.html');
-        const isJs = pathname.endsWith('.js') || pathname.endsWith('.mjs');
-        const isCss = pathname.endsWith('.css');
-
-        // Delete HTML, JS, and CSS files, preserve images and other assets
-        if (isHtml || isJs || isCss) {
-          await cache.delete(request);
-        }
-      }
-    }
+    
+    // Delete ALL cache storage entries completely
+    await Promise.all(
+      cacheNames.map(cacheName => caches.delete(cacheName))
+    );
+    
+    console.log(`Cleared ${cacheNames.length} cache storage entries:`, cacheNames);
   } catch (error) {
     // Service worker cache clearing is optional, don't fail if it errors
     console.warn('Could not clear service worker cache:', error);
@@ -266,6 +272,9 @@ export async function clearAllCaches(options: ClearCacheOptions = {}): Promise<v
 
   // Clear service worker cache if requested
   if (shouldClearSW) {
+    // Unregister service workers first
+    await unregisterServiceWorkers();
+    // Then delete all cache storage entries
     await clearServiceWorkerCache();
   }
 
