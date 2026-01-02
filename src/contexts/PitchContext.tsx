@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { SongSingerPitch, CreatePitchInput, UpdatePitchInput, ServiceError } from '../types';
 import { pitchService } from '../services';
 import { useToast } from './ToastContext';
+import { safeSetLocalStorageItem } from '../utils/cacheUtils';
 
 const PITCHES_CACHE_KEY = 'saiSongs:pitchesCache';
 const PITCHES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -91,17 +92,20 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
 
       // Persist to cache for subsequent loads
       if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.setItem(
-            PITCHES_CACHE_KEY,
-            JSON.stringify({
-              timestamp: Date.now(),
-              pitches: fetchedPitches,
-            })
-          );
-        } catch (e) {
-          // Silently ignore storage errors (e.g., quota exceeded on iOS)
-          console.warn('Failed to cache pitches to localStorage:', e);
+        const cacheData = JSON.stringify({
+          timestamp: Date.now(),
+          pitches: fetchedPitches,
+        });
+        
+        const success = safeSetLocalStorageItem(PITCHES_CACHE_KEY, cacheData, {
+          clearOnQuotaError: true,
+          skipKeys: [PITCHES_CACHE_KEY], // Don't clear the pitches cache we're trying to set
+        });
+        
+        if (!success) {
+          // Silently ignore storage errors (e.g., quota exceeded on mobile)
+          // Pitches will be fetched from server on next load
+          console.warn('Failed to cache pitches to localStorage due to quota. Pitches will be fetched from server on next load.');
         }
       }
     } catch (err) {
