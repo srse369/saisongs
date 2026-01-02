@@ -223,7 +223,9 @@ export interface PresentationTemplate {
   isDefault?: boolean;
   centerIds?: number[];              // Centers that have access to this template (empty = all centers)
   createdAt?: Date;
+  createdBy?: string;                
   updatedAt?: Date;
+  updatedBy?: string;
   yaml?: string;
 }
 
@@ -257,9 +259,9 @@ export interface Song {
   refGents?: string;
   refLadies?: string;
   
-  createdAt: Date;
+  createdAt?: Date;
   createdBy?: string;                  // User ID who created the song
-  updatedAt: Date;
+  updatedAt?: Date;
   updatedBy?: string;
   
   pitchCount?: number;                // Number of pitch assignments for this song
@@ -274,9 +276,9 @@ export interface Singer {
   editorFor?: number[];               // Centers this user can edit (if they have editor permissions)
   isAdmin?: boolean;                  // Whether this user is an admin
   pitchCount?: number;                // Number of pitch assignments this singer has
-  createdAt: Date;
+  createdAt?: Date;
   createdBy?: string;
-  updatedAt: Date;
+  updatedAt?: Date;
   updatedBy?: string;
 }
 
@@ -284,8 +286,8 @@ export interface SongSingerPitch {
   id: string;
   songId: string;
   singerId: string;
-  songName: string;
-  singerName: string;
+  songName?: string;
+  singerName?: string;
   pitch: string;
   createdAt?: Date;
   createdBy?: string;
@@ -298,9 +300,9 @@ export interface NamedSession {
   name: string;
   description?: string;
   centerIds?: number[];              // Centers that have access to this session (empty = all centers)
-  createdAt: Date;
+  createdAt?: Date;
   createdBy?: string;                // Email of user who created the session
-  updatedAt: Date;
+  updatedAt?: Date;
   updatedBy?: string;
 }
 
@@ -311,9 +313,9 @@ export interface SessionItem {
   singerId?: string;
   pitch?: string;
   sequenceOrder: number;
-  createdAt: Date;
+  createdAt?: Date;
   createdBy?: string;
-  updatedAt: Date;
+  updatedAt?: Date;
   updatedBy?: string;
 }
 
