@@ -267,7 +267,7 @@ export const SingerManager: React.FC = () => {
                 onChange={handleSearchChange}
                 placeholder="Search singers by name..."
                 autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
-                className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                className="w-full pl-9 pr-9 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
               {searchTerm && (

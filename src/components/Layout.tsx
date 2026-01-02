@@ -230,12 +230,60 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     const maxVerticalDistance = 100; // Maximum vertical movement to still count as horizontal swipe
 
     const handleTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      
+      // Ignore swipe if touching an input, textarea, select, or contenteditable element
+      if (target.tagName === 'INPUT' || 
+          target.tagName === 'TEXTAREA' || 
+          target.tagName === 'SELECT' ||
+          target.isContentEditable ||
+          target.closest('input, textarea, select, [contenteditable="true"]')) {
+        return;
+      }
+      
+      // Ignore swipe if touching a button or link
+      if (target.tagName === 'BUTTON' || 
+          target.tagName === 'A' ||
+          target.closest('button, a')) {
+        return;
+      }
+      
       touchStartX = e.touches[0].clientX;
       touchStartY = e.touches[0].clientY;
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
       if (touchStartX === null || touchStartY === null) return;
+
+      const target = e.target as HTMLElement;
+      
+      // Ignore swipe if touching an input, textarea, select, or contenteditable element
+      if (target.tagName === 'INPUT' || 
+          target.tagName === 'TEXTAREA' || 
+          target.tagName === 'SELECT' ||
+          target.isContentEditable ||
+          target.closest('input, textarea, select, [contenteditable="true"]')) {
+        touchStartX = null;
+        touchStartY = null;
+        return;
+      }
+      
+      // Ignore swipe if touching a button or link
+      if (target.tagName === 'BUTTON' || 
+          target.tagName === 'A' ||
+          target.closest('button, a')) {
+        touchStartX = null;
+        touchStartY = null;
+        return;
+      }
+      
+      // Check if user is selecting text
+      const selection = window.getSelection();
+      if (selection && selection.toString().length > 0) {
+        touchStartX = null;
+        touchStartY = null;
+        return;
+      }
 
       const touchEndX = e.changedTouches[0].clientX;
       const touchEndY = e.changedTouches[0].clientY;

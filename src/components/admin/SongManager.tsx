@@ -391,7 +391,7 @@ export const SongManager: React.FC = () => {
         <div className="flex flex-col gap-2 sm:gap-4 mb-2 sm:mb-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-0">
                 Song Management
               </h1>
               <a

@@ -173,7 +173,7 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
           placeholder={llmEnabled ? placeholder : 'Search (Enable AI for natural language)...'}
           autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
           className={`
-            w-full pl-10 pr-32 py-3 sm:py-2.5 text-base sm:text-sm border rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
+            w-full pl-10 pr-32 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
             ${llmEnabled 
               ? 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/10' 
               : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800'
