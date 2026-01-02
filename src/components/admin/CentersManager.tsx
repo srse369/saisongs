@@ -375,8 +375,8 @@ export const CentersManager: React.FC = () => {
           <p className="text-gray-500 dark:text-gray-400">No centers found. Create your first center to get started.</p>
         </div>
       ) : (
-        <div className="space-y-1.5 md:space-y-3">
-          {centers.map((center) => {
+        <div className="space-y-0 md:space-y-3">
+          {centers.map((center, index) => {
             const isSelected = selectedCenterId === center.id;
             return (
             <div
@@ -387,11 +387,17 @@ export const CentersManager: React.FC = () => {
                   setSelectedCenterId(isSelected ? null : center.id);
                 }
               }}
-              className={`p-2 md:p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border ${
-                isSelected && isMobile
-                  ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
-                  : 'border-gray-200 dark:border-gray-700'
-              } hover:shadow-lg transition-shadow ${isMobile ? 'cursor-pointer' : ''}`}
+              className={`p-2 md:p-4 bg-white dark:bg-gray-800 transition-all duration-200 ${
+                isMobile 
+                  ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${
+                      isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    }`
+                  : `border rounded-lg shadow-md hover:shadow-lg ${
+                      isSelected
+                        ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                        : 'border-gray-200 dark:border-gray-700'
+                    }`
+              }`}
             >
               <div className="flex items-center gap-2 md:gap-4">
                 {/* Content */}

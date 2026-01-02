@@ -51,7 +51,7 @@ export const PitchList: React.FC<PitchListProps> = ({
   const [pitchToDelete, setPitchToDelete] = useState<PitchWithDetails | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectedPitchId, setSelectedPitchId] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -154,8 +154,8 @@ export const PitchList: React.FC<PitchListProps> = ({
   return (
     <>
       {/* Card layout for all screen sizes - SAME AS SONGS */}
-      <div className="space-y-1.5 md:space-y-3">
-        {enrichedPitches.map((pitch) => {
+      <div className="space-y-0 md:space-y-3">
+        {enrichedPitches.map((pitch, index) => {
           const isSelected = selectedPitchId === pitch.id;
           return (
           <div
@@ -166,11 +166,17 @@ export const PitchList: React.FC<PitchListProps> = ({
                 setSelectedPitchId(isSelected ? null : pitch.id);
               }
             }}
-            className={`bg-white dark:bg-gray-800 border rounded-lg shadow-md p-2 md:p-4 hover:shadow-lg transition-all duration-200 ${
-              isSelected 
-                ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800' 
-                : 'border-gray-200 dark:border-gray-700'
-            } ${isMobile ? 'cursor-pointer' : ''}`}
+            className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${
+              isMobile 
+                ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${
+                    isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                  }`
+                : `border rounded-lg shadow-md hover:shadow-lg ${
+                    isSelected 
+                      ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800' 
+                      : 'border-gray-200 dark:border-gray-700'
+                  }`
+            }`}
           >
             <div className="flex flex-col gap-1.5 md:gap-3">
               {/* Content Section */}

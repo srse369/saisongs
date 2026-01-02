@@ -933,17 +933,19 @@ export const TemplateManager: React.FC = () => {
       )}
 
       {/* Templates List */}
-      <div className="space-y-1.5 md:space-y-3">
+      <div className="space-y-0 md:space-y-3">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
             <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">Loading templates...</p>
           </div>
         ) : filteredTemplates.length > 0 ? (
-          filteredTemplates.map((template) => (
+          filteredTemplates.map((template, index) => (
             <div
               key={template.id}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2 md:p-4 hover:shadow-md transition-shadow"
+              className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${
+                index > 0 ? 'md:border-t-0 border-t border-gray-300 dark:border-gray-600' : ''
+              } md:border md:border-gray-200 md:dark:border-gray-700 md:rounded-lg md:hover:shadow-md`}
             >
               <div className="flex flex-col gap-1.5 md:gap-3">
                 <div className="flex-1 min-w-0">

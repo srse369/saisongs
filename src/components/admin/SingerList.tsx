@@ -29,7 +29,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [mergeModalOpen, setMergeModalOpen] = useState(false);
   const [selectedSingerId, setSelectedSingerId] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -198,8 +198,8 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
         )}
       </div>
       {/* Card layout for all screen sizes - SAME AS SONGS */}
-      <div className="space-y-1.5 md:space-y-3">
-        {singers.map((singer) => {
+      <div className="space-y-0 md:space-y-3">
+        {singers.map((singer, index) => {
           const isSelected = selectedSingerId === singer.id;
           const isMergeSelected = selectedSingerIds.includes(singer.id);
           return (
@@ -211,11 +211,17 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                 setSelectedSingerId(isSelected ? null : singer.id);
               }
             }}
-            className={`bg-white dark:bg-gray-800 border rounded-lg shadow-md p-2 md:p-4 hover:shadow-lg transition-all duration-200 ${
-              isMergeSelected || (isMobile && isSelected && !isSelectionMode)
-                ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
-                : 'border-gray-200 dark:border-gray-700'
-            } ${isMobile && !isSelectionMode ? 'cursor-pointer' : ''}`}
+            className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${
+              isMobile 
+                ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${
+                    isMergeSelected || (isSelected && !isSelectionMode) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                  }`
+                : `border rounded-lg shadow-md hover:shadow-lg ${
+                    isMergeSelected || isSelected
+                      ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800' 
+                      : 'border-gray-200 dark:border-gray-700'
+                  }`
+            }`}
           >
             <div className="flex flex-col gap-1.5 md:gap-3">
               {/* Main row: Checkbox + Singer Name + Badges */}

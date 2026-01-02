@@ -209,8 +209,8 @@ export const FeedbackManager: React.FC = () => {
           <p className="text-gray-500 dark:text-gray-400">No feedback found</p>
         </div>
       ) : (
-        <div className="space-y-2 md:space-y-4">
-          {feedback.map((item) => {
+        <div className="space-y-0 md:space-y-4">
+          {feedback.map((item, index) => {
             const isSelected = selectedFeedbackId === item.id;
             return (
             <div
@@ -221,11 +221,17 @@ export const FeedbackManager: React.FC = () => {
                   setSelectedFeedbackId(isSelected ? null : item.id);
                 }
               }}
-              className={`bg-white dark:bg-gray-800 border rounded-lg p-2 md:p-4 hover:shadow-md transition-shadow ${
-                isSelected && isMobile
-                  ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
-                  : 'border-gray-200 dark:border-gray-700'
-              } ${isMobile ? 'cursor-pointer' : ''}`}
+              className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${
+                isMobile 
+                  ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${
+                      isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    }`
+                  : `border rounded-lg hover:shadow-md ${
+                      isSelected
+                        ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                        : 'border-gray-200 dark:border-gray-700'
+                    }`
+              }`}
             >
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 md:gap-4">
                 <div className="flex-1 min-w-0">

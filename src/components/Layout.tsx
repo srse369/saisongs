@@ -694,12 +694,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </main>
 
       {/* Mobile Bottom Navigation - Songs, Singers, Pitches, Live buttons */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-30" style={{ paddingBottom: 'max(0.3rem, env(safe-area-inset-bottom))' }}>
-        <div className="flex items-center justify-around pt-2 pb-1">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-30">
+        <div className="flex items-stretch justify-around py-3">
           {/* Songs */}
           <Link
             to="/admin/songs"
-            className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${isActive('/admin/songs')
+            className={`flex flex-col items-center justify-center gap-0 px-2 transition-colors flex-1 ${isActive('/admin/songs')
               ? 'text-blue-600 dark:text-blue-400'
               : 'text-gray-600 dark:text-gray-400'
               }`}
@@ -714,7 +714,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <>
               <Link
                 to="/admin/singers"
-                className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${isActive('/admin/singers')
+                className={`flex flex-col items-center justify-center gap-0 px-2 transition-colors flex-1 ${isActive('/admin/singers')
                   ? 'text-blue-600 dark:text-blue-400'
                   : 'text-gray-600 dark:text-gray-400'
                   }`}
@@ -725,7 +725,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
               <Link
                 to="/admin/pitches"
-                className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${isActive('/admin/pitches')
+                className={`flex flex-col items-center justify-center gap-0 px-2 transition-colors flex-1 ${isActive('/admin/pitches')
                   ? 'text-blue-600 dark:text-blue-400'
                   : 'text-gray-600 dark:text-gray-400'
                   }`}
@@ -740,7 +740,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           {/* Live */}
           <Link
             to="/session"
-            className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${isActive('/session')
+            className={`flex flex-col items-center justify-center gap-0 px-2 transition-colors flex-1 ${isActive('/session')
               ? 'text-blue-600 dark:text-blue-400'
               : 'text-gray-600 dark:text-gray-400'
               }`}

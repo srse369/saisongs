@@ -156,7 +156,7 @@ export class WebLLMService {
       const content = response.choices[0]?.message?.content || '{}';
       console.log('🤖 WebLLM Raw Response:', content);
       
-      const parsed = this.parseResponse(content, searchType);
+      const parsed = this.parseResponse(content, searchType, query);
       console.log('🤖 WebLLM Parsed Result:', parsed);
       
       return parsed;
@@ -218,6 +218,17 @@ export class WebLLMService {
       if (lowerQuery.includes(level)) {
         hints.push(`"${level}" is a LEVEL`);
       }
+    }
+    
+    // Special handling for "which singers" queries - these are asking about singers, not pitches
+    if (searchType === 'pitch' && (lowerQuery.includes('which singers') || lowerQuery.includes('which singer') || 
+        lowerQuery.includes('who sings') || lowerQuery.includes('singers who'))) {
+      hints.push('[QUERY TYPE: This is asking about SINGERS, not pitches. Extract singerName or deity filters only. Do NOT extract pitch unless explicitly mentioned.]');
+    }
+    
+    // "bhajans" is a song type, not a raga
+    if (lowerQuery.includes('bhajan')) {
+      hints.push('"bhajan" or "bhajans" is a SONG TYPE, NOT a raga name. Do NOT classify it as a raga.');
     }
     
     // If we found any hints, append them to the query
@@ -364,6 +375,12 @@ Output: {"deity":"devi","raga":"hamsadhwani"}
 Input: "Which singers sing krishna bhajans in sanskrit"
 Output: {"deity":"krishna","language":"sanskrit"}
 
+Input: "Which singers have krishna bhajans"
+Output: {"deity":"krishna"}
+
+Input: "Who sings devi songs"
+Output: {"deity":"devi"}
+
 Input: "C pitch for mohanam raga"
 Output: {"pitch":"C","raga":"mohanam"}
 
@@ -373,7 +390,12 @@ Output: {"pitch":"D#","raga":"kalyani"}
 Input: "Show me D# devi songs in sanskrit"
 Output: {"pitch":"D#","deity":"devi","language":"sanskrit"}
 
-CRITICAL: Sanskrit, Hindi, Telugu, Tamil, Kannada, Malayalam, Bengali, Marathi, Gujarati, Punjabi, Oriya are LANGUAGES, NOT ragas. Never classify them as ragas.
+CRITICAL RULES:
+1. ONLY extract values that are EXPLICITLY mentioned in the query. Do NOT invent or guess values.
+2. If NO pitch is mentioned, do NOT include a pitch filter.
+3. "bhajans" or "bhajan" is a SONG TYPE, NOT a raga. Never classify it as a raga.
+4. Sanskrit, Hindi, Telugu, Tamil, Kannada, Malayalam, Bengali, Marathi, Gujarati, Punjabi, Oriya are LANGUAGES, NOT ragas. Never classify them as ragas.
+5. For "which singers" queries, extract deity or songName filters to find singers who sing those songs. Do NOT extract pitch unless explicitly mentioned.
 
 PAY ATTENTION TO HINTS: If query contains [HINT: "word" is a TYPE], use that TYPE for classification.
 
@@ -389,7 +411,7 @@ Output ONLY the JSON object, nothing else.`;
 Output the JSON filter object:`;
   }
 
-  private parseResponse(content: string, searchType: SearchType): LLMSearchResult {
+  private parseResponse(content: string, searchType: SearchType, originalQuery?: string): LLMSearchResult {
     try {
       // Try multiple parsing strategies
       let parsed: any = {};
@@ -428,19 +450,112 @@ Output the JSON filter object:`;
       // Post-processing: Fix obvious misclassifications
       const correctedFilters = this.correctMisclassifications(cleanFilters);
       
+      // Post-processing: Remove values that weren't in the original query
+      const validatedFilters = originalQuery ? this.validateFiltersAgainstQuery(correctedFilters, originalQuery) : correctedFilters;
+      
       console.log('✅ Clean filters:', cleanFilters);
       if (JSON.stringify(cleanFilters) !== JSON.stringify(correctedFilters)) {
         console.log('🔧 Corrected filters:', correctedFilters);
       }
+      if (JSON.stringify(correctedFilters) !== JSON.stringify(validatedFilters)) {
+        console.log('🔍 Validated filters (removed values not in query):', validatedFilters);
+      }
       
       return {
-        filters: correctedFilters,
+        filters: validatedFilters,
         confidence: 0.8,
       };
     } catch (error) {
       console.error('❌ Failed to parse LLM response:', error, 'Content:', content);
       return { filters: {} };
     }
+  }
+  
+  private validateFiltersAgainstQuery(filters: Record<string, string>, query: string): Record<string, string> {
+    const validated: Record<string, string> = {};
+    const lowerQuery = query.toLowerCase();
+    
+    // Known valid values that should be checked
+    const { ragas, deities, languages, tempos, beats, levels, pitches, singerNames } = this.availableValues;
+    
+    for (const [key, value] of Object.entries(filters)) {
+      let isValid = false;
+      let correctedValue = value;
+      
+      // Check if the value or a close match appears in the query
+      if (lowerQuery.includes(value)) {
+        isValid = true;
+      } else {
+        // For deity, check if a similar deity name appears in query
+        if (key === 'deity') {
+          const deityMatch = deities?.find(d => {
+            const lowerDeity = d.toLowerCase();
+            return lowerQuery.includes(lowerDeity) && 
+              (lowerDeity === value || lowerDeity.includes(value) || value.includes(lowerDeity));
+          });
+          if (deityMatch) {
+            correctedValue = deityMatch.toLowerCase();
+            isValid = true;
+          }
+        }
+        // For pitch, only include if explicitly mentioned (C, C#, D, etc.)
+        else if (key === 'pitch') {
+          // Check if any pitch from available pitches appears in query
+          const pitchMatch = pitches?.find(p => {
+            const lowerPitch = p.toLowerCase();
+            // Match exact pitch or pitch with # (e.g., "c#" matches "C#")
+            return lowerQuery.includes(lowerPitch) || 
+              (lowerQuery.includes(p.replace('#', '').toLowerCase()) && lowerQuery.includes('#'));
+          });
+          if (pitchMatch && lowerQuery.includes(pitchMatch.toLowerCase())) {
+            correctedValue = pitchMatch.toLowerCase();
+            isValid = true;
+          }
+        }
+        // For language, check if language appears in query
+        else if (key === 'language') {
+          const langMatch = languages?.find(l => {
+            const lowerLang = l.toLowerCase();
+            return lowerQuery.includes(lowerLang) && 
+              (lowerLang === value || lowerLang.includes(value) || value.includes(lowerLang));
+          });
+          if (langMatch) {
+            correctedValue = langMatch.toLowerCase();
+            isValid = true;
+          }
+        }
+        // For raga, check if raga appears in query
+        else if (key === 'raga') {
+          const ragaMatch = ragas?.find(r => {
+            const lowerRaga = r.toLowerCase();
+            return lowerQuery.includes(lowerRaga) && 
+              (lowerRaga === value || lowerRaga.includes(value) || value.includes(lowerRaga));
+          });
+          if (ragaMatch) {
+            correctedValue = ragaMatch.toLowerCase();
+            isValid = true;
+          }
+        }
+        // For other fields (singerName, songName, etc.), be more lenient
+        else {
+          // Check if value or part of it appears in query
+          const words = value.split(/\s+/);
+          const queryWords = lowerQuery.split(/\s+/);
+          const hasMatch = words.some(word => queryWords.some(qw => qw.includes(word) || word.includes(qw)));
+          if (hasMatch) {
+            isValid = true;
+          }
+        }
+      }
+      
+      if (isValid) {
+        validated[key] = correctedValue;
+      } else {
+        console.warn(`⚠️ Removed filter ${key}: "${value}" - not found in query: "${query}"`);
+      }
+    }
+    
+    return validated;
   }
 
   private correctMisclassifications(filters: Record<string, string>): Record<string, string> {

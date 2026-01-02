@@ -553,7 +553,7 @@ export const SessionManager: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="space-y-1.5 md:space-y-3">
+        <div className="space-y-0 md:space-y-3">
           {sessionItems.map(({ entry, song, singer }, index) => {
             const itemKey = `${entry.songId}-${entry.singerId ?? 'none'}`;
             const isSelected = selectedSessionItemKey === itemKey;
@@ -566,10 +566,17 @@ export const SessionManager: React.FC = () => {
                     setSelectedSessionItemKey(isSelected ? null : itemKey);
                   }
                 }}
-                className={`bg-white dark:bg-gray-800 border rounded-lg shadow-md p-2 md:p-4 hover:shadow-lg transition-all duration-200 ${isSelected
-                  ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
-                  : 'border-gray-200 dark:border-gray-700'
-                  } ${isMobile ? 'cursor-pointer' : 'cursor-move'}`}
+                className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${
+                  isMobile 
+                    ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${
+                        isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                      }`
+                    : `border rounded-lg shadow-md hover:shadow-lg cursor-move ${
+                        isSelected
+                          ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                          : 'border-gray-200 dark:border-gray-700'
+                      }`
+                }`}
                 draggable={!isMobile}
                 onDragStart={(e) => !isMobile && handleDragStart(e, index)}
                 onDragOver={(e) => !isMobile && e.preventDefault()}

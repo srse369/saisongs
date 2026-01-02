@@ -26,7 +26,7 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
   const [loadProgress, setLoadProgress] = useState<string>('');
   const [loadPercentage, setLoadPercentage] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [hasWebGPU, setHasWebGPU] = useState(false);
+  const [hasWebGPU, setHasWebGPU] = useState(() => typeof window !== 'undefined' && checkWebGPUSupport());
   const [isProcessing, setIsProcessing] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 

@@ -42,7 +42,7 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
   const hasReferencePitches = song.refGents || song.refLadies;
 
   return (
-    <div className={`${showBackground ? 'bg-slate-100/80 dark:bg-gray-900/60' : ''} px-1.5 md:px-2 pt-0.5 md:pt-1 pb-0.5 md:pb-1 mb-1 md:mb-1.5 ${showBackground ? 'rounded-lg' : ''}`}>
+    <div className={`${showBackground ? 'bg-slate-100/80 dark:bg-gray-900/60' : ''} md:px-2 md:pt-1 md:pb-1 md:mb-1.5 ${showBackground ? 'rounded-lg' : ''}`}>
       {/* Song Name with External Link and Info Button */}
       <div className="flex items-center gap-2">
         {onNameClick ? (
