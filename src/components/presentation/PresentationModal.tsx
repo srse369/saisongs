@@ -408,7 +408,7 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
             (containerRef as any).current = el;
             (fullscreenContainerRef as any).current = el;
           }}
-          className={`flex-1 overflow-hidden relative flex items-center justify-center bg-gray-900 ${isFullscreen ? 'p-0' : 'p-4'}`}
+          className={`flex-1 overflow-hidden relative flex items-center justify-center bg-gray-900 ${isFullscreen ? 'p-0' : 'p-0'}`}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onMouseMove={resetNavButtonTimeout}

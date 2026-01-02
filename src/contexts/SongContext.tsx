@@ -38,63 +38,66 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
   const toast = useToast();
 
   // Listen for pitch creation/deletion events to update pitch counts optimistically
+  // Listen for pitch events to update pitch counts optimistically
   useEffect(() => {
-    const handlePitchCreated = (event: CustomEvent<{ singerId: string; songId: string }>) => {
-      const { songId } = event.detail;
-      setSongs(prev => {
-        const updated = prev.map(song => 
-          song.id === songId 
-            ? { ...song, pitchCount: (song.pitchCount ?? 0) + 1 }
-            : song
-        );
-        
-        // Update localStorage cache to keep it in sync
-        if (typeof window !== 'undefined') {
-          const cacheData = JSON.stringify({
-            timestamp: Date.now(),
-            songs: updated,
-          });
-          safeSetLocalStorageItem(SONGS_CACHE_KEY, cacheData, {
-            clearOnQuotaError: true,
-            skipKeys: [SONGS_CACHE_KEY],
-          });
-        }
-        
-        return updated;
+    let unsubscribes: (() => void)[] = [];
+    
+    import('../utils/globalEventBus').then(({ globalEventBus }) => {
+      const unsubscribePitchCreated = globalEventBus.on('pitchCreated', (detail) => {
+        const { songId } = detail;
+        setSongs(prev => {
+          const updated = prev.map(song => 
+            song.id === songId 
+              ? { ...song, pitchCount: (song.pitchCount ?? 0) + 1 }
+              : song
+          );
+          
+          // Update localStorage cache to keep it in sync
+          if (typeof window !== 'undefined') {
+            const cacheData = JSON.stringify({
+              timestamp: Date.now(),
+              songs: updated,
+            });
+            safeSetLocalStorageItem(SONGS_CACHE_KEY, cacheData, {
+              clearOnQuotaError: true,
+              skipKeys: [SONGS_CACHE_KEY],
+            });
+          }
+          
+          return updated;
+        });
       });
-    };
-
-    const handlePitchDeleted = (event: CustomEvent<{ singerId: string; songId: string }>) => {
-      const { songId } = event.detail;
-      setSongs(prev => {
-        const updated = prev.map(song => 
-          song.id === songId 
-            ? { ...song, pitchCount: Math.max(0, (song.pitchCount ?? 0) - 1) }
-            : song
-        );
-        
-        // Update localStorage cache to keep it in sync
-        if (typeof window !== 'undefined') {
-          const cacheData = JSON.stringify({
-            timestamp: Date.now(),
-            songs: updated,
-          });
-          safeSetLocalStorageItem(SONGS_CACHE_KEY, cacheData, {
-            clearOnQuotaError: true,
-            skipKeys: [SONGS_CACHE_KEY],
-          });
-        }
-        
-        return updated;
+      
+      const unsubscribePitchDeleted = globalEventBus.on('pitchDeleted', (detail) => {
+        const { songId } = detail;
+        setSongs(prev => {
+          const updated = prev.map(song => 
+            song.id === songId 
+              ? { ...song, pitchCount: Math.max(0, (song.pitchCount ?? 0) - 1) }
+              : song
+          );
+          
+          // Update localStorage cache to keep it in sync
+          if (typeof window !== 'undefined') {
+            const cacheData = JSON.stringify({
+              timestamp: Date.now(),
+              songs: updated,
+            });
+            safeSetLocalStorageItem(SONGS_CACHE_KEY, cacheData, {
+              clearOnQuotaError: true,
+              skipKeys: [SONGS_CACHE_KEY],
+            });
+          }
+          
+          return updated;
+        });
       });
-    };
-
-    window.addEventListener('pitchCreated', handlePitchCreated as EventListener);
-    window.addEventListener('pitchDeleted', handlePitchDeleted as EventListener);
+      
+      unsubscribes.push(unsubscribePitchCreated, unsubscribePitchDeleted);
+    });
 
     return () => {
-      window.removeEventListener('pitchCreated', handlePitchCreated as EventListener);
-      window.removeEventListener('pitchDeleted', handlePitchDeleted as EventListener);
+      unsubscribes.forEach(unsub => unsub());
     };
   }, []);
 
@@ -212,6 +215,11 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
       // Clear localStorage cache so it doesn't return stale data
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(SONGS_CACHE_KEY);
+        
+        // Dispatch global event to notify other components
+        import('../utils/globalEventBus').then(({ globalEventBus }) => {
+          globalEventBus.dispatch('songCreated', { type: 'songCreated' });
+        });
       }
       
       toast.success('Song created successfully');
@@ -240,6 +248,11 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
         // Clear localStorage cache so it doesn't return stale data
         if (typeof window !== 'undefined') {
           window.localStorage.removeItem(SONGS_CACHE_KEY);
+          
+          // Dispatch global event to notify other components
+          import('../utils/globalEventBus').then(({ globalEventBus }) => {
+            globalEventBus.dispatch('songUpdated', { type: 'songUpdated' });
+          });
         }
         
         toast.success('Song updated successfully');
@@ -269,6 +282,11 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
         // Clear localStorage cache so it doesn't return stale data
         if (typeof window !== 'undefined') {
           window.localStorage.removeItem(SONGS_CACHE_KEY);
+          
+          // Dispatch global event to notify other components
+          import('../utils/globalEventBus').then(({ globalEventBus }) => {
+            globalEventBus.dispatch('songDeleted', { type: 'songDeleted' });
+          });
         }
         
         toast.success('Song deleted successfully');

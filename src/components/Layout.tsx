@@ -2,15 +2,46 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../contexts/AuthContext';
+import { fetchCentersOnce } from './common/CenterBadges';
 import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, CenterBadges, Modal } from './common';
 import { FeedbackDrawer } from './common/FeedbackDrawer';
 import { clearAllCaches, checkCacheClearCooldown, CACHE_KEYS } from '../utils/cacheUtils';
 import apiClient from '../services/ApiClient';
 
+// Cache health stats for 60 seconds
+let healthStatsCache: { stats: any; timestamp: number } | null = null;
+const HEALTH_STATS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+// Cache Brevo status for 60 seconds (changes less frequently)
+let brevoStatusCache: { status: any; timestamp: number } | null = null;
+const BREVO_STATUS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+
 interface AdminUser {
   id: string;
   name: string;
   email: string;
+}
+
+interface Center {
+  id: number;
+  name: string;
+  badgeTextColor: string;
+}
+
+interface DatabaseStats {
+  centers: number;
+  songs: number;
+  users: number;
+  pitches: number;
+  templates: number;
+  sessions: number;
+}
+
+interface BrevoStatus {
+  status: 'ok' | 'error';
+  message?: string;
+  configured: boolean;
 }
 
 interface LayoutProps {
@@ -25,7 +56,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [showAdminsModal, setShowAdminsModal] = useState(false);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loadingAdmins, setLoadingAdmins] = useState(false);
-  const [clearingCache, setClearingCache] = useState(false);
+  const [stats, setStats] = useState<DatabaseStats | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [clearingLocalStorage, setClearingLocalStorage] = useState(false);
+  const [reloadingBackendCache, setReloadingBackendCache] = useState(false);
+  const [reloadMessage, setReloadMessage] = useState<string | null>(null);
+  const [centers, setCenters] = useState<Center[]>([]);
   const { isConnected, connectionError, resetConnection } = useDatabase();
   const { isAuthenticated, userRole, userName, userEmail, logout, centerIds, editorFor, isAdmin } = useAuth();
 
@@ -45,7 +81,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
 
-  const handleRefreshLocalCache = async () => {
+  const handleClearLocalStorage = async () => {
     const cooldown = checkCacheClearCooldown(60000); // 60 second cooldown
     if (cooldown.isOnCooldown && cooldown.remainingSeconds > 0) {
       alert(`Please wait ${cooldown.remainingSeconds} seconds before clearing cache again.`);
@@ -56,9 +92,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       return;
     }
 
-    setClearingCache(true);
+    setClearingLocalStorage(true);
     setIsMobileMenuOpen(false);
-    
+
     try {
       await clearAllCaches({
         clearServiceWorkerCache: true,
@@ -69,8 +105,37 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       });
     } catch (error) {
       console.error('Error clearing cache:', error);
-      setClearingCache(false);
+      setClearingLocalStorage(false);
       alert('Failed to clear cache. Please try again.');
+    }
+  };
+
+  const handleReloadBackendCache = async () => {
+    setReloadingBackendCache(true);
+    setReloadMessage(null);
+    try {
+      const response = await apiClient.post('/cache/reload');
+      setReloadMessage('Cache reloaded successfully!');
+      // Invalidate health stats cache
+      healthStatsCache = null;
+      // Refresh stats after reload
+      setStats(null);
+      setStatsError(null);
+      // Fetch fresh stats
+      const healthResponse = await apiClient.get<any>('/health?stats=true');
+      if (healthResponse && healthResponse.stats) {
+        // Cache the fresh stats
+        healthStatsCache = {
+          stats: healthResponse.stats,
+          timestamp: Date.now()
+        };
+        setStats(healthResponse.stats);
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to reload cache';
+      setReloadMessage(`Error: ${errorMsg}`);
+    } finally {
+      setReloadingBackendCache(false);
     }
   };
 
@@ -78,6 +143,71 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
+
+  // Fetch centers on mount using cached fetch
+  useEffect(() => {
+    if (userRole !== 'public') {
+      fetchCentersOnce().then(data => {
+        setCenters(data);
+      }).catch(error => {
+        console.error('Error fetching centers:', error);
+      });
+    }
+  }, [userRole]);
+
+  // Global event bus listener - requests data refresh when data changes
+  // Components should refresh their data on mount and when they receive refresh requests
+  useEffect(() => {
+    let unsubscribes: (() => void)[] = [];
+
+    import('../utils/globalEventBus').then(({ globalEventBus }) => {
+      // When singers change, request refresh for centers (since center counts change)
+      unsubscribes.push(globalEventBus.on('singerCreated', () => {
+        globalEventBus.requestRefresh('centers');
+      }));
+
+      unsubscribes.push(globalEventBus.on('singerUpdated', () => {
+        globalEventBus.requestRefresh('centers');
+      }));
+
+      unsubscribes.push(globalEventBus.on('singerDeleted', () => {
+        globalEventBus.requestRefresh('centers');
+      }));
+
+      // When pitches change, request refresh for songs and singers (pitch counts change)
+      unsubscribes.push(globalEventBus.on('pitchCreated', () => {
+        globalEventBus.requestRefresh('songs');
+        globalEventBus.requestRefresh('singers');
+      }));
+
+      unsubscribes.push(globalEventBus.on('pitchDeleted', () => {
+        globalEventBus.requestRefresh('songs');
+        globalEventBus.requestRefresh('singers');
+      }));
+
+      // When songs change, request refresh for songs
+      unsubscribes.push(globalEventBus.on('songCreated', () => {
+        globalEventBus.requestRefresh('songs');
+      }));
+
+      unsubscribes.push(globalEventBus.on('songUpdated', () => {
+        globalEventBus.requestRefresh('songs');
+      }));
+
+      unsubscribes.push(globalEventBus.on('songDeleted', () => {
+        globalEventBus.requestRefresh('songs');
+      }));
+
+      // When centers change, request refresh for centers
+      unsubscribes.push(globalEventBus.on('centerUpdated', () => {
+        globalEventBus.requestRefresh('centers');
+      }));
+    });
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, []);
 
   // Swipe navigation for mobile - navigate between main tabs
   useEffect(() => {
@@ -121,7 +251,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       // Find current tab index
       const currentPath = location.pathname;
-      const currentIndex = tabs.findIndex(tab => 
+      const currentIndex = tabs.findIndex(tab =>
         currentPath === tab.path || currentPath.startsWith(tab.path + '/')
       );
 
@@ -165,7 +295,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     const baseClasses = "inline-flex items-center px-2 lg:px-3 py-2 text-sm font-medium rounded-md transition-colors";
     const activeClasses = "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300";
     const inactiveClasses = "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-blue-600 dark:hover:text-blue-400";
-    
+
     return `${baseClasses} ${isActive(path) ? activeClasses : inactiveClasses}`;
   };
 
@@ -177,9 +307,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex justify-between items-center h-12 md:h-16">
             {/* Logo/Brand */}
             <Link to="/" className="flex items-center group">
-              <img 
-                src="/logo.png" 
-                alt="Sai Songs" 
+              <img
+                src="/logo.png"
+                alt="Sai Songs"
                 className="h-8 sm:h-10 md:h-12 w-auto object-contain group-hover:scale-105 transition-transform"
               />
             </Link>
@@ -190,7 +320,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <SongIcon className="w-4 h-4 mr-1.5" />
                 Songs
               </Link>
-              
+
               {/* Singers and Pitches tabs visible to all authenticated users */}
               {isAuthenticated && (
                 <>
@@ -204,38 +334,37 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </Link>
                 </>
               )}
-              
+
               <Link to="/session" className={getLinkClasses('/session')}>
                 <i className="fas fa-play-circle w-4 h-4 mr-1.5"></i>
                 Live
               </Link>
-              
+
               {(userRole === 'admin' || userRole === 'editor') && (
                 <Link to="/admin/templates" className={getLinkClasses('/admin/templates')}>
                   <i className="fas fa-layer-group w-4 h-4 mr-1.5"></i>
                   Templates
                 </Link>
               )}
-              
+
               {/* Help, Database connection indicator + Auth controls */}
               <div className="ml-2 flex items-center space-x-2">
-                <Link 
-                  to="/help" 
+                <Link
+                  to="/help"
                   title="Help & Documentation"
                   className="p-2 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200"
                 >
                   <i className="fas fa-question-circle text-lg"></i>
                 </Link>
-                
+
                 {/* Only show database status to authenticated users */}
-                {isAuthenticated && (
-                  <DatabaseStatusDropdown 
-                    isConnected={isConnected}
-                    connectionError={connectionError}
-                    resetConnection={resetConnection}
-                    isAdmin={isAdmin}
-                  />
-                )}
+                <DatabaseStatusDropdown
+                  isConnected={isConnected}
+                  connectionError={connectionError}
+                  resetConnection={resetConnection}
+                  isAdmin={isAdmin}
+                  isAuthenticated={isAuthenticated}
+                />
 
                 {/* Login/Logout buttons */}
                 {isAuthenticated ? (
@@ -292,7 +421,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   Templates
                 </Link>
               )}
-              
+
               <Link
                 to="/help"
                 className={`block ${getLinkClasses('/help')}`}
@@ -301,16 +430,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <i className="fas fa-question-circle w-5 h-5 mr-2 inline"></i>
                 Help
               </Link>
-              
-              <button
-                onClick={handleRefreshLocalCache}
-                disabled={clearingCache}
-                className={`block w-full text-left ${getLinkClasses('')} ${clearingCache ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <i className="fas fa-sync-alt w-5 h-5 mr-2 inline"></i>
-                {clearingCache ? 'Refreshing Cache...' : 'Refresh Local Cache'}
-              </button>
-              
+
               {/* Database status and Auth controls in mobile menu */}
               <div className="px-3 py-2 space-y-3 border-t border-gray-200 dark:border-gray-700 mt-2 pt-3">
                 {/* Database status */}
@@ -333,6 +453,58 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   )}
                 </div>
 
+                {/* Clear Local Storage Button (All Users) */}
+                <div className={'mt-4 pt-4 border-t border-gray-200 dark:border-gray-700'}>
+                  <button
+                    onClick={handleClearLocalStorage}
+                    disabled={clearingLocalStorage}
+                    className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 dark:bg-orange-700 dark:hover:bg-orange-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {clearingLocalStorage ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin text-base mr-2"></i>
+                        Clearing...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-trash-alt text-base mr-2"></i>
+                        Clear Local Cache
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Reload Cache Button (Admin Only) */}
+                {isAdmin && (
+                  <div className="border-gray-200 dark:border-gray-700">
+                    <button
+                      onClick={handleReloadBackendCache}
+                      disabled={reloadingBackendCache}
+                      className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {reloadingBackendCache ? (
+                        <>
+                          <i className="fas fa-spinner fa-spin text-base mr-2"></i>
+                          Reloading...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-sync text-base mr-2"></i>
+                          Reload Backend Cache
+                        </>
+                      )}
+                    </button>
+                    {reloadMessage && (
+                      <p className={`mt-2 text-xs text-center ${reloadMessage.startsWith('Error')
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-green-600 dark:text-green-400'
+                        }`}>
+                        {reloadMessage}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Login/Logout and Role */}
                 {isAuthenticated ? (
                   <>
@@ -352,33 +524,65 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                           </p>
                         </div>
                       </div>
-                      
-                      {/* Center Access Info */}
-                      {(centerIds.length > 0 || editorFor.length > 0) && (
-                        <div className="space-y-2 mb-3 pb-3 border-b border-gray-200 dark:border-gray-600">
-                          {centerIds.length > 0 && (
-                            <div>
-                              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                                Associated Centers:
-                              </p>
-                              <div className="flex flex-wrap gap-1">
-                                <CenterBadges centerIds={centerIds} showAllIfEmpty={false} />
-                              </div>
-                            </div>
-                          )}
-                          {editorFor.length > 0 && (
-                            <div>
-                              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                                Editor For:
-                              </p>
-                              <div className="flex flex-wrap gap-1">
-                                <CenterBadges centerIds={editorFor} showAllIfEmpty={false} />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
+
+                      {/* Editor For */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          Editor For:
+                        </p>
+                        {userRole === 'admin' ? (
+                          <span className="text-xs text-gray-600 dark:text-gray-400 italic">All</span>
+                        ) : editorFor.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {editorFor.map(centerId => {
+                              const center = centers.find(c => c.id === centerId);
+                              return center ? (
+                                <span
+                                  key={centerId}
+                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700"
+                                  style={{
+                                    color: center.badgeTextColor || '#3b82f6'
+                                  }}
+                                >
+                                  {center.name}
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-500 dark:text-gray-500 italic">None</span>
+                        )}
+                      </div>
+
+                      {/* Associated Centers */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          Associated Centers:
+                        </p>
+                        {userRole === 'admin' ? (
+                          <span className="text-xs text-gray-600 dark:text-gray-400 italic">All</span>
+                        ) : centerIds.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {centerIds.map(centerId => {
+                              const center = centers.find(c => c.id === centerId);
+                              return center ? (
+                                <span
+                                  key={centerId}
+                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700"
+                                  style={{
+                                    color: center.badgeTextColor || '#10b981'
+                                  }}
+                                >
+                                  {center.name}
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-500 dark:text-gray-500 italic">None</span>
+                        )}
+                      </div>
+
                       {/* Admin Menu Items */}
                       {userRole === 'admin' && (
                         <div className="space-y-1 mb-3">
@@ -421,7 +625,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                           </button>
                         </div>
                       )}
-                      
+
                       {/* Import - Available to editors and admins */}
                       {(userRole === 'admin' || userRole === 'editor') && (
                         <div className="space-y-1 mb-3">
@@ -437,7 +641,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                           </button>
                         </div>
                       )}
-                      
+
                       {/* Logout button */}
                       <button
                         onClick={async () => {
@@ -472,7 +676,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   </button>
                 )}
               </div>
-              
+
               {/* Version display */}
               <div className="px-3 py-2 border-t border-gray-200 dark:border-gray-700 mt-2 pt-3">
                 <p className="text-xs text-center text-gray-500 dark:text-gray-400">
@@ -495,27 +699,25 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           {/* Songs */}
           <Link
             to="/admin/songs"
-            className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${
-              isActive('/admin/songs')
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-gray-600 dark:text-gray-400'
-            }`}
+            className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${isActive('/admin/songs')
+              ? 'text-blue-600 dark:text-blue-400'
+              : 'text-gray-600 dark:text-gray-400'
+              }`}
             onClick={() => setIsMobileMenuOpen(false)}
           >
             <SongIcon />
             <span className="text-[9px] font-medium leading-none">Songs</span>
           </Link>
-          
+
           {/* Singers and Pitches tabs visible to all authenticated users */}
           {isAuthenticated && (
             <>
               <Link
                 to="/admin/singers"
-                className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${
-                  isActive('/admin/singers')
-                    ? 'text-blue-600 dark:text-blue-400'
-                    : 'text-gray-600 dark:text-gray-400'
-                }`}
+                className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${isActive('/admin/singers')
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-gray-600 dark:text-gray-400'
+                  }`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <i className="fas fa-users text-lg"></i>
@@ -523,11 +725,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
               <Link
                 to="/admin/pitches"
-                className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${
-                  isActive('/admin/pitches')
-                    ? 'text-blue-600 dark:text-blue-400'
-                    : 'text-gray-600 dark:text-gray-400'
-                }`}
+                className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${isActive('/admin/pitches')
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-gray-600 dark:text-gray-400'
+                  }`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <MusicIcon className="w-5 h-5" />
@@ -535,15 +736,14 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
             </>
           )}
-          
+
           {/* Live */}
           <Link
             to="/session"
-            className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${
-              isActive('/session')
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-gray-600 dark:text-gray-400'
-            }`}
+            className={`flex flex-col items-center justify-center gap-0 px-2 py-0.5 transition-colors flex-1 ${isActive('/session')
+              ? 'text-blue-600 dark:text-blue-400'
+              : 'text-gray-600 dark:text-gray-400'
+              }`}
             onClick={() => setIsMobileMenuOpen(false)}
           >
             <i className="fas fa-play-circle text-lg"></i>
@@ -556,7 +756,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-auto hidden md:block">
         <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
           <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-          Sai Songs © {new Date().getFullYear()}
+            Sai Songs © {new Date().getFullYear()}
           </p>
           <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-1">
             Thanks 🙏 to sairhythms for Songs and Metadata.
@@ -571,7 +771,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <button
         onClick={() => setIsFeedbackOpen(true)}
         title="Send feedback, report bugs, or request new features"
-        className="fixed bottom-20 md:bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-30"
+        className="fixed bottom-25 md:bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-30"
         aria-label="Send feedback"
       >
         <i className="fas fa-comment text-lg mx-auto"></i>
@@ -590,7 +790,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Users with full administrative access to the system.
           </p>
-          
+
           {loadingAdmins ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -621,7 +821,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               ))}
             </div>
           )}
-          
+
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Total: {admins.length} administrator{admins.length !== 1 ? 's' : ''}

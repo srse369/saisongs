@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserMultiSelect } from '../common/UserMultiSelect';
 import { clearCentersCache } from '../common/CenterBadges';
@@ -54,28 +54,7 @@ export const CentersManager: React.FC = () => {
   
   const hasFetchedRef = useRef(false);
 
-  useEffect(() => {
-    if (!hasFetchedRef.current) {
-      hasFetchedRef.current = true;
-      fetchCenters();
-    }
-  }, []);
-
-  // Handle escape key press
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFormOpen) {
-        handleCloseForm();
-      }
-    };
-
-    if (isFormOpen) {
-      document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
-    }
-  }, [isFormOpen, formData, originalData]);
-
-  const fetchCenters = async () => {
+  const fetchCenters = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE_URL}/centers`, {
@@ -95,7 +74,44 @@ export const CentersManager: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Always refresh centers data on mount to ensure we have latest data
+  useEffect(() => {
+    fetchCenters();
+  }, [fetchCenters]);
+
+  // Listen for data refresh requests from global event bus
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    
+    import('../../utils/globalEventBus').then(({ globalEventBus }) => {
+      unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
+        if (detail.resource === 'centers' || detail.resource === 'all') {
+          // Refresh centers data from backend to get latest counts
+          fetchCenters();
+        }
+      });
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [fetchCenters]);
+
+  // Handle escape key press
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFormOpen) {
+        handleCloseForm();
+      }
+    };
+
+    if (isFormOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [isFormOpen, formData, originalData]);
 
   const handleOpenForm = (center?: Center) => {
     const initialData = center
@@ -209,6 +225,11 @@ export const CentersManager: React.FC = () => {
       window.localStorage.removeItem('saiSongs:singersCache'); // Singers may have changed permissions
       window.localStorage.removeItem('saiSongs:centersCache'); // Clear any localStorage centers cache
       
+      // Dispatch global event to notify other components
+      import('../../utils/globalEventBus').then(({ globalEventBus }) => {
+        globalEventBus.dispatch('centerUpdated', { type: 'centerUpdated' });
+      });
+      
       setError('');
       handleCloseForm(true); // Force close without unsaved changes check
     } catch (err: any) {
@@ -259,6 +280,11 @@ export const CentersManager: React.FC = () => {
       clearCentersCache();
       window.localStorage.removeItem('saiSongs:singersCache');
       window.localStorage.removeItem('saiSongs:centersCache');
+      
+      // Dispatch global event to notify other components
+      import('../../utils/globalEventBus').then(({ globalEventBus }) => {
+        globalEventBus.dispatch('centerUpdated', { type: 'centerUpdated' });
+      });
       
       setError('');
     } catch (err: any) {

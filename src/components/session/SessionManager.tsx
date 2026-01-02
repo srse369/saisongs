@@ -82,7 +82,7 @@ export const SessionManager: React.FC = () => {
           localStorage.removeItem('selectedSessionTemplateId');
         }
       }
-      
+
       // If no saved template or error loading it, load default template
       try {
         const defaultTemplate = await templateService.getDefaultTemplate();
@@ -145,7 +145,7 @@ export const SessionManager: React.FC = () => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
@@ -178,9 +178,9 @@ export const SessionManager: React.FC = () => {
 
   const handleExportToPowerPoint = async () => {
     if (sessionItems.length === 0 || exporting) return;
-    
+
     setExporting(true);
-    
+
     try {
       // Fetch full song data with lyrics - same logic as SessionPresentationMode
       const songPromises = sessionItems.map(async ({ entry, song: cachedSong }) => {
@@ -209,7 +209,7 @@ export const SessionManager: React.FC = () => {
       // Export to PowerPoint
       const exportName = currentSession?.name || 'Session';
       await pptxExportService.exportSession(slides, selectedTemplate, exportName);
-      
+
       console.log('Session exported successfully');
     } catch (error) {
       console.error('Failed to export session:', error);
@@ -367,17 +367,17 @@ export const SessionManager: React.FC = () => {
     if (sessionToLoad && currentSession && currentSession.id === sessionToLoad && currentSession.items) {
       // Clear existing session first
       clearSession();
-      
+
       // Load songs into the active session context
       currentSession.items.forEach(item => {
         // All authenticated users (editors and viewers) can see singer and pitch info
         // from sessions that belong to their centers
         addSong(item.songId, item.singerId, item.pitch);
       });
-      
+
       setShowLoadModal(false);
       setLoadingSession(false);
-      
+
       // Clear after successful load
       setSessionToLoad(null);
     }
@@ -424,10 +424,10 @@ export const SessionManager: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
-      <div className="mb-2 sm:mb-4 md:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
+      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="min-w-60 flex-shrink">
           <div className="flex items-center gap-2">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Session</h1>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Session</h1>
             <a
               href="/help#live"
               className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
@@ -441,74 +441,81 @@ export const SessionManager: React.FC = () => {
             present them as a continuous slideshow.
           </p>
         </div>
+
         {/* Action buttons - Hidden on mobile, shown on desktop */}
-        <div className="hidden md:block w-full sm:w-auto">
+        <div className="grid grid-cols-3 gap-2 w-full md:w-auto flex-shrink-0">
           {/* When session is empty, only show Load Session */}
           {sessionItems.length === 0 ? (
-            <button
-              type="button"
-              onClick={() => setShowLoadModal(true)}
-              title="Load a previously saved session into this list"
-              className="w-full sm:w-auto min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center"
-            >
-              <i className="fas fa-folder-open mr-2"></i>
-              Load
-            </button>
+            <>
+              {isAuthenticated && (
+                <button
+                  type="button"
+                  onClick={() => setShowLoadModal(true)}
+                  title="Load a previously saved session into this list"
+                  className="hidden md:block min-h-[16px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center flex items-center justify-center gap-1.5"
+                >
+                  <i className="fas fa-folder-open mr-2"></i>
+                  Load
+                </button>
+              )}
+            </>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <>
               {/* Load Session */}
-          <button
-            type="button"
-            onClick={() => setShowLoadModal(true)}
-            title="Load a previously saved session into this list"
-            className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center flex items-center justify-center gap-1.5"
-          >
-            <i className="fas fa-folder-open mr-1"></i>
-            <span>Load</span>
-          </button>
-              
+              {isAuthenticated && (
+                <button
+                  type="button"
+                  onClick={() => setShowLoadModal(true)}
+                  title="Load a previously saved session into this list"
+                  className="hidden md:flex min-h-[16px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-yellow-400 rounded-lg sm:rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors text-center flex items-center justify-center gap-1.5"
+                >
+                  <i className="fas fa-folder-open mr-1"></i>
+                  <span>Load</span>
+                </button>
+              )}
+
               {/* Save Session (only for authenticated users) */}
               {isAuthenticated && (
                 <button
                   type="button"
                   onClick={() => setShowSaveModal(true)}
                   title="Save the current session with all songs, singers, and pitches for later use"
-                  className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg sm:rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
+                  className="hidden md:flex min-h-[16px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg sm:rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
                 >
                   <i className="fas fa-save mr-1"></i>
                   <span>Save</span>
                 </button>
               )}
-              
+
               {/* Clear Session */}
               <button
                 type="button"
                 onClick={clearSession}
                 title="Remove all songs from the current session"
-                className="min-h-[48px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-700 bg-white dark:bg-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg sm:rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
+                className="hidden md:flex min-h-[16px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg sm:rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
               >
                 <i className="fas fa-trash-alt mr-1"></i>
                 <span>Clear</span>
               </button>
-              
+
               {/* Template */}
-              <div className="min-h-[48px] sm:min-h-0">
+              <div className="hidden md:flex min-h-[16px] sm:min-h-0">
                 <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
               </div>
-              
+
               {/* Present Session */}
               <div>
                 <button
                   type="button"
                   onClick={handlePresentSession}
                   title="Start full-screen presentation with all songs in order"
-                  className="min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg sm:rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors flex items-center justify-center gap-2"
+                  className="w-full hidden md:flex min-h-[16px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg sm:rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
                 >
                   <i className="fas fa-play"></i>
                   <span>Present</span>
                 </button>
               </div>
-              
+
               {/* Export to PowerPoint */}
               <div>
                 <button
@@ -516,13 +523,13 @@ export const SessionManager: React.FC = () => {
                   onClick={handleExportToPowerPoint}
                   disabled={exporting}
                   title="Export session to PowerPoint file with all song slides"
-                  className="min-h-[48px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-white bg-purple-600 rounded-lg sm:rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  className="w-full hidden md:flex min-h-[16px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg sm:rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
                 >
                   <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-download'}`}></i>
                   <span>{exporting ? 'Exporting...' : 'Export'}</span>
                 </button>
               </div>
-            </div>
+            </>
           )}
         </div>
         {/* Template selector for mobile - shown above bottom bar */}
@@ -551,100 +558,98 @@ export const SessionManager: React.FC = () => {
             const itemKey = `${entry.songId}-${entry.singerId ?? 'none'}`;
             const isSelected = selectedSessionItemKey === itemKey;
             return (
-            <div
-              key={itemKey}
-              onClick={() => {
-                // On mobile, toggle selection on row click
-                if (isMobile) {
-                  setSelectedSessionItemKey(isSelected ? null : itemKey);
-                }
-              }}
-              className={`bg-white dark:bg-gray-800 border rounded-lg shadow-md p-2 md:p-4 hover:shadow-lg transition-all duration-200 ${
-                isSelected 
-                  ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800' 
+              <div
+                key={itemKey}
+                onClick={() => {
+                  // On mobile, toggle selection on row click
+                  if (isMobile) {
+                    setSelectedSessionItemKey(isSelected ? null : itemKey);
+                  }
+                }}
+                className={`bg-white dark:bg-gray-800 border rounded-lg shadow-md p-2 md:p-4 hover:shadow-lg transition-all duration-200 ${isSelected
+                  ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
                   : 'border-gray-200 dark:border-gray-700'
-              } ${isMobile ? 'cursor-pointer' : 'cursor-move'}`}
-              draggable={!isMobile}
-              onDragStart={(e) => !isMobile && handleDragStart(e, index)}
-              onDragOver={(e) => !isMobile && e.preventDefault()}
-              onDrop={(e) => !isMobile && handleDrop(e, index)}
-            >
-              <div className="flex flex-col gap-1.5 md:gap-3">
-                {/* Header with song number */}
-                <div className="flex items-start gap-1.5 md:gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full font-bold text-sm">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {/* Song Metadata Section - Reusable component */}
-                    <SongMetadataCard
-                      song={song}
-                      onNameClick={isMobile ? undefined : () => handlePreviewSong(song.id)}
-                      nameClickTitle={isMobile ? undefined : song.name}
-                      showBackground={!isMobile}
-                      isSelected={isSelected}
-                      alwaysShowDeityLanguage={true}
-                      onPreviewClick={() => handlePreviewSong(song.id)}
-                    />
-                    
-                    {/* Singer and Pitch */}
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {singer && (
-                        <>
-                          <span className="hidden md:inline font-medium">Singer: </span>
-                          <span className={`font-bold text-base ${
-                            singer.gender?.toLowerCase() === 'male' 
-                              ? 'text-blue-600 dark:text-blue-400' 
-                              : singer.gender?.toLowerCase() === 'boy' 
-                                ? 'text-blue-400 dark:text-blue-300' 
-                                : singer.gender?.toLowerCase() === 'female' 
-                                  ? 'text-pink-600 dark:text-pink-400' 
-                                  : singer.gender?.toLowerCase() === 'girl' 
-                                    ? 'text-pink-400 dark:text-pink-300' 
+                  } ${isMobile ? 'cursor-pointer' : 'cursor-move'}`}
+                draggable={!isMobile}
+                onDragStart={(e) => !isMobile && handleDragStart(e, index)}
+                onDragOver={(e) => !isMobile && e.preventDefault()}
+                onDrop={(e) => !isMobile && handleDrop(e, index)}
+              >
+                <div className="flex flex-col gap-1.5 md:gap-3">
+                  {/* Header with song number */}
+                  <div className="flex items-start gap-1.5 md:gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full font-bold text-sm">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {/* Song Metadata Section - Reusable component */}
+                      <SongMetadataCard
+                        song={song}
+                        onNameClick={isMobile ? undefined : () => handlePreviewSong(song.id)}
+                        nameClickTitle={isMobile ? undefined : song.name}
+                        showBackground={!isMobile}
+                        isSelected={isSelected}
+                        alwaysShowDeityLanguage={true}
+                        onPreviewClick={() => handlePreviewSong(song.id)}
+                      />
+
+                      {/* Singer and Pitch */}
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        {singer && (
+                          <>
+                            <span className="hidden md:inline font-medium">Singer: </span>
+                            <span className={`font-bold text-base ${singer.gender?.toLowerCase() === 'male'
+                              ? 'text-blue-600 dark:text-blue-400'
+                              : singer.gender?.toLowerCase() === 'boy'
+                                ? 'text-blue-400 dark:text-blue-300'
+                                : singer.gender?.toLowerCase() === 'female'
+                                  ? 'text-pink-600 dark:text-pink-400'
+                                  : singer.gender?.toLowerCase() === 'girl'
+                                    ? 'text-pink-400 dark:text-pink-300'
                                     : 'text-gray-600 dark:text-gray-400'
-                          }`}>
-                            {singer.name}
-                          </span>
-                          <span className="mx-2">•</span>
-                        </>
-                      )}
-                      {entry.pitch && (
-                        <>
-                          <span className="hidden md:inline">Pitch: </span>
-                          <span className="font-bold text-gray-700 dark:text-gray-200">{formatNormalizedPitch(entry.pitch)}</span>
-                        </>
-                      )}
+                              }`}>
+                              {singer.name}
+                            </span>
+                            <span className="mx-2">•</span>
+                          </>
+                        )}
+                        {entry.pitch && (
+                          <>
+                            <span className="hidden md:inline">Pitch: </span>
+                            <span className="font-bold text-gray-700 dark:text-gray-200">{formatNormalizedPitch(entry.pitch)}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Action buttons - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}
-                <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ml-11 ${isMobile && !isSelected ? 'hidden' : ''}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {song.externalSourceUrl && (
-                    <a
-                      href={song.externalSourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="View song on external source (YouTube, etc.)"
-                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                    >
-                      <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400"></i>
-                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">External URL</span>
-                    </a>
-                  )}
-                  <button
-                    onClick={() => removeSong(entry.songId, entry.singerId)}
-                    title="Remove"
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                  {/* Action buttons - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}
+                  <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ml-11 ${isMobile && !isSelected ? 'hidden' : ''}`}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <i className="fas fa-times text-lg text-red-600 dark:text-red-400"></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Remove</span>
-                  </button>
+                    {song.externalSourceUrl && (
+                      <a
+                        href={song.externalSourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="View song on external source (YouTube, etc.)"
+                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                      >
+                        <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400"></i>
+                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">External URL</span>
+                      </a>
+                    )}
+                    <button
+                      onClick={() => removeSong(entry.songId, entry.singerId)}
+                      title="Remove"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                    >
+                      <i className="fas fa-times text-lg text-red-600 dark:text-red-400"></i>
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Remove</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
             );
           })}
         </div>
@@ -672,7 +677,7 @@ export const SessionManager: React.FC = () => {
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Save the current session ({sessionItems.length} {sessionItems.length === 1 ? 'song' : 'songs'}) 
+            Save the current session ({sessionItems.length} {sessionItems.length === 1 ? 'song' : 'songs'})
             as a named session for easy reuse later.
           </p>
 
@@ -805,7 +810,7 @@ export const SessionManager: React.FC = () => {
                       <CenterBadges centerIds={session.centerIds || []} showAllIfEmpty={true} />
                     </div>
                   </button>
-                  
+
                   {isAuthenticated && (userRole !== 'viewer' || session.created_by === userEmail) && (
                     <button
                       onClick={(e) => {

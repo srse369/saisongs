@@ -23,12 +23,27 @@ export const SingerManager: React.FC = () => {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Fetch singers when user changes to get correct filtered data
-    if (userId !== lastFetchedUserIdRef.current) {
-      lastFetchedUserIdRef.current = userId;
-      fetchSingers(); // Use cached data, only refresh if stale
-    }
-  }, [fetchSingers, userId]);
+    // Always fetch singers on mount to ensure we have latest data
+    fetchSingers(); // Use cached data, only refresh if stale
+  }, [fetchSingers]);
+
+  // Listen for data refresh requests from global event bus
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    
+    import('../../utils/globalEventBus').then(({ globalEventBus }) => {
+      unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
+        if (detail.resource === 'singers' || detail.resource === 'all') {
+          // Refresh singers data from backend to get latest state
+          fetchSingers(true); // Force refresh
+        }
+      });
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [fetchSingers]);
 
   // Focus search bar on Escape key
   useEffect(() => {

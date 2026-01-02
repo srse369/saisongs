@@ -163,39 +163,42 @@ class DatabaseWriteService {
   /**
    * Unset all templates as default
    */
-  async unsetAllDefaultTemplates(): Promise<void> {
-    await this.db.query('UPDATE presentation_templates SET is_default = 0');
+  async unsetAllDefaultTemplates(updatedBy: string): Promise<void> {
+    await this.db.query('UPDATE presentation_templates SET is_default = 0, updated_at = CURRENT_TIMESTAMP, updated_by = :1', [updatedBy]);
   }
 
   /**
    * Create a new template
    */
-  async createTemplate(id: string, name: string, description: string | null, templateJson: string, centerIdsJson: string | null, isDefault: boolean): Promise<void> {
+  async createTemplate(id: string, name: string, description: string | null, templateJson: string, centerIdsJson: string | null, isDefault: boolean, createdBy: string): Promise<void> {
     await this.db.query(`
       INSERT INTO presentation_templates
-      (id, name, description, template_json, center_ids, is_default, created_at, updated_at)
-      VALUES (:1, :2, :3, :4, :5, :6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `, [id, name, description, templateJson, centerIdsJson, isDefault ? 1 : 0]);
+      (id, name, description, template_json, center_ids, is_default, created_at, created_by)
+      VALUES (:1, :2, :3, :4, :5, :6, CURRENT_TIMESTAMP, :7)
+    `, [id, name, description, templateJson, centerIdsJson, isDefault ? 1 : 0, createdBy]);
   }
 
   /**
    * Update a template
    */
-  async updateTemplate(id: string, name: string, description: string | null, templateJson: string, isDefault: boolean, centerIdsJson: string | null): Promise<void> {
+  async updateTemplate(id: string, name: string, description: string | null, templateJson: string, centerIdsJson: string | null, isDefault: boolean, updatedBy: string): Promise<void> {
     await this.db.query(`
       UPDATE presentation_templates
-      SET name = :1, description = :2, template_json = :3, is_default = :4, center_ids = :5, updated_at = CURRENT_TIMESTAMP
+      SET name = :1, description = :2, template_json = :3, center_ids = :4, is_default = :5, updated_at = CURRENT_TIMESTAMP, updated_by = :6
       WHERE id = :6
-    `, [name, description, templateJson, isDefault ? 1 : 0, centerIdsJson, id]);
+    `, [name, description, templateJson, centerIdsJson, isDefault ? 1 : 0, updatedBy, id]);
   }
 
   /**
    * Set template as default
    */
-  async setTemplateAsDefault(id: string): Promise<void> {
+  async setTemplateAsDefault(id: string, updatedBy: string): Promise<void> {
+    // First, unset all other templates as default
+    await this.unsetAllDefaultTemplates(updatedBy);
+
     await this.db.query(
-      'UPDATE presentation_templates SET is_default = 1, updated_at = CURRENT_TIMESTAMP WHERE id = :1',
-      [id]
+      'UPDATE presentation_templates SET is_default = 1, updated_at = CURRENT_TIMESTAMP, updated_by = :2 WHERE id = :1',
+      [updatedBy, id]
     );
   }
 

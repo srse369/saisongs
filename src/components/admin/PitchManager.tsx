@@ -115,31 +115,41 @@ export const PitchManager: React.FC = () => {
     }
   }, [singerFilterId, songFilterId]);
 
-  // Fetch songs, singers, and all existing pitch associations when needed.
-  // Use cached data when switching tabs for better performance
-  // Parallelize fetches for better performance
+  // Always fetch data on mount to ensure we have latest data
   useEffect(() => {
-    if (userId !== lastFetchedUserIdRef.current) {
-      lastFetchedUserIdRef.current = userId;
-      
-      // Fetch all data in parallel for faster loading
-      Promise.all([
-        !songsLoading && fetchSongs(), // Use cached data
-        !singersLoading && fetchSingers(), // Use cached data
-        !pitchLoading && fetchAllPitches() // Use cached data
-      ]).catch(error => {
-        console.error('Error fetching data in parallel:', error);
+    // Fetch all data in parallel for faster loading
+    Promise.all([
+      !songsLoading && fetchSongs(), // Use cached data
+      !singersLoading && fetchSingers(), // Use cached data
+      !pitchLoading && fetchAllPitches() // Use cached data
+    ]).catch(error => {
+      console.error('Error fetching data in parallel:', error);
+    });
+  }, [fetchSongs, fetchSingers, fetchAllPitches, songsLoading, singersLoading, pitchLoading]);
+
+  // Listen for data refresh requests from global event bus
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    
+    import('../../utils/globalEventBus').then(({ globalEventBus }) => {
+      unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
+        if (detail.resource === 'pitches' || detail.resource === 'all') {
+          // Refresh pitches data from backend to get latest state
+          fetchAllPitches(true); // Force refresh
+        }
+        if (detail.resource === 'songs' || detail.resource === 'all') {
+          fetchSongs(true);
+        }
+        if (detail.resource === 'singers' || detail.resource === 'all') {
+          fetchSingers(true);
+        }
       });
-    }
-  }, [
-    fetchSongs,
-    fetchSingers,
-    fetchAllPitches,
-    userId,
-    songsLoading,
-    singersLoading,
-    pitchLoading,
-  ]);
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [fetchSongs, fetchSingers, fetchAllPitches]);
 
   // Focus search bar on Escape key
   useEffect(() => {

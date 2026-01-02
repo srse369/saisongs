@@ -16,7 +16,7 @@ router.get('/', optionalAuth, async (req, res) => {
     let templates: PresentationTemplate[];
     if (req.user) {
       const accessibleCenterIds = [...(req.user.centerIds || []), ...(req.user.editorFor || [])];
-      templates = cacheService.filterByCenterAccess(allTemplates, req.user.role, accessibleCenterIds);
+      templates = cacheService.filterByCenterAccess<PresentationTemplate>(allTemplates, req.user.role, accessibleCenterIds);
     } else {
       // Public/unauthenticated users should only see templates with no center restrictions
       templates = allTemplates.filter(t => !t.centerIds || t.centerIds.length === 0);
@@ -127,6 +127,7 @@ router.post('/', requireAuth, async (req, res) => {
       }
     }
 
+    template.createdBy = user.email;
     const created = await cacheService.createTemplate(template);
     res.status(201).json(created);
   } catch (error) {
@@ -196,6 +197,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       }
     }
     
+    updates.updatedBy = user.email || '';
     const updated = await cacheService.updateTemplate(id, updates);
     res.json(updated);
   } catch (error) {
@@ -206,10 +208,12 @@ router.put('/:id', requireAuth, async (req, res) => {
 });
 
 // Set template as default (through CacheService for write-through caching)
-router.post('/:id/set-default', async (req, res) => {
+router.post('/:id/set-default', requireAuth, async (req, res) => {
   try {
+    const user = req.user;
+
     const { id } = req.params;
-    const template = await cacheService.setTemplateAsDefault(id);
+    const template = await cacheService.setTemplateAsDefault(id, user.email || '');
     res.json({ message: 'Template set as default', template });
   } catch (error) {
     console.error('Error setting template as default:', error);
@@ -280,12 +284,13 @@ router.post('/:id/duplicate', requireEditor, async (req, res) => {
     }
 
     // Create duplicate template (exclude id and isDefault)
-    const { id: _id, isDefault, created_at, updated_at, ...templateData } = existingTemplate;
+    const { id: _id, isDefault, createdAt, updatedAt, ...templateData } = existingTemplate;
     const duplicateTemplate: PresentationTemplate = {
       ...templateData,
       name,
       centerIds: centerIds || [],
       isDefault: false,
+      createdBy: user.email || '',
     };
 
     const created = await cacheService.createTemplate(duplicateTemplate);

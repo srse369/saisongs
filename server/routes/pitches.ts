@@ -135,7 +135,7 @@ router.post('/', async (req, res) => {
       }
       
       // If pitch is different, update it and return the updated pitch
-      await cacheService.updatePitch(existing.id, { pitch, updatedBy: user.email });
+      await cacheService.updatePitch(existing.id, { pitch: pitch, updatedBy: user.email });
       // Fetch the updated pitch to return
       const updatedPitch = await cacheService.getPitch(existing.id);
       return res.status(200).json(updatedPitch);

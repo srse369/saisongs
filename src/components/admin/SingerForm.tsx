@@ -174,8 +174,8 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
         centerIds: centerIds.length > 0 ? centerIds : undefined,
       };
       
-      // If current user is admin and we're editing, pass admin fields
-      const adminFields = (isAdmin && isEditMode) ? {
+      // If current user is admin, pass admin fields (both create and edit)
+      const adminFields = isAdmin ? {
         isAdmin: singerIsAdmin,
         editorFor: editorForCenters
       } : undefined;
@@ -283,7 +283,7 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
         )}
       </div>
 
-      {isEditMode && (
+      {(isEditMode || isAdmin) && (
         <>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

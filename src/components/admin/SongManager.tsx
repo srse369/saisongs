@@ -50,12 +50,27 @@ export const SongManager: React.FC = () => {
   }, [songs]);
 
   useEffect(() => {
-    // Fetch songs when user changes to get correct filtered data
-    if (userId !== lastFetchedUserIdRef.current) {
-      lastFetchedUserIdRef.current = userId;
-      fetchSongs(); // Use cached data, only refresh if stale
-    }
-  }, [fetchSongs, userId]);
+    // Always fetch songs on mount to ensure we have latest data
+    fetchSongs(); // Use cached data, only refresh if stale
+  }, [fetchSongs]);
+
+  // Listen for data refresh requests from global event bus
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    
+    import('../../utils/globalEventBus').then(({ globalEventBus }) => {
+      unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
+        if (detail.resource === 'songs' || detail.resource === 'all') {
+          // Refresh songs data from backend to get latest state
+          fetchSongs(true); // Force refresh
+        }
+      });
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [fetchSongs]);
 
   // Focus search bar on Escape key
   useEffect(() => {

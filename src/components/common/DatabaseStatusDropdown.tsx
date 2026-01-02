@@ -15,6 +15,7 @@ interface DatabaseStatusDropdownProps {
   connectionError: string | null;
   resetConnection: () => Promise<void>;
   isAdmin?: boolean;
+  isAuthenticated?: boolean;
 }
 
 interface DatabaseStats {
@@ -37,12 +38,13 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
   connectionError,
   resetConnection,
   isAdmin = false,
+  isAuthenticated = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [stats, setStats] = useState<DatabaseStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
-  const [reloadingCache, setReloadingCache] = useState(false);
+  const [reloadingBackendCache, setReloadingBackendCache] = useState(false);
   const [reloadMessage, setReloadMessage] = useState<string | null>(null);
   const [clearingLocalStorage, setClearingLocalStorage] = useState(false);
   const [localStorageMessage, setLocalStorageMessage] = useState<string | null>(null);
@@ -152,8 +154,8 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
     }
   };
 
-  const handleReloadCache = async () => {
-    setReloadingCache(true);
+  const handleReloadBackendCache = async () => {
+    setReloadingBackendCache(true);
     setReloadMessage(null);
     try {
       const response = await apiClient.post('/cache/reload');
@@ -177,7 +179,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
       const errorMsg = error instanceof Error ? error.message : 'Failed to reload cache';
       setReloadMessage(`Error: ${errorMsg}`);
     } finally {
-      setReloadingCache(false);
+      setReloadingBackendCache(false);
     }
   };
 
@@ -196,7 +198,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
 
     setClearingLocalStorage(true);
     setLocalStorageMessage(null);
-    
+
     try {
       await clearAllCaches({
         clearServiceWorkerCache: true,
@@ -209,7 +211,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
       // Update local state for cooldown tracking
       const timestamp = Date.now();
       setLastLocalStorageClear(timestamp);
-      
+
       setLocalStorageMessage('Web page, JavaScript, and CSS cache cleared! Reloading...');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to clear cache';
@@ -223,11 +225,10 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
       {/* Status Icon Button */}
       <button
         onClick={handleToggle}
-        className={`p-2 rounded-full transition-all duration-200 ${
-          isConnected
+        className={`p-2 rounded-full transition-all duration-200 ${isConnected
             ? 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
             : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
-        }`}
+          }`}
         title={isConnected ? 'Database connected - Click for details' : 'Database disconnected - Click for details'}
       >
         {isConnected ? (
@@ -258,11 +259,11 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
           <div className="px-4 py-3">
             {isConnected ? (
               <>
-                {loading ? (
+                {isAuthenticated && loading ? (
                   <div className="flex items-center justify-center py-4">
                     <i className="fas fa-spinner fa-spin text-xl text-blue-600 dark:text-blue-400"></i>
                   </div>
-                ) : stats ? (
+                ) : isAuthenticated && stats ? (
                   <div className="space-y-2">
                     <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">Database Statistics:</p>
                     <div className="grid grid-cols-2 gap-2 text-sm">
@@ -292,7 +293,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                       </div>
                     </div>
                   </div>
-                ) : (
+                ) : isAuthenticated ? (
                   <div className="text-sm text-gray-600 dark:text-gray-400">
                     <p className="mb-2">Unable to load statistics</p>
                     {statsError && (
@@ -301,43 +302,45 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                       </p>
                     )}
                   </div>
-                )}
-                
+                ) : null}
+
                 {/* Brevo API Status */}
-                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Email Service (Brevo):</p>
-                  {brevoLoading ? (
-                    <div className="flex items-center justify-center py-2">
-                      <i className="fas fa-spinner fa-spin text-base text-blue-600 dark:text-blue-400"></i>
-                    </div>
-                  ) : brevoStatus ? (
-                    <div className="flex items-center space-x-2 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
-                      {brevoStatus.status === 'ok' ? (
-                        <>
-                          <i className="fas fa-check-circle text-base text-green-600 dark:text-green-400"></i>
-                          <span className="text-sm text-green-700 dark:text-green-300 font-medium">Connected</span>
-                        </>
-                      ) : (
-                        <>
-                          <i className="fas fa-times-circle text-base text-red-600 dark:text-red-400"></i>
-                          <div className="flex-1">
-                            <span className="text-sm text-red-700 dark:text-red-300 font-medium">
-                              {brevoStatus.configured ? 'Error' : 'Not Configured'}
-                            </span>
-                            {brevoStatus.message && (
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 break-words">
-                                {brevoStatus.message}
-                              </p>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-                
+                {isAuthenticated && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Email Service (Brevo):</p>
+                    {brevoLoading ? (
+                      <div className="flex items-center justify-center py-2">
+                        <i className="fas fa-spinner fa-spin text-base text-blue-600 dark:text-blue-400"></i>
+                      </div>
+                    ) : brevoStatus ? (
+                      <div className="flex items-center space-x-2 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
+                        {brevoStatus.status === 'ok' ? (
+                          <>
+                            <i className="fas fa-check-circle text-base text-green-600 dark:text-green-400"></i>
+                            <span className="text-sm text-green-700 dark:text-green-300 font-medium">Connected</span>
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-times-circle text-base text-red-600 dark:text-red-400"></i>
+                            <div className="flex-1">
+                              <span className="text-sm text-red-700 dark:text-red-300 font-medium">
+                                {brevoStatus.configured ? 'Error' : 'Not Configured'}
+                              </span>
+                              {brevoStatus.message && (
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 break-words">
+                                  {brevoStatus.message}
+                                </p>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+
                 {/* Clear Local Storage Button (All Users) */}
-                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className={`${isAuthenticated && 'mt-4 pt-4 border-t'} border-gray-200 dark:border-gray-700`}>
                   <button
                     onClick={handleClearLocalStorage}
                     disabled={clearingLocalStorage}
@@ -356,11 +359,10 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                     )}
                   </button>
                   {localStorageMessage && (
-                    <p className={`mt-2 text-xs text-center ${
-                      localStorageMessage.startsWith('Error') || localStorageMessage.startsWith('Please wait')
-                        ? 'text-red-600 dark:text-red-400' 
+                    <p className={`mt-2 text-xs text-center ${localStorageMessage.startsWith('Error') || localStorageMessage.startsWith('Please wait')
+                        ? 'text-red-600 dark:text-red-400'
                         : 'text-green-600 dark:text-green-400'
-                    }`}>
+                      }`}>
                       {localStorageMessage}
                     </p>
                   )}
@@ -368,16 +370,16 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                     Clears web page (HTML), JavaScript, CSS cache, and localStorage data. Preserves images. 2-minute cooldown.
                   </p>
                 </div>
-                
+
                 {/* Reload Cache Button (Admin Only) */}
                 {isAdmin && (
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                     <button
-                      onClick={handleReloadCache}
-                      disabled={reloadingCache}
+                      onClick={handleReloadBackendCache}
+                      disabled={reloadingBackendCache}
                       className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {reloadingCache ? (
+                      {reloadingBackendCache ? (
                         <>
                           <i className="fas fa-spinner fa-spin text-base mr-2"></i>
                           Reloading...
@@ -390,11 +392,10 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                       )}
                     </button>
                     {reloadMessage && (
-                      <p className={`mt-2 text-xs text-center ${
-                        reloadMessage.startsWith('Error') 
-                          ? 'text-red-600 dark:text-red-400' 
+                      <p className={`mt-2 text-xs text-center ${reloadMessage.startsWith('Error')
+                          ? 'text-red-600 dark:text-red-400'
                           : 'text-green-600 dark:text-green-400'
-                      }`}>
+                        }`}>
                         {reloadMessage}
                       </p>
                     )}
@@ -421,7 +422,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                 </button>
               </>
             )}
-            
+
             {/* Release Version */}
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between px-2 py-1.5">

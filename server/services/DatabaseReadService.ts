@@ -515,7 +515,7 @@ class DatabaseReadService {
   /**
    * Get all presentation templates
    */
-  async getAllTemplates(): Promise<any[]> {
+async getAllTemplates(): Promise<any[]> {
     return await this.query<any>(`
       SELECT id, name, description, template_json, center_ids, is_default, created_at, updated_at
       FROM presentation_templates
@@ -730,4 +730,3 @@ class DatabaseReadService {
 // Export singleton instance
 export const databaseReadService = new DatabaseReadService();
 export default databaseReadService;
-

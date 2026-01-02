@@ -82,17 +82,16 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setExpanded(!expanded)}
-          className={`w-full sm:w-auto sm:max-w-[200px] min-h-[48px] sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 sm:gap-3 px-3 sm:px-5 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 shadow-lg hover:shadow-xl transition-all duration-200 font-medium bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 focus:ring-amber-500 ${
+          className={`w-full sm:w-auto sm:min-w-[200px] sm:max-w-[200px] min-h-[35px] sm:max-h-[35px] max-h-[35px] flex items-center justify-center sm:justify-start gap-2 sm:gap-3 px-3 sm:px-5 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 shadow-lg hover:shadow-xl transition-all duration-200 font-medium bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 focus:ring-amber-500 ${
             !isTemplateSelected ? 'animate-pulse-gentle' : ''
           }`}
           title={isTemplateSelected ? `Template: ${selectedTemplate?.name}` : 'Pick a template for presentation'}
         >
           <i className="fas fa-layer-group text-lg flex-shrink-0"></i>
           {/* Mobile: simplified, Desktop: full layout */}
-          <span className="sm:hidden text-sm font-medium">Template</span>
-          <div className="hidden sm:flex flex-col items-start gap-0.5 min-w-0 overflow-hidden">
+          <div className="flex sm:flex flex-col items-start gap-0.5 min-w-0 overflow-hidden">
             <span className="text-xs font-bold opacity-90 tracking-wider">TEMPLATE</span>
-            <span className="text-sm truncate w-full">
+            <span className="text-[10px] truncate w-full">
               {isTemplateSelected ? selectedTemplate?.name : 'Select one'}
             </span>
           </div>

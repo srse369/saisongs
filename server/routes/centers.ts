@@ -260,7 +260,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
     // Check if center is tagged in any templates (using cache)
     const allTemplates = await cacheService.getAllTemplates();
     const templatesWithCenter = allTemplates.filter(template =>
-      template.center_ids && template.center_ids.includes(centerId)
+      template.centerIds && template.centerIds.includes(centerId)
     );
 
     if (templatesWithCenter.length > 0) {
@@ -332,7 +332,7 @@ router.get('/:id/stats', requireAdmin, async (req, res) => {
     // Get template counts (using cache)
     const allTemplates = await cacheService.getAllTemplates();
     const templatesCount = allTemplates.filter(template =>
-      template.center_ids && template.center_ids.includes(centerId)
+      template.centerIds && template.centerIds.includes(centerId)
     ).length;
 
     // Get session counts (using cache)

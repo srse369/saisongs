@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { SongSingerPitch, CreatePitchInput, UpdatePitchInput, ServiceError } from '../types';
 import { pitchService } from '../services';
@@ -177,8 +177,16 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
         // Also clear songs cache since song pitch count may change
         window.localStorage.removeItem('saiSongs:songsCache');
         
-        // Dispatch custom event to notify SingerContext to update pitch count
-        // This allows optimistic update without direct context dependency
+        // Dispatch global event to notify other components
+        import('../utils/globalEventBus').then(({ globalEventBus }) => {
+          globalEventBus.dispatch('pitchCreated', { 
+            type: 'pitchCreated',
+            singerId: pitch.singerId, 
+            songId: pitch.songId 
+          });
+        });
+        
+        // Also dispatch legacy event for SongContext and SingerContext optimistic updates
         window.dispatchEvent(new CustomEvent('pitchCreated', { 
           detail: { singerId: pitch.singerId, songId: pitch.songId } 
         }));
@@ -228,13 +236,23 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
 
   const deletePitch = useCallback(async (id: string): Promise<void> => {
     setLoading(true);
+    // Get the pitch before deleting to know which singer/song to update
+    let pitchToDelete: SongSingerPitch | undefined;
+    
     try {
-      // Get the pitch before deleting to know which singer/song to update
-      let pitchToDelete: SongSingerPitch | undefined;
       setPitches(prev => {
         pitchToDelete = prev.find(p => p.id === id);
         return prev.filter(pitch => pitch.id !== id);
       });
+      
+      // Dispatch custom event IMMEDIATELY to update song and singer pitch counts
+      // This allows optimistic update - if API call fails, we'll need to rollback
+      if (typeof window !== 'undefined' && pitchToDelete) {
+        // Dispatch legacy event for SongContext and SingerContext optimistic updates
+        window.dispatchEvent(new CustomEvent('pitchDeleted', { 
+          detail: { singerId: pitchToDelete.singerId, songId: pitchToDelete.songId } 
+        }));
+      }
       
       await pitchService.deletePitch(id);
       
@@ -245,16 +263,39 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
         window.localStorage.removeItem('saiSongs:singersCache');
         window.localStorage.removeItem('saiSongs:songsCache');
         
-        // Dispatch custom event to notify SingerContext to update pitch count
-        if (pitchToDelete) {
-          window.dispatchEvent(new CustomEvent('pitchDeleted', { 
-            detail: { singerId: pitchToDelete.singerId, songId: pitchToDelete.songId } 
-          }));
+        // Dispatch global event to notify other components
+        if (pitchToDelete?.singerId && pitchToDelete?.songId) {
+          const { singerId, songId } = pitchToDelete;
+          import('../utils/globalEventBus').then(({ globalEventBus }) => {
+            globalEventBus.dispatch('pitchDeleted', { 
+              type: 'pitchDeleted',
+              singerId, 
+              songId 
+            });
+          });
         }
       }
       
       toast.success('Pitch association deleted successfully');
     } catch (err) {
+      // Rollback: restore the pitch to state and reverse the pitch count update
+      if (typeof window !== 'undefined' && pitchToDelete) {
+        setPitches(prev => {
+          // Check if pitch already exists (might have been restored)
+          if (prev.some(p => p.id === pitchToDelete!.id)) {
+            return prev;
+          }
+          return [...prev, pitchToDelete!];
+        });
+        
+        // Dispatch event to reverse the pitch count update
+        if (pitchToDelete) {
+          window.dispatchEvent(new CustomEvent('pitchCreated', { 
+            detail: { singerId: pitchToDelete.singerId, songId: pitchToDelete.songId } 
+          }));
+        }
+      }
+      
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete pitch';
       // Only show error via toast, don't persist to state
       // This prevents non-dismissible error banners in PitchManager

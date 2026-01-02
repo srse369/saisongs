@@ -5,6 +5,7 @@
 
 import { databaseReadService } from './DatabaseReadService.js';
 import { databaseWriteService } from './DatabaseWriteService.js';
+import { cacheService } from './CacheService.js';
 import { randomUUID } from 'crypto';
 import * as yaml from 'js-yaml';
 
@@ -110,7 +111,7 @@ export interface TemplateSlide {
   videos?: VideoElement[];
   audios?: AudioElement[];
   text?: TextElement[];
-  
+
   // Song content styling (only used on reference slides)
   songTitleStyle?: SongContentStyle;
   songLyricsStyle?: SongContentStyle;
@@ -157,7 +158,7 @@ function ensureSongContentStyles(slide: TemplateSlide, aspectRatio: AspectRatio 
   const dimensions = aspectRatio === '4:3' ? { width: 1600, height: 1200 } : { width: 1920, height: 1080 };
   const scaleY = dimensions.height / 1080;
   const scaleX = dimensions.width / 1920;
-  
+
   return {
     ...slide,
     songTitleStyle: slide.songTitleStyle || {
@@ -187,27 +188,24 @@ export interface PresentationTemplate {
   description?: string;
   aspectRatio?: AspectRatio;          // Template aspect ratio: '16:9' (default) or '4:3'
   centerIds?: number[];              // Centers that have access to this template
-  
+
   // Multi-slide structure (new format)
   slides?: TemplateSlide[];           // Array of slides in the template
   referenceSlideIndex?: number;       // 0-based index of the slide used for song content overlay
-  
+
   // Legacy single-slide fields (for backward compatibility)
   background?: BackgroundElement;
   images?: ImageElement[];
   videos?: VideoElement[];
   audios?: AudioElement[];
   text?: TextElement[];
-  
+
   isDefault?: boolean;
   createdAt?: Date;
+  createdBy?: string;
   updatedAt?: Date;
+  updatedBy?: string;
   yaml?: string;
-}
-
-// Helper to check if template uses multi-slide format
-function isMultiSlideTemplate(templateJson: any): boolean {
-  return Array.isArray(templateJson.slides) && templateJson.slides.length > 0;
 }
 
 // Normalize rotation values to whole integers on all elements in all slides
@@ -291,6 +289,69 @@ function getReferenceSlide(template: PresentationTemplate): TemplateSlide {
 
 class TemplateService {
   /**
+   * Map template JSON to PresentationTemplate
+   */
+  mapTemplateJson(id: string, name: string, description: string, isDefault: boolean, centerIds: [], templateJson: any, createdAt: Date, createdBy: string, updatedAt: Date, updatedBy: string): PresentationTemplate {
+    const template: PresentationTemplate = {
+      id: id,
+      name: name,
+      description: description,
+      isDefault: isDefault,
+      centerIds: centerIds || [],
+      createdAt: createdAt,
+      createdBy: createdBy,
+      updatedAt: updatedAt,
+      updatedBy: updatedBy,
+    };
+
+    // New multi-slide format
+    template.aspectRatio = templateJson.aspectRatio || '16:9';
+    template.slides = templateJson.slides;
+    template.referenceSlideIndex = templateJson.referenceSlideIndex ?? 0;
+    // Also populate legacy fields from reference slide for backward compatibility
+    if (template.slides && template.slides.length > 0) {
+      const refSlide = template.slides[template.referenceSlideIndex ?? 0] || template.slides[0];
+      template.background = refSlide?.background;
+      template.images = refSlide?.images || [];
+      template.videos = refSlide?.videos || [];
+      template.audios = refSlide?.audios || [];
+      template.text = refSlide?.text || [];
+    }
+
+    // Ensure reference slide has song content styles with defaults
+    if (template.slides && template.slides.length > 0) {
+      const refIndex = template.referenceSlideIndex ?? 0;
+      template.slides[refIndex] = ensureSongContentStyles(
+        template.slides[refIndex],
+        template.aspectRatio || '16:9'
+      );
+    }
+
+    // Reconstruct YAML from template data
+    template.yaml = this.templateToYaml(template);
+
+    return template;
+  }
+
+  /**
+   * Map template row to PresentationTemplate
+   */
+  mapTemplateRow(row: any): PresentationTemplate {
+    // Center Ids
+    const centerIds: [] = typeof row.CENTER_IDS === 'string' ? JSON.parse(row.CENTER_IDS) : row.CENTER_IDS || [];
+
+    // Template JSON
+    let templateJson: any = {};
+    try {
+      templateJson = typeof row.TEMPLATE_JSON === 'string' ? JSON.parse(row.TEMPLATE_JSON) : row.TEMPLATE_JSON || {};
+    } catch (e) {
+      console.error('❌ Error parsing template JSON:', e);
+    }
+
+    return this.mapTemplateJson(row.ID || row.id, row.NAME || row.name, row.DESCRIPTION || row.description, row.IS_DEFAULT || row.isDefault, centerIds, templateJson, row.CREATED_AT || row.createdAt, row.CREATED_BY || row.createdBy, row.UPDATED_AT || row.updatedAt, row.UPDATED_BY || row.updatedBy);
+  }
+
+  /**
    * Get all templates
    */
   async getAllTemplates(): Promise<PresentationTemplate[]> {
@@ -298,68 +359,7 @@ class TemplateService {
       const result = await databaseReadService.getAllTemplates();
 
       return result.map((row: any) => {
-        let templateJson: any = {};
-        try {
-          templateJson = typeof row.TEMPLATE_JSON === 'string' ? JSON.parse(row.TEMPLATE_JSON) : row.TEMPLATE_JSON || {};
-        } catch (e) {
-          console.error('❌ Error parsing template JSON:', e);
-        }
-
-        // Handle both multi-slide (new) and single-slide (legacy) formats
-        const template: PresentationTemplate = {
-          id: row.ID,
-          name: row.NAME,
-          description: row.DESCRIPTION,
-          isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
-          createdAt: row.CREATED_AT,
-          updatedAt: row.UPDATED_AT,
-        };
-
-        // Set aspect ratio (default to 16:9 for legacy templates)
-        template.aspectRatio = templateJson.aspectRatio || '16:9';
-
-        if (isMultiSlideTemplate(templateJson)) {
-          // New multi-slide format
-          template.slides = templateJson.slides;
-          template.referenceSlideIndex = templateJson.referenceSlideIndex ?? 0;
-          // Also populate legacy fields from reference slide for backward compatibility
-          const refSlide = template.slides[template.referenceSlideIndex] || template.slides[0];
-          template.background = refSlide?.background;
-          template.images = refSlide?.images || [];
-          template.videos = refSlide?.videos || [];
-          template.audios = refSlide?.audios || [];
-          template.text = refSlide?.text || [];
-        } else {
-          // Legacy single-slide format
-          template.background = templateJson.background;
-          template.images = templateJson.images || [];
-          template.videos = templateJson.videos || [];
-          template.audios = templateJson.audios || [];
-          template.text = templateJson.text || [];
-          // Auto-migrate to multi-slide format structure
-          template.slides = [{
-            background: template.background,
-            images: template.images,
-            videos: template.videos,
-            audios: template.audios,
-            text: template.text,
-          }];
-          template.referenceSlideIndex = 0;
-        }
-
-        // Ensure reference slide has song content styles with defaults
-        if (template.slides && template.slides.length > 0) {
-          const refIndex = template.referenceSlideIndex ?? 0;
-          template.slides[refIndex] = ensureSongContentStyles(
-            template.slides[refIndex],
-            template.aspectRatio || '16:9'
-          );
-        }
-
-        // Reconstruct YAML from template data
-        template.yaml = this.templateToYaml(template);
-
-        return template;
+        return this.mapTemplateRow(row);
       });
     } catch (error) {
       console.error('Error fetching templates:', error);
@@ -377,68 +377,8 @@ class TemplateService {
       if (!row) {
         return null;
       }
-      let templateJson: any = {};
-      try {
-        templateJson = typeof row.TEMPLATE_JSON === 'string' ? JSON.parse(row.TEMPLATE_JSON) : row.TEMPLATE_JSON || {};
-      } catch (e) {
-        console.error('❌ Error parsing template JSON:', e);
-      }
 
-      // Handle both multi-slide (new) and single-slide (legacy) formats
-      const template: PresentationTemplate = {
-        id: row.ID,
-        name: row.NAME,
-        description: row.DESCRIPTION,
-        isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
-        createdAt: row.CREATED_AT,
-        updatedAt: row.UPDATED_AT,
-      };
-
-      // Set aspect ratio (default to 16:9 for legacy templates)
-      template.aspectRatio = templateJson.aspectRatio || '16:9';
-
-      if (isMultiSlideTemplate(templateJson)) {
-        // New multi-slide format
-        template.slides = templateJson.slides;
-        template.referenceSlideIndex = templateJson.referenceSlideIndex ?? 0;
-        // Also populate legacy fields from reference slide for backward compatibility
-        const refSlide = template.slides[template.referenceSlideIndex] || template.slides[0];
-        template.background = refSlide?.background;
-        template.images = refSlide?.images || [];
-        template.videos = refSlide?.videos || [];
-        template.audios = refSlide?.audios || [];
-        template.text = refSlide?.text || [];
-      } else {
-        // Legacy single-slide format
-        template.background = templateJson.background;
-        template.images = templateJson.images || [];
-        template.videos = templateJson.videos || [];
-        template.audios = templateJson.audios || [];
-        template.text = templateJson.text || [];
-        // Auto-migrate to multi-slide format structure
-        template.slides = [{
-          background: template.background,
-          images: template.images,
-          videos: template.videos,
-          audios: template.audios,
-          text: template.text,
-        }];
-        template.referenceSlideIndex = 0;
-      }
-
-      // Ensure reference slide has song content styles with defaults
-      if (template.slides && template.slides.length > 0) {
-        const refIndex = template.referenceSlideIndex ?? 0;
-        template.slides[refIndex] = ensureSongContentStyles(
-          template.slides[refIndex],
-          template.aspectRatio || '16:9'
-        );
-      }
-
-      // Reconstruct YAML from template data
-      template.yaml = this.templateToYaml(template);
-
-      return template;
+      return this.mapTemplateRow(row);
     } catch (error) {
       console.error('Error fetching template:', error);
       throw error;
@@ -456,68 +396,7 @@ class TemplateService {
         return null;
       }
 
-      let templateJson: any = {};
-      try {
-        templateJson = typeof row.TEMPLATE_JSON === 'string' ? JSON.parse(row.TEMPLATE_JSON) : row.TEMPLATE_JSON || {};
-      } catch (e) {
-        console.error('Error parsing template JSON:', e);
-      }
-
-      // Handle both multi-slide (new) and single-slide (legacy) formats
-      const template: PresentationTemplate = {
-        id: row.ID,
-        name: row.NAME,
-        description: row.DESCRIPTION,
-        isDefault: row.IS_DEFAULT === 1 || row.IS_DEFAULT === '1',
-        createdAt: row.CREATED_AT,
-        updatedAt: row.UPDATED_AT,
-      };
-
-      // Set aspect ratio (default to 16:9 for legacy templates)
-      template.aspectRatio = templateJson.aspectRatio || '16:9';
-
-      if (isMultiSlideTemplate(templateJson)) {
-        // New multi-slide format
-        template.slides = templateJson.slides;
-        template.referenceSlideIndex = templateJson.referenceSlideIndex ?? 0;
-        // Also populate legacy fields from reference slide for backward compatibility
-        const refSlide = template.slides[template.referenceSlideIndex] || template.slides[0];
-        template.background = refSlide?.background;
-        template.images = refSlide?.images || [];
-        template.videos = refSlide?.videos || [];
-        template.audios = refSlide?.audios || [];
-        template.text = refSlide?.text || [];
-      } else {
-        // Legacy single-slide format
-        template.background = templateJson.background;
-        template.images = templateJson.images || [];
-        template.videos = templateJson.videos || [];
-        template.audios = templateJson.audios || [];
-        template.text = templateJson.text || [];
-        // Auto-migrate to multi-slide format structure
-        template.slides = [{
-          background: template.background,
-          images: template.images,
-          videos: template.videos,
-          audios: template.audios,
-          text: template.text,
-        }];
-        template.referenceSlideIndex = 0;
-      }
-
-      // Ensure reference slide has song content styles with defaults
-      if (template.slides && template.slides.length > 0) {
-        const refIndex = template.referenceSlideIndex ?? 0;
-        template.slides[refIndex] = ensureSongContentStyles(
-          template.slides[refIndex],
-          template.aspectRatio || '16:9'
-        );
-      }
-
-      // Reconstruct YAML from template data
-      template.yaml = this.templateToYaml(template);
-
-      return template;
+      return this.mapTemplateRow(row);
     } catch (error) {
       console.error('Error fetching default template:', error);
       throw error;
@@ -525,33 +404,23 @@ class TemplateService {
   }
 
   /**
-   * Build the JSON structure to save to database
-   * Saves in new multi-slide format while maintaining backward compatibility
+   * Build the JSON template structure to save to database
    */
   private buildTemplateJson(template: PresentationTemplate): string {
-    // If template has slides array, save in new format
-    if (template.slides && template.slides.length > 0) {
-      return JSON.stringify({
-        aspectRatio: template.aspectRatio || '16:9',
-        slides: template.slides,
-        referenceSlideIndex: template.referenceSlideIndex ?? 0,
-      });
-    }
-    
-    // Legacy format - convert to multi-slide format when saving
-    const slide: TemplateSlide = {
-      background: template.background,
-      images: template.images || [],
-      videos: template.videos || [],
-      audios: template.audios || [],
-      text: template.text || [],
-    };
-    
     return JSON.stringify({
       aspectRatio: template.aspectRatio || '16:9',
-      slides: [slide],
-      referenceSlideIndex: 0,
+      slides: template.slides,
+      referenceSlideIndex: template.referenceSlideIndex ?? 0,
     });
+  }
+
+  /**
+   * Build the JSON center ids structure to save to database
+   */
+  private buildCenterIdsJson(template: PresentationTemplate): string | null {
+    return template.centerIds && template.centerIds.length > 0
+      ? JSON.stringify(template.centerIds)
+      : null;
   }
 
   /**
@@ -560,52 +429,26 @@ class TemplateService {
   async createTemplate(template: PresentationTemplate): Promise<PresentationTemplate> {
     try {
       const id = template.id || randomUUID();
-      const templateJson = this.buildTemplateJson(template);
 
       // If this is set as default, unset other defaults
       if (template.isDefault) {
-        await databaseWriteService.unsetAllDefaultTemplates();
+        await databaseWriteService.unsetAllDefaultTemplates(template.createdBy || '');
       }
 
-      // Prepare centerIds as JSON string for DB column center_ids
-      const centerIdsJson = template.centerIds && template.centerIds.length > 0 
-        ? JSON.stringify(template.centerIds) 
-        : null;
-
-      await databaseWriteService.createTemplate(
+      const row = await databaseWriteService.createTemplate(
         id,
         template.name,
         template.description || null,
-        templateJson,
-        centerIdsJson,
-        template.isDefault || false
+        this.buildTemplateJson(template),
+        this.buildCenterIdsJson(template),
+        template.isDefault || false,
+        template.createdBy || ''
       );
 
       // Invalidate cache after create
-      const { cacheService } = await import('./CacheService.js');
       cacheService.invalidate('templates:all');
 
-      // Return with normalized structure
-      const result: PresentationTemplate = {
-        ...template,
-        id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      // Ensure slides array is populated
-      if (!result.slides || result.slides.length === 0) {
-        result.slides = [{
-          background: result.background,
-          images: result.images || [],
-          videos: result.videos || [],
-          audios: result.audios || [],
-          text: result.text || [],
-        }];
-        result.referenceSlideIndex = 0;
-      }
-      
-      return result;
+      return this.mapTemplateRow(row);
     } catch (error) {
       console.error('Error creating template:', error);
       throw error;
@@ -628,29 +471,22 @@ class TemplateService {
         id,
       };
 
-      const templateJson = this.buildTemplateJson(updated);
-
       // If this is set as default, unset other defaults
       if (template.isDefault && !existing.isDefault) {
-        await databaseWriteService.unsetAllDefaultTemplates();
+        await databaseWriteService.unsetAllDefaultTemplates(template.updatedBy || '');
       }
-
-      // Prepare centerIds as JSON string for DB column center_ids
-      const centerIdsJson = updated.centerIds && updated.centerIds.length > 0 
-        ? JSON.stringify(updated.centerIds) 
-        : null;
 
       await databaseWriteService.updateTemplate(
         id,
         updated.name,
         updated.description || null,
-        templateJson,
+        this.buildTemplateJson(updated),
+        this.buildCenterIdsJson(updated),
         updated.isDefault || false,
-        centerIdsJson
+        updated.updatedBy || ''
       );
 
       // Invalidate cache after update
-      const { cacheService } = await import('./CacheService.js');
       cacheService.invalidate('templates:all');
 
       return { ...updated, updatedAt: new Date() };
@@ -663,16 +499,12 @@ class TemplateService {
   /**
    * Set a template as default (unsets others)
    */
-  async setAsDefault(id: string): Promise<PresentationTemplate> {
+  async setAsDefault(id: string, updatedBy: string): Promise<PresentationTemplate> {
     try {
-      // First, unset all other templates as default
-      await databaseWriteService.unsetAllDefaultTemplates();
-
       // Then set this one as default
-      await databaseWriteService.setTemplateAsDefault(id);
+      await databaseWriteService.setTemplateAsDefault(id, updatedBy);
 
       // Invalidate cache after update
-      const { cacheService } = await import('./CacheService.js');
       cacheService.invalidate('templates:all');
 
       // Return the updated template
@@ -693,9 +525,8 @@ class TemplateService {
   async deleteTemplate(id: string): Promise<void> {
     try {
       await databaseWriteService.deleteTemplate(id);
-      
+
       // Invalidate cache after delete
-      const { cacheService } = await import('./CacheService.js');
       cacheService.invalidate('templates:all');
     } catch (error) {
       console.error('Error deleting template:', error);
@@ -710,53 +541,26 @@ class TemplateService {
   parseYaml(yamlContent: string): Partial<PresentationTemplate> {
     try {
       const parsed = yaml.load(yamlContent) as any;
-      
+
       // Parse aspect ratio (default to 16:9)
       const aspectRatio: AspectRatio = parsed.aspectRatio === '4:3' ? '4:3' : '16:9';
-      
-      // Check if this is a multi-slide template
-      if (Array.isArray(parsed.slides) && parsed.slides.length > 0) {
-        // New multi-slide format
-        const refIndex = parsed.referenceSlideIndex ?? 0;
-        const normalizedSlides = normalizeSlideRotations(parsed.slides) || parsed.slides;
-        const refSlide = normalizedSlides[refIndex] || normalizedSlides[0];
-        
-        return {
-          name: parsed.name,
-          description: parsed.description,
-          aspectRatio,
-          slides: normalizedSlides,
-          referenceSlideIndex: refIndex,
-          // Also populate legacy fields from reference slide
-          background: refSlide?.background,
-          images: refSlide?.images || [],
-          videos: refSlide?.videos || [],
-          text: refSlide?.text || [],
-          yaml: yamlContent,
-        };
-      }
-      
-      // Legacy single-slide format
-      const slide: TemplateSlide = {
-        background: parsed.background,
-        images: parsed.images || [],
-        videos: parsed.videos || [],
-        text: parsed.text || [],
-      };
-      const normalizedSlides = normalizeSlideRotations([slide]) || [slide];
-      
+
+      // New multi-slide format
+      const refIndex = parsed.referenceSlideIndex ?? 0;
+      const normalizedSlides = normalizeSlideRotations(parsed.slides) || parsed.slides;
+      const refSlide = normalizedSlides[refIndex] || normalizedSlides[0];
+
       return {
         name: parsed.name,
         description: parsed.description,
         aspectRatio,
         slides: normalizedSlides,
-        referenceSlideIndex: 0,
-        // Also populate legacy fields
-        background: normalizedSlides[0]?.background ?? parsed.background,
-        images: normalizedSlides[0]?.images || [],
-        videos: normalizedSlides[0]?.videos || [],
-        text: normalizedSlides[0]?.text || [],
-        yaml: yamlContent,
+        referenceSlideIndex: refIndex,
+        background: refSlide?.background,
+        images: refSlide?.images || [],
+        videos: refSlide?.videos || [],
+        audios: refSlide?.audios || [],
+        text: refSlide?.text || [],
       };
     } catch (error) {
       console.error('Error parsing YAML:', error);
@@ -769,30 +573,12 @@ class TemplateService {
    * Always outputs in new multi-slide format
    */
   templateToYaml(template: PresentationTemplate): string {
-    // If template has slides array, use new format
-    if (template.slides && template.slides.length > 0) {
-      return yaml.dump({
-        name: template.name,
-        description: template.description,
-        aspectRatio: template.aspectRatio || '16:9',
-        slides: template.slides,
-        referenceSlideIndex: template.referenceSlideIndex ?? 0,
-      });
-    }
-    
-    // Convert legacy format to multi-slide in YAML output
     return yaml.dump({
       name: template.name,
       description: template.description,
       aspectRatio: template.aspectRatio || '16:9',
-      slides: [{
-        background: template.background,
-        images: template.images || [],
-        videos: template.videos || [],
-        audios: template.audios || [],
-        text: template.text || [],
-      }],
-      referenceSlideIndex: 0,
+      slides: template.slides,
+      referenceSlideIndex: template.referenceSlideIndex ?? 0,
     });
   }
 }
