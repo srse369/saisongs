@@ -10,8 +10,8 @@ export interface SongMetadata {
   deity?: string;
   language?: string;
   tempo?: string;
-  referenceGentsPitch?: string;
-  referenceLadiesPitch?: string;
+  refGents?: string;
+  refLadies?: string;
 }
 
 interface SongMetadataCardProps {
@@ -39,7 +39,7 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
   alwaysShowDeityLanguage = false,
   onPreviewClick,
 }) => {
-  const hasReferencePitches = song.referenceGentsPitch || song.referenceLadiesPitch;
+  const hasReferencePitches = song.refGents || song.refLadies;
 
   return (
     <div className={`${showBackground ? 'bg-slate-100/80 dark:bg-gray-900/60' : ''} px-1.5 md:px-2 pt-0.5 md:pt-1 pb-0.5 md:pb-1 mb-1 md:mb-1.5 ${showBackground ? 'rounded-lg' : ''}`}>
@@ -134,16 +134,16 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
       {/* Reference Pitches - Show on mobile when selected */}
       {hasReferencePitches && (
         <div className={`${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400`}>
-          {song.referenceGentsPitch && (
+          {song.refGents && (
             <span>
               <span className="text-blue-600 dark:text-blue-400 font-medium">Gents: </span>
-              <span className="font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.referenceGentsPitch)}</span>
+              <span className="font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.refGents)}</span>
             </span>
           )}
-          {song.referenceLadiesPitch && (
+          {song.refLadies && (
             <span>
               <span className="text-pink-600 dark:text-pink-400 font-medium">Ladies: </span>
-              <span className="font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.referenceLadiesPitch)}</span>
+              <span className="font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.refLadies)}</span>
             </span>
           )}
         </div>

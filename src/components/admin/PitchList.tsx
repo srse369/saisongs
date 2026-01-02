@@ -14,8 +14,8 @@ interface PitchWithDetails extends SongSingerPitch {
   singerGender?: string;
   singerCenterIds?: number[];
   externalSourceUrl?: string;
-  referenceGentsPitch?: string;
-  referenceLadiesPitch?: string;
+  refGents?: string;
+  refLadies?: string;
   deity?: string;
   language?: string;
   tempo?: string;
@@ -71,8 +71,8 @@ export const PitchList: React.FC<PitchListProps> = ({
   const songMap = useMemo(() => new Map(songs.map(song => [song.id, { 
     name: song.name, 
     externalSourceUrl: song.externalSourceUrl,
-    referenceGentsPitch: song.referenceGentsPitch,
-    referenceLadiesPitch: song.referenceLadiesPitch,
+    refGents: song.refGents,
+    refLadies: song.refLadies,
     deity: song.deity,
     language: song.language,
     tempo: song.tempo,
@@ -89,8 +89,8 @@ export const PitchList: React.FC<PitchListProps> = ({
     singerGender: singerMap.get(pitch.singerId)?.gender,
     singerCenterIds: singerMap.get(pitch.singerId)?.centerIds,
     externalSourceUrl: songMap.get(pitch.songId)?.externalSourceUrl,
-    referenceGentsPitch: songMap.get(pitch.songId)?.referenceGentsPitch,
-    referenceLadiesPitch: songMap.get(pitch.songId)?.referenceLadiesPitch,
+    refGents: songMap.get(pitch.songId)?.refGents,
+    refLadies: songMap.get(pitch.songId)?.refLadies,
     deity: songMap.get(pitch.songId)?.deity,
     language: songMap.get(pitch.songId)?.language,
     tempo: songMap.get(pitch.songId)?.tempo,
@@ -185,8 +185,8 @@ export const PitchList: React.FC<PitchListProps> = ({
                     deity: pitch.deity,
                     language: pitch.language,
                     tempo: pitch.tempo,
-                    referenceGentsPitch: pitch.referenceGentsPitch,
-                    referenceLadiesPitch: pitch.referenceLadiesPitch,
+                    refGents: pitch.refGents,
+                    refLadies: pitch.refLadies,
                   }}
                   onNameClick={isMobile ? undefined : () => handlePresent(pitch)}
                   nameClickTitle={isMobile ? undefined : pitch.songName}

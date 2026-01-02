@@ -214,6 +214,7 @@ router.post('/:id/sync', async (req, res) => {
     res.status(500).json({ error: 'Failed to sync song' });
   }
 });
+
 // Extract reference pitches from external URL (proxy to avoid CORS)
 router.post('/extract-pitches', async (req, res) => {
   try {
@@ -228,7 +229,7 @@ router.post('/extract-pitches', async (req, res) => {
     const response = await fetch(url);
     if (!response.ok) {
       console.log(`❌ Failed to fetch ${url}: ${response.status} ${response.statusText}`);
-      return res.json({ referenceGentsPitch: null, referenceLadiesPitch: null });
+      return res.json({ refGents: null, refLadies: null });
     }
 
     const html = await response.text();
@@ -267,7 +268,7 @@ router.post('/extract-pitches', async (req, res) => {
       console.log(`⚠️ No Ladies pitch found in HTML`);
     }
 
-    res.json({ referenceGentsPitch: gentsPitch, referenceLadiesPitch: ladiesPitch });
+    res.json({ refGents: gentsPitch, refLadies: ladiesPitch });
   } catch (error) {
     console.error('Error extracting reference pitches:', error);
     res.status(500).json({ error: 'Failed to extract reference pitches' });

@@ -23,8 +23,8 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
   const [audioLink, setAudioLink] = useState('');
   const [videoLink, setVideoLink] = useState('');
   const [goldenVoice, setGoldenVoice] = useState(false);
-  const [referenceGentsPitch, setReferenceGentsPitch] = useState('');
-  const [referenceLadiesPitch, setReferenceLadiesPitch] = useState('');
+  const [refGents, setRefGents] = useState('');
+  const [refLadies, setRefLadies] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -50,8 +50,8 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
         audioLink !== (song.audioLink || '') ||
         videoLink !== (song.videoLink || '') ||
         goldenVoice !== (song.goldenVoice || false) ||
-        referenceGentsPitch !== (song.referenceGentsPitch || '') ||
-        referenceLadiesPitch !== (song.referenceLadiesPitch || '')
+        refGents !== (song.refGents || '') ||
+        refLadies !== (song.refLadies || '')
       );
     } else {
       // Create mode - check if any field has content
@@ -70,11 +70,11 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
         audioLink.trim() ||
         videoLink.trim() ||
         goldenVoice ||
-        referenceGentsPitch.trim() ||
-        referenceLadiesPitch.trim()
+        refGents.trim() ||
+        refLadies.trim()
       );
     }
-  }, [song, name, externalSourceUrl, lyrics, meaning, language, deity, tempo, beat, raga, level, songTags, audioLink, videoLink, goldenVoice, referenceGentsPitch, referenceLadiesPitch]);
+  }, [song, name, externalSourceUrl, lyrics, meaning, language, deity, tempo, beat, raga, level, songTags, audioLink, videoLink, goldenVoice, refGents, refLadies]);
 
   // Expose hasUnsavedChanges check to parent via ref
   useEffect(() => {
@@ -117,8 +117,8 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
       setAudioLink(song.audioLink || '');
       setVideoLink(song.videoLink || '');
       setGoldenVoice(song.goldenVoice || false);
-      setReferenceGentsPitch(song.referenceGentsPitch || '');
-      setReferenceLadiesPitch(song.referenceLadiesPitch || '');
+      setRefGents(song.refGents || '');
+      setRefLadies(song.refLadies || '');
     } else {
       setName('');
       setExternalSourceUrl('');
@@ -134,8 +134,8 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
       setAudioLink('');
       setVideoLink('');
       setGoldenVoice(false);
-      setReferenceGentsPitch('');
-      setReferenceLadiesPitch('');
+      setRefGents('');
+      setRefLadies('');
     }
     setErrors({});
   }, [song]);
@@ -209,8 +209,8 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
         audioLink: audioLink.trim() || undefined,
         videoLink: videoLink.trim() || undefined,
         goldenVoice,
-        referenceGentsPitch: referenceGentsPitch.trim() || undefined,
-        referenceLadiesPitch: referenceLadiesPitch.trim() || undefined,
+        refGents: refGents.trim() || undefined,
+        refLadies: refLadies.trim() || undefined,
       };
       await onSubmit(submitData);
     } finally {
@@ -577,7 +577,7 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           {/* Reference Gents Pitch */}
           <div>
-            <label htmlFor="referenceGentsPitch" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label htmlFor="refGents" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Reference Gents Pitch
               <span 
                 title="Recommended pitch/key for male singers - helps singers choose their starting pitch"
@@ -587,10 +587,10 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
               </span>
             </label>
             <input
-              id="referenceGentsPitch"
+              id="refLadies"
               type="text"
-              value={referenceGentsPitch}
-              onChange={(e) => setReferenceGentsPitch(e.target.value)}
+              value={refGents}
+              onChange={(e) => setRefGents(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
               placeholder="e.g., F, 2 Madhyam, C#"
               disabled={isSubmitting}
@@ -614,8 +614,8 @@ export const SongForm: React.FC<SongFormProps> = ({ song, onSubmit, onCancel, on
             <input
               id="referenceLadiesPitch"
               type="text"
-              value={referenceLadiesPitch}
-              onChange={(e) => setReferenceLadiesPitch(e.target.value)}
+              value={refLadies}
+              onChange={(e) => setRefLadies(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
               placeholder="e.g., C, 1 Madhyam, G#"
               disabled={isSubmitting}

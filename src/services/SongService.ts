@@ -105,8 +105,8 @@ class SongService {
         audioLink: input.audioLink || null,
         videoLink: input.videoLink || null,
         goldenVoice: input.goldenVoice,
-        referenceGentsPitch: input.referenceGentsPitch || null,
-        referenceLadiesPitch: input.referenceLadiesPitch || null,
+        refGents: input.refGents || null,
+        refLadies: input.refLadies || null,
       });
     } catch (error) {
       console.error('Error creating song:', error);
@@ -140,8 +140,8 @@ class SongService {
         audioLink: input.audioLink,
         videoLink: input.videoLink,
         goldenVoice: input.goldenVoice,
-        referenceGentsPitch: input.referenceGentsPitch,
-        referenceLadiesPitch: input.referenceLadiesPitch,
+        refGents: input.refGents,
+        refLadies: input.refLadies,
       };
       await apiClient.updateSong(id, updateData);
       // Use nocache=true to ensure we get fresh data after the update

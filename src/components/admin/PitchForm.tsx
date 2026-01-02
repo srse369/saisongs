@@ -85,7 +85,7 @@ export const PitchForm: React.FC<PitchFormProps> = ({
   
   // Get selected song's reference pitches
   const selectedSong = songs.find(s => s.id === songId);
-  const hasReferencePitches = selectedSong?.referenceGentsPitch || selectedSong?.referenceLadiesPitch;
+  const hasReferencePitches = selectedSong?.refGents || selectedSong?.refLadies;
 
   useEffect(() => {
     if (pitch) {
@@ -231,19 +231,19 @@ export const PitchForm: React.FC<PitchFormProps> = ({
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Reference Pitches for Selected Song:</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {selectedSong?.referenceGentsPitch && (
+            {selectedSong?.refGents && (
               <div className="text-sm">
                 <span className="text-gray-600 dark:text-gray-400">Gents: </span>
                 <span className="font-semibold text-blue-700 dark:text-blue-300">
-                  {formatNormalizedPitch(selectedSong.referenceGentsPitch)}
+                  {formatNormalizedPitch(selectedSong.refGents)}
                 </span>
               </div>
             )}
-            {selectedSong?.referenceLadiesPitch && (
+            {selectedSong?.refLadies && (
               <div className="text-sm">
                 <span className="text-gray-600 dark:text-gray-400">Ladies: </span>
                 <span className="font-semibold text-blue-700 dark:text-blue-300">
-                  {formatNormalizedPitch(selectedSong.referenceLadiesPitch)}
+                  {formatNormalizedPitch(selectedSong.refLadies)}
                 </span>
               </div>
             )}

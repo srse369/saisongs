@@ -54,21 +54,21 @@ class ImportService {
    * @returns Object with reference gents and ladies pitches, or nulls if not found
    */
   private async extractReferencePitches(url: string): Promise<{
-    referenceGentsPitch: string | null;
-    referenceLadiesPitch: string | null;
+    refGents: string | null;
+    refLadies: string | null;
   }> {
     try {
       console.log(`📊 Fetching reference pitches from: ${url}`);
       const response = await apiClient.post<{
-        referenceGentsPitch: string | null;
-        referenceLadiesPitch: string | null;
+        refGents: string | null;
+        refLadies: string | null;
       }>('/songs/extract-pitches', { url });
       
-      console.log(`✅ Extracted pitches - Gents: ${response.referenceGentsPitch}, Ladies: ${response.referenceLadiesPitch}`);
+      console.log(`✅ Extracted pitches - Gents: ${response.refGents}, Ladies: ${response.refLadies}`);
       return response;
     } catch (error) {
       console.error(`❌ Failed to extract reference pitches from ${url}:`, error);
-      return { referenceGentsPitch: null, referenceLadiesPitch: null };
+      return { refGents: null, refLadies: null };
     }
   }
 
@@ -99,7 +99,7 @@ class ImportService {
     });
 
     // Extract reference pitches from the song URL
-    const { referenceGentsPitch, referenceLadiesPitch } = await this.extractReferencePitches(discovered.url);
+    const { refGents, refLadies } = await this.extractReferencePitches(discovered.url);
 
     const payload = {
       name: discovered.name,
@@ -116,8 +116,8 @@ class ImportService {
       audioLink: (discovered as any).audio_link,
       videoLink: (discovered as any).video_link,
       goldenVoice: (discovered as any).golden_voice === 'yes',
-      referenceGentsPitch: referenceGentsPitch || undefined,
-      referenceLadiesPitch: referenceLadiesPitch || undefined,
+      refGents: refGents || undefined,
+      refLadies: refLadies || undefined,
     };
 
     if (existing) {

@@ -215,13 +215,9 @@ class CacheService {
         s.raga,
         s."LEVEL" as song_level,
         s.audio_link,
-        s.video_link,
         s.golden_voice,
         s.reference_gents_pitch,
         s.reference_ladies_pitch,
-        s.created_by,
-        s.created_at,
-        s.updated_at,
         (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.song_id = s.id) as pitch_count
       FROM songs s
       ORDER BY LTRIM(REGEXP_REPLACE(LOWER(s.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ')
@@ -238,13 +234,9 @@ class CacheService {
       raga: extractValue(song.RAGA),
       level: extractValue(song.SONG_LEVEL),
       audioLink: extractValue(song.AUDIO_LINK),
-      videoLink: extractValue(song.VIDEO_LINK),
       goldenVoice: !!extractValue(song.GOLDEN_VOICE),
-      referenceGentsPitch: extractValue(song.REFERENCE_GENTS_PITCH),
-      referenceLadiesPitch: extractValue(song.REFERENCE_LADIES_PITCH),
-      createdBy: extractValue(song.CREATED_BY),
-      createdAt: extractValue(song.CREATED_AT),
-      updatedAt: extractValue(song.UPDATED_AT),
+      refGents: extractValue(song.REFERENCE_GENTS_PITCH),
+      refLadies: extractValue(song.REFERENCE_LADIES_PITCH),
       pitchCount: parseInt(song.PITCH_COUNT || song.pitch_count || '0', 10),
       // CLOB fields set to null - fetch on-demand via getSong(id)
       lyrics: null,
@@ -285,9 +277,6 @@ class CacheService {
         s.golden_voice,
         s.reference_gents_pitch,
         s.reference_ladies_pitch,
-        s.created_by,
-        s.created_at,
-        s.updated_at,
         (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.song_id = s.id) as pitch_count
       FROM songs s
       WHERE RAWTOHEX(s.id) = :1
@@ -312,11 +301,8 @@ class CacheService {
       audioLink: extractValue(song.AUDIO_LINK),
       videoLink: extractValue(song.VIDEO_LINK),
       goldenVoice: !!extractValue(song.GOLDEN_VOICE),
-      referenceGentsPitch: extractValue(song.REFERENCE_GENTS_PITCH),
-      referenceLadiesPitch: extractValue(song.REFERENCE_LADIES_PITCH),
-      createdBy: extractValue(song.CREATED_BY),
-      createdAt: extractValue(song.CREATED_AT),
-      updatedAt: extractValue(song.UPDATED_AT),
+      refGents: extractValue(song.REFERENCE_GENTS_PITCH),
+      refLadies: extractValue(song.REFERENCE_LADIES_PITCH),
       pitchCount: parseInt(song.PITCH_COUNT || song.pitch_count || '0', 10),
     };
 
@@ -343,8 +329,8 @@ class CacheService {
       audio_link: songData.audioLink ?? songData.audio_link,
       video_link: songData.videoLink ?? songData.video_link,
       golden_voice: songData.goldenVoice ?? songData.golden_voice,
-      reference_gents_pitch: songData.referenceGentsPitch ?? songData.reference_gents_pitch,
-      reference_ladies_pitch: songData.referenceLadiesPitch ?? songData.reference_ladies_pitch,
+      reference_gents_pitch: songData.refGents ?? songData.reference_gents_pitch,
+      reference_ladies_pitch: songData.refLadies ?? songData.reference_ladies_pitch,
       created_by: songData.createdBy ?? songData.created_by,
     };
 
@@ -400,12 +386,9 @@ class CacheService {
         "LEVEL" as song_level,
         DBMS_LOB.SUBSTR(song_tags, 4000, 1) AS song_tags,
         audio_link,
-        video_link,
         golden_voice,
         reference_gents_pitch,
-        reference_ladies_pitch,
-        created_at,
-        updated_at
+        reference_ladies_pitch
       FROM songs
       WHERE name = :name
       ORDER BY created_at DESC
@@ -428,12 +411,9 @@ class CacheService {
         level: extractValue(newSong.SONG_LEVEL),
         songTags: extractValue(newSong.SONG_TAGS),
         audioLink: extractValue(newSong.AUDIO_LINK),
-        videoLink: extractValue(newSong.VIDEO_LINK),
         goldenVoice: !!extractValue(newSong.GOLDEN_VOICE),
-        referenceGentsPitch: extractValue(newSong.REFERENCE_GENTS_PITCH),
-        referenceLadiesPitch: extractValue(newSong.REFERENCE_LADIES_PITCH),
-        createdAt: extractValue(newSong.CREATED_AT),
-        updatedAt: extractValue(newSong.UPDATED_AT),
+        refGents: extractValue(newSong.REFERENCE_GENTS_PITCH),
+        refLadies: extractValue(newSong.REFERENCE_LADIES_PITCH),
         pitchCount: 0, // New songs have no pitches yet
       };
 
@@ -477,8 +457,8 @@ class CacheService {
       audio_link: songData.audioLink ?? songData.audio_link,
       video_link: songData.videoLink ?? songData.video_link,
       golden_voice: songData.goldenVoice ?? songData.golden_voice,
-      reference_gents_pitch: songData.referenceGentsPitch ?? songData.reference_gents_pitch,
-      reference_ladies_pitch: songData.referenceLadiesPitch ?? songData.reference_ladies_pitch,
+      reference_gents_pitch: songData.refGents ?? songData.reference_gents_pitch,
+      reference_ladies_pitch: songData.refLadies ?? songData.reference_ladies_pitch,
       updated_by: songData.updatedBy ?? songData.updated_by,
     };
 
@@ -542,12 +522,9 @@ class CacheService {
         "LEVEL" as song_level,
         song_tags,
         audio_link,
-        video_link,
         golden_voice,
         reference_gents_pitch,
-        reference_ladies_pitch,
-        created_at,
-        updated_at
+        reference_ladies_pitch
       FROM songs
       WHERE RAWTOHEX(id) = :id
     `, { id: id });
@@ -573,12 +550,9 @@ class CacheService {
         level: extractValue(updatedSong.SONG_LEVEL),
         songTags: extractValue(updatedSong.SONG_TAGS),
         audioLink: extractValue(updatedSong.AUDIO_LINK),
-        videoLink: extractValue(updatedSong.VIDEO_LINK),
         goldenVoice: !!extractValue(updatedSong.GOLDEN_VOICE),
-        referenceGentsPitch: extractValue(updatedSong.REFERENCE_GENTS_PITCH),
-        referenceLadiesPitch: extractValue(updatedSong.REFERENCE_LADIES_PITCH),
-        createdAt: extractValue(updatedSong.CREATED_AT),
-        updatedAt: extractValue(updatedSong.UPDATED_AT),
+        refGents: extractValue(updatedSong.REFERENCE_GENTS_PITCH),
+        refLadies: extractValue(updatedSong.REFERENCE_LADIES_PITCH),
         pitchCount: cachedSong?.pitchCount ?? 0, // Preserve from cache since update doesn't change pitches
       };
 
@@ -652,15 +626,13 @@ class CacheService {
         u.is_admin,
         u.center_ids,
         u.editor_for,
-        u.created_at,
-        u.updated_at,
         (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
       FROM users u
       WHERE u.name IS NOT NULL
       ORDER BY u.name
     `);
 
-    // Normalize field names (Oracle returns uppercase: ID, NAME, GENDER, CENTER_IDS, EDITOR_FOR, CREATED_AT, UPDATED_AT)
+    // Normalize field names (Oracle returns uppercase: ID, NAME, GENDER, CENTER_IDS, EDITOR_FOR)
     const normalizedSingers = singers.map((s: any) => {
       let centerIds: number[] = [];
       let editorFor: number[] = [];
@@ -692,8 +664,6 @@ class CacheService {
         isAdmin: isAdminVal === 1 || isAdminVal === '1' || isAdminVal === true,
         centerIds: centerIds,
         editorFor: editorFor,
-        createdAt: s.created_at || s.CREATED_AT,
-        updatedAt: s.updated_at || s.UPDATED_AT,
         pitchCount: parseInt(s.pitch_count || s.PITCH_COUNT || '0', 10),
       };
     }).filter((s: any) => s.name); // Filter out any singers with no name
@@ -712,8 +682,6 @@ class CacheService {
         u.is_admin,
         u.center_ids,
         u.editor_for,
-        u.created_at,
-        u.updated_at,
         (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
       FROM users u
       WHERE RAWTOHEX(u.id) = :1
@@ -752,8 +720,6 @@ class CacheService {
       isAdmin: isAdminVal === 1 || isAdminVal === '1' || isAdminVal === true,
       centerIds: centerIds,
       editorFor: editorFor,
-      createdAt: s.created_at || s.CREATED_AT,
-      updatedAt: s.updated_at || s.UPDATED_AT,
       pitchCount: parseInt(s.pitch_count || s.PITCH_COUNT || '0', 10),
     };
   }
@@ -806,9 +772,7 @@ class CacheService {
           gender,
           email,
           center_ids,
-          editor_for,
-          created_at,
-          updated_at
+          editor_for
         FROM users
         WHERE name = :1
         ORDER BY created_at DESC
@@ -845,8 +809,6 @@ class CacheService {
           email: rawSinger.email || rawSinger.EMAIL,
           centerIds: parsedCenterIds,
           editorFor: parsedEditorFor,
-          createdAt: rawSinger.created_at || rawSinger.CREATED_AT,
-          updatedAt: rawSinger.updated_at || rawSinger.UPDATED_AT,
           pitchCount: 0,
         };
 
@@ -950,8 +912,6 @@ class CacheService {
         u.is_admin,
         u.center_ids,
         u.editor_for,
-        u.created_at,
-        u.updated_at,
         (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
       FROM users u
       WHERE RAWTOHEX(u.id) = :1
@@ -985,8 +945,6 @@ class CacheService {
         isAdmin: incomingIsAdmin,
         centerIds: incomingParsedCenterIds,
         editorFor: incomingParsedEditorFor,
-        createdAt: s.created_at || s.CREATED_AT,
-        updatedAt: s.updated_at || s.UPDATED_AT,
         pitchCount: parseInt(s.pitch_count || s.PITCH_COUNT || '0', 10),
       };
 
@@ -1182,9 +1140,7 @@ class CacheService {
         RAWTOHEX(ssp.singer_id) as singer_id,
         ssp.pitch,
         s.name as song_name,
-        si.name as singer_name,
-        ssp.created_at,
-        ssp.updated_at
+        si.name as singer_name
       FROM song_singer_pitches ssp
       LEFT JOIN songs s ON ssp.song_id = s.id
       LEFT JOIN users si ON ssp.singer_id = si.id
@@ -1199,8 +1155,6 @@ class CacheService {
       pitch: p.pitch || p.PITCH,
       songName: p.song_name || p.SONG_NAME,
       singerName: p.singer_name || p.SINGER_NAME,
-      createdAt: p.created_at || p.CREATED_AT,
-      updatedAt: p.updated_at || p.UPDATED_AT,
     }));
 
     this.set(cacheKey, normalizedPitches, this.DEFAULT_TTL_MS);
@@ -1225,11 +1179,7 @@ class CacheService {
         RAWTOHEX(ssp.singer_id) as singer_id,
         ssp.pitch,
         s.name as song_name,
-        si.name as singer_name,
-        ssp.created_at,
-        ssp.created_by,
-        ssp.updated_at,
-        ssp.updated_by
+        si.name as singer_name
       FROM song_singer_pitches ssp
       LEFT JOIN songs s ON ssp.song_id = s.id
       LEFT JOIN users si ON ssp.singer_id = si.id
@@ -1245,10 +1195,6 @@ class CacheService {
       pitch: p.pitch || p.PITCH,
       songName: p.song_name || p.SONG_NAME,
       singerName: p.singer_name || p.SINGER_NAME,
-      createdAt: p.created_at || p.CREATED_AT,
-      createdBy: p.created_by || p.CREATED_BY,
-      updatedAt: p.updated_at || p.UPDATED_AT,
-      updatedBy: p.updated_by || p.UPDATED_BY,
     };
 
     if (cached) {
@@ -1291,11 +1237,7 @@ class CacheService {
         RAWTOHEX(ssp.singer_id) as singer_id,
         ssp.pitch,
         s.name as song_name,
-        si.name as singer_name,
-        ssp.created_at,
-        ssp.created_by,
-        ssp.updated_at,
-        ssp.updated_by
+        si.name as singer_name
       FROM song_singer_pitches ssp
       JOIN songs s ON ssp.song_id = s.id
       JOIN users si ON ssp.singer_id = si.id
@@ -1314,10 +1256,6 @@ class CacheService {
         pitch: rawPitch.pitch || rawPitch.PITCH,
         songName: rawPitch.song_name || rawPitch.SONG_NAME,
         singerName: rawPitch.singer_name || rawPitch.SINGER_NAME,
-        createdAt: rawPitch.created_at || rawPitch.CREATED_AT,
-        createdBy: rawPitch.created_by || rawPitch.CREATED_BY,
-        updatedAt: rawPitch.updated_at || rawPitch.UPDATED_AT,
-        updatedBy: rawPitch.updated_by || rawPitch.UPDATED_BY,
       } as SongSingerPitch;
 
       // Write-through cache: Add to existing cache or invalidate
@@ -1358,7 +1296,7 @@ class CacheService {
     let pitch: string;
     let updated_by: string | null;
 
-    pitch = pitchData.pitch;
+    pitch = pitchData.pitch ?? '';
     updated_by = pitchData.updatedBy ?? null;
 
     await this.dbWrite(`
@@ -1377,11 +1315,7 @@ class CacheService {
         RAWTOHEX(ssp.singer_id) as singer_id,
         ssp.pitch,
         s.name as song_name,
-        si.name as singer_name,
-        ssp.created_at,
-        ssp.created_by,
-        ssp.updated_at,
-        ssp.updated_by
+        si.name as singer_name
       FROM song_singer_pitches ssp
       JOIN songs s ON ssp.song_id = s.id
       JOIN users si ON ssp.singer_id = si.id
@@ -1400,10 +1334,6 @@ class CacheService {
           pitch: rawPitch.pitch || rawPitch.PITCH,
           songName: rawPitch.song_name || rawPitch.SONG_NAME,
           singerName: rawPitch.singer_name || rawPitch.SINGER_NAME,
-          createdAt: rawPitch.created_at || rawPitch.CREATED_AT,
-          createdBy: rawPitch.created_by || rawPitch.CREATED_BY,
-          updatedAt: rawPitch.updated_at || rawPitch.UPDATED_AT,
-          updatedBy: rawPitch.updated_by || rawPitch.UPDATED_BY,
         };
 
         // Replace the pitch in cache (use lowercase 'id' to match normalized cache)
@@ -2200,9 +2130,7 @@ class CacheService {
         RAWTOHEX(id) as id,
         csv_song_name,
         RAWTOHEX(db_song_id) as db_song_id,
-        db_song_name,
-        created_at,
-        updated_at
+        db_song_name
       FROM csv_song_mappings
       ORDER BY created_at DESC
     `);
@@ -2212,8 +2140,6 @@ class CacheService {
       csvSongName: m.csv_song_name || m.CSV_SONG_NAME,
       dbSongId: m.db_song_id || m.DB_SONG_ID,
       dbSongName: m.db_song_name || m.DB_SONG_NAME,
-      createdAt: m.created_at || m.CREATED_AT,
-      updatedAt: m.updated_at || m.UPDATED_AT,
     }));
   }
 
@@ -2223,9 +2149,7 @@ class CacheService {
         RAWTOHEX(id) as id,
         csv_song_name,
         RAWTOHEX(db_song_id) as db_song_id,
-        db_song_name,
-        created_at,
-        updated_at
+        db_song_name
       FROM csv_song_mappings
       WHERE csv_song_name = :1
     `, [csvName]);
@@ -2238,8 +2162,6 @@ class CacheService {
       csvSongName: m.csv_song_name || m.CSV_SONG_NAME,
       dbSongId: m.db_song_id || m.DB_SONG_ID,
       dbSongName: m.db_song_name || m.DB_SONG_NAME,
-      createdAt: m.created_at || m.CREATED_AT,
-      updatedAt: m.updated_at || m.UPDATED_AT,
     };
   }
 
@@ -2275,9 +2197,7 @@ class CacheService {
       SELECT 
         RAWTOHEX(id) as id,
         original_format,
-        normalized_format,
-        created_at,
-        updated_at
+        normalized_format
       FROM csv_pitch_mappings
       ORDER BY created_at DESC
     `);
@@ -2286,8 +2206,6 @@ class CacheService {
       id: m.id || m.ID,
       originalFormat: m.original_format || m.ORIGINAL_FORMAT,
       normalizedFormat: m.normalized_format || m.NORMALIZED_FORMAT,
-      createdAt: m.created_at || m.CREATED_AT,
-      updatedAt: m.updated_at || m.UPDATED_AT,
     }));
   }
 
@@ -2296,9 +2214,7 @@ class CacheService {
       SELECT 
         RAWTOHEX(id) as id,
         original_format,
-        normalized_format,
-        created_at,
-        updated_at
+        normalized_format
       FROM csv_pitch_mappings
       WHERE original_format = :1
     `, [originalFormat]);
@@ -2310,8 +2226,6 @@ class CacheService {
       id: m.id || m.ID,
       originalFormat: m.original_format || m.ORIGINAL_FORMAT,
       normalizedFormat: m.normalized_format || m.NORMALIZED_FORMAT,
-      createdAt: m.created_at || m.CREATED_AT,
-      updatedAt: m.updated_at || m.UPDATED_AT,
     };
   }
 

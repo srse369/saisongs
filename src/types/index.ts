@@ -254,8 +254,8 @@ export interface Song {
   audioLink?: string;
   videoLink?: string;
   goldenVoice?: boolean;
-  referenceGentsPitch?: string;
-  referenceLadiesPitch?: string;
+  refGents?: string;
+  refLadies?: string;
   
   createdAt: Date;
   createdBy?: string;                  // User ID who created the song
@@ -287,9 +287,9 @@ export interface SongSingerPitch {
   songName: string;
   singerName: string;
   pitch: string;
-  createdAt: Date;
+  createdAt?: Date;
   createdBy?: string;
-  updatedAt: Date;
+  updatedAt?: Date;
   updatedBy?: string;
 }
 
@@ -386,8 +386,8 @@ export interface CreateSongInput {
   audioLink?: string;
   videoLink?: string;
   goldenVoice?: boolean;
-  referenceGentsPitch?: string;
-  referenceLadiesPitch?: string;
+  refGents?: string;
+  refLadies?: string;
 }
 
 export interface UpdateSongInput {

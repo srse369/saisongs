@@ -58,8 +58,8 @@ class DatabaseWriteService {
    * @returns Object with updated fields, or null if no fields to update
    */
   async syncSongFromExtracted(songId: string, extracted: {
-    referenceGentsPitch?: string;
-    referenceLadiesPitch?: string;
+    refGents?: string;
+    refLadies?: string;
     lyrics?: string;
     meaning?: string;
     audioLink?: string;
@@ -76,8 +76,8 @@ class DatabaseWriteService {
     // Build list of fields to update (only non-empty values)
     const fieldsToUpdate: { column: string; value: any }[] = [];
 
-    if (extracted.referenceGentsPitch) fieldsToUpdate.push({ column: 'reference_gents_pitch', value: extracted.referenceGentsPitch });
-    if (extracted.referenceLadiesPitch) fieldsToUpdate.push({ column: 'reference_ladies_pitch', value: extracted.referenceLadiesPitch });
+    if (extracted.refGents) fieldsToUpdate.push({ column: 'reference_gents_pitch', value: extracted.refGents });
+    if (extracted.refLadies) fieldsToUpdate.push({ column: 'reference_ladies_pitch', value: extracted.refLadies });
     if (extracted.lyrics) fieldsToUpdate.push({ column: 'lyrics', value: extracted.lyrics });
     if (extracted.meaning) fieldsToUpdate.push({ column: 'meaning', value: extracted.meaning });
     if (extracted.audioLink) fieldsToUpdate.push({ column: 'audio_link', value: extracted.audioLink });

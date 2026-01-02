@@ -12,8 +12,8 @@ export type ExtractResult = {
   beat?: string | null;
   level?: string | null;
   tempo?: string | null;
-  referenceGentsPitch?: string | null;
-  referenceLadiesPitch?: string | null;
+  refGents?: string | null;
+  refLadies?: string | null;
   songTags?: string[];
   goldenVoice?: boolean | null;
 };
@@ -147,9 +147,9 @@ export function extractFromHtml(html: string, origin = ''): ExtractResult {
     }
     
     if (label.includes('gents')) {
-      result.referenceGentsPitch = truncateField('reference_gents_pitch', value);
+      result.refGents = truncateField('reference_gents_pitch', value);
     } else if (label.includes('ladies')) {
-      result.referenceLadiesPitch = truncateField('reference_ladies_pitch', value);
+      result.refLadies = truncateField('reference_ladies_pitch', value);
     }
   });
 

@@ -114,15 +114,15 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     // If no singer pitch is provided, use reference pitches from the song
     if (!pitch) {
       // If both reference pitches exist, show both
-      if (songData.referenceGentsPitch && songData.referenceLadiesPitch) {
+      if (songData.refGents && songData.refLadies) {
         displaySingerName = 'Gents/Ladies';
-        displayPitch = `${songData.referenceGentsPitch} / ${songData.referenceLadiesPitch}`;
-      } else if (songData.referenceGentsPitch) {
+        displayPitch = `${songData.refGents} / ${songData.refLadies}`;
+      } else if (songData.refGents) {
         displaySingerName = 'Gents';
-        displayPitch = songData.referenceGentsPitch;
-      } else if (songData.referenceLadiesPitch) {
+        displayPitch = songData.refGents;
+      } else if (songData.refLadies) {
         displaySingerName = 'Ladies';
-        displayPitch = songData.referenceLadiesPitch;
+        displayPitch = songData.refLadies;
       }
     }
 
