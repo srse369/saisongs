@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { PresentationTemplate, ServiceError } from '../types';
 import templateService from '../services/TemplateService';
 import { useToast } from './ToastContext';
-import { safeSetLocalStorageItem, getLocalStorageItem } from '../utils/cacheUtils';
+import { safeSetLocalStorageItem, getLocalStorageItem, compressString, decompressString } from '../utils/cacheUtils';
 
 const TEMPLATES_CACHE_KEY = 'saiSongs:templatesCache';
 const TEMPLATES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -71,7 +71,9 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
         const cachedRaw = getLocalStorageItem(TEMPLATES_CACHE_KEY);
         if (cachedRaw) {
           try {
-            const cached = JSON.parse(cachedRaw) as {
+            // Decompress if needed
+            const decompressed = decompressString(cachedRaw);
+            const cached = JSON.parse(decompressed) as {
               timestamp: number;
               templates: PresentationTemplate[];
             };
@@ -93,14 +95,17 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
       setTemplates(freshTemplates);
       setHasFetched(true);
 
-      // Persist to cache for subsequent loads
+      // Persist to cache for subsequent loads (with compression for large template data)
       if (typeof window !== 'undefined') {
         const cacheData = JSON.stringify({
           timestamp: Date.now(),
           templates: freshTemplates,
         });
         
-        const success = safeSetLocalStorageItem(TEMPLATES_CACHE_KEY, cacheData, {
+        // Compress template data to save localStorage space
+        const compressedCacheData = compressString(cacheData);
+        
+        const success = safeSetLocalStorageItem(TEMPLATES_CACHE_KEY, compressedCacheData, {
           clearOnQuotaError: true,
           skipKeys: [TEMPLATES_CACHE_KEY], // Don't clear the template we're trying to set
         });

@@ -46,7 +46,22 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     if (newTemplateId && newTemplateId !== selectedTemplateId) {
       setSelectedTemplateId(newTemplateId);
     }
-  }, [templateId, urlTemplateId]);
+  }, [templateId, urlTemplateId, selectedTemplateId]);
+  
+  // Pre-load default template if no template is specified
+  useEffect(() => {
+    if (!templateId && !urlTemplateId && !selectedTemplateId && !activeTemplate) {
+      // Load default template immediately so UI shows correct state and slides can be generated
+      templateService.getDefaultTemplate().then(template => {
+        if (template && !selectedTemplateId && !activeTemplate) {
+          setSelectedTemplateId(template.id);
+          setActiveTemplate(template);
+        }
+      }).catch(err => {
+        console.error('Error pre-loading default template:', err);
+      });
+    }
+  }, [templateId, urlTemplateId, selectedTemplateId, activeTemplate]);
 
   // Load template and song data on mount
   useEffect(() => {
@@ -57,6 +72,16 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
       try {
         // Get templateId from prop, URL params, or state (in that order of priority)
         const effectiveTemplateId = templateId || urlTemplateId || selectedTemplateId;
+        
+        // Only skip reloading if we have BOTH template AND song with full data, and they match
+        // Don't skip if we only have template but not song, or vice versa
+        const hasFullSongData = songData?.id === songId && songData?.lyrics !== null && songData?.lyrics !== undefined;
+        const hasMatchingTemplate = activeTemplate && activeTemplate.id === effectiveTemplateId;
+        
+        if (hasFullSongData && hasMatchingTemplate) {
+          setLoading(false);
+          return;
+        }
         
         // Load template and song in parallel
         const [template, song] = await Promise.all([
@@ -92,9 +117,19 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
         setSongData(song);
         if (template) {
           setActiveTemplate(template);
-          // Update selectedTemplateId if we loaded a template and it's different
-          if (template.id !== selectedTemplateId) {
-            setSelectedTemplateId(template.id);
+          // Always update selectedTemplateId to match the loaded template
+          // This ensures default template is selected if no template was specified
+          setSelectedTemplateId(template.id);
+        } else {
+          // If template failed to load, try to get default as fallback
+          try {
+            const defaultTemplate = await templateService.getDefaultTemplate();
+            if (defaultTemplate) {
+              setActiveTemplate(defaultTemplate);
+              setSelectedTemplateId(defaultTemplate.id);
+            }
+          } catch (e) {
+            console.error('Failed to load default template as fallback:', e);
           }
         }
       } catch (err) {
@@ -105,11 +140,16 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     };
 
     loadData();
-  }, [songId, templateId, urlTemplateId, selectedTemplateId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songId, templateId, urlTemplateId]);
 
   // Generate slides when song or template changes (after initial load)
   useEffect(() => {
-    if (!songData) return;
+    if (!songData || !activeTemplate) {
+      // Clear slides if we don't have both song and template
+      setSlides([]);
+      return;
+    }
 
     // Determine which pitch and singer name to use
     let displayPitch = pitch;
@@ -132,15 +172,24 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
 
     // Generate slides using multi-slide template support if available
     // For single song preview, skip intro/outro static slides - only show song content
-    const generatedSlides = generatePresentationSlides(
-      songData,
-      activeTemplate,
-      displaySingerName,
-      displayPitch,
-      { skipStaticSlides: true }
-    );
-    
-    setSlides(generatedSlides);
+    try {
+      const generatedSlides = generatePresentationSlides(
+        songData,
+        activeTemplate,
+        displaySingerName,
+        displayPitch,
+        { skipStaticSlides: true }
+      );
+      
+      if (generatedSlides.length === 0) {
+        console.warn('Generated slides array is empty for song:', songData.name, 'Template:', activeTemplate.name);
+      }
+      
+      setSlides(generatedSlides);
+    } catch (error) {
+      console.error('Error generating slides:', error, 'Song:', songData.name, 'Template:', activeTemplate.name);
+      setSlides([]);
+    }
   }, [songData, singerName, pitch, activeTemplate]);
 
   // Auto-hide overlay after 2 seconds (but not when template picker is open)

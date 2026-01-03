@@ -105,6 +105,10 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         // Always ensure we have a template - use default if template is null
         if (template) {
           setActiveTemplate(template);
+          // Ensure selectedTemplateId is always set to match the active template
+          if (template.id !== selectedTemplateId) {
+            setSelectedTemplateId(template.id);
+          }
         } else {
           // If no template loaded, try one more time to get default
           try {

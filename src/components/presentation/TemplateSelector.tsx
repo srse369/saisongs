@@ -74,7 +74,9 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
   };
 
   const selectedTemplate = contextTemplates.find(t => t.id === currentTemplateId);
-  const isTemplateSelected = !!selectedTemplate;
+  // Consider template selected if we have a currentTemplateId, even if templates haven't loaded yet
+  // This prevents showing "Select one" while the default template is being loaded
+  const isTemplateSelected = !!selectedTemplate || (!!currentTemplateId && contextLoading);
 
   return (
     <>
@@ -92,7 +94,9 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
           <div className="flex sm:flex flex-col items-start gap-0.5 min-w-0 overflow-hidden">
             <span className="text-xs font-bold opacity-90 tracking-wider">TEMPLATE</span>
             <span className="text-[10px] truncate w-full">
-              {isTemplateSelected ? selectedTemplate?.name : 'Select one'}
+              {isTemplateSelected 
+                ? (selectedTemplate?.name || (currentTemplateId && contextLoading ? 'Loading...' : 'Default'))
+                : 'Select one'}
             </span>
           </div>
           <i className={`fas fa-chevron-down text-base flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}></i>
