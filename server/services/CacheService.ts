@@ -139,27 +139,11 @@ class CacheService {
   }
 
   // ==================== DATABASE OPERATIONS ====================
-  // All database operations go through CacheService to ensure proper caching
+  // All database operations MUST go through DatabaseReadService (for SELECT) or DatabaseWriteService (for INSERT/UPDATE/DELETE)
   // Routes should NEVER import DatabaseService directly
-  private databaseReadService = databaseReadService;
-  private databaseWriteService = databaseWriteService;
-  private templateService = templateService;
-
-  /**
-   * Execute a SELECT query through DatabaseReadService
-   */
-  private async dbRead<T = any>(sql: string, params: any[] | Record<string, any> = [], options: any = {}): Promise<T[]> {
-    const db = await this.databaseReadService.executeQuery<T>(sql, params, options);
-    return db;
-  }
-
-  /**
-   * Execute a write query (INSERT/UPDATE/DELETE) through DatabaseWriteService
-   */
-  private async dbWrite<T = any>(sql: string, params: any[] | Record<string, any> = [], options: any = {}): Promise<T[]> {
-    const db = await this.databaseWriteService.executeQuery<T>(sql, params, options);
-    return db;
-  }
+  private readonly databaseReadService = databaseReadService;
+  private readonly databaseWriteService = databaseWriteService;
+  private readonly templateService = templateService;
 
   /**
    * Filter resources by center access permissions
@@ -203,25 +187,7 @@ class CacheService {
     const cached = this.get<any[]>(cacheKey);
     if (cached && Array.isArray(cached)) return cached;
 
-    const songs = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(s.id) as id,
-        s.name,
-        s.external_source_url,
-        s."LANGUAGE" as language,
-        s.deity,
-        s.tempo,
-        s.beat,
-        s.raga,
-        s."LEVEL" as song_level,
-        s.audio_link,
-        s.golden_voice,
-        s.reference_gents_pitch,
-        s.reference_ladies_pitch,
-        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.song_id = s.id) as pitch_count
-      FROM songs s
-      ORDER BY LTRIM(REGEXP_REPLACE(LOWER(s.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ')
-    `);
+    const songs = await this.databaseReadService.getAllSongsForCache();
 
     const mappedSongs = songs.map((song: any) => ({
       id: extractValue(song.ID),
@@ -258,29 +224,7 @@ class CacheService {
     const cached = this.get<any>(cacheKey);
     if (cached) return cached;
 
-    const songs = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(s.id) as id,
-        s.name,
-        s.external_source_url,
-        DBMS_LOB.SUBSTR(s.lyrics, 4000, 1) AS lyrics,
-        DBMS_LOB.SUBSTR(s.meaning, 4000, 1) AS meaning,
-        s."LANGUAGE" as language,
-        s.deity,
-        s.tempo,
-        s.beat,
-        s.raga,
-        s."LEVEL" as song_level,
-        DBMS_LOB.SUBSTR(s.song_tags, 4000, 1) AS song_tags,
-        s.audio_link,
-        s.video_link,
-        s.golden_voice,
-        s.reference_gents_pitch,
-        s.reference_ladies_pitch,
-        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.song_id = s.id) as pitch_count
-      FROM songs s
-      WHERE RAWTOHEX(s.id) = :1
-    `, [id]);
+    const songs = await this.databaseReadService.getSongWithClobsForCache(id);
 
     if (songs.length === 0) return null;
 
@@ -335,65 +279,10 @@ class CacheService {
     };
 
     // Step 1: Insert along with all CLOB fields
-    await this.dbWrite(`
-      INSERT INTO songs (
-        name, external_source_url,
-        "LANGUAGE", deity, tempo, beat, raga, "LEVEL",
-        audio_link, video_link, golden_voice,
-        reference_gents_pitch, reference_ladies_pitch, created_by,
-        lyrics, meaning, song_tags
-      ) VALUES (
-        :p_name, :p_external_source_url, :p_language, :p_deity, :p_tempo, :p_beat, :p_raga, :p_level,
-        :p_audio_link, :p_video_link, :p_golden_voice,
-        :p_reference_gents_pitch, :p_reference_ladies_pitch, :p_created_by,
-        :p_lyrics, :p_meaning, :p_song_tags
-      )
-    `, {
-      p_name: String(data.name || ''),
-      p_external_source_url: data.external_source_url ? String(data.external_source_url) : null,
-      p_language: String(data.language || ''),
-      p_deity: String(data.deity || ''),
-      p_tempo: data.tempo ? String(data.tempo) : null,
-      p_beat: data.beat ? String(data.beat) : null,
-      p_raga: data.raga ? String(data.raga) : null,
-      p_level: data.level ? String(data.level) : null,
-      p_audio_link: data.audio_link ? String(data.audio_link) : null,
-      p_video_link: data.video_link ? String(data.video_link) : null,
-      p_golden_voice: (data.golden_voice === true || data.golden_voice === 1 || data.golden_voice === '1') ? 1 : 0,
-      p_reference_gents_pitch: data.reference_gents_pitch ? String(data.reference_gents_pitch) : null,
-      p_reference_ladies_pitch: data.reference_ladies_pitch ? String(data.reference_ladies_pitch) : null,
-      p_created_by: data.created_by ? String(data.created_by) : null,
-      p_lyrics: data.lyrics ? String(data.lyrics) : null,
-      p_meaning: data.meaning ? String(data.meaning) : null,
-      p_song_tags: data.song_tags ? String(data.song_tags) : null
-    }, {
-      autoCommit: false
-    });
+    await this.databaseWriteService.createSongForCache(data);
 
     // Write-through cache: Fetch only the newly created song
-    const newSongs = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        external_source_url,
-        DBMS_LOB.SUBSTR(lyrics, 4000, 1) AS lyrics,
-        DBMS_LOB.SUBSTR(meaning, 4000, 1) AS meaning,
-        "LANGUAGE" as language,
-        deity,
-        tempo,
-        beat,
-        raga,
-        "LEVEL" as song_level,
-        DBMS_LOB.SUBSTR(song_tags, 4000, 1) AS song_tags,
-        audio_link,
-        golden_voice,
-        reference_gents_pitch,
-        reference_ladies_pitch
-      FROM songs
-      WHERE name = :name
-      ORDER BY created_at DESC
-      FETCH FIRST 1 ROWS ONLY
-    `, { name: songData.name });
+    const newSongs = await this.databaseReadService.getNewSongByNameForCache(songData.name);
 
     if (newSongs.length > 0) {
       const newSong = newSongs[0];
@@ -462,72 +351,10 @@ class CacheService {
       updated_by: songData.updatedBy ?? songData.updated_by,
     };
 
-    await this.dbWrite(`
-      UPDATE songs SET
-        name = :p_name,
-        external_source_url = :p_external_source_url,
-        "LANGUAGE" = :p_language,
-        deity = :p_deity,
-        tempo = :p_tempo,
-        beat = :p_beat,
-        raga = :p_raga,
-        "LEVEL" = :p_level,
-        audio_link = :p_audio_link,
-        video_link = :p_video_link,
-        golden_voice = :p_golden_voice,
-        reference_gents_pitch = :p_reference_gents_pitch,
-        reference_ladies_pitch = :p_reference_ladies_pitch,
-        updated_by = :p_updated_by,
-        updated_at = CURRENT_TIMESTAMP,
-        lyrics = :p_lyrics,
-        meaning = :p_meaning,
-        song_tags = :p_song_tags
-      WHERE RAWTOHEX(id) = :p_id
-    `, {
-      p_name: String(data.name || ''),
-      p_external_source_url: data.external_source_url ? String(data.external_source_url) : null,
-      p_language: String(data.language || ''),
-      p_deity: String(data.deity || ''),
-      p_tempo: data.tempo ? String(data.tempo) : null,
-      p_beat: data.beat ? String(data.beat) : null,
-      p_raga: data.raga ? String(data.raga) : null,
-      p_level: data.level ? String(data.level) : null,
-      p_audio_link: data.audio_link ? String(data.audio_link) : null,
-      p_video_link: data.video_link ? String(data.video_link) : null,
-      p_golden_voice: (data.golden_voice === true || data.golden_voice === 1 || data.golden_voice === '1') ? 1 : 0,
-      p_reference_gents_pitch: data.reference_gents_pitch ? String(data.reference_gents_pitch) : null,
-      p_reference_ladies_pitch: data.reference_ladies_pitch ? String(data.reference_ladies_pitch) : null,
-      p_updated_by: data.updated_by ? String(data.updated_by) : null,
-      p_lyrics: data.lyrics ? String(data.lyrics) : null,
-      p_meaning: data.meaning ? String(data.meaning) : null,
-      p_song_tags: data.song_tags ? String(data.song_tags) : null,
-      p_id: String(id)
-    }, {
-      autoCommit: true  // Commit immediately - CLOB updates are separate transactions
-    });
+    await this.databaseWriteService.updateSongForCache(id, data);
 
     // Write-through cache: Fetch only the updated song
-    const updatedSongs = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        external_source_url,
-        lyrics,
-        meaning,
-        "LANGUAGE" as language,
-        deity,
-        tempo,
-        beat,
-        raga,
-        "LEVEL" as song_level,
-        song_tags,
-        audio_link,
-        golden_voice,
-        reference_gents_pitch,
-        reference_ladies_pitch
-      FROM songs
-      WHERE RAWTOHEX(id) = :id
-    `, { id: id });
+    const updatedSongs = await this.databaseReadService.getUpdatedSongByIdForCache(id);
 
     if (updatedSongs.length > 0) {
       const updatedSong = updatedSongs[0];
@@ -588,7 +415,7 @@ class CacheService {
   }
 
   async deleteSong(id: string): Promise<void> {
-    await this.dbWrite(`DELETE FROM songs WHERE RAWTOHEX(id) = :1`, [id]);
+    await this.databaseWriteService.deleteSongForCache(id);
 
     // Remove from individual song cache
     this.invalidate(`song:${id}`);
@@ -617,20 +444,7 @@ class CacheService {
     const cached = this.get(cacheKey);
     if (cached && Array.isArray(cached)) return cached;
 
-    const singers = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(u.id) as id,
-        u.name,
-        u.gender,
-        u.email,
-        u.is_admin,
-        u.center_ids,
-        u.editor_for,
-        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
-      FROM users u
-      WHERE u.name IS NOT NULL
-      ORDER BY u.name
-    `);
+    const singers = await this.databaseReadService.getAllSingersForCache();
 
     // Normalize field names (Oracle returns uppercase: ID, NAME, GENDER, CENTER_IDS, EDITOR_FOR)
     const normalizedSingers = singers.map((s: any) => {
@@ -673,19 +487,7 @@ class CacheService {
   }
 
   async getSinger(id: string): Promise<any> {
-    const singers = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(u.id) as id,
-        u.name,
-        u.gender,
-        u.email,
-        u.is_admin,
-        u.center_ids,
-        u.editor_for,
-        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
-      FROM users u
-      WHERE RAWTOHEX(u.id) = :1
-    `, [id]);
+    const singers = await this.databaseReadService.getSingerByIdForCache(id);
 
     if (singers.length === 0) return null;
 
@@ -762,22 +564,10 @@ class CacheService {
         ? JSON.stringify(data.editorFor)
         : null;
 
-      await this.dbWrite(`INSERT INTO users (name, gender, email, center_ids, editor_for, created_by) VALUES (:1, :2, :3, :4, :5, :6)`, [data.name, data.gender || null, data.email || null, centerIdsJson, editorForJson, data.createdBy || null]);
+      await this.databaseWriteService.createSingerForCache(data.name, data.gender || null, data.email || null, centerIdsJson, editorForJson, data.createdBy || null);
 
       // Write-through cache: Fetch only the newly created singer
-      const newSingers = await this.dbRead(`
-        SELECT 
-          RAWTOHEX(id) as id,
-          name,
-          gender,
-          email,
-          center_ids,
-          editor_for
-        FROM users
-        WHERE name = :1
-        ORDER BY created_at DESC
-        FETCH FIRST 1 ROWS ONLY
-      `, [data.name]);
+      const newSingers = await this.databaseReadService.getNewSingerByNameForCache(data.name);
 
       if (newSingers.length > 0) {
         const rawSinger = newSingers[0];
@@ -859,21 +649,37 @@ class CacheService {
       updatedBy: singerData.updatedBy ?? singerData.updated_by,
     };
 
-    const dbSingers = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(u.id) as id,
-        u.is_admin,
-        u.center_ids,
-        u.editor_for
-      FROM users u
-      WHERE RAWTOHEX(u.id) = :1
-    `, [id]);
+    const dbSingers = await this.databaseReadService.getSingerForUpdateForCache(id);
 
     if (dbSingers.length > 0) {
       const dbSinger = dbSingers[0];
       dbIsAdmin = dbSinger.is_admin ?? dbSinger.IS_ADMIN ?? 0;
-      dbParsedCenterIds = JSON.parse(dbSinger.CENTER_IDS || dbSinger.center_ids);
-      dbParsedEditorFor = JSON.parse(dbSinger.EDITOR_FOR || dbSinger.editor_for);
+      
+      // Parse center_ids - handle null/undefined
+      const centerIdsValue = dbSinger.CENTER_IDS || dbSinger.center_ids;
+      if (centerIdsValue && centerIdsValue !== 'null' && centerIdsValue !== 'undefined') {
+        try {
+          dbParsedCenterIds = JSON.parse(centerIdsValue);
+        } catch (e) {
+          console.error('Error parsing center_ids:', e);
+          dbParsedCenterIds = [];
+        }
+      } else {
+        dbParsedCenterIds = [];
+      }
+      
+      // Parse editor_for - handle null/undefined
+      const editorForValue = dbSinger.EDITOR_FOR || dbSinger.editor_for;
+      if (editorForValue && editorForValue !== 'null' && editorForValue !== 'undefined') {
+        try {
+          dbParsedEditorFor = JSON.parse(editorForValue);
+        } catch (e) {
+          console.error('Error parsing editor_for:', e);
+          dbParsedEditorFor = [];
+        }
+      } else {
+        dbParsedEditorFor = [];
+      }
     }
 
     // Prepare is_admin as number
@@ -889,33 +695,10 @@ class CacheService {
       ? JSON.stringify(incomingData.editorFor)
       : null;
 
-    await this.dbWrite(`
-      UPDATE users SET
-        name = :1,
-        gender = :2,
-        email = :3,
-        is_admin = :4,
-        center_ids = :5,
-        editor_for = :6,
-        updated_by = :7,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE RAWTOHEX(id) = :8
-      `, [incomingData.name, incomingData.gender || null, incomingData.email || null, incomingIsAdmin, incomingCenterIdsJson, incomingEditorForJson, incomingData.updatedBy || null, id]);
+    await this.databaseWriteService.updateSingerForCache(id, incomingData.name, incomingData.gender || null, incomingData.email || null, incomingIsAdmin, incomingCenterIdsJson, incomingEditorForJson, incomingData.updatedBy || null);
 
     // Write-through cache: Fetch the complete updated singer with all fields including pitch_count
-    const updatedSingers = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(u.id) as id,
-        u.name,
-        u.gender,
-        u.email,
-        u.is_admin,
-        u.center_ids,
-        u.editor_for,
-        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
-      FROM users u
-      WHERE RAWTOHEX(u.id) = :1
-    `, [id]);
+    const updatedSingers = await this.databaseReadService.getUpdatedSingerByIdForCache(id);
 
     if (updatedSingers.length > 0) {
       const s = updatedSingers[0];
@@ -972,7 +755,7 @@ class CacheService {
   }
 
   async deleteSinger(id: string): Promise<void> {
-    await this.dbWrite(`DELETE FROM users WHERE RAWTOHEX(id) = :1`, [id]);
+    await this.databaseWriteService.deleteSingerForCache(id);
 
     // Write-through cache: Remove from cached list
     let cached = this.get('singers:all');
@@ -995,10 +778,7 @@ class CacheService {
   async updateSingerAdminStatus(id: string, isAdmin: number): Promise<void> {
 
     // First check if user has email (required for admin)
-    const users = await this.dbRead(
-      `SELECT email FROM users WHERE RAWTOHEX(id) = :1`,
-      [id]
-    );
+    const users = await this.databaseReadService.getUserEmailByIdForCache(id);
 
     if (users.length === 0) {
       throw new Error('User not found');
@@ -1012,10 +792,7 @@ class CacheService {
     }
 
     // Update admin status
-    await this.dbWrite(
-      `UPDATE users SET is_admin = :1 WHERE RAWTOHEX(id) = :2`,
-      [isAdmin, id]
-    );
+    await this.databaseWriteService.updateUserAdminStatusForCache(id, isAdmin);
 
     // Invalidate user-related caches
     this.invalidateUserRelatedCaches();
@@ -1024,10 +801,7 @@ class CacheService {
   async updateUserEditorFor(id: string, editorFor: number[]): Promise<void> {
 
     // Validate that user exists
-    const users = await this.dbRead(
-      `SELECT id FROM users WHERE RAWTOHEX(id) = :1`,
-      [id]
-    );
+    const users = await this.databaseReadService.getUserEmailByIdForCache(id);
 
     if (users.length === 0) {
       throw new Error('User not found');
@@ -1039,10 +813,7 @@ class CacheService {
       : null;
 
     // Update editor_for
-    await this.dbWrite(
-      `UPDATE users SET editor_for = :1 WHERE RAWTOHEX(id) = :2`,
-      [editorForJson, id]
-    );
+    await this.databaseWriteService.updateUserEditorForForCache(id, editorForJson);
 
     // Invalidate user-related caches (affects singers view and centers editor lists)
     this.invalidateUserRelatedCaches();
@@ -1051,10 +822,7 @@ class CacheService {
   async addUserEditorAccess(userId: string, centerId: number): Promise<void> {
 
     // Get current editor_for array (userId is hex string from RAWTOHEX)
-    const users = await this.dbRead<any>(
-      `SELECT editor_for FROM users WHERE RAWTOHEX(id) = :1`,
-      [userId]
-    );
+    const users = await this.databaseReadService.getUserEditorForByIdForCache(userId);
 
     if (users.length === 0) {
       throw new Error('User not found');
@@ -1074,10 +842,7 @@ class CacheService {
       editorFor.push(centerId);
       const editorForJson = JSON.stringify(editorFor);
 
-      await this.dbWrite(
-        `UPDATE users SET editor_for = :1 WHERE RAWTOHEX(id) = :2`,
-        [editorForJson, userId]
-      );
+      await this.databaseWriteService.addUserEditorAccessForCache(userId, editorForJson);
 
       // Invalidate user-related caches
       this.invalidateUserRelatedCaches();
@@ -1087,10 +852,7 @@ class CacheService {
   async removeUserEditorAccess(userId: string, centerId: number): Promise<void> {
 
     // Get current editor_for array (userId is hex string from RAWTOHEX)
-    const users = await this.dbRead<any>(
-      `SELECT editor_for FROM users WHERE RAWTOHEX(id) = :1`,
-      [userId]
-    );
+    const users = await this.databaseReadService.getUserEditorForByIdForCache(userId);
 
     if (users.length === 0) {
       throw new Error('User not found');
@@ -1110,10 +872,7 @@ class CacheService {
     if (filtered.length !== editorFor.length) {
       const editorForJson = filtered.length > 0 ? JSON.stringify(filtered) : null;
 
-      await this.dbWrite(
-        `UPDATE users SET editor_for = :1 WHERE RAWTOHEX(id) = :2`,
-        [editorForJson, userId]
-      );
+      await this.databaseWriteService.removeUserEditorAccessForCache(userId, editorForJson);
 
       // Invalidate user-related caches
       this.invalidateUserRelatedCaches();
@@ -1133,19 +892,7 @@ class CacheService {
 
     // Fetch pitches with song and singer names for proper sorting
     // Use LEFT JOIN to include orphaned pitches (where song or singer was deleted)
-    const pitches = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(ssp.id) as id,
-        RAWTOHEX(ssp.song_id) as song_id,
-        RAWTOHEX(ssp.singer_id) as singer_id,
-        ssp.pitch,
-        s.name as song_name,
-        si.name as singer_name
-      FROM song_singer_pitches ssp
-      LEFT JOIN songs s ON ssp.song_id = s.id
-      LEFT JOIN users si ON ssp.singer_id = si.id
-      ORDER BY LTRIM(REGEXP_REPLACE(LOWER(s.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ') NULLS LAST, LTRIM(REGEXP_REPLACE(LOWER(si.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ') NULLS LAST
-    `);
+    const pitches = await this.databaseReadService.getAllPitchesForCache();
 
     // Normalize field names (Oracle returns uppercase)
     const normalizedPitches = pitches.map((p: any) => ({
@@ -1172,19 +919,7 @@ class CacheService {
       }
     }
 
-    const pitches: any[] = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(ssp.id) as id,
-        RAWTOHEX(ssp.song_id) as song_id,
-        RAWTOHEX(ssp.singer_id) as singer_id,
-        ssp.pitch,
-        s.name as song_name,
-        si.name as singer_name
-      FROM song_singer_pitches ssp
-      LEFT JOIN songs s ON ssp.song_id = s.id
-      LEFT JOIN users si ON ssp.singer_id = si.id
-      WHERE RAWTOHEX(ssp.id) = :1
-    `, [id]);
+    const pitches: any[] = await this.databaseReadService.getPitchByIdForCache(id);
 
     // Normalize field names (Oracle returns uppercase)
     const p: any = pitches[0];
@@ -1224,27 +959,13 @@ class CacheService {
       created_by: pitchData.createdBy,
     };
 
-    await this.dbWrite(`
-      INSERT INTO song_singer_pitches (song_id, singer_id, pitch, created_at, created_by)
-      VALUES (HEXTORAW(:1), HEXTORAW(:2), :3, CURRENT_TIMESTAMP, :4)
-    `, [data.song_id, data.singer_id, data.pitch, data.created_by || null]);
+    if (!data.song_id || !data.singer_id) {
+      throw new Error('song_id and singer_id are required');
+    }
+    await this.databaseWriteService.createPitchForCache(data.song_id, data.singer_id, data.pitch || '', data.created_by || null);
 
     // Write-through cache: Fetch only the newly created pitch with joins
-    const newPitches = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(ssp.id) as id,
-        RAWTOHEX(ssp.song_id) as song_id,
-        RAWTOHEX(ssp.singer_id) as singer_id,
-        ssp.pitch,
-        s.name as song_name,
-        si.name as singer_name
-      FROM song_singer_pitches ssp
-      JOIN songs s ON ssp.song_id = s.id
-      JOIN users si ON ssp.singer_id = si.id
-      WHERE RAWTOHEX(ssp.song_id) = :1 AND RAWTOHEX(ssp.singer_id) = :2
-      ORDER BY ssp.created_at DESC
-      FETCH FIRST 1 ROWS ONLY
-    `, [data.song_id, data.singer_id]);
+    const newPitches = await this.databaseReadService.getNewPitchForCache(data.song_id, data.singer_id);
 
     if (newPitches.length > 0) {
       // Normalize the new pitch data
@@ -1299,28 +1020,10 @@ class CacheService {
     pitch = pitchData.pitch ?? '';
     updated_by = pitchData.updatedBy ?? null;
 
-    await this.dbWrite(`
-      UPDATE song_singer_pitches SET
-        pitch = :1,
-        updated_by = :2,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE RAWTOHEX(id) = :3
-    `, [pitch, updated_by, id]);
+    await this.databaseWriteService.updatePitchForCache(id, pitch, updated_by);
 
     // Write-through cache: Fetch only the updated pitch with joins
-    const updatedPitches = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(ssp.id) as id,
-        RAWTOHEX(ssp.song_id) as song_id,
-        RAWTOHEX(ssp.singer_id) as singer_id,
-        ssp.pitch,
-        s.name as song_name,
-        si.name as singer_name
-      FROM song_singer_pitches ssp
-      JOIN songs s ON ssp.song_id = s.id
-      JOIN users si ON ssp.singer_id = si.id
-      WHERE RAWTOHEX(ssp.id) = :1
-    `, [id]);
+    const updatedPitches = await this.databaseReadService.getUpdatedPitchForCache(id);
 
     if (updatedPitches.length > 0) {
       const cached = this.get('pitches:all');
@@ -1353,11 +1056,7 @@ class CacheService {
     if (cached && Array.isArray(cached)) {
       try {
         // Fetch updated pitch count from database
-        const result = await this.dbRead(`
-          SELECT COUNT(*) as pitch_count
-          FROM song_singer_pitches
-          WHERE RAWTOHEX(song_id) = :1
-        `, [songId]);
+        const result = await this.databaseReadService.getSongPitchCountForCache(songId);
 
         if (result && result.length > 0) {
           const newPitchCount = parseInt(result[0].PITCH_COUNT || result[0].pitch_count || '0', 10);
@@ -1386,11 +1085,7 @@ class CacheService {
     if (cached && Array.isArray(cached)) {
       try {
         // Fetch updated pitch count from database
-        const result = await this.dbRead(`
-          SELECT COUNT(*) as pitch_count
-          FROM song_singer_pitches
-          WHERE RAWTOHEX(singer_id) = :1
-        `, [singerId]);
+        const result = await this.databaseReadService.getSingerPitchCountForCache(singerId);
 
         if (result && result.length > 0) {
           const newPitchCount = parseInt(result[0].PITCH_COUNT || result[0].pitch_count || '0', 10);
@@ -1423,7 +1118,7 @@ class CacheService {
       }
     }
 
-    await this.dbWrite(`DELETE FROM song_singer_pitches WHERE RAWTOHEX(id) = :1`, [id]);
+    await this.databaseWriteService.deletePitchForCache(id);
 
     // Write-through cache: Remove from cached list
     const cached = this.get('pitches:all');
@@ -1477,9 +1172,12 @@ class CacheService {
 
     const template = templateService.getTemplate(id);
 
-    if (cached) {
+    console.log('cached', cached);
+    console.log('template', template);
+
+    if (cached && Array.isArray(cached) && template) {
       this.set(cacheKey, [...cached, template], this.DEFAULT_TTL_MS);
-    } else {
+    } else if (template) {
       this.set(cacheKey, [template], this.DEFAULT_TTL_MS);
     }
 
@@ -1565,19 +1263,7 @@ class CacheService {
     const cached = this.get(cacheKey);
     if (cached && Array.isArray(cached)) return cached;
 
-    const sessions = await this.dbRead(`
-        SELECT 
-          RAWTOHEX(id) as id,
-          name,
-          description,
-          center_ids,
-          created_at,
-          created_by,
-          updated_at,
-          updated_by
-        FROM song_sessions 
-        ORDER BY name
-      `);
+    const sessions = await this.databaseReadService.getAllSessionsForCache();
 
     const mappedSessions = sessions.map((row: any) => {
       let centerIds: number[] | undefined = undefined;
@@ -1612,18 +1298,7 @@ class CacheService {
   async getSession(id: string): Promise<any> {
 
     // Get session
-    const sessions = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        description,
-        center_ids,
-        created_by,
-        created_at,
-        updated_at
-      FROM song_sessions 
-      WHERE RAWTOHEX(id) = :1
-    `, [id]);
+    const sessions = await this.databaseReadService.getSessionByIdForCache(id);
 
     if (sessions.length === 0) return null;
 
@@ -1644,30 +1319,7 @@ class CacheService {
     }
 
     // Get session items with details
-    const items = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(si.id) as id,
-        RAWTOHEX(si.session_id) as session_id,
-        RAWTOHEX(si.song_id) as song_id,
-        RAWTOHEX(si.singer_id) as singer_id,
-        si.pitch,
-        si.sequence_order,
-        si.created_at,
-        si.updated_at,
-        s.name as song_name,
-        s.deity as song_deity,
-        s.language as song_language,
-        s.tempo as song_tempo,
-        s.raga as song_raga,
-        sg.name as singer_name,
-        sg.gender as singer_gender,
-        sg.center_ids as singer_center_ids
-      FROM song_session_items si
-      JOIN songs s ON si.song_id = s.id
-      LEFT JOIN users sg ON si.singer_id = sg.id
-      WHERE RAWTOHEX(si.session_id) = :1
-      ORDER BY si.sequence_order
-    `, [id]);
+    const items = await this.databaseReadService.getSessionItemsForCache(id);
 
     const mappedItems = items.map((row: any) => {
       // Parse singer center IDs
@@ -1743,24 +1395,10 @@ class CacheService {
       ? JSON.stringify(data.centerIds)
       : null;
 
-    await this.dbWrite(`
-      INSERT INTO song_sessions (name, description, center_ids, created_by)
-      VALUES (:1, :2, :3, :4)
-    `, [String(data.name), String(data.description || ''), centerIdsJson, data.createdBy || null]);
+    await this.databaseWriteService.createSessionForCache(String(data.name), String(data.description || ''), centerIdsJson, data.createdBy || null);
 
     // Fetch the created session
-    const sessions = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        description,
-        center_ids,
-        created_by,
-        created_at,
-        updated_at
-      FROM song_sessions 
-      WHERE name = :1
-    `, [data.name]);
+    const sessions = await this.databaseReadService.getNewSessionByNameForCache(data.name);
 
     if (sessions.length === 0) throw new Error('Failed to retrieve created session');
 
@@ -1835,24 +1473,10 @@ class CacheService {
     updateParts.push('updated_at = CURRENT_TIMESTAMP');
     params.push(id);
 
-    await this.dbWrite(`
-      UPDATE song_sessions 
-      SET ${updateParts.join(', ')} 
-      WHERE RAWTOHEX(id) = :${paramIndex}
-    `, params);
+    await this.databaseWriteService.updateSessionForCache(id, updateParts, params);
 
     // Fetch updated session
-    const sessions = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        description,
-        center_ids,
-        created_at,
-        updated_at
-      FROM song_sessions 
-      WHERE RAWTOHEX(id) = :1
-    `, [id]);
+    const sessions = await this.databaseReadService.getUpdatedSessionByIdForCache(id);
 
     if (sessions.length === 0) return null;
 
@@ -1892,7 +1516,7 @@ class CacheService {
   }
 
   async deleteSession(id: string): Promise<void> {
-    await this.dbWrite(`DELETE FROM song_sessions WHERE RAWTOHEX(id) = :1`, [id]);
+    await this.databaseWriteService.deleteSessionForCache(id);
 
     // Write-through cache: Remove from cached list
     const cached = this.get('sessions:all');
@@ -1905,52 +1529,27 @@ class CacheService {
   async duplicateSession(id: string, newName: string): Promise<any> {
 
     // Get original session
-    const sessions = await this.dbRead(`
-      SELECT name, description 
-      FROM song_sessions 
-      WHERE RAWTOHEX(id) = :1
-    `, [id]);
+    const sessions = await this.databaseReadService.getSessionForDuplicateForCache(id);
 
     if (sessions.length === 0) throw new Error('Session not found');
 
     const originalSession = sessions[0];
 
     // Create new session
-    await this.dbWrite(`
-      INSERT INTO song_sessions (name, description)
-      VALUES (:1, :2)
-    `, [String(newName), String(originalSession.DESCRIPTION || '')]);
+    await this.databaseWriteService.duplicateSessionForCache(newName, String(originalSession.DESCRIPTION || ''));
 
     // Get the new session ID
-    const newSessions = await this.dbRead(`
-      SELECT RAWTOHEX(id) as id 
-      FROM song_sessions 
-      WHERE name = :1
-    `, [newName]);
+    const newSessions = await this.databaseReadService.getNewSessionIdByNameForCache(newName);
 
     if (newSessions.length === 0) throw new Error('Failed to retrieve duplicated session');
 
     const newSessionId = newSessions[0].ID;
 
     // Copy items
-    await this.dbWrite(`
-      INSERT INTO song_session_items (session_id, song_id, singer_id, pitch, sequence_order)
-      SELECT HEXTORAW(:1), song_id, singer_id, pitch, sequence_order
-      FROM song_session_items
-      WHERE RAWTOHEX(session_id) = :2
-    `, [newSessionId, id]);
+    await this.databaseWriteService.copySessionItemsForCache(newSessionId, id);
 
     // Fetch new session with full details
-    const result = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        name,
-        description,
-        created_at,
-        updated_at
-      FROM song_sessions 
-      WHERE RAWTOHEX(id) = :1
-    `, [newSessionId]);
+    const result = await this.databaseReadService.getDuplicatedSessionForCache(newSessionId);
 
     const session = result[0];
     const mappedSession = {
@@ -1974,24 +1573,7 @@ class CacheService {
   }
 
   async getSessionItems(sessionId: string): Promise<any[]> {
-    const items = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(si.id) as id,
-        RAWTOHEX(si.session_id) as session_id,
-        RAWTOHEX(si.song_id) as song_id,
-        RAWTOHEX(si.singer_id) as singer_id,
-        si.pitch,
-        si.sequence_order,
-        si.created_at,
-        si.updated_at,
-        s.name as song_name,
-        sg.name as singer_name
-      FROM song_session_items si
-      JOIN songs s ON si.song_id = s.id
-      LEFT JOIN users sg ON si.singer_id = sg.id
-      WHERE RAWTOHEX(si.session_id) = :1
-      ORDER BY si.sequence_order
-    `, [sessionId]);
+    const items = await this.databaseReadService.getSessionItemsForReorderForCache(sessionId);
 
     return items.map((row: any) => ({
       id: row.ID || row.id,
@@ -2010,19 +1592,7 @@ class CacheService {
   async addSessionItem(sessionId: string, itemData: any): Promise<void> {
     const { songId, singerId, pitch, sequenceOrder } = itemData;
 
-    await this.dbWrite(`
-      INSERT INTO song_session_items (session_id, song_id, singer_id, pitch, sequence_order)
-      VALUES (
-        HEXTORAW(:1),
-        HEXTORAW(:2),
-        ${singerId ? 'HEXTORAW(:3)' : 'NULL'},
-        :${singerId ? '4' : '3'},
-        :${singerId ? '5' : '4'}
-      )
-    `, singerId
-      ? [sessionId, songId, singerId, String(pitch || ''), sequenceOrder]
-      : [sessionId, songId, String(pitch || ''), sequenceOrder]
-    );
+    await this.databaseWriteService.addSessionItemForCache(sessionId, songId, singerId || null, String(pitch || ''), sequenceOrder);
 
     // Session items don't have separate cache, just invalidate sessions
     this.invalidatePattern('sessions:');
@@ -2057,18 +1627,14 @@ class CacheService {
     updateParts.push('updated_at = CURRENT_TIMESTAMP');
     params.push(id);
 
-    await this.dbWrite(`
-      UPDATE song_session_items 
-      SET ${updateParts.join(', ')} 
-      WHERE RAWTOHEX(id) = :${paramIndex}
-    `, params);
+    await this.databaseWriteService.updateSessionItemForCache(id, updateParts, params);
 
     // Session items don't have separate cache, just invalidate sessions
     this.invalidatePattern('sessions:');
   }
 
   async deleteSessionItem(id: string): Promise<void> {
-    await this.dbWrite(`DELETE FROM song_session_items WHERE RAWTOHEX(id) = :1`, [id]);
+    await this.databaseWriteService.deleteSessionItemForCache(id);
 
     // Session items don't have separate cache, just invalidate sessions
     this.invalidatePattern('sessions:');
@@ -2076,13 +1642,7 @@ class CacheService {
 
   async reorderSessionItems(sessionId: string, itemIds: string[]): Promise<void> {
 
-    for (let i = 0; i < itemIds.length; i++) {
-      await this.dbWrite(`
-        UPDATE song_session_items 
-        SET sequence_order = :1, updated_at = CURRENT_TIMESTAMP 
-        WHERE RAWTOHEX(id) = :2 AND RAWTOHEX(session_id) = :3
-      `, [i + 1, itemIds[i], sessionId]);
-    }
+    await this.databaseWriteService.reorderSessionItemsForCache(sessionId, itemIds);
 
     // Session items don't have separate cache, just invalidate sessions
     this.invalidatePattern('sessions:');
@@ -2091,28 +1651,12 @@ class CacheService {
   async setSessionItems(sessionId: string, items: any[]): Promise<any[]> {
 
     // Delete existing items
-    await this.dbWrite(`
-      DELETE FROM song_session_items 
-      WHERE RAWTOHEX(session_id) = :1
-    `, [sessionId]);
+    await this.databaseWriteService.deleteAllSessionItemsForCache(sessionId);
 
     // Insert new items
     for (let i = 0; i < items.length; i++) {
       const { songId, singerId, pitch } = items[i];
-
-      await this.dbWrite(`
-        INSERT INTO song_session_items (session_id, song_id, singer_id, pitch, sequence_order)
-        VALUES (
-          HEXTORAW(:1),
-          HEXTORAW(:2),
-          ${singerId ? 'HEXTORAW(:3)' : 'NULL'},
-          :${singerId ? '4' : '3'},
-          :${singerId ? '5' : '4'}
-        )
-      `, singerId
-        ? [sessionId, songId, singerId, String(pitch || ''), i + 1]
-        : [sessionId, songId, String(pitch || ''), i + 1]
-      );
+      await this.databaseWriteService.addSessionItemForCache(sessionId, songId, singerId || null, String(pitch || ''), i + 1);
     }
 
     // Session items don't have separate cache, just invalidate sessions
@@ -2125,15 +1669,7 @@ class CacheService {
   // ==================== IMPORT MAPPINGS ====================
 
   async getAllSongMappings(): Promise<any[]> {
-    const mappings = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        csv_song_name,
-        RAWTOHEX(db_song_id) as db_song_id,
-        db_song_name
-      FROM csv_song_mappings
-      ORDER BY created_at DESC
-    `);
+    const mappings = await this.databaseReadService.getAllSongMappingsForCache();
 
     return mappings.map((m: any) => ({
       id: m.id || m.ID,
@@ -2144,15 +1680,7 @@ class CacheService {
   }
 
   async getSongMappingByName(csvName: string): Promise<any | null> {
-    const mappings = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        csv_song_name,
-        RAWTOHEX(db_song_id) as db_song_id,
-        db_song_name
-      FROM csv_song_mappings
-      WHERE csv_song_name = :1
-    `, [csvName]);
+    const mappings = await this.databaseReadService.getSongMappingByNameForCache(csvName);
 
     if (mappings.length === 0) return null;
 
@@ -2170,37 +1698,15 @@ class CacheService {
     // Check if mapping already exists
     const existing = await this.getSongMappingByName(csvSongName);
 
-    if (existing) {
-      // Update existing mapping
-      await this.dbWrite(`
-        UPDATE csv_song_mappings
-        SET db_song_id = HEXTORAW(:1),
-            db_song_name = :2,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE csv_song_name = :3
-      `, [dbSongId, dbSongName, csvSongName]);
-    } else {
-      // Insert new mapping
-      await this.dbWrite(`
-        INSERT INTO csv_song_mappings (csv_song_name, db_song_id, db_song_name)
-        VALUES (:1, HEXTORAW(:2), :3)
-      `, [csvSongName, dbSongId, dbSongName]);
-    }
+    await this.databaseWriteService.saveSongMappingForCache(csvSongName, dbSongId, dbSongName, !!existing);
   }
 
   async deleteSongMapping(id: string): Promise<void> {
-    await this.dbWrite(`DELETE FROM csv_song_mappings WHERE RAWTOHEX(id) = :1`, [id]);
+    await this.databaseWriteService.deleteSongMappingForCache(id);
   }
 
   async getAllPitchMappings(): Promise<any[]> {
-    const mappings = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        original_format,
-        normalized_format
-      FROM csv_pitch_mappings
-      ORDER BY created_at DESC
-    `);
+    const mappings = await this.databaseReadService.getAllPitchMappingsForCache();
 
     return mappings.map((m: any) => ({
       id: m.id || m.ID,
@@ -2210,14 +1716,7 @@ class CacheService {
   }
 
   async getPitchMappingByFormat(originalFormat: string): Promise<any | null> {
-    const mappings = await this.dbRead(`
-      SELECT 
-        RAWTOHEX(id) as id,
-        original_format,
-        normalized_format
-      FROM csv_pitch_mappings
-      WHERE original_format = :1
-    `, [originalFormat]);
+    const mappings = await this.databaseReadService.getPitchMappingByFormatForCache(originalFormat);
 
     if (mappings.length === 0) return null;
 
@@ -2234,25 +1733,11 @@ class CacheService {
     // Check if mapping already exists
     const existing = await this.getPitchMappingByFormat(originalFormat);
 
-    if (existing) {
-      // Update existing mapping
-      await this.dbWrite(`
-        UPDATE csv_pitch_mappings
-        SET normalized_format = :1,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE original_format = :2
-      `, [normalizedFormat, originalFormat]);
-    } else {
-      // Insert new mapping
-      await this.dbWrite(`
-        INSERT INTO csv_pitch_mappings (original_format, normalized_format)
-        VALUES (:1, :2)
-      `, [originalFormat, normalizedFormat]);
-    }
+    await this.databaseWriteService.savePitchMappingForCache(originalFormat, normalizedFormat, !!existing);
   }
 
   async deletePitchMapping(id: string): Promise<void> {
-    await this.dbWrite(`DELETE FROM csv_pitch_mappings WHERE RAWTOHEX(id) = :1`, [id]);
+    await this.databaseWriteService.deletePitchMappingForCache(id);
   }
 
   // ============================================================================
@@ -2260,90 +1745,124 @@ class CacheService {
   // ============================================================================
 
   async getAllCenters(): Promise<any[]> {
+    console.log('getAllCenters');
     const cacheKey = 'centers:all';
     const cached = this.get<any[]>(cacheKey);
 
-    if (cached) {
+    // Ensure cached value is an array
+    if (cached && Array.isArray(cached)) {
+      console.log('cached', cached);
       return cached;
     }
 
-    const centers = await this.dbRead<any>(
-      `SELECT id, name, badge_text_color, created_at, updated_at 
-       FROM centers 
-       ORDER BY name ASC`
-    );
-
-    // Get all users with their editor_for and center_ids arrays
-    const users = await this.dbRead<any>(
-      `SELECT RAWTOHEX(id) as id, editor_for, center_ids, name
-        FROM users WHERE name IS NOT NULL`
-    );
-
-    // Build maps for center_id -> user_ids who are editors, and center_id -> singer count
-    // Use Number keys for consistent lookups (JSON parse may return numbers, Oracle may return strings)
-    const centerEditors = new Map<number, string[]>();
-    const centerSingerCount = new Map<number, number>();
-
-    for (const user of users) {
-      try {
-        // Count editors
-        const editorFor = user.EDITOR_FOR || user.editor_for;
-        if (editorFor) {
-          const centerIds = JSON.parse(editorFor);
-          for (const centerId of centerIds) {
-            const numCenterId = Number(centerId);
-            if (!centerEditors.has(numCenterId)) {
-              centerEditors.set(numCenterId, []);
-            }
-            centerEditors.get(numCenterId)!.push(user.ID || user.id);
-          }
-        }
-
-        // Count singers (users with center_ids)
-        const centerIds = user.CENTER_IDS || user.center_ids;
-        if (centerIds) {
-          const parsedCenterIds = JSON.parse(centerIds);
-          for (const centerId of parsedCenterIds) {
-            const numCenterId = Number(centerId);
-            centerSingerCount.set(numCenterId, (centerSingerCount.get(numCenterId) || 0) + 1);
-          }
-        }
-      } catch {
-        // Skip invalid JSON
-      }
+    // If cache exists but is not an array, invalidate it
+    if (cached) {
+      this.invalidate(cacheKey);
     }
 
-    // Normalize Oracle uppercase column names to camelCase and add editorIds and singerCount
-    const normalizedCenters = centers.map(center => {
-      const id = Number(center.ID || center.id);
-      return {
-        id,
-        name: center.NAME || center.name,
-        badgeTextColor: center.BADGE_TEXT_COLOR || center.badge_text_color,
-        editorIds: centerEditors.get(id) || [],
-        singerCount: centerSingerCount.get(id) || 0,
-        createdAt: center.CREATED_AT || center.created_at,
-        updatedAt: center.UPDATED_AT || center.updated_at,
-      };
-    });
+    try {
+      const centers = await this.databaseReadService.getAllCentersForCache();
 
-    this.set(cacheKey, normalizedCenters);
-    return normalizedCenters;
+      // Ensure centers is an array
+      if (!Array.isArray(centers)) {
+        console.error('getAllCentersForCache did not return an array:', centers);
+        return [];
+      }
+
+      // Get all users with their editor_for and center_ids arrays
+      let users: any[] = [];
+      try {
+        users = await this.databaseReadService.getAllUsersForCentersCache();
+      } catch (error) {
+        console.error('Error fetching users for centers cache:', error);
+        // Continue with empty users array - centers will still be returned without editor/singer counts
+      }
+
+      // Ensure users is an array
+      if (!Array.isArray(users)) {
+        console.error('getAllUsersForCentersCache did not return an array:', users);
+        users = [];
+      }
+
+      // Build maps for center_id -> user_ids who are editors, and center_id -> singer count
+      // Use Number keys for consistent lookups (JSON parse may return numbers, Oracle may return strings)
+      const centerEditors = new Map<number, string[]>();
+      const centerSingerCount = new Map<number, number>();
+
+      for (const user of users) {
+        try {
+          // Count editors
+          const editorFor = user.EDITOR_FOR || user.editor_for;
+          if (editorFor && editorFor !== 'null' && editorFor !== 'undefined') {
+            const centerIds = JSON.parse(editorFor);
+            for (const centerId of centerIds) {
+              const numCenterId = Number(centerId);
+              if (!centerEditors.has(numCenterId)) {
+                centerEditors.set(numCenterId, []);
+              }
+              centerEditors.get(numCenterId)!.push(user.ID || user.id);
+            }
+          }
+
+          // Count singers (users with center_ids)
+          const centerIds = user.CENTER_IDS || user.center_ids;
+          if (centerIds && centerIds !== 'null' && centerIds !== 'undefined') {
+            const parsedCenterIds = JSON.parse(centerIds);
+            for (const centerId of parsedCenterIds) {
+              const numCenterId = Number(centerId);
+              centerSingerCount.set(numCenterId, (centerSingerCount.get(numCenterId) || 0) + 1);
+            }
+          }
+        } catch (error) {
+          // Skip invalid JSON - log for debugging but continue processing
+          console.warn('Error parsing user center data:', error, 'User:', user.ID || user.id);
+        }
+      }
+
+      // Normalize Oracle uppercase column names to camelCase and add editorIds and singerCount
+      const normalizedCenters = centers.map(center => {
+        const id = Number(center.ID || center.id);
+        return {
+          id,
+          name: center.NAME || center.name,
+          badgeTextColor: center.BADGE_TEXT_COLOR || center.badge_text_color || '#1e40af',
+          editorIds: centerEditors.get(id) || [],
+          singerCount: centerSingerCount.get(id) || 0,
+          createdAt: center.CREATED_AT || center.created_at,
+          createdBy: center.CREATED_BY || center.created_by,
+          updatedAt: center.UPDATED_AT || center.updated_at,
+          updatedBy: center.UPDATED_BY || center.updated_by,
+        };
+      });
+
+      this.set(cacheKey, normalizedCenters);
+      console.log('set', cacheKey, normalizedCenters);
+      console.log('immediate get', this.get(cacheKey));
+      return normalizedCenters;
+    } catch (error) {
+      console.error('Error in getAllCenters:', error);
+      // Return empty array on error to prevent breaking the request
+      // The route handler will catch this and return appropriate error response
+      throw error;
+    }
   }
 
   async getCenterById(id: string | number): Promise<any> {
-    const cacheKey = 'centers:all';
-    const cached = this.get<any>(cacheKey);
-    if (cached) {
-      return cached.find((c: any) => c.id === id);
+    // Convert id to number for Oracle (centers table uses numeric ID)
+    const centerId = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (isNaN(centerId)) {
+      return null;
     }
 
-    const centers = await this.dbRead<any>(
-      `SELECT id, name, badge_text_color, created_at, updated_at 
-       FROM centers 
-       WHERE id = :1`,
-      [id]
-    );
+    const cacheKey = 'centers:all';
+    const cached = this.get<any[]>(cacheKey);
+    if (cached && Array.isArray(cached) && cached.length > 0) {
+      if (cached.find((c: any) => c.id === centerId)) {
+        return cached.find((c: any) => c.id === centerId);
+      }
+    }
+
+    const centers = await this.databaseReadService.getCenterByIdForCache(centerId);
 
     if (centers.length === 0) {
       return null;
@@ -2352,30 +1871,26 @@ class CacheService {
     const center = centers[0];
 
     // Get all users who have this center in their editor_for array
-    const editors = await this.dbRead<any>(
-      `SELECT RAWTOHEX(id) as id FROM users 
-       WHERE editor_for IS NOT NULL
-       AND EXISTS (
-         SELECT 1 FROM JSON_TABLE(editor_for, '$[*]'
-           COLUMNS (center_id NUMBER PATH '$')
-         ) jt
-         WHERE jt.center_id = :1
-       )`,
-      [id]
-    );
+    const editors = await this.databaseReadService.getCenterEditorsForCache(centerId);
 
     const editor_ids = editors.map((e: any) => e.ID || e.id);
 
     const normalizedCenter = {
       id: center.ID || center.id,
       name: center.NAME || center.name,
-      badgeTextColor: center.BADGE_TEXT_COLOR || center.badge_text_color,
+      badgeTextColor: center.BADGE_TEXT_COLOR || center.badge_text_color || '#1e40af',
       editorIds: editor_ids,
       createdAt: center.CREATED_AT || center.created_at,
+      createdBy: center.CREATED_BY || center.created_by,
       updatedAt: center.UPDATED_AT || center.updated_at,
+      updatedBy: center.UPDATED_BY || center.updated_by,
     };
 
-    this.set(cacheKey, normalizedCenter);
+    if (cached) {
+      this.set(cacheKey, [...cached, normalizedCenter], this.DEFAULT_TTL_MS);
+    } else {
+      this.set(cacheKey, [normalizedCenter], this.DEFAULT_TTL_MS);
+    }
     return normalizedCenter;
   }
 
@@ -2390,20 +1905,10 @@ class CacheService {
     };
 
     // Insert center
-    await this.dbWrite(
-      `INSERT INTO centers (name, badge_text_color, created_by, created_at, updated_at) 
-       VALUES (:1, :2, :3, SYSTIMESTAMP, SYSTIMESTAMP)`,
-      [data.name, data.badgeTextColor, data.createdBy || null]
-    );
+    await this.databaseWriteService.createCenterForCache(data.name, data.badgeTextColor, data.createdBy || null);
 
     // Get the newly created center
-    const result = await this.dbRead<any>(
-      `SELECT id, name, badge_text_color, created_at, updated_at 
-       FROM centers 
-       WHERE name = :1 
-       ORDER BY created_at DESC`,
-      [data.name]
-    );
+    const result = await this.databaseReadService.getNewCenterByNameForCache(data.name);
 
     // Invalidate center-related caches
     this.invalidateCenterRelatedCaches();
@@ -2414,9 +1919,9 @@ class CacheService {
       return {
         id: center.ID || center.id,
         name: center.NAME || center.name,
-        badgeTextColor: center.BADGE_TEXT_COLOR || center.badge_text_color,
+        badgeTextColor: center.BADGE_TEXT_COLOR || center.badge_text_color || '#1e40af',
         createdAt: center.CREATED_AT || center.created_at,
-        updatedAt: center.UPDATED_AT || center.updated_at,
+        createdBy: center.CREATED_BY || center.created_by,
       };
     }
 
@@ -2432,6 +1937,12 @@ class CacheService {
       editorIds: centerData.editorIds ?? centerData.editor_ids,
       updatedBy: centerData.updatedBy ?? centerData.updated_by,
     };
+
+    // Convert id to number for Oracle (centers table uses numeric ID)
+    const centerId = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (isNaN(centerId)) {
+      throw new Error('Invalid center ID');
+    }
 
     const updates: string[] = [];
     const params: any[] = [];
@@ -2452,26 +1963,19 @@ class CacheService {
     }
 
     updates.push('updated_at = SYSTIMESTAMP');
-    params.push(id);
+    params.push(centerId);
 
-    await this.dbWrite(
-      `UPDATE centers SET ${updates.join(', ')} WHERE id = :${params.length}`,
-      params
-    );
+    await this.databaseWriteService.updateCenterForCache(centerId, updates, params);
 
     // Invalidate center-related caches
     this.invalidateCenterRelatedCaches();
 
     // Return updated center
-    return this.getCenterById(id);
+    return this.getCenterById(centerId);
   }
 
   async deleteCenter(id: string | number): Promise<void> {
-
-    await this.dbWrite(
-      `DELETE FROM centers WHERE id = :1`,
-      [id]
-    );
+    await this.databaseWriteService.deleteCenterForCache(id);
 
     // Invalidate center-related caches
     this.invalidateCenterRelatedCaches();
@@ -2493,18 +1997,7 @@ class CacheService {
       ipAddress: feedbackData.ipAddress ?? feedbackData.ip_address,
     };
 
-    await this.dbWrite(
-      `INSERT INTO feedback (feedback, category, email, user_agent, url, ip_address, status, created_at, updated_at)
-       VALUES (:1, :2, :3, :4, :5, :6, 'new', SYSTIMESTAMP, SYSTIMESTAMP)`,
-      [
-        data.feedback,
-        data.category,
-        data.email,
-        data.userAgent || null,
-        data.url || null,
-        data.ipAddress || null
-      ]
-    );
+    await this.databaseWriteService.createFeedbackForCache(data.feedback, data.category, data.email, data.userAgent || null, data.url || null, data.ipAddress || null);
 
     // Invalidate feedback cache
     this.invalidatePattern(/^feedback:/);
@@ -2536,12 +2029,7 @@ class CacheService {
       return cached;
     }
 
-    const feedback = await this.dbRead<any>(
-      `SELECT RAWTOHEX(id) as id, feedback, category, email, user_agent, url, ip_address, 
-              status, admin_notes, created_at, updated_at
-       FROM feedback 
-       ORDER BY created_at DESC`
-    );
+    const feedback = await this.databaseReadService.getAllFeedbackForCache();
 
     // Normalize Oracle uppercase column names
     const normalizedFeedback = feedback.map((row: any) => this.mapFeedbackRow(row));
@@ -2563,13 +2051,7 @@ class CacheService {
       }
     }
 
-    const feedback = await this.dbRead<any>(
-      `SELECT RAWTOHEX(id) as id, feedback, category, email, user_agent, url, ip_address, 
-              status, admin_notes, created_at, updated_at
-       FROM feedback 
-       WHERE RAWTOHEX(id) = :1`,
-      [id]
-    );
+    const feedback = await this.databaseReadService.getFeedbackByIdForCache(id);
 
     if (feedback.length === 0) {
       return null;
@@ -2610,10 +2092,7 @@ class CacheService {
     updates.push('updated_at = SYSTIMESTAMP');
     params.push(id);
 
-    await this.dbWrite(
-      `UPDATE feedback SET ${updates.join(', ')} WHERE RAWTOHEX(id) = :${params.length}`,
-      params
-    );
+    await this.databaseWriteService.updateFeedbackForCache(id, updates, params);
 
     const feedback = await this.getFeedbackById(id);
     const cacheKey = 'feedback:all';
@@ -2631,10 +2110,7 @@ class CacheService {
    * Delete a feedback item with write-through cache update
    */
   async deleteFeedback(id: string | number): Promise<void> {
-    await this.dbWrite(
-      `DELETE FROM feedback WHERE RAWTOHEX(id) = :1`,
-      [id]
-    );
+    await this.databaseWriteService.deleteFeedbackForCache(id);
 
     const cacheKey = 'feedback:all';
     const cached = this.get<any>(cacheKey);
@@ -2690,7 +2166,6 @@ export async function warmupCache(): Promise<void> {
   try {
     const songs = await cacheService.getAllSongs();
     stats.push({ table: 'songs', count: songs.length });
-    cacheService.set('songs:all', songs, CACHE_TTL);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache songs:', error instanceof Error ? error.message : error);
@@ -2702,7 +2177,6 @@ export async function warmupCache(): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 500));
     const singers = await cacheService.getAllSingers();
     stats.push({ table: 'singers', count: singers.length });
-    cacheService.set('singers:all', singers, CACHE_TTL);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache singers:', error instanceof Error ? error.message : error);
@@ -2714,7 +2188,6 @@ export async function warmupCache(): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 500));
     const pitches = await cacheService.getAllPitches();
     stats.push({ table: 'pitches', count: pitches.length });
-    cacheService.set('pitches:all', pitches, CACHE_TTL);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache pitches:', error instanceof Error ? error.message : error);
@@ -2726,7 +2199,6 @@ export async function warmupCache(): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 500));
     const sessions = await cacheService.getAllSessions();
     stats.push({ table: 'sessions', count: sessions.length });
-    cacheService.set('sessions:all', sessions, CACHE_TTL);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache sessions:', error instanceof Error ? error.message : error);
@@ -2738,7 +2210,6 @@ export async function warmupCache(): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 500));
     const templates = await cacheService.getAllTemplates();
     stats.push({ table: 'templates', count: templates.length });
-    cacheService.set('templates:all', templates, CACHE_TTL);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache templates:', error instanceof Error ? error.message : error);
@@ -2749,66 +2220,10 @@ export async function warmupCache(): Promise<void> {
     // Small delay between queries to avoid overwhelming the pool
     await new Promise(resolve => setTimeout(resolve, 500));
     const centers = await cacheService.getAllCenters();
-
-    // Small delay between queries to avoid overwhelming the pool
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // Get all users with their editor_for and center_ids arrays
-    const usersForCenters = await databaseService.executeQuery(
-      `SELECT RAWTOHEX(id) as id, editor_for, center_ids FROM users WHERE name IS NOT NULL`
-    );
-
-    // Build maps for center_id -> user_ids who are editors, and center_id -> singer count
-    // Use Number keys for consistent lookups
-    const centerEditors = new Map<number, string[]>();
-    const centerSingerCount = new Map<number, number>();
-
-    for (const user of usersForCenters) {
-      try {
-        // Count editors
-        const editorFor = (user as any).EDITOR_FOR || (user as any).editor_for;
-        if (editorFor) {
-          const editorCenterIds = JSON.parse(editorFor);
-          for (const centerId of editorCenterIds) {
-            const numCenterId = Number(centerId);
-            if (!centerEditors.has(numCenterId)) {
-              centerEditors.set(numCenterId, []);
-            }
-            centerEditors.get(numCenterId)!.push((user as any).ID || (user as any).id);
-          }
-        }
-
-        // Count singers (users with center_ids)
-        const userCenterIds = (user as any).CENTER_IDS || (user as any).center_ids;
-        if (userCenterIds) {
-          const parsedCenterIds = JSON.parse(userCenterIds);
-          for (const centerId of parsedCenterIds) {
-            const numCenterId = Number(centerId);
-            centerSingerCount.set(numCenterId, (centerSingerCount.get(numCenterId) || 0) + 1);
-          }
-        }
-      } catch {
-        // Skip invalid JSON
-      }
-    }
-
-    // Normalize Oracle uppercase column names to camelCase and add editorIds and singerCount
-    const normalizedCenters = centers.map((center: any) => {
-      const id = Number(center.ID || center.id);
-      return {
-        id,
-        name: center.NAME || center.name,
-        badgeTextColor: center.BADGE_TEXT_COLOR || center.badge_text_color,
-        editorIds: centerEditors.get(id) || [],
-        singerCount: centerSingerCount.get(id) || 0,
-        createdAt: center.CREATED_AT || center.created_at,
-        updatedAt: center.UPDATED_AT || center.updated_at,
-      };
-    });
-
-    cacheService.set('centers:all', normalizedCenters, CACHE_TTL);
+    stats.push({ table: 'centers', count: centers.length });
     successCount++;
   } catch (error) {
-    console.error('  ✗ Failed to cache centers:', error instanceof Error ? error.message : error);
+    console.error('  ✗ Failed to cache templates:', error instanceof Error ? error.message : error);
     failureCount++;
   }
 
@@ -2817,7 +2232,6 @@ export async function warmupCache(): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 500));
     const feedback = await cacheService.getAllFeedback();
     stats.push({ table: 'feedback', count: feedback.length });
-    cacheService.set('feedback:all', feedback, CACHE_TTL);
     successCount++;
   } catch (error) {
     console.error('  ✗ Failed to cache feedback:', error instanceof Error ? error.message : error);

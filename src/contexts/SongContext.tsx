@@ -4,7 +4,7 @@ import type { Song, CreateSongInput, UpdateSongInput, ServiceError } from '../ty
 import { songService } from '../services';
 import { useToast } from './ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../utils';
-import { safeSetLocalStorageItem, getLocalStorageItem } from '../utils/cacheUtils';
+import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
 
 const SONGS_CACHE_KEY = 'saiSongs:songsCache';
 const SONGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -58,10 +58,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
               timestamp: Date.now(),
               songs: updated,
             });
-            safeSetLocalStorageItem(SONGS_CACHE_KEY, cacheData, {
-              clearOnQuotaError: true,
-              skipKeys: [SONGS_CACHE_KEY],
-            });
+            setLocalStorageItem(SONGS_CACHE_KEY, cacheData);
           }
           
           return updated;
@@ -83,10 +80,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
               timestamp: Date.now(),
               songs: updated,
             });
-            safeSetLocalStorageItem(SONGS_CACHE_KEY, cacheData, {
-              clearOnQuotaError: true,
-              skipKeys: [SONGS_CACHE_KEY],
-            });
+            setLocalStorageItem(SONGS_CACHE_KEY, cacheData);
           }
           
           return updated;
@@ -160,10 +154,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
           timestamp: Date.now(),
           songs: sortedSongs,
         });
-        safeSetLocalStorageItem(SONGS_CACHE_KEY, cacheData, {
-          clearOnQuotaError: true,
-          skipKeys: [SONGS_CACHE_KEY],
-        });
+        setLocalStorageItem(SONGS_CACHE_KEY, cacheData);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch songs';
@@ -214,7 +205,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
       
       // Clear localStorage cache so it doesn't return stale data
       if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(SONGS_CACHE_KEY);
+        removeLocalStorageItem(SONGS_CACHE_KEY);
         
         // Dispatch global event to notify other components
         import('../utils/globalEventBus').then(({ globalEventBus }) => {
@@ -247,7 +238,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
         
         // Clear localStorage cache so it doesn't return stale data
         if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(SONGS_CACHE_KEY);
+          removeLocalStorageItem(SONGS_CACHE_KEY);
           
           // Dispatch global event to notify other components
           import('../utils/globalEventBus').then(({ globalEventBus }) => {
@@ -281,7 +272,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
         
         // Clear localStorage cache so it doesn't return stale data
         if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(SONGS_CACHE_KEY);
+          removeLocalStorageItem(SONGS_CACHE_KEY);
           
           // Dispatch global event to notify other components
           import('../utils/globalEventBus').then(({ globalEventBus }) => {

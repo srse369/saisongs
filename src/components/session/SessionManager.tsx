@@ -18,6 +18,7 @@ import TemplateSelector from '../presentation/TemplateSelector';
 import templateService from '../../services/TemplateService';
 import { pptxExportService } from '../../services/PptxExportService';
 import ApiClient from '../../services/ApiClient';
+import { getSelectedTemplateId, setSelectedTemplateId } from '../../utils/cacheUtils';
 
 export const SessionManager: React.FC = () => {
   const { entries, removeSong, clearSession, reorderSession, addSong } = useSession();
@@ -68,7 +69,7 @@ export const SessionManager: React.FC = () => {
     }
 
     const restoreTemplate = async () => {
-      const savedTemplateId = localStorage.getItem('selectedSessionTemplateId');
+      const savedTemplateId = getSelectedTemplateId();
       if (savedTemplateId) {
         try {
           const template = await templateService.getTemplate(savedTemplateId);
@@ -79,7 +80,7 @@ export const SessionManager: React.FC = () => {
         } catch (error) {
           console.error('Error restoring template:', error);
           // Clear invalid template ID from storage
-          localStorage.removeItem('selectedSessionTemplateId');
+          // Note: The invalid ID will be overwritten when a valid template is selected
         }
       }
 
@@ -88,7 +89,7 @@ export const SessionManager: React.FC = () => {
         const defaultTemplate = await templateService.getDefaultTemplate();
         if (defaultTemplate) {
           setSelectedTemplate(defaultTemplate);
-          localStorage.setItem('selectedSessionTemplateId', defaultTemplate.id);
+          setSelectedTemplateId(defaultTemplate.id);
         }
       } catch (error) {
         console.error('Error loading default template:', error);
@@ -120,7 +121,7 @@ export const SessionManager: React.FC = () => {
   // Re-sync template when returning to the Live tab (handles same-tab navigation)
   useEffect(() => {
     const syncTemplateFromStorage = async () => {
-      const savedTemplateId = localStorage.getItem('selectedSessionTemplateId');
+      const savedTemplateId = getSelectedTemplateId();
       if (savedTemplateId && savedTemplateId !== selectedTemplate?.id) {
         try {
           const template = await templateService.getTemplate(savedTemplateId);
@@ -166,14 +167,8 @@ export const SessionManager: React.FC = () => {
 
   const handlePresentSession = () => {
     if (sessionItems.length === 0) return;
-    // Navigate to presentation with selected template ID in query params
-    const templateId = selectedTemplate?.id;
-    if (templateId) {
-      navigate(`/session/present?templateId=${templateId}`);
-    } else {
-      // If no template selected, navigate without template ID (will use default)
-      navigate('/session/present');
-    }
+    // Template will be loaded from localStorage, no need to pass in URL
+    navigate('/session/present');
   };
 
   const handleExportToPowerPoint = async () => {
@@ -223,12 +218,7 @@ export const SessionManager: React.FC = () => {
     setSelectedTemplate(template);
     // Save selected template ID to localStorage for persistence
     if (template.id) {
-      try {
-        localStorage.setItem('selectedSessionTemplateId', template.id);
-      } catch (e) {
-        // Silently ignore storage errors (e.g., quota exceeded on iOS)
-        console.warn('Failed to save template selection to localStorage:', e);
-      }
+      setSelectedTemplateId(template.id);
     }
   };
 
@@ -246,10 +236,7 @@ export const SessionManager: React.FC = () => {
     if (item.entry.pitch) {
       params.set('pitch', item.entry.pitch);
     }
-    // Use the selected template for preview
-    if (selectedTemplate?.id) {
-      params.set('templateId', selectedTemplate.id);
-    }
+    // Template will be loaded from localStorage, no need to pass in URL
     const query = params.toString();
     navigate(`/presentation/${songId}${query ? `?${query}` : ''}`);
   };

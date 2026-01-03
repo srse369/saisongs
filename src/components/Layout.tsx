@@ -616,9 +616,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                               return center ? (
                                 <span
                                   key={centerId}
-                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700"
+                                  className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full border-2"
                                   style={{
-                                    color: center.badgeTextColor || '#10b981'
+                                    backgroundColor: (center.badgeTextColor || '#1e40af') + '20',
+                                    borderColor: center.badgeTextColor || '#1e40af',
+                                    color: center.badgeTextColor || '#1e40af'
                                   }}
                                 >
                                   {center.name}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { OTPLoginDialog } from '../admin/OTPLoginDialog';
 
@@ -11,6 +11,7 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireAdmin = false, requireEditor = false }) => {
   const { isAuthenticated, isAdmin, isEditor, isLoading } = useAuth();
+  const navigate = useNavigate();
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const location = useLocation();
@@ -42,12 +43,20 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
         <div className="p-8 text-center">
           <h2 className="text-xl font-bold text-red-600 mb-4">Access Denied</h2>
           <p className="text-gray-700 dark:text-gray-300">This page requires administrator privileges.</p>
-          <button 
-            onClick={() => window.history.back()}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Go Back
-          </button>
+          <div className="flex gap-4 justify-center mt-4">
+            <button 
+              onClick={() => window.history.back()}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Go Back
+            </button>
+            <button 
+              onClick={() => navigate('/')}
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              Go Home
+            </button>
+          </div>
         </div>
       );
     }
@@ -57,12 +66,20 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
         <div className="p-8 text-center">
           <h2 className="text-xl font-bold text-red-600 mb-4">Access Denied</h2>
           <p className="text-gray-700 dark:text-gray-300">This page requires editor privileges.</p>
-          <button 
-            onClick={() => window.history.back()}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Go Back
-          </button>
+          <div className="flex gap-4 justify-center mt-4">
+            <button 
+              onClick={() => window.history.back()}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Go Back
+            </button>
+            <button 
+              onClick={() => navigate('/')}
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              Go Home
+            </button>
+          </div>
         </div>
       );
     }

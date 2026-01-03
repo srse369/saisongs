@@ -6,13 +6,13 @@ import { generatePresentationSlides } from '../../utils/slideUtils';
 import type { Slide, Song, PresentationTemplate } from '../../types';
 import apiClient from '../../services/ApiClient';
 import templateService from '../../services/TemplateService';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSongs } from '../../contexts/SongContext';
+import { getSelectedTemplateId, setSelectedTemplateId, clearSelectedTemplateId } from '../../utils/cacheUtils';
 
 interface PresentationModeProps {
   songId: string;
   onExit?: () => void;
-  templateId?: string;
 }
 
 // Content scale bounds
@@ -20,8 +20,9 @@ const MIN_CONTENT_SCALE = 0.5;
 const MAX_CONTENT_SCALE = 1.5;
 const CONTENT_SCALE_STEP = 0.1;
 
-export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onExit, templateId }) => {
+export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onExit }) => {
   const { songs } = useSongs();
+  const navigate = useNavigate();
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -35,33 +36,37 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
   const [searchParams] = useSearchParams();
   const singerName = searchParams.get('singerName') || undefined;
   const pitch = searchParams.get('pitch') || undefined;
-  // Read templateId from URL params if not provided as prop
-  const urlTemplateId = searchParams.get('templateId') || undefined;
-
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(templateId || urlTemplateId);
-
-  // Update selectedTemplateId when URL param or prop changes
-  useEffect(() => {
-    const newTemplateId = templateId || urlTemplateId;
-    if (newTemplateId && newTemplateId !== selectedTemplateId) {
-      setSelectedTemplateId(newTemplateId);
-    }
-  }, [templateId, urlTemplateId, selectedTemplateId]);
   
-  // Pre-load default template if no template is specified
+  // Always get templateId from localStorage, or use default if not set
+  const persistedTemplateId = getSelectedTemplateId();
+  const [selectedTemplateId, setSelectedTemplateIdState] = useState<string | undefined>(persistedTemplateId || undefined);
+  
+  // Wrapper to update both state and localStorage
+  const updateSelectedTemplateId = (id: string | undefined) => {
+    setSelectedTemplateIdState(id);
+    if (id) {
+      setSelectedTemplateId(id); // Save to localStorage utility function
+    }
+  };
+
+  // Re-read persisted template when songId changes (in case it was updated in another preview)
   useEffect(() => {
-    if (!templateId && !urlTemplateId && !selectedTemplateId && !activeTemplate) {
-      // Load default template immediately so UI shows correct state and slides can be generated
+    const currentPersisted = getSelectedTemplateId();
+    if (currentPersisted && currentPersisted !== selectedTemplateId) {
+      setSelectedTemplateIdState(currentPersisted);
+    } else if (!currentPersisted && !selectedTemplateId && !activeTemplate) {
+      // If no template in localStorage, load default template
       templateService.getDefaultTemplate().then(template => {
-        if (template && !selectedTemplateId && !activeTemplate) {
-          setSelectedTemplateId(template.id);
+        if (template && template.id) {
+          setSelectedTemplateIdState(template.id);
           setActiveTemplate(template);
+          setSelectedTemplateId(template.id); // Persist default template
         }
       }).catch(err => {
-        console.error('Error pre-loading default template:', err);
+        console.error('Error loading default template:', err);
       });
     }
-  }, [templateId, urlTemplateId, selectedTemplateId, activeTemplate]);
+  }, [songId, selectedTemplateId, activeTemplate]);
 
   // Load template and song data on mount
   useEffect(() => {
@@ -70,8 +75,14 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
       setError(null);
       
       try {
-        // Get templateId from prop, URL params, or state (in that order of priority)
-        const effectiveTemplateId = templateId || urlTemplateId || selectedTemplateId;
+        // Always get templateId from localStorage or state, fallback to default
+        const currentPersistedTemplateId = getSelectedTemplateId();
+        const effectiveTemplateId = currentPersistedTemplateId || selectedTemplateId;
+        
+        // Update state if we found a persisted template that's different
+        if (currentPersistedTemplateId && currentPersistedTemplateId !== selectedTemplateId) {
+          setSelectedTemplateIdState(currentPersistedTemplateId);
+        }
         
         // Only skip reloading if we have BOTH template AND song with full data, and they match
         // Don't skip if we only have template but not song, or vice versa
@@ -94,7 +105,33 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
               }
             } catch (error) {
               console.error('Error loading template:', error);
-              return null;
+              
+              // Only clear template ID if we're certain it's a 404 (not found) error
+              // For all other errors (network, 500, timeout, etc.), keep the template ID
+              // as the error may be temporary and the template may be valid
+              const isNotFoundError = error instanceof Error && (
+                error.message.includes('404') ||
+                error.message.includes('Not Found') ||
+                (error.message.includes('not found') && !error.message.includes('Failed to fetch'))
+              );
+              
+              // Only clear on confirmed 404 errors
+              if (isNotFoundError && effectiveTemplateId && effectiveTemplateId === currentPersistedTemplateId) {
+                console.warn(`Template ${effectiveTemplateId} not found (404), clearing from localStorage and using default`);
+                clearSelectedTemplateId();
+              } else if (effectiveTemplateId && effectiveTemplateId === currentPersistedTemplateId) {
+                // For all other errors, don't clear - just log and fall back temporarily
+                // The template ID is preserved so it can be retried later
+                console.warn(`Error loading template ${effectiveTemplateId}, falling back to default (error may be temporary, template ID preserved)`);
+              }
+              
+              // Fall back to default template
+              try {
+                return await templateService.getDefaultTemplate();
+              } catch (e) {
+                console.error('Error loading default template:', e);
+                return null;
+              }
             }
           })(),
           (async () => {
@@ -117,16 +154,22 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
         setSongData(song);
         if (template) {
           setActiveTemplate(template);
-          // Always update selectedTemplateId to match the loaded template
-          // This ensures default template is selected if no template was specified
-          setSelectedTemplateId(template.id);
+          // Update state to match loaded template
+          if (template.id && template.id !== selectedTemplateId) {
+            setSelectedTemplateIdState(template.id);
+          }
         } else {
           // If template failed to load, try to get default as fallback
           try {
             const defaultTemplate = await templateService.getDefaultTemplate();
-            if (defaultTemplate) {
+            if (defaultTemplate && defaultTemplate.id) {
               setActiveTemplate(defaultTemplate);
-              setSelectedTemplateId(defaultTemplate.id);
+              setSelectedTemplateIdState(defaultTemplate.id);
+              // Persist default template if not already persisted
+              const currentPersisted = getSelectedTemplateId();
+              if (!currentPersisted) {
+                setSelectedTemplateId(defaultTemplate.id);
+              }
             }
           } catch (e) {
             console.error('Failed to load default template as fallback:', e);
@@ -140,8 +183,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     };
 
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [songId, templateId, urlTemplateId]);
+  }, [songId, selectedTemplateId]);
 
   // Generate slides when song or template changes (after initial load)
   useEffect(() => {
@@ -372,12 +414,20 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white">
         <p className="text-xl mb-4">{error || 'No slides available'}</p>
-        <button
-          onClick={handleExitPresentation}
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-        >
-          Go Back
-        </button>
+        <div className="flex gap-4">
+          <button
+            onClick={handleExitPresentation}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            Go Back
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="px-6 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            Go Home
+          </button>
+        </div>
       </div>
     );
   }
@@ -404,7 +454,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
         <TemplateSelector 
           currentTemplateId={selectedTemplateId}
           onTemplateSelect={(template) => {
-            setSelectedTemplateId(template.id);
+            updateSelectedTemplateId(template.id);
             setActiveTemplate(template);
           }}
           onExpandedChange={setTemplatePickerExpanded}

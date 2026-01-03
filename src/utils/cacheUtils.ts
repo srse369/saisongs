@@ -9,14 +9,6 @@ import LZString from 'lz-string';
 
 // Common cache keys used across the application
 export const CACHE_KEYS = {
-  // Legacy keys (songStudio prefix)
-  SONG_STUDIO_SONGS: 'songStudio:songsCache',
-  SONG_STUDIO_SINGERS: 'songStudio:singersCache',
-  SONG_STUDIO_PITCHES: 'songStudio:pitchesCache',
-  SONG_STUDIO_TEMPLATES: 'songStudio:templatesCache',
-  SONG_STUDIO_CENTERS: 'songStudio:centersCache',
-  SONG_STUDIO_APP_VERSION: 'songStudio:appVersion',
-
   // Current keys (saiSongs prefix)
   SAI_SONGS_SONGS: 'saiSongs:songsCache',
   SAI_SONGS_SINGERS: 'saiSongs:singersCache',
@@ -25,65 +17,13 @@ export const CACHE_KEYS = {
   SAI_SONGS_CENTERS: 'saiSongs:centersCache',
   
   // Other app data
-  SELECTED_SESSION_TEMPLATE_ID: 'selectedSessionTemplateId',
-  TEMPLATE_CLIPBOARD_V1: 'songstudio-template-clipboard',
-  TEMPLATE_CLIPBOARD_V2: 'saisongs-template-clipboard-v2',
+  SELECTED_SESSION_TEMPLATE_ID: 'saiSongs:selectedSessionTemplateId',
+  TEMPLATE_CLIPBOARD: 'saiSongs:templateClipboard',
   
   // Version tracking
   APP_VERSION: 'saiSongs:appVersion',
   LAST_LOCAL_STORAGE_CLEAR: 'lastLocalStorageClear',
 } as const;
-
-/**
- * All cache keys that should be cleared
- */
-export const ALL_CACHE_KEYS = [
-  CACHE_KEYS.SONG_STUDIO_SONGS,
-  CACHE_KEYS.SONG_STUDIO_SINGERS,
-  CACHE_KEYS.SONG_STUDIO_PITCHES,
-  CACHE_KEYS.SONG_STUDIO_TEMPLATES,
-  CACHE_KEYS.SONG_STUDIO_CENTERS,
-  CACHE_KEYS.SONG_STUDIO_APP_VERSION,
-  CACHE_KEYS.SAI_SONGS_SONGS,
-  CACHE_KEYS.SAI_SONGS_SINGERS,
-  CACHE_KEYS.SAI_SONGS_PITCHES,
-  CACHE_KEYS.SAI_SONGS_TEMPLATES,  
-  CACHE_KEYS.SAI_SONGS_CENTERS,
-  CACHE_KEYS.APP_VERSION,
-  CACHE_KEYS.SELECTED_SESSION_TEMPLATE_ID,
-  CACHE_KEYS.TEMPLATE_CLIPBOARD_V1,
-  CACHE_KEYS.TEMPLATE_CLIPBOARD_V2,
-] as const;
-
-/**
- * Legacy cache keys (songStudio prefix) - no longer used
- */
-export const LEGACY_CACHE_KEYS = [
-  CACHE_KEYS.SONG_STUDIO_SONGS,
-  CACHE_KEYS.SONG_STUDIO_SINGERS,
-  CACHE_KEYS.SONG_STUDIO_PITCHES,
-  CACHE_KEYS.SONG_STUDIO_TEMPLATES,
-  CACHE_KEYS.SONG_STUDIO_CENTERS,
-  CACHE_KEYS.SONG_STUDIO_APP_VERSION,
-  CACHE_KEYS.TEMPLATE_CLIPBOARD_V1,
-] as const;
-
-/**
- * Cache keys for data caches (excludes version tracking and clipboard)
- */
-export const DATA_CACHE_KEYS = [
-  CACHE_KEYS.SONG_STUDIO_SONGS,
-  CACHE_KEYS.SONG_STUDIO_SINGERS,
-  CACHE_KEYS.SONG_STUDIO_PITCHES,
-  CACHE_KEYS.SONG_STUDIO_TEMPLATES,
-  CACHE_KEYS.SONG_STUDIO_CENTERS,
-  CACHE_KEYS.SAI_SONGS_SONGS,
-  CACHE_KEYS.SAI_SONGS_SINGERS,
-  CACHE_KEYS.SAI_SONGS_PITCHES,
-  CACHE_KEYS.SAI_SONGS_TEMPLATES,
-  CACHE_KEYS.SAI_SONGS_CENTERS,
-  CACHE_KEYS.SELECTED_SESSION_TEMPLATE_ID,
-] as const;
 
 export interface ClearCacheOptions {
   /** Whether to clear service worker cache (HTML, JS, CSS files) */
@@ -137,6 +77,45 @@ export function compressString(data: string): string {
 }
 
 /**
+ * Get the selected template ID from localStorage (shared across all preview modes)
+ */
+export function getSelectedTemplateId(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(CACHE_KEYS.SELECTED_SESSION_TEMPLATE_ID);
+  } catch (e) {
+    console.warn('Failed to get selected template ID from localStorage:', e);
+    return null;
+  }
+}
+
+/**
+ * Set the selected template ID in localStorage (shared across all preview modes)
+ */
+export function setSelectedTemplateId(templateId: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    localStorage.setItem(CACHE_KEYS.SELECTED_SESSION_TEMPLATE_ID, templateId);
+    return true;
+  } catch (e) {
+    console.warn('Failed to save selected template ID to localStorage:', e);
+    return false;
+  }
+}
+
+/**
+ * Clear the selected template ID from localStorage
+ */
+export function clearSelectedTemplateId(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(CACHE_KEYS.SELECTED_SESSION_TEMPLATE_ID);
+  } catch (e) {
+    console.warn('Failed to clear selected template ID from localStorage:', e);
+  }
+}
+
+/**
  * Decompress a string if it was compressed
  * Returns original string if not compressed or decompression fails
  */
@@ -159,100 +138,6 @@ export function decompressString(data: string): string {
   return data;
 }
 
-/**
- * Safely set a localStorage item with quota exceeded error handling
- * If quota is exceeded, attempts to clear old caches and retry
- * Automatically compresses large data to reduce storage size
- * @param key - The key to set
- * @param value - The value to set
- * @param options - Options for handling quota errors
- * @returns true if successful, false if failed even after cleanup
- */
-export function safeSetLocalStorageItem(
-  key: string,
-  value: string,
-  options: {
-    clearOnQuotaError?: boolean;
-    skipKeys?: string[];
-    compress?: boolean;
-  } = {}
-): boolean {
-  const { clearOnQuotaError = true, skipKeys = [], compress = true } = options;
-
-  // Compress if enabled and data is large (>10KB)
-  let dataToStore = value;
-  if (compress && value.length > 10000) {
-    dataToStore = compressString(value);
-  }
-
-  try {
-    localStorage.setItem(key, dataToStore);
-    return true;
-  } catch (error) {
-    // Check if it's a quota exceeded error
-    const isQuotaError =
-      error instanceof DOMException &&
-      (error.code === 22 || // QuotaExceededError
-       error.code === 1014 || // NS_ERROR_DOM_QUOTA_REACHED (Firefox)
-       error.name === 'QuotaExceededError' ||
-       error.name === 'NS_ERROR_DOM_QUOTA_REACHED');
-
-    if (!isQuotaError) {
-      // Not a quota error, just log and return false
-      console.warn(`Failed to set localStorage key "${key}":`, error);
-      return false;
-    }
-
-    console.warn(`localStorage quota exceeded when setting "${key}". Attempting cleanup...`);
-
-    if (!clearOnQuotaError) {
-      return false;
-    }
-
-    // Try to clear old caches and retry
-    try {
-      // Clear data caches (but skip the key we're trying to set and any explicitly skipped keys)
-      const keysToClear = DATA_CACHE_KEYS.filter(
-        k => k !== key && !skipKeys.includes(k)
-      );
-
-      // Clear oldest caches first (we'll clear all data caches as a simple strategy)
-      keysToClear.forEach(k => {
-        try {
-          localStorage.removeItem(k);
-        } catch (e) {
-          // Ignore errors when clearing
-        }
-      });
-
-      // Retry setting the item (use compressed version if we have it)
-      localStorage.setItem(key, dataToStore);
-      console.log(`Successfully set "${key}" after clearing old caches`);
-      return true;
-    } catch (retryError) {
-      console.error(`Failed to set "${key}" even after clearing caches:`, retryError);
-      return false;
-    }
-  }
-}
-
-/**
- * Clear legacy cache keys (songStudio:* prefix)
- * Should be called on app initialization to free up localStorage space
- */
-export function clearLegacyCacheKeys(): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  LEGACY_CACHE_KEYS.forEach(key => {
-    try {
-      window.localStorage.removeItem(key);
-    } catch (error) {
-      console.warn(`Failed to clear legacy cache key "${key}":`, error);
-    }
-  });
-}
 
 /**
  * Get a localStorage item and automatically decompress if needed
@@ -271,19 +156,71 @@ export function getLocalStorageItem(key: string): string | null {
 }
 
 /**
+ * Set a localStorage item with automatic compression and error handling
+ * @param key - The key to set
+ * @param value - The value to set (will be compressed before storing)
+ * @returns true if successful, false if failed
+ */
+export function setLocalStorageItem(key: string, value: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    // Automatically compress the value to save localStorage space
+    const compressedValue = compressString(value);
+    localStorage.setItem(key, compressedValue);
+    return true;
+  } catch (error) {
+    console.warn(`Failed to set localStorage key "${key}":`, error);
+    return false;
+  }
+}
+
+/**
+ * Remove a localStorage item with error handling
+ * @param key - The key to remove
+ * @returns true if successful, false if failed
+ */
+export function removeLocalStorageItem(key: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch (error) {
+    console.warn(`Failed to remove localStorage key "${key}":`, error);
+    return false;
+  }
+}
+
+/**
+ * Check if a localStorage item exists
+ * @param key - The key to check
+ * @returns true if the key exists, false otherwise
+ */
+export function hasLocalStorageItem(key: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(key) !== null;
+  } catch (error) {
+    console.warn(`Failed to check localStorage key "${key}":`, error);
+    return false;
+  }
+}
+
+/**
  * Clear localStorage caches
  * @param keys - Array of cache keys to clear. If not provided, clears all data cache keys.
  */
 export function clearLocalStorageCache(keys?: string[]): void {
-  const keysToClear = keys || DATA_CACHE_KEYS;
-  
-  keysToClear.forEach(key => {
-    try {
-      window.localStorage.removeItem(key);
-    } catch (error) {
-      console.warn(`Failed to clear localStorage key "${key}":`, error);
-    }
-  });
+  const appVersion = localStorage.getItem(CACHE_KEYS.APP_VERSION);
+  const lastLocalStorageClear = localStorage.getItem(CACHE_KEYS.LAST_LOCAL_STORAGE_CLEAR);
+
+  localStorage.clear();
+
+  if (appVersion) {
+    localStorage.setItem(CACHE_KEYS.APP_VERSION, appVersion);
+  }
+  if (lastLocalStorageClear) {
+    localStorage.setItem(CACHE_KEYS.LAST_LOCAL_STORAGE_CLEAR, lastLocalStorageClear);
+  }
 }
 
 /**

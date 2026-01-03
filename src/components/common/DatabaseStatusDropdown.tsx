@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../../services/ApiClient';
-import { clearAllCaches, checkCacheClearCooldown, CACHE_KEYS } from '../../utils/cacheUtils';
+import { clearAllCaches, checkCacheClearCooldown, CACHE_KEYS, getLocalStorageItem } from '../../utils/cacheUtils';
 
 // Cache health stats for 60 seconds
 let healthStatsCache: { stats: any; timestamp: number } | null = null;
@@ -49,7 +49,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
   const [clearingLocalStorage, setClearingLocalStorage] = useState(false);
   const [localStorageMessage, setLocalStorageMessage] = useState<string | null>(null);
   const [lastLocalStorageClear, setLastLocalStorageClear] = useState<number | null>(() => {
-    const saved = localStorage.getItem(CACHE_KEYS.LAST_LOCAL_STORAGE_CLEAR);
+    const saved = getLocalStorageItem(CACHE_KEYS.LAST_LOCAL_STORAGE_CLEAR);
     return saved ? parseInt(saved, 10) : null;
   });
   const [brevoStatus, setBrevoStatus] = useState<BrevoStatus | null>(null);

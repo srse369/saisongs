@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../contexts/SessionContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
@@ -9,6 +9,7 @@ import { LoadingSpinner } from '../common/LoadingSpinner';
 import { generateSessionPresentationSlides } from '../../utils/slideUtils';
 import ApiClient from '../../services/ApiClient';
 import templateService from '../../services/TemplateService';
+import { getSelectedTemplateId, setSelectedTemplateId, clearSelectedTemplateId } from '../../utils/cacheUtils';
 import type { Slide, Song, PresentationTemplate } from '../../types';
 
 interface SessionPresentationModeProps {
@@ -21,7 +22,7 @@ const MAX_CONTENT_SCALE = 1.5;
 const CONTENT_SCALE_STEP = 0.1;
 
 export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = ({ onExit }) => {
-  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { entries } = useSession();
   const { songs } = useSongs();
   const { singers } = useSingers();
@@ -52,7 +53,9 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
       setError(null);
       
       try {
-        const templateId = searchParams.get('templateId');
+        // Always get templateId from localStorage, or use default if not set
+        const persistedTemplateId = getSelectedTemplateId();
+        const templateId = persistedTemplateId;
         
         // Load template and songs in parallel
         const [template, fullSongs] = await Promise.all([
@@ -63,20 +66,42 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
                 setSelectedTemplateId(templateId);
                 return t;
               } else {
-                // Always load default template if no template specified
+                // Always load default template if no template in localStorage
                 const t = await templateService.getDefaultTemplate();
-                if (t) {
+                if (t && t.id) {
                   setSelectedTemplateId(t.id);
+                  setSelectedTemplateId(t.id); // Persist default template
                 }
                 return t;
               }
             } catch (error) {
               console.error('Error loading template:', error);
-              // If error loading template, try to fall back to default
+              
+              // Only clear template ID if we're certain it's a 404 (not found) error
+              // For all other errors (network, 500, timeout, etc.), keep the template ID
+              // as the error may be temporary and the template may be valid
+              const isNotFoundError = error instanceof Error && (
+                error.message.includes('404') ||
+                error.message.includes('Not Found') ||
+                (error.message.includes('not found') && !error.message.includes('Failed to fetch'))
+              );
+              
+              // Only clear on confirmed 404 errors
+              if (isNotFoundError && templateId && templateId === persistedTemplateId) {
+                console.warn(`Template ${templateId} not found (404), clearing from localStorage and using default`);
+                clearSelectedTemplateId();
+              } else if (templateId && templateId === persistedTemplateId) {
+                // For all other errors, don't clear - just log and fall back temporarily
+                // The template ID is preserved so it can be retried later
+                console.warn(`Error loading template ${templateId}, falling back to default (error may be temporary, template ID preserved)`);
+              }
+              
+              // Fall back to default template
               try {
                 const defaultTemplate = await templateService.getDefaultTemplate();
-                if (defaultTemplate) {
+                if (defaultTemplate && defaultTemplate.id) {
                   setSelectedTemplateId(defaultTemplate.id);
+                  setSelectedTemplateId(defaultTemplate.id); // Persist default template
                   return defaultTemplate;
                 }
               } catch (e) {
@@ -106,16 +131,17 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         if (template) {
           setActiveTemplate(template);
           // Ensure selectedTemplateId is always set to match the active template
-          if (template.id !== selectedTemplateId) {
+          if (template.id && template.id !== selectedTemplateId) {
             setSelectedTemplateId(template.id);
           }
         } else {
           // If no template loaded, try one more time to get default
           try {
             const defaultTemplate = await templateService.getDefaultTemplate();
-            if (defaultTemplate) {
+            if (defaultTemplate && defaultTemplate.id) {
               setActiveTemplate(defaultTemplate);
               setSelectedTemplateId(defaultTemplate.id);
+              setSelectedTemplateId(defaultTemplate.id); // Persist default template
             }
           } catch (e) {
             console.error('Failed to load default template as fallback:', e);
@@ -130,7 +156,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
     };
 
     loadData();
-  }, [entries, searchParams]);
+  }, [entries]);
 
   // Generate slides when data changes (after initial load)
   useEffect(() => {
@@ -340,12 +366,20 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white">
         <p className="text-xl mb-4">{error || 'No slides available'}</p>
-        <button
-          onClick={handleExitPresentation}
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-        >
-          Go Back
-        </button>
+        <div className="flex gap-4">
+          <button
+            onClick={handleExitPresentation}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            Go Back
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="px-6 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            Go Home
+          </button>
+        </div>
       </div>
     );
   }
@@ -375,14 +409,9 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
           onTemplateSelect={(template) => {
             setSelectedTemplateId(template.id);
             setActiveTemplate(template);
-            // Sync template selection to localStorage for the Live tab
+            // Persist template selection to localStorage for future previews
             if (template.id) {
-              try {
-                localStorage.setItem('selectedSessionTemplateId', template.id);
-              } catch (e) {
-                // Silently ignore storage errors (e.g., quota exceeded on iOS)
-                console.warn('Failed to save template selection to localStorage:', e);
-              }
+              setSelectedTemplateId(template.id);
             }
           }}
           onExpandedChange={setTemplatePickerExpanded}

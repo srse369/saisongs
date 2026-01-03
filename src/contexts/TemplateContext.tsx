@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { PresentationTemplate, ServiceError } from '../types';
 import templateService from '../services/TemplateService';
 import { useToast } from './ToastContext';
-import { safeSetLocalStorageItem, getLocalStorageItem, compressString, decompressString } from '../utils/cacheUtils';
+import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
 
 const TEMPLATES_CACHE_KEY = 'saiSongs:templatesCache';
 const TEMPLATES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -71,9 +71,8 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
         const cachedRaw = getLocalStorageItem(TEMPLATES_CACHE_KEY);
         if (cachedRaw) {
           try {
-            // Decompress if needed
-            const decompressed = decompressString(cachedRaw);
-            const cached = JSON.parse(decompressed) as {
+            // getLocalStorageItem already decompresses automatically
+            const cached = JSON.parse(cachedRaw) as {
               timestamp: number;
               templates: PresentationTemplate[];
             };
@@ -95,22 +94,14 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
       setTemplates(freshTemplates);
       setHasFetched(true);
 
-      // Persist to cache for subsequent loads (with compression for large template data)
+      // Persist to cache for subsequent loads (compression is handled automatically by setLocalStorageItem)
       if (typeof window !== 'undefined') {
         const cacheData = JSON.stringify({
           timestamp: Date.now(),
           templates: freshTemplates,
         });
         
-        // Compress template data to save localStorage space
-        const compressedCacheData = compressString(cacheData);
-        
-        const success = safeSetLocalStorageItem(TEMPLATES_CACHE_KEY, compressedCacheData, {
-          clearOnQuotaError: true,
-          skipKeys: [TEMPLATES_CACHE_KEY], // Don't clear the template we're trying to set
-        });
-        
-        if (!success) {
+        if (!setLocalStorageItem(TEMPLATES_CACHE_KEY, cacheData)) {
           console.warn('Failed to cache templates due to localStorage quota. Templates will be fetched from server on next load.');
         }
       }
@@ -169,9 +160,7 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
       // Add to local state immediately for instant UI update
       setTemplates(prev => [...prev, created]);
       // Clear localStorage cache so fresh data is fetched next time
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(TEMPLATES_CACHE_KEY);
-      }
+      removeLocalStorageItem(TEMPLATES_CACHE_KEY);
       toast.success('Template created successfully');
       return created;
     } catch (err) {
@@ -195,9 +184,7 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
       if (updated) {
         setTemplates(prev => prev.map(t => t.id === id ? updated : t));
         // Clear localStorage cache so fresh data is fetched next time
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(TEMPLATES_CACHE_KEY);
-        }
+        removeLocalStorageItem(TEMPLATES_CACHE_KEY);
         toast.success('Template updated successfully');
       }
       return updated;
@@ -221,9 +208,7 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
       await templateService.deleteTemplate(id);
       setTemplates(prev => prev.filter(template => template.id !== id));
       // Clear localStorage cache so fresh data is fetched next time
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(TEMPLATES_CACHE_KEY);
-      }
+      removeLocalStorageItem(TEMPLATES_CACHE_KEY);
       toast.success('Template deleted successfully');
       return true;
     } catch (err) {
@@ -251,9 +236,7 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
           isDefault: t.id === id
         })));
         // Clear localStorage cache so fresh data is fetched next time
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(TEMPLATES_CACHE_KEY);
-        }
+        removeLocalStorageItem(TEMPLATES_CACHE_KEY);
         toast.success(`${updated.name} is now the default template`);
       }
       return updated;
@@ -279,9 +262,7 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
         // Add to local state immediately for instant UI update
         setTemplates(prev => [...prev, duplicated]);
         // Clear localStorage cache so fresh data is fetched next time
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(TEMPLATES_CACHE_KEY);
-        }
+        removeLocalStorageItem(TEMPLATES_CACHE_KEY);
         toast.success(`Template duplicated as "${name}"`);
       }
       return duplicated;

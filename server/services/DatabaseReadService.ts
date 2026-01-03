@@ -714,16 +714,640 @@ async getAllTemplates(): Promise<any[]> {
   }
 
   // =====================================================
-  // RAW QUERY EXECUTION (for CacheService complex operations)
-  // These methods should ONLY be called from CacheService
+  // CACHE SERVICE READ METHODS
+  // These methods are specifically for CacheService to use
   // =====================================================
 
   /**
-   * Execute a raw SELECT query
-   * @internal For use by CacheService only
+   * Get all songs without CLOB fields (for caching)
    */
-  async executeQuery<T = any>(sql: string, params: any[] | Record<string, any> = [], options: any = {}): Promise<T[]> {
-    return await this.query<T>(sql, params, options);
+  async getAllSongsForCache(): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(s.id) as id,
+        s.name,
+        s.external_source_url,
+        s."LANGUAGE" as language,
+        s.deity,
+        s.tempo,
+        s.beat,
+        s.raga,
+        s."LEVEL" as song_level,
+        s.audio_link,
+        s.golden_voice,
+        s.reference_gents_pitch,
+        s.reference_ladies_pitch,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.song_id = s.id) as pitch_count
+      FROM songs s
+      ORDER BY LTRIM(REGEXP_REPLACE(LOWER(s.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ')
+    `);
+  }
+
+  /**
+   * Get a single song with CLOB fields (for caching)
+   */
+  async getSongWithClobsForCache(id: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(s.id) as id,
+        s.name,
+        s.external_source_url,
+        DBMS_LOB.SUBSTR(s.lyrics, 4000, 1) AS lyrics,
+        DBMS_LOB.SUBSTR(s.meaning, 4000, 1) AS meaning,
+        s."LANGUAGE" as language,
+        s.deity,
+        s.tempo,
+        s.beat,
+        s.raga,
+        s."LEVEL" as song_level,
+        DBMS_LOB.SUBSTR(s.song_tags, 4000, 1) AS song_tags,
+        s.audio_link,
+        s.video_link,
+        s.golden_voice,
+        s.reference_gents_pitch,
+        s.reference_ladies_pitch,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.song_id = s.id) as pitch_count
+      FROM songs s
+      WHERE RAWTOHEX(s.id) = :1
+    `, [id]);
+  }
+
+  /**
+   * Get newly created song by name (for caching)
+   */
+  async getNewSongByNameForCache(name: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        name,
+        external_source_url,
+        DBMS_LOB.SUBSTR(lyrics, 4000, 1) AS lyrics,
+        DBMS_LOB.SUBSTR(meaning, 4000, 1) AS meaning,
+        "LANGUAGE" as language,
+        deity,
+        tempo,
+        beat,
+        raga,
+        "LEVEL" as song_level,
+        DBMS_LOB.SUBSTR(song_tags, 4000, 1) AS song_tags,
+        audio_link,
+        golden_voice,
+        reference_gents_pitch,
+        reference_ladies_pitch
+      FROM songs
+      WHERE name = :name
+      ORDER BY created_at DESC
+      FETCH FIRST 1 ROWS ONLY
+    `, { name });
+  }
+
+  /**
+   * Get updated song by ID (for caching)
+   */
+  async getUpdatedSongByIdForCache(id: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        name,
+        external_source_url,
+        lyrics,
+        meaning,
+        "LANGUAGE" as language,
+        deity,
+        tempo,
+        beat,
+        raga,
+        "LEVEL" as song_level,
+        song_tags,
+        audio_link,
+        golden_voice,
+        reference_gents_pitch,
+        reference_ladies_pitch
+      FROM songs
+      WHERE RAWTOHEX(id) = :id
+    `, { id: id });
+  }
+
+  /**
+   * Get all singers (for caching)
+   */
+  async getAllSingersForCache(): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(u.id) as id,
+        u.name,
+        u.gender,
+        u.email,
+        u.is_admin,
+        u.center_ids,
+        u.editor_for,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
+      FROM users u
+      WHERE u.name IS NOT NULL
+      ORDER BY u.name
+    `);
+  }
+
+  /**
+   * Get a single singer by ID (for caching)
+   */
+  async getSingerByIdForCache(id: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(u.id) as id,
+        u.name,
+        u.gender,
+        u.email,
+        u.is_admin,
+        u.center_ids,
+        u.editor_for,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
+      FROM users u
+      WHERE RAWTOHEX(u.id) = :1
+    `, [id]);
+  }
+
+  /**
+   * Get newly created singer by name (for caching)
+   */
+  async getNewSingerByNameForCache(name: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        name,
+        gender,
+        email,
+        center_ids,
+        editor_for
+      FROM users
+      WHERE name = :1
+      ORDER BY created_at DESC
+      FETCH FIRST 1 ROWS ONLY
+    `, [name]);
+  }
+
+  /**
+   * Get singer admin/center data before update (for caching)
+   */
+  async getSingerForUpdateForCache(id: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(u.id) as id,
+        u.is_admin,
+        u.center_ids,
+        u.editor_for
+      FROM users u
+      WHERE RAWTOHEX(u.id) = :1
+    `, [id]);
+  }
+
+  /**
+   * Get updated singer by ID (for caching)
+   */
+  async getUpdatedSingerByIdForCache(id: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(u.id) as id,
+        u.name,
+        u.gender,
+        u.email,
+        u.is_admin,
+        u.center_ids,
+        u.editor_for,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
+      FROM users u
+      WHERE RAWTOHEX(u.id) = :1
+    `, [id]);
+  }
+
+  /**
+   * Get user by ID for admin status check (for caching)
+   */
+  async getUserEmailByIdForCache(id: string): Promise<any[]> {
+    return await this.query(
+      `SELECT email FROM users WHERE RAWTOHEX(id) = :1`,
+      [id]
+    );
+  }
+
+  /**
+   * Get user editor_for by ID (for caching)
+   */
+  async getUserEditorForByIdForCache(id: string): Promise<any[]> {
+    return await this.query(
+      `SELECT RAWTOHEX(id) as id, editor_for FROM users WHERE RAWTOHEX(id) = :1`,
+      [id]
+    );
+  }
+
+  /**
+   * Get all pitches with song and singer names (for caching)
+   */
+  async getAllPitchesForCache(): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(ssp.id) as id,
+        RAWTOHEX(ssp.song_id) as song_id,
+        RAWTOHEX(ssp.singer_id) as singer_id,
+        ssp.pitch,
+        s.name as song_name,
+        si.name as singer_name
+      FROM song_singer_pitches ssp
+      LEFT JOIN songs s ON ssp.song_id = s.id
+      LEFT JOIN users si ON ssp.singer_id = si.id
+      ORDER BY LTRIM(REGEXP_REPLACE(LOWER(s.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ') NULLS LAST, LTRIM(REGEXP_REPLACE(LOWER(si.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ') NULLS LAST
+    `);
+  }
+
+  /**
+   * Get a single pitch by ID (for caching)
+   */
+  async getPitchByIdForCache(id: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(ssp.id) as id,
+        RAWTOHEX(ssp.song_id) as song_id,
+        RAWTOHEX(ssp.singer_id) as singer_id,
+        ssp.pitch,
+        s.name as song_name,
+        si.name as singer_name
+      FROM song_singer_pitches ssp
+      LEFT JOIN songs s ON ssp.song_id = s.id
+      LEFT JOIN users si ON ssp.singer_id = si.id
+      WHERE RAWTOHEX(ssp.id) = :1
+    `, [id]);
+  }
+
+  /**
+   * Get newly created pitch (for caching)
+   */
+  async getNewPitchForCache(songId: string, singerId: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(ssp.id) as id,
+        RAWTOHEX(ssp.song_id) as song_id,
+        RAWTOHEX(ssp.singer_id) as singer_id,
+        ssp.pitch,
+        s.name as song_name,
+        si.name as singer_name
+      FROM song_singer_pitches ssp
+      JOIN songs s ON ssp.song_id = s.id
+      JOIN users si ON ssp.singer_id = si.id
+      WHERE RAWTOHEX(ssp.song_id) = :1 AND RAWTOHEX(ssp.singer_id) = :2
+      ORDER BY ssp.created_at DESC
+      FETCH FIRST 1 ROWS ONLY
+    `, [songId, singerId]);
+  }
+
+  /**
+   * Get updated pitch by ID (for caching)
+   */
+  async getUpdatedPitchForCache(id: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(ssp.id) as id,
+        RAWTOHEX(ssp.song_id) as song_id,
+        RAWTOHEX(ssp.singer_id) as singer_id,
+        ssp.pitch,
+        s.name as song_name,
+        si.name as singer_name
+      FROM song_singer_pitches ssp
+      JOIN songs s ON ssp.song_id = s.id
+      JOIN users si ON ssp.singer_id = si.id
+      WHERE RAWTOHEX(ssp.id) = :1
+    `, [id]);
+  }
+
+  /**
+   * Get pitch count for a song (for caching)
+   */
+  async getSongPitchCountForCache(songId: string): Promise<any[]> {
+    return await this.query(`
+      SELECT COUNT(*) as pitch_count
+      FROM song_singer_pitches
+      WHERE RAWTOHEX(song_id) = :1
+    `, [songId]);
+  }
+
+  /**
+   * Get pitch count for a singer (for caching)
+   */
+  async getSingerPitchCountForCache(singerId: string): Promise<any[]> {
+    return await this.query(`
+      SELECT COUNT(*) as pitch_count
+      FROM song_singer_pitches
+      WHERE RAWTOHEX(singer_id) = :1
+    `, [singerId]);
+  }
+
+  /**
+   * Get all centers (for caching)
+   */
+  async getAllCentersForCache(): Promise<any[]> {
+    return await this.query(
+      `SELECT id, name, badge_text_color, created_at, created_by, updated_at, updated_by
+       FROM centers 
+       ORDER BY name ASC`
+    );
+  }
+
+  /**
+   * Get all users with editor_for and center_ids (for caching)
+   */
+  async getAllUsersForCentersCache(): Promise<any[]> {
+    return await this.query(
+      `SELECT RAWTOHEX(id) as id, editor_for, center_ids, name
+        FROM users WHERE name IS NOT NULL`
+    );
+  }
+
+  /**
+   * Get center by ID (for caching)
+   */
+  async getCenterByIdForCache(id: string | number): Promise<any[]> {
+    return await this.query(
+      `SELECT id, name, badge_text_color, created_at, created_by, updated_at, updated_by
+       FROM centers 
+       WHERE id = :1`,
+      [id]
+    );
+  }
+
+  /**
+   * Get editors for a center (for caching)
+   */
+  async getCenterEditorsForCache(id: string | number): Promise<any[]> {
+    return await this.query(
+      `SELECT RAWTOHEX(id) as id FROM users 
+       WHERE editor_for IS NOT NULL
+       AND EXISTS (
+         SELECT 1 FROM JSON_TABLE(editor_for, '$[*]'
+           COLUMNS (center_id NUMBER PATH '$')
+         ) jt
+         WHERE jt.center_id = :1
+       )`,
+      [id]
+    );
+  }
+
+  /**
+   * Get newly created center by name (for caching)
+   */
+  async getNewCenterByNameForCache(name: string): Promise<any[]> {
+    return await this.query(
+      `SELECT id, name, badge_text_color, created_at, updated_at 
+       FROM centers 
+       WHERE name = :1 
+       ORDER BY created_at DESC`,
+      [name]
+    );
+  }
+
+  /**
+   * Get all sessions (for caching)
+   */
+  async getAllSessionsForCache(): Promise<any[]> {
+    return await this.query(`
+        SELECT 
+          RAWTOHEX(id) as id,
+          name,
+          description,
+          center_ids,
+          created_at,
+          created_by,
+          updated_at,
+          updated_by
+        FROM song_sessions 
+        ORDER BY name
+      `);
+  }
+
+  /**
+   * Get session by ID (for caching)
+   */
+  async getSessionByIdForCache(id: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        name,
+        description,
+        center_ids,
+        created_by,
+        created_at,
+        updated_at
+      FROM song_sessions 
+      WHERE RAWTOHEX(id) = :1
+    `, [id]);
+  }
+
+  /**
+   * Get session items with details (for caching)
+   */
+  async getSessionItemsForCache(sessionId: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(si.id) as id,
+        RAWTOHEX(si.session_id) as session_id,
+        RAWTOHEX(si.song_id) as song_id,
+        RAWTOHEX(si.singer_id) as singer_id,
+        si.pitch,
+        si.sequence_order,
+        si.created_at,
+        si.updated_at,
+        s.name as song_name,
+        s.deity as song_deity,
+        s.language as song_language,
+        s.tempo as song_tempo,
+        s.raga as song_raga,
+        sg.name as singer_name,
+        sg.gender as singer_gender,
+        sg.center_ids as singer_center_ids
+      FROM song_session_items si
+      JOIN songs s ON si.song_id = s.id
+      LEFT JOIN users sg ON si.singer_id = sg.id
+      WHERE RAWTOHEX(si.session_id) = :1
+      ORDER BY si.sequence_order
+    `, [sessionId]);
+  }
+
+  /**
+   * Get session items for reordering (for caching)
+   */
+  async getSessionItemsForReorderForCache(sessionId: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(si.id) as id,
+        RAWTOHEX(si.session_id) as session_id,
+        RAWTOHEX(si.song_id) as song_id,
+        RAWTOHEX(si.singer_id) as singer_id,
+        si.pitch,
+        si.sequence_order,
+        si.created_at,
+        si.updated_at,
+        s.name as song_name,
+        sg.name as singer_name
+      FROM song_session_items si
+      JOIN songs s ON si.song_id = s.id
+      LEFT JOIN users sg ON si.singer_id = sg.id
+      WHERE RAWTOHEX(si.session_id) = :1
+      ORDER BY si.sequence_order
+    `, [sessionId]);
+  }
+
+  /**
+   * Get newly created session by name (for caching)
+   */
+  async getNewSessionByNameForCache(name: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        name,
+        description,
+        center_ids,
+        created_by,
+        created_at,
+        updated_at
+      FROM song_sessions 
+      WHERE name = :1
+    `, [name]);
+  }
+
+  /**
+   * Get updated session by ID (for caching)
+   */
+  async getUpdatedSessionByIdForCache(id: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        name,
+        description,
+        center_ids,
+        created_at,
+        updated_at
+      FROM song_sessions 
+      WHERE RAWTOHEX(id) = :1
+    `, [id]);
+  }
+
+  /**
+   * Get session name and description for duplication (for caching)
+   */
+  async getSessionForDuplicateForCache(id: string): Promise<any[]> {
+    return await this.query(`
+      SELECT name, description 
+      FROM song_sessions 
+      WHERE RAWTOHEX(id) = :1
+    `, [id]);
+  }
+
+  /**
+   * Get new session ID by name after duplication (for caching)
+   */
+  async getNewSessionIdByNameForCache(name: string): Promise<any[]> {
+    return await this.query(`
+      SELECT RAWTOHEX(id) as id 
+      FROM song_sessions 
+      WHERE name = :1
+    `, [name]);
+  }
+
+  /**
+   * Get duplicated session details (for caching)
+   */
+  async getDuplicatedSessionForCache(newSessionId: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        name,
+        description,
+        created_at,
+        updated_at
+      FROM song_sessions 
+      WHERE RAWTOHEX(id) = :1
+    `, [newSessionId]);
+  }
+
+  /**
+   * Get all song mappings (for caching)
+   */
+  async getAllSongMappingsForCache(): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        csv_song_name,
+        RAWTOHEX(db_song_id) as db_song_id,
+        db_song_name
+      FROM csv_song_mappings
+      ORDER BY created_at DESC
+    `);
+  }
+
+  /**
+   * Get song mapping by CSV name (for caching)
+   */
+  async getSongMappingByNameForCache(csvName: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        csv_song_name,
+        RAWTOHEX(db_song_id) as db_song_id,
+        db_song_name
+      FROM csv_song_mappings
+      WHERE csv_song_name = :1
+    `, [csvName]);
+  }
+
+  /**
+   * Get all pitch mappings (for caching)
+   */
+  async getAllPitchMappingsForCache(): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        original_format,
+        normalized_format
+      FROM csv_pitch_mappings
+      ORDER BY created_at DESC
+    `);
+  }
+
+  /**
+   * Get pitch mapping by format (for caching)
+   */
+  async getPitchMappingByFormatForCache(originalFormat: string): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(id) as id,
+        original_format,
+        normalized_format
+      FROM csv_pitch_mappings
+      WHERE original_format = :1
+    `, [originalFormat]);
+  }
+
+  /**
+   * Get all feedback (for caching)
+   */
+  async getAllFeedbackForCache(): Promise<any[]> {
+    return await this.query(`
+      SELECT RAWTOHEX(id) as id, feedback, category, email, user_agent, url, ip_address, 
+              status, admin_notes, created_at, updated_at
+       FROM feedback 
+       ORDER BY created_at DESC
+    `);
+  }
+
+  /**
+   * Get feedback by ID (for caching)
+   */
+  async getFeedbackByIdForCache(id: string | number): Promise<any[]> {
+    return await this.query(`
+      SELECT RAWTOHEX(id) as id, feedback, category, email, user_agent, url, ip_address, 
+              status, admin_notes, created_at, updated_at
+       FROM feedback 
+       WHERE RAWTOHEX(id) = :1`,
+      [id]
+    );
   }
 }
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserMultiSelect } from '../common/UserMultiSelect';
 import { clearCentersCache } from '../common/CenterBadges';
+import { removeLocalStorageItem } from '../../utils/cacheUtils';
 import { RefreshIcon, Modal, MobileBottomActionBar, type MobileAction } from '../common';
 
 interface Center {
@@ -66,7 +67,8 @@ export const CentersManager: React.FC = () => {
       }
 
       const data = await response.json();
-      setCenters(data);
+      // Ensure data is an array
+      setCenters(Array.isArray(data) ? data : []);
       setError('');
     } catch (err) {
       console.error('Error fetching centers:', err);
@@ -116,9 +118,9 @@ export const CentersManager: React.FC = () => {
   const handleOpenForm = (center?: Center) => {
     const initialData = center
       ? { 
-          name: center.name, 
-          badgeTextColor: center.badgeTextColor,
-          editorIds: center.editorIds || []
+          name: center.name ?? '', 
+          badgeTextColor: center.badgeTextColor ?? '#1e40af',
+          editorIds: center.editorIds ?? []
         }
       : { 
           name: '', 
@@ -140,9 +142,9 @@ export const CentersManager: React.FC = () => {
 
   const handlePreviewClick = (center: Center) => {
     const initialData = { 
-      name: center.name, 
-      badgeTextColor: center.badgeTextColor,
-      editorIds: center.editorIds || []
+      name: center?.name ?? '', 
+      badgeTextColor: center?.badgeTextColor ?? '#1e40af',
+      editorIds: center?.editorIds ?? []
     };
     setEditingCenter(center);
     setFormData(initialData);
@@ -222,8 +224,8 @@ export const CentersManager: React.FC = () => {
       
       // Clear caches since centers data has changed
       clearCentersCache(); // Clear the CenterBadges module-level cache
-      window.localStorage.removeItem('saiSongs:singersCache'); // Singers may have changed permissions
-      window.localStorage.removeItem('saiSongs:centersCache'); // Clear any localStorage centers cache
+      removeLocalStorageItem('saiSongs:singersCache'); // Singers may have changed permissions
+      removeLocalStorageItem('saiSongs:centersCache'); // Clear any localStorage centers cache
       
       // Dispatch global event to notify other components
       import('../../utils/globalEventBus').then(({ globalEventBus }) => {
@@ -278,8 +280,8 @@ export const CentersManager: React.FC = () => {
       
       // Clear caches since centers data has changed
       clearCentersCache();
-      window.localStorage.removeItem('saiSongs:singersCache');
-      window.localStorage.removeItem('saiSongs:centersCache');
+      removeLocalStorageItem('saiSongs:singersCache');
+      removeLocalStorageItem('saiSongs:centersCache');
       
       // Dispatch global event to notify other components
       import('../../utils/globalEventBus').then(({ globalEventBus }) => {
@@ -408,8 +410,12 @@ export const CentersManager: React.FC = () => {
                         {center.name}
                       </h3>
                       <span
-                        className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700"
-                        style={{ color: center.badgeTextColor }}
+                        className="px-2.5 py-0.5 text-xs font-medium rounded-full border-2"
+                        style={{ 
+                          backgroundColor: (center.badgeTextColor || '#1e40af') + '20',
+                          borderColor: center.badgeTextColor || '#1e40af',
+                          color: center.badgeTextColor || '#1e40af'
+                        }}
                       >
                         {center.name}
                       </span>
@@ -438,7 +444,15 @@ export const CentersManager: React.FC = () => {
                   </span>
                   <span className="text-gray-500 dark:text-gray-400">
                     <i className="fas fa-calendar-alt mr-1"></i>
-                    Created {new Date(center.createdAt).toLocaleDateString()}
+                    Created {(() => {
+                      if (!center.createdAt) return 'Unknown';
+                      try {
+                        const date = new Date(center.createdAt);
+                        return isNaN(date.getTime()) ? 'Unknown' : date.toLocaleDateString();
+                      } catch {
+                        return 'Unknown';
+                      }
+                    })()}
                   </span>
                 </div>
                 </div>
@@ -490,7 +504,7 @@ export const CentersManager: React.FC = () => {
             <input
               id="name"
               type="text"
-              value={formData.name}
+              value={formData.name ?? ''}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
               placeholder="Enter center name"
@@ -515,14 +529,14 @@ export const CentersManager: React.FC = () => {
               <input
                 id="badgeTextColor"
                 type="color"
-                value={formData.badgeTextColor}
+                value={formData.badgeTextColor ?? '#1e40af'}
                 onChange={(e) => setFormData({ ...formData, badgeTextColor: e.target.value })}
                 className="w-10 h-10 rounded cursor-pointer border border-gray-300 dark:border-gray-600"
                 disabled={isSubmitting || isPreviewMode}
               />
               <input
                 type="text"
-                value={formData.badgeTextColor}
+                value={formData.badgeTextColor ?? '#1e40af'}
                 onChange={(e) => setFormData({ ...formData, badgeTextColor: e.target.value })}
                 className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono"
                 placeholder="#1e40af"

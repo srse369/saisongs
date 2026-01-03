@@ -13,6 +13,8 @@ interface PitchFormProps {
   onCancel: () => void;
   onUnsavedChangesRef?: React.MutableRefObject<(() => boolean) | null>;
   userSingerId?: string; // Current user's singer ID if they have a profile
+  defaultSongId?: string; // Default song ID from filter (if any)
+  defaultSingerId?: string; // Default singer ID from filter (if any)
 }
 
 export const PitchForm: React.FC<PitchFormProps> = ({ 
@@ -22,7 +24,9 @@ export const PitchForm: React.FC<PitchFormProps> = ({
   onSubmit, 
   onCancel,
   onUnsavedChangesRef,
-  userSingerId
+  userSingerId,
+  defaultSongId,
+  defaultSingerId
 }) => {
   const { isEditor } = useAuth();
   const [songId, setSongId] = useState('');
@@ -43,17 +47,34 @@ export const PitchForm: React.FC<PitchFormProps> = ({
     });
   }, []);
 
-  // Initialize form with pitch data (edit mode) or pre-select user's singer (viewer creating for self)
+  // Initialize form with pitch data (edit mode) or pre-select defaults (create mode)
   useEffect(() => {
     if (pitch) {
       setSongId(pitch.songId);
       setSingerId(pitch.singerId);
       setPitchValue(pitch.pitch);
-    } else if (isViewerCreatingForSelf && userSingerId) {
-      // Pre-select viewer's own singer profile
-      setSingerId(userSingerId);
+    } else {
+      // Create mode: set defaults based on filters or logged-in user
+      // Priority: 1) song filter, 2) singer filter, 3) logged-in user (for singer only)
+      if (defaultSongId) {
+        setSongId(defaultSongId);
+      } else {
+        setSongId('');
+      }
+      if (defaultSingerId) {
+        setSingerId(defaultSingerId);
+      } else if (isViewerCreatingForSelf && userSingerId) {
+        // Pre-select viewer's own singer profile if no filter
+        setSingerId(userSingerId);
+      } else if (userSingerId) {
+        setSingerId(userSingerId);
+      } else {
+        setSingerId('');
+      }
+      setPitchValue('');
     }
-  }, [pitch, isViewerCreatingForSelf, userSingerId]);
+    setErrors({});
+  }, [pitch, isViewerCreatingForSelf, userSingerId, defaultSongId, defaultSingerId]);
   
   // Track if form has unsaved changes
   const hasUnsavedChanges = useMemo(() => {
@@ -86,22 +107,6 @@ export const PitchForm: React.FC<PitchFormProps> = ({
   // Get selected song's reference pitches
   const selectedSong = songs.find(s => s.id === songId);
   const hasReferencePitches = selectedSong?.refGents || selectedSong?.refLadies;
-
-  useEffect(() => {
-    if (pitch) {
-      setSongId(pitch.songId);
-      setSingerId(pitch.singerId);
-      setPitchValue(pitch.pitch);
-    } else {
-      setSongId('');
-      // Don't clear singerId if viewer is creating for themselves
-      if (!isViewerCreatingForSelf || !userSingerId) {
-        setSingerId('');
-      }
-      setPitchValue('');
-    }
-    setErrors({});
-  }, [pitch, isViewerCreatingForSelf, userSingerId]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};

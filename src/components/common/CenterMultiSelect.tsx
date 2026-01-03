@@ -128,15 +128,18 @@ export const CenterMultiSelect: React.FC<CenterMultiSelectProps> = ({
         ) : (
           selectedCenters.map(center => {
             const isReadOnly = readOnlyCenterIds.includes(center.id);
+            const badgeColor = center.badgeTextColor || '#1e40af';
             return (
               <span
                 key={center.id}
-                className={`inline-flex items-center gap-1 px-3 py-1 text-sm font-medium rounded-full ${
-                  isReadOnly 
-                    ? 'bg-gray-200 dark:bg-gray-600 opacity-75' 
-                    : 'bg-gray-100 dark:bg-gray-700'
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-full border-2 ${
+                  isReadOnly ? 'opacity-75' : ''
                 }`}
-                style={{ color: center.badgeTextColor }}
+                style={{ 
+                  backgroundColor: badgeColor + '20',
+                  borderColor: badgeColor,
+                  color: badgeColor
+                }}
                 title={isReadOnly ? 'Managed by another center - cannot remove' : ''}
               >
                 {center.name}

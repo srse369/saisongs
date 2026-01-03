@@ -204,7 +204,7 @@ export const PitchList: React.FC<PitchListProps> = ({
                 {/* Singer and Pitch */}
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   <span className="hidden md:inline font-medium">Singer: </span>
-                  <span className={`font-bold text-base ${
+                  <span className={`font-semibold text-base ${
                     pitch.singerGender?.toLowerCase() === 'male' 
                       ? 'text-blue-600 dark:text-blue-400' 
                       : pitch.singerGender?.toLowerCase() === 'boy' 

@@ -17,6 +17,7 @@ import { SongDetails } from './SongDetails';
 
 export const PitchManager: React.FC = () => {
   const { isEditor, userId, isAuthenticated } = useAuth();
+
   const { 
     pitches, 
     loading: pitchLoading, 
@@ -118,14 +119,15 @@ export const PitchManager: React.FC = () => {
   // Always fetch data on mount to ensure we have latest data
   useEffect(() => {
     // Fetch all data in parallel for faster loading
+    // The fetch functions handle their own loading state and caching
     Promise.all([
-      !songsLoading && fetchSongs(), // Use cached data
-      !singersLoading && fetchSingers(), // Use cached data
-      !pitchLoading && fetchAllPitches() // Use cached data
+      fetchSongs(), // Will use cache if available and fresh
+      fetchSingers(), // Will use cache if available and fresh
+      fetchAllPitches() // Will use cache if available and fresh
     ]).catch(error => {
       console.error('Error fetching data in parallel:', error);
     });
-  }, [fetchSongs, fetchSingers, fetchAllPitches, songsLoading, singersLoading, pitchLoading]);
+  }, [fetchSongs, fetchSingers, fetchAllPitches]);
 
   // Listen for data refresh requests from global event bus
   useEffect(() => {
@@ -684,7 +686,11 @@ export const PitchManager: React.FC = () => {
             singers={singers}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
-            onUnsavedChangesRef={checkUnsavedChangesRef}            userSingerId={userSinger?.id}          />
+            onUnsavedChangesRef={checkUnsavedChangesRef}
+            userSingerId={userSinger?.id}
+            defaultSongId={songFilterId || undefined}
+            defaultSingerId={singerFilterId || undefined}
+          />
         </Modal>
       )}
 

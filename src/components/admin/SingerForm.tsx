@@ -86,9 +86,6 @@ export const SingerForm: React.FC<SingerFormProps> = ({ singer, onSubmit, onCanc
 
   useEffect(() => {
     if (singer) {
-      console.log('Singer data:', singer);
-      console.log('Editor for:', singer.editorFor);
-      
       // If user is not admin/editor and trying to view someone else's profile, show blank form
       if (!isAdmin && !isEditor && singer.id !== userId) {
         setName('');

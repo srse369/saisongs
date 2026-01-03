@@ -4,7 +4,7 @@ import type { Singer, CreateSingerInput, UpdateSingerInput, ServiceError } from 
 import { singerService } from '../services';
 import { useToast } from './ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../utils';
-import { safeSetLocalStorageItem, getLocalStorageItem } from '../utils/cacheUtils';
+import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
 
 const SINGERS_CACHE_KEY = 'saiSongs:singersCache';
 const SINGERS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -57,10 +57,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
               timestamp: Date.now(),
               singers: updated,
             });
-            safeSetLocalStorageItem(SINGERS_CACHE_KEY, cacheData, {
-              clearOnQuotaError: true,
-              skipKeys: [SINGERS_CACHE_KEY],
-            });
+            setLocalStorageItem(SINGERS_CACHE_KEY, cacheData);
           }
           
           return updated;
@@ -82,10 +79,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
               timestamp: Date.now(),
               singers: updated,
             });
-            safeSetLocalStorageItem(SINGERS_CACHE_KEY, cacheData, {
-              clearOnQuotaError: true,
-              skipKeys: [SINGERS_CACHE_KEY],
-            });
+            setLocalStorageItem(SINGERS_CACHE_KEY, cacheData);
           }
           
           return updated;
@@ -162,12 +156,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
           singers: fetchedSingers,
         });
         
-        const success = safeSetLocalStorageItem(SINGERS_CACHE_KEY, cacheData, {
-          clearOnQuotaError: true,
-          skipKeys: [SINGERS_CACHE_KEY], // Don't clear the singers cache we're trying to set
-        });
-        
-        if (!success) {
+        if (!setLocalStorageItem(SINGERS_CACHE_KEY, cacheData)) {
           // Silently ignore storage errors (e.g., quota exceeded on mobile)
           // Singers will be fetched from server on next load
           console.warn('Failed to cache singers to localStorage due to quota. Singers will be fetched from server on next load.');
@@ -231,12 +220,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
             singers: newList,
           });
           
-          const success = safeSetLocalStorageItem(SINGERS_CACHE_KEY, cacheData, {
-            clearOnQuotaError: true,
-            skipKeys: [SINGERS_CACHE_KEY],
-          });
-          
-          if (!success) {
+          if (!setLocalStorageItem(SINGERS_CACHE_KEY, cacheData)) {
             // Silently ignore storage errors (e.g., quota exceeded on mobile)
             console.warn('Failed to update singers cache in localStorage due to quota.');
           }
@@ -281,7 +265,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
         setSingers(prev => prev.map(s => s.id === id ? singer : s));
         // Clear localStorage cache so fresh data is fetched next time
         if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(SINGERS_CACHE_KEY);
+          removeLocalStorageItem(SINGERS_CACHE_KEY);
           
           // Dispatch global event to notify other components
           const newCenterIds = singer.centerIds || [];
@@ -339,7 +323,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       
       // Clear localStorage cache so fresh data is fetched next time
       if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(SINGERS_CACHE_KEY);
+        removeLocalStorageItem(SINGERS_CACHE_KEY);
         
         // Dispatch global event to notify other components
         // Always dispatch, even if no centers, so other components can refresh
@@ -388,8 +372,8 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       // Note: Pitches are also affected by merge (transferred/deleted), so we clear their cache too
       // The calling component (SingerManager) will refresh pitches after merge completes
       if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(SINGERS_CACHE_KEY);
-        window.localStorage.removeItem('saiSongs:pitchesCache');
+        removeLocalStorageItem(SINGERS_CACHE_KEY);
+        removeLocalStorageItem('saiSongs:pitchesCache');
         
         // Dispatch global events to notify other components
         // 1. Dispatch singerDeleted for each merged singer

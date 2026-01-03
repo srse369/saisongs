@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { SongSingerPitch, CreatePitchInput, UpdatePitchInput, ServiceError } from '../types';
 import { pitchService } from '../services';
 import { useToast } from './ToastContext';
-import { safeSetLocalStorageItem, getLocalStorageItem } from '../utils/cacheUtils';
+import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
 
 const PITCHES_CACHE_KEY = 'saiSongs:pitchesCache';
 const PITCHES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -97,12 +97,7 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
           pitches: fetchedPitches,
         });
         
-        const success = safeSetLocalStorageItem(PITCHES_CACHE_KEY, cacheData, {
-          clearOnQuotaError: true,
-          skipKeys: [PITCHES_CACHE_KEY], // Don't clear the pitches cache we're trying to set
-        });
-        
-        if (!success) {
+        if (!setLocalStorageItem(PITCHES_CACHE_KEY, cacheData)) {
           // Silently ignore storage errors (e.g., quota exceeded on mobile)
           // Pitches will be fetched from server on next load
           console.warn('Failed to cache pitches to localStorage due to quota. Pitches will be fetched from server on next load.');
@@ -173,13 +168,10 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
         return [...prev, pitch];
       });
       
-      // Clear localStorage caches for pitches and singers
-      // Singer pitch count changes when a pitch is created, so we need to refresh singers
+      // Clear localStorage cache for pitches only
+      // SongContext and SingerContext event listeners will update their caches optimistically
       if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(PITCHES_CACHE_KEY);
-        window.localStorage.removeItem('saiSongs:singersCache');
-        // Also clear songs cache since song pitch count may change
-        window.localStorage.removeItem('saiSongs:songsCache');
+        removeLocalStorageItem(PITCHES_CACHE_KEY);
         
         // Dispatch global event to notify other components
         import('../utils/globalEventBus').then(({ globalEventBus }) => {
@@ -220,7 +212,7 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
         setPitches(prev => prev.map(p => p.id === id ? pitch : p));
         // Clear localStorage cache so fresh data is fetched next time
         if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(PITCHES_CACHE_KEY);
+          removeLocalStorageItem(PITCHES_CACHE_KEY);
         }
         toast.success('Pitch association updated successfully');
       }
@@ -260,24 +252,20 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
       
       await pitchService.deletePitch(id);
       
-      // Clear localStorage caches for pitches, singers, and songs
-      // Pitch counts change when a pitch is deleted
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(PITCHES_CACHE_KEY);
-        window.localStorage.removeItem('saiSongs:singersCache');
-        window.localStorage.removeItem('saiSongs:songsCache');
-        
-        // Dispatch global event to notify other components
-        if (pitchToDelete?.singerId && pitchToDelete?.songId) {
-          const { singerId, songId } = pitchToDelete;
-          import('../utils/globalEventBus').then(({ globalEventBus }) => {
-            globalEventBus.dispatch('pitchDeleted', { 
-              type: 'pitchDeleted',
-              singerId, 
-              songId 
-            });
+      // Clear localStorage cache for pitches only
+      // SongContext and SingerContext event listeners will update their caches optimistically
+      removeLocalStorageItem(PITCHES_CACHE_KEY);
+      
+      // Dispatch global event to notify other components
+      if (pitchToDelete?.singerId && pitchToDelete?.songId) {
+        const { singerId, songId } = pitchToDelete;
+        import('../utils/globalEventBus').then(({ globalEventBus }) => {
+          globalEventBus.dispatch('pitchDeleted', { 
+            type: 'pitchDeleted',
+            singerId, 
+            songId 
           });
-        }
+        });
       }
       
       toast.success('Pitch association deleted successfully');
