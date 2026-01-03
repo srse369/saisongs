@@ -55,12 +55,15 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
       setError(null);
       
       try {
+        // Get templateId from prop, URL params, or state (in that order of priority)
+        const effectiveTemplateId = templateId || urlTemplateId || selectedTemplateId;
+        
         // Load template and song in parallel
         const [template, song] = await Promise.all([
           (async () => {
             try {
-              if (selectedTemplateId) {
-                return await templateService.getTemplate(selectedTemplateId);
+              if (effectiveTemplateId) {
+                return await templateService.getTemplate(effectiveTemplateId);
               } else {
                 return await templateService.getDefaultTemplate();
               }
@@ -89,7 +92,8 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
         setSongData(song);
         if (template) {
           setActiveTemplate(template);
-          if (!selectedTemplateId) {
+          // Update selectedTemplateId if we loaded a template and it's different
+          if (template.id !== selectedTemplateId) {
             setSelectedTemplateId(template.id);
           }
         }
@@ -101,7 +105,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     };
 
     loadData();
-  }, [songId, selectedTemplateId]);
+  }, [songId, templateId, urlTemplateId, selectedTemplateId]);
 
   // Generate slides when song or template changes (after initial load)
   useEffect(() => {
