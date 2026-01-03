@@ -61,14 +61,14 @@ export const SessionManager: React.FC = () => {
     }
   }, [fetchSongs, fetchSingers, isAuthenticated]);
 
-  // Restore previously selected template from localStorage (only if session has songs)
+  // Restore previously selected template from localStorage (always, even if session is empty)
   useEffect(() => {
-    // Skip template loading if session is empty
-    if (entries.length === 0) {
-      return;
-    }
-
     const restoreTemplate = async () => {
+      // Only load default if no template is currently selected
+      if (selectedTemplate) {
+        return;
+      }
+
       const savedTemplateId = getSelectedTemplateId();
       if (savedTemplateId) {
         try {
@@ -87,7 +87,7 @@ export const SessionManager: React.FC = () => {
       // If no saved template or error loading it, load default template
       try {
         const defaultTemplate = await templateService.getDefaultTemplate();
-        if (defaultTemplate) {
+        if (defaultTemplate && defaultTemplate.id) {
           setSelectedTemplate(defaultTemplate);
           setSelectedTemplateId(defaultTemplate.id);
         }
@@ -96,7 +96,7 @@ export const SessionManager: React.FC = () => {
       }
     };
     restoreTemplate();
-  }, [entries.length]);
+  }, [selectedTemplate]);
 
   // Listen for template changes from presentation mode (via localStorage)
   // This handles cross-tab synchronization

@@ -6,7 +6,7 @@ import { useToast } from './ToastContext';
 import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
 
 const PITCHES_CACHE_KEY = 'saiSongs:pitchesCache';
-const PITCHES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const PITCHES_CACHE_TTL_MS = 10 * 60 * 1000; // 5 minutes
 
 interface PitchContextState {
   pitches: SongSingerPitch[];

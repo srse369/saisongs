@@ -20,6 +20,16 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
     }
   }, [contextTemplates.length, contextLoading, fetchTemplates]);
 
+  // Automatically select default template if no template is selected and templates are available
+  useEffect(() => {
+    if (!currentTemplateId && contextTemplates.length > 0 && !contextLoading && onTemplateSelect) {
+      const defaultTemplate = contextTemplates.find(t => t.isDefault);
+      if (defaultTemplate) {
+        onTemplateSelect(defaultTemplate);
+      }
+    }
+  }, [currentTemplateId, contextTemplates, contextLoading, onTemplateSelect]);
+
   // Notify parent when expanded state changes
   useEffect(() => {
     onExpandedChange?.(expanded);

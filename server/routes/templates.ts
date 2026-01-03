@@ -1,8 +1,8 @@
 import express from 'express';
-import templateService from '../services/TemplateService.js';
 import cacheService from '../services/CacheService.js';
+import type { PresentationTemplate } from '../services/CacheService.js';
+import { parseYaml } from '../services/CacheService.js';
 import { requireAuth, requireEditor, optionalAuth } from '../middleware/simpleAuth.js';
-import type { PresentationTemplate } from '../services/TemplateService.js';
 
 const router = express.Router();
 
@@ -360,7 +360,7 @@ router.post('/validate/yaml', async (req, res) => {
       return res.status(400).json({ error: 'YAML content is required' });
     }
 
-    const parsed = templateService.parseYaml(yamlContent);
+    const parsed = parseYaml(yamlContent);
     res.json({ valid: true, template: parsed });
   } catch (error) {
     console.error('Error parsing YAML:', error);

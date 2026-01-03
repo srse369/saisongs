@@ -209,7 +209,7 @@ export const FeedbackManager: React.FC = () => {
           <p className="text-gray-500 dark:text-gray-400">No feedback found</p>
         </div>
       ) : (
-        <div className="space-y-0 md:space-y-4">
+        <div className="space-y-0 md:space-y-3">
           {feedback.map((item, index) => {
             const isSelected = selectedFeedbackId === item.id;
             return (
@@ -226,14 +226,15 @@ export const FeedbackManager: React.FC = () => {
                   ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${
                       isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                     }`
-                  : `border rounded-lg hover:shadow-md ${
+                  : `border rounded-lg shadow-md hover:shadow-lg ${
                       isSelected
                         ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
                         : 'border-gray-200 dark:border-gray-700'
                     }`
               }`}
             >
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 md:gap-4">
+              <div className="flex flex-col gap-1.5 md:gap-3">
+                {/* Content Section */}
                 <div className="flex-1 min-w-0">
                   {/* Category and Status */}
                   <div className="flex items-center justify-between gap-2 mb-2">
@@ -244,8 +245,8 @@ export const FeedbackManager: React.FC = () => {
                       <span className="font-medium text-gray-900 dark:text-white">
                         {CATEGORY_LABELS[item.category]?.label || 'Other'}
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[item.status]}`}>
-                        {item.status.replace('-', ' ')}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[item.status || 'new'] || STATUS_COLORS['new']}`}>
+                        {(item.status || 'new').replace('-', ' ')}
                       </span>
                     </div>
                     <button
@@ -274,23 +275,24 @@ export const FeedbackManager: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Actions - Hidden on mobile until row is selected */}
-                <div className={`flex gap-1.5 sm:gap-2 sm:flex-col ${isMobile && !isSelected ? 'hidden' : ''}`}
+                {/* Actions - On separate line below horizontal separator on desktop */}
+                <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
                     onClick={() => handleViewDetails(item)}
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg sm:rounded-md transition-colors"
+                    title="Edit feedback status and admin notes"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                   >
-                    <i className="fas fa-eye text-lg"></i>
-                    <span className="hidden sm:inline">View Details</span>
+                    <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
                   </button>
                   <button
                     onClick={() => handleDelete(item.id)}
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg sm:rounded-md transition-colors"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                   >
-                    <i className="fas fa-trash text-lg"></i>
-                    <span className="hidden sm:inline">Delete</span>
+                    <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
                   </button>
                 </div>
               </div>

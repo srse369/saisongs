@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, cache } from 'react';
 import type { ReactNode } from 'react';
 import type { PresentationTemplate, ServiceError } from '../types';
 import templateService from '../services/TemplateService';
@@ -6,7 +6,7 @@ import { useToast } from './ToastContext';
 import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
 
 const TEMPLATES_CACHE_KEY = 'saiSongs:templatesCache';
-const TEMPLATES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const TEMPLATES_CACHE_TTL_MS = 10 * 60 * 1000; // 5 minutes
 
 interface TemplateContextState {
   templates: PresentationTemplate[];

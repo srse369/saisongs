@@ -292,8 +292,19 @@ export const TemplateManager: React.FC = () => {
   const [exportingPptx, setExportingPptx] = useState<string | null>(null);
   const [showMediaExportModal, setShowMediaExportModal] = useState(false);
   const [pendingPptxFile, setPendingPptxFile] = useState<File | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const pptxInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Check if template has unsaved changes
   const hasUnsavedChanges = React.useMemo(() => {
@@ -940,12 +951,26 @@ export const TemplateManager: React.FC = () => {
             <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">Loading templates...</p>
           </div>
         ) : filteredTemplates.length > 0 ? (
-          filteredTemplates.map((template, index) => (
+          filteredTemplates.map((template, index) => {
+            const isSelected = selectedTemplateId === template.id;
+            return (
             <div
               key={template.id}
+              onClick={() => {
+                // On mobile, toggle selection on row click
+                if (isMobile) {
+                  setSelectedTemplateId(isSelected ? null : template.id || null);
+                }
+              }}
               className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${
-                index > 0 ? 'md:border-t-0 border-t border-gray-300 dark:border-gray-600' : ''
-              } md:border md:border-gray-200 md:dark:border-gray-700 md:rounded-lg md:hover:shadow-md`}
+                isMobile 
+                  ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${
+                      isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    }`
+                  : `md:border md:border-gray-200 md:dark:border-gray-700 md:rounded-lg md:hover:shadow-md ${
+                      index > 0 ? 'md:border-t-0' : ''
+                    }`
+              }`}
             >
               <div className="flex flex-col gap-1.5 md:gap-3">
                 <div className="flex-1 min-w-0">
@@ -982,8 +1007,10 @@ export const TemplateManager: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Actions Row - Icon-only on mobile, text on desktop */}
-                <div className="flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700">
+                {/* Actions Row - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}
+                <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     onClick={() => handlePreview(template)}
                     title="Preview this template with sample content"
@@ -1046,7 +1073,8 @@ export const TemplateManager: React.FC = () => {
                 </div>
               </div>
             </div>
-          ))
+            );
+          })
         ) : (
           <div className="text-center py-12">
             <p className="text-gray-500 dark:text-gray-400">
@@ -1119,7 +1147,16 @@ export const TemplateManager: React.FC = () => {
                 onSlideIndexChange={setEditorSelectedSlideIndex}
                 onSwitchToYaml={(slideIndex) => {
                   // Sync visual changes to YAML before switching
-                  const templateWithDefaults = applyDefaultSongContentStyles(editingTemplate);
+                  // Apply default song content styles to the reference slide if needed
+                  const templateWithDefaults = editingTemplate ? {
+                    ...editingTemplate,
+                    slides: editingTemplate.slides?.map((slide, idx) => {
+                      if (idx === (editingTemplate.referenceSlideIndex ?? 0)) {
+                        return ensureSongContentStyles(slide, editingTemplate.aspectRatio || '16:9');
+                      }
+                      return slide;
+                    })
+                  } : editingTemplate;
                   const newYaml = templateToYaml(templateWithDefaults);
                   setYamlContent(newYaml);
                   setEditorMode('yaml');

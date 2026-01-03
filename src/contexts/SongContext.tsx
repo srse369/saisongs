@@ -7,7 +7,7 @@ import { compareStringsIgnoringSpecialChars } from '../utils';
 import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
 
 const SONGS_CACHE_KEY = 'saiSongs:songsCache';
-const SONGS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const SONGS_CACHE_TTL_MS = 10 * 60 * 1000; // 5 minutes
 
 interface SongContextState {
   songs: Song[];

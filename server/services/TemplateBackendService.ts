@@ -1,211 +1,42 @@
 /**
- * TemplateService manages presentation templates
+ * TemplateBackendService manages presentation templates
  * Handles CRUD operations, YAML parsing, and template validation
  */
 
 import { databaseReadService } from './DatabaseReadService.js';
 import { databaseWriteService } from './DatabaseWriteService.js';
-import { cacheService } from './CacheService.js';
 import { randomUUID } from 'crypto';
 import * as yaml from 'js-yaml';
+import type {
+  BackgroundElement,
+  ImageElement,
+  VideoElement,
+  AudioElement,
+  TextElement,
+  SongContentStyle,
+  TemplateSlide,
+  AspectRatio,
+  PresentationTemplate,
+} from '../../src/types/index.js';
+import {
+  ensureSongContentStyles,
+} from '../../src/types/index.js';
 
-// Type definitions (matching src/types/index.ts)
-export interface BackgroundElement {
-  type: 'color' | 'image' | 'video';
-  value: string;
-  opacity?: number;
-}
-
-export interface ImageElement {
-  id: string;
-  url: string;
-  position?: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
-  x?: number | string;
-  y?: number | string;
-  width?: string;
-  height?: string;
-  opacity?: number;
-  zIndex?: number;
-  rotation?: number;
-}
-
-export interface VideoElement {
-  id: string;
-  url: string;
-  position?: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
-  x?: number | string;
-  y?: number | string;
-  width?: string;
-  height?: string;
-  opacity?: number;
-  zIndex?: number;
-  autoPlay?: boolean;
-  loop?: boolean;
-  muted?: boolean;
-  rotation?: number;
-}
-
-export interface AudioElement {
-  id: string;
-  url: string;
-  position?: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
-  x?: number | string;
-  y?: number | string;
-  width?: string;
-  height?: string;
-  opacity?: number;
-  zIndex?: number;
-  autoPlay?: boolean;
-  loop?: boolean;
-  volume?: number;
-  visualHidden?: boolean;
-  // Multi-slide audio support (1-based slide numbers)
-  startSlide?: number;  // 1-based slide number to start playing on
-  endSlide?: number;    // 1-based slide number to stop playing on
-  playAcrossAllSlides?: boolean;
-  rotation?: number;
-}
-
-export interface TextElement {
-  id: string;
-  content: string;
-  position?: 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
-  x?: number | string;
-  y?: number | string;
-  width?: string;
-  height?: string;
-  fontSize?: string;
-  color?: string;
-  fontWeight?: 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
-  fontStyle?: 'normal' | 'italic';
-  fontFamily?: string;
-  textAlign?: 'left' | 'center' | 'right';
-  opacity?: number;
-  zIndex?: number;
-  maxWidth?: string;
-  rotation?: number;
-}
-
-// Song content styling for reference slides
-export interface SongContentStyle {
-  // Position in slide coordinates (pixels)
-  x: number;
-  y: number;
-  width: number;
-  height?: number;
-  // Font styling
-  fontSize: string;         // e.g., "48px", "3rem"
-  fontWeight: 'normal' | 'bold';
-  fontStyle?: 'normal' | 'italic';
-  fontFamily?: string;
-  textAlign: 'left' | 'center' | 'right';
-  color: string;            // e.g., "#ffffff"
-  // Legacy: yPosition as percentage (deprecated, use y instead)
-  yPosition?: number;
-}
-
-// Individual slide within a multi-slide template
-export interface TemplateSlide {
-  background?: BackgroundElement;
-  images?: ImageElement[];
-  videos?: VideoElement[];
-  audios?: AudioElement[];
-  text?: TextElement[];
-
-  // Song content styling (only used on reference slides)
-  songTitleStyle?: SongContentStyle;
-  songLyricsStyle?: SongContentStyle;
-  songTranslationStyle?: SongContentStyle;
-}
-
-// Multi-slide presentation template
-// Aspect ratio options for templates
-export type AspectRatio = '16:9' | '4:3';
-
-// Default song content styles for reference slides
-const DEFAULT_SONG_TITLE_STYLE: SongContentStyle = {
-  x: 40,
-  y: 54, // ~5% of 1080
-  width: 1840,
-  fontSize: '48px',
-  fontWeight: 'bold',
-  textAlign: 'center',
-  color: '#ffffff',
+// Re-export types for backward compatibility
+export type {
+  BackgroundElement,
+  ImageElement,
+  VideoElement,
+  AudioElement,
+  TextElement,
+  SongContentStyle,
+  TemplateSlide,
+  AspectRatio,
+  PresentationTemplate,
 };
 
-const DEFAULT_SONG_LYRICS_STYLE: SongContentStyle = {
-  x: 40,
-  y: 216, // ~20% of 1080
-  width: 1840,
-  fontSize: '36px',
-  fontWeight: 'bold',
-  textAlign: 'center',
-  color: '#ffffff',
-};
-
-const DEFAULT_SONG_TRANSLATION_STYLE: SongContentStyle = {
-  x: 40,
-  y: 810, // ~75% of 1080
-  width: 1840,
-  fontSize: '24px',
-  fontWeight: 'normal',
-  textAlign: 'center',
-  color: '#ffffff',
-};
-
-// Ensure a slide has song content styles, applying defaults if missing
-function ensureSongContentStyles(slide: TemplateSlide, aspectRatio: AspectRatio = '16:9'): TemplateSlide {
-  const dimensions = aspectRatio === '4:3' ? { width: 1600, height: 1200 } : { width: 1920, height: 1080 };
-  const scaleY = dimensions.height / 1080;
-  const scaleX = dimensions.width / 1920;
-
-  return {
-    ...slide,
-    songTitleStyle: slide.songTitleStyle || {
-      ...DEFAULT_SONG_TITLE_STYLE,
-      x: Math.round(DEFAULT_SONG_TITLE_STYLE.x * scaleX),
-      y: Math.round(DEFAULT_SONG_TITLE_STYLE.y * scaleY),
-      width: Math.round(DEFAULT_SONG_TITLE_STYLE.width * scaleX),
-    },
-    songLyricsStyle: slide.songLyricsStyle || {
-      ...DEFAULT_SONG_LYRICS_STYLE,
-      x: Math.round(DEFAULT_SONG_LYRICS_STYLE.x * scaleX),
-      y: Math.round(DEFAULT_SONG_LYRICS_STYLE.y * scaleY),
-      width: Math.round(DEFAULT_SONG_LYRICS_STYLE.width * scaleX),
-    },
-    songTranslationStyle: slide.songTranslationStyle || {
-      ...DEFAULT_SONG_TRANSLATION_STYLE,
-      x: Math.round(DEFAULT_SONG_TRANSLATION_STYLE.x * scaleX),
-      y: Math.round(DEFAULT_SONG_TRANSLATION_STYLE.y * scaleY),
-      width: Math.round(DEFAULT_SONG_TRANSLATION_STYLE.width * scaleX),
-    },
-  };
-}
-
-export interface PresentationTemplate {
-  id?: string;
-  name: string;
-  description?: string;
-  aspectRatio?: AspectRatio;          // Template aspect ratio: '16:9' (default) or '4:3'
-  centerIds?: number[];              // Centers that have access to this template
-
-  // Multi-slide structure (new format)
-  slides?: TemplateSlide[];           // Array of slides in the template
-  referenceSlideIndex?: number;       // 0-based index of the slide used for song content overlay
-
-  // Legacy single-slide fields (for backward compatibility)
-  background?: BackgroundElement;
-  images?: ImageElement[];
-  videos?: VideoElement[];
-  audios?: AudioElement[];
-  text?: TextElement[];
-
-  isDefault?: boolean;
-  createdAt?: Date;
-  createdBy?: string;
-  updatedAt?: Date;
-  updatedBy?: string;
-  yaml?: string;
+export function parseYaml(yamlContent: string): Partial<PresentationTemplate> {
+  return templateBackendService.parseYaml(yamlContent);
 }
 
 // Normalize rotation values to whole integers on all elements in all slides
@@ -287,7 +118,7 @@ function getReferenceSlide(template: PresentationTemplate): TemplateSlide {
   };
 }
 
-class TemplateService {
+class TemplateBackendService {
   /**
    * Map template JSON to PresentationTemplate
    */
@@ -445,9 +276,6 @@ class TemplateService {
         template.createdBy || ''
       );
 
-      // Invalidate cache after create
-      cacheService.invalidate('templates:all');
-
       return this.mapTemplateRow(row);
     } catch (error) {
       console.error('Error creating template:', error);
@@ -486,12 +314,21 @@ class TemplateService {
         updated.updatedBy || ''
       );
 
-      // Invalidate cache after update
-      cacheService.invalidate('templates:all');
-
       return { ...updated, updatedAt: new Date() };
     } catch (error) {
       console.error('Error updating template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a template
+   */
+  async deleteTemplate(id: string): Promise<void> {
+    try {
+      await databaseWriteService.deleteTemplate(id);
+    } catch (error) {
+      console.error('Error deleting template:', error);
       throw error;
     }
   }
@@ -504,9 +341,6 @@ class TemplateService {
       // Then set this one as default
       await databaseWriteService.setTemplateAsDefault(id, updatedBy);
 
-      // Invalidate cache after update
-      cacheService.invalidate('templates:all');
-
       // Return the updated template
       const updated = await this.getTemplate(id);
       if (!updated) {
@@ -515,21 +349,6 @@ class TemplateService {
       return updated;
     } catch (error) {
       console.error('Error setting template as default:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Delete a template
-   */
-  async deleteTemplate(id: string): Promise<void> {
-    try {
-      await databaseWriteService.deleteTemplate(id);
-
-      // Invalidate cache after delete
-      cacheService.invalidate('templates:all');
-    } catch (error) {
-      console.error('Error deleting template:', error);
       throw error;
     }
   }
@@ -583,4 +402,5 @@ class TemplateService {
   }
 }
 
-export default new TemplateService();
+const templateBackendService = new TemplateBackendService();
+export default templateBackendService;

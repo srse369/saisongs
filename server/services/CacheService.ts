@@ -3,10 +3,37 @@
  * Reduces database load by caching query results with TTL
  */
 
-import { PresentationTemplate, SongSingerPitch } from '../../src/types/index';
+import {
+  BackgroundElement,
+  ImageElement,
+  VideoElement,
+  AudioElement,
+  TextElement,
+  SongContentStyle,
+  TemplateSlide,
+  AspectRatio,
+  PresentationTemplate,
+  SongSingerPitch
+} from '../../src/types/index';
 import databaseReadService from './DatabaseReadService.js';
 import databaseWriteService from './DatabaseWriteService.js';
-import templateService from './TemplateService.js';
+import templateBackendService from './TemplateBackendService.js';
+
+export type {
+  BackgroundElement,
+  ImageElement,
+  VideoElement,
+  AudioElement,
+  TextElement,
+  SongContentStyle,
+  TemplateSlide,
+  AspectRatio,
+  PresentationTemplate,
+};
+
+export function parseYaml(yamlContent: string): Partial<PresentationTemplate> {
+  return templateBackendService.parseYaml(yamlContent);
+}
 
 interface CacheEntry<T> {
   data: T;
@@ -143,7 +170,7 @@ class CacheService {
   // Routes should NEVER import DatabaseService directly
   private readonly databaseReadService = databaseReadService;
   private readonly databaseWriteService = databaseWriteService;
-  private readonly templateService = templateService;
+  private readonly templateBackendService = templateBackendService;
 
   /**
    * Filter resources by center access permissions
@@ -1153,7 +1180,7 @@ class CacheService {
     const cached = this.get(cacheKey);
     if (cached && Array.isArray(cached)) return cached;
 
-    const mappedTemplates = templateService.getAllTemplates();
+    const mappedTemplates = this.templateBackendService.getAllTemplates();
     this.set(cacheKey, mappedTemplates, this.DEFAULT_TTL_MS);
     return mappedTemplates;
   }
@@ -1170,10 +1197,7 @@ class CacheService {
         return template;
     }
 
-    const template = templateService.getTemplate(id);
-
-    console.log('cached', cached);
-    console.log('template', template);
+    const template = await this.templateBackendService.getTemplate(id);
 
     if (cached && Array.isArray(cached) && template) {
       this.set(cacheKey, [...cached, template], this.DEFAULT_TTL_MS);
@@ -1188,7 +1212,7 @@ class CacheService {
    * Create a template with write-through cache update
    */
   async createTemplate(template: PresentationTemplate): Promise<any> {
-    const created = await this.templateService.createTemplate(template);
+    const created = await this.templateBackendService.createTemplate(template);
     
     // Write-through: add to cache directly
     const cacheKey = 'templates:all';
@@ -1205,7 +1229,7 @@ class CacheService {
    * Update a template with write-through cache update
    */
   async updateTemplate(id: string, updates: any): Promise<any> {
-    const updated = await this.templateService.updateTemplate(id, updates);
+    const updated = await this.templateBackendService.updateTemplate(id, updates);
 
     // Write-through: update in cache directly
     const cacheKey = 'templates:all';
@@ -1225,14 +1249,14 @@ class CacheService {
    * Delete a template with write-through cache update
    */
   async deleteTemplate(id: string): Promise<void> {
-    await this.templateService.deleteTemplate(id);
+    await this.templateBackendService.deleteTemplate(id);
 
     // Write-through: remove from cache directly
     const cacheKey = 'templates:all';
     const cached = this.get(cacheKey);
     if (cached && Array.isArray(cached)) {
       const filtered = cached.filter((t: any) => t.id !== id);
-      this.set(cacheKey, filtered, 5 * 60 * 1000);
+      this.set(cacheKey, filtered, this.DEFAULT_TTL_MS);
     }
   }
 
@@ -1240,7 +1264,7 @@ class CacheService {
    * Set a template as default with write-through cache update
    */
   async setTemplateAsDefault(id: string, updatedBy: string): Promise<any> {
-    const updated = await this.templateService.setAsDefault(id, updatedBy);
+    const updated = await this.templateBackendService.setAsDefault(id, updatedBy);
 
     // Write-through: update all templates in cache to reflect new default
     const cacheKey = 'templates:all';
@@ -1745,13 +1769,11 @@ class CacheService {
   // ============================================================================
 
   async getAllCenters(): Promise<any[]> {
-    console.log('getAllCenters');
     const cacheKey = 'centers:all';
     const cached = this.get<any[]>(cacheKey);
 
     // Ensure cached value is an array
     if (cached && Array.isArray(cached)) {
-      console.log('cached', cached);
       return cached;
     }
 
@@ -2112,14 +2134,21 @@ class CacheService {
   async deleteFeedback(id: string | number): Promise<void> {
     await this.databaseWriteService.deleteFeedbackForCache(id);
 
+    // Normalize ID to string for comparison
+    const normalizedId = String(id).toUpperCase();
+    
     const cacheKey = 'feedback:all';
     const cached = this.get<any>(cacheKey);
     if (cached) {
-      const updated = cached.filter((f: any) => f.id !== id);
+      const updated = cached.filter((f: any) => {
+        const feedbackId = String(f.id || '').toUpperCase();
+        return feedbackId !== normalizedId;
+      });
       this.set(cacheKey, updated, this.DEFAULT_TTL_MS);
-    } else {
-      this.set(cacheKey, [], this.DEFAULT_TTL_MS);
     }
+    
+    // Also invalidate the cache pattern to ensure fresh data on next fetch
+    this.invalidatePattern(/^feedback:/);
   }
 }
 

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../services/ApiClient';
 import { clearAllCaches, CACHE_KEYS, getLocalStorageItem, setLocalStorageItem } from '../utils/cacheUtils';
 
-const VERSION_CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
+const VERSION_CHECK_INTERVAL = 10 * 60 * 1000; // Check every 5 minutes
 
 interface HealthResponse {
   status: string;

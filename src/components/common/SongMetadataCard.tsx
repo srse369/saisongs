@@ -41,8 +41,11 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
 }) => {
   const hasReferencePitches = song.refGents || song.refLadies;
 
+  // Show background on desktop always, or on mobile when selected
+  const shouldShowBackground = showBackground || isSelected;
+  
   return (
-    <div className={`${showBackground ? 'bg-slate-100/80 dark:bg-gray-900/60' : ''} md:px-2 md:pt-1 md:pb-1 md:mb-1.5 ${showBackground ? 'rounded-lg' : ''}`}>
+    <div className={`${shouldShowBackground ? 'bg-slate-100/80 dark:bg-gray-900/60 px-[5px] pb-[5px]' : ''} md:px-2 md:pt-1 md:pb-1 md:mb-1.5 ${shouldShowBackground ? 'rounded-lg' : ''}`}>
       {/* Song Name with External Link and Info Button */}
       <div className="flex items-center gap-2">
         {onNameClick ? (
