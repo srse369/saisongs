@@ -2024,7 +2024,7 @@ class CacheService {
     return { success: true };
   }
 
-  mapFeedbackRow(row: any): Promise<any> {
+  mapFeedbackRow(row: any): any {
     // Dates are already converted to ISO strings in the SQL query using TO_CHAR
     // Just ensure they're strings (they should already be from TO_CHAR)
     const convertDate = (date: any): string => {
