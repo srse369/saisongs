@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { feedbackService, type Feedback } from '../../services/FeedbackService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -45,31 +45,7 @@ export const FeedbackManager: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  useEffect(() => {
-    if (isAdmin) {
-      const callLoadFeedback = async () => {
-        await loadFeedback();
-      };
-      callLoadFeedback();
-    }
-  }, [isAdmin, filter]);
-
-  useEffect(() => {
-    let unsubscribes: (() => void)[] = [];
-    const unsubscribeFeedbackSubmitted = globalEventBus.on('feedbackSubmitted', (detail) => {
-      const callLoadFeedback = async () => {
-        await loadFeedback();
-      };
-      callLoadFeedback();
-    });
-    unsubscribes.push(unsubscribeFeedbackSubmitted);
-
-    return () => {
-      unsubscribes.forEach(unsub => unsub());
-    };
-  }, []);
-
-  const loadFeedback = async () => {
+  const loadFeedback = useCallback(async () => {
     try {
       setLoading(true);
       const response = await feedbackService.getFeedback(filter);
@@ -81,7 +57,25 @@ export const FeedbackManager: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, toast]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadFeedback();
+    }
+  }, [isAdmin, loadFeedback]);
+
+  useEffect(() => {
+    let unsubscribes: (() => void)[] = [];
+    const unsubscribeFeedbackSubmitted = globalEventBus.on('feedbackSubmitted', (detail) => {
+      loadFeedback();
+    });
+    unsubscribes.push(unsubscribeFeedbackSubmitted);
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [loadFeedback]);
 
   const handleViewDetails = (item: Feedback) => {
     setSelectedFeedback(item);
@@ -164,10 +158,7 @@ export const FeedbackManager: React.FC = () => {
       label: 'Refresh',
       icon: 'fas fa-sync-alt',
       onClick: () => {
-        const callLoadFeedback = async () => {
-          await loadFeedback();
-        };
-        callLoadFeedback();
+        loadFeedback();
       },
       variant: 'secondary',
       disabled: loading,
@@ -226,12 +217,7 @@ export const FeedbackManager: React.FC = () => {
         <div className="hidden md:block">
           <button
             type="button"
-            onClick={() => {
-              const callLoadFeedback = async () => {
-                await loadFeedback();
-              };
-              callLoadFeedback();
-            }}
+            onClick={() => loadFeedback()}
             disabled={loading}
             title="Refresh feedback list"
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
