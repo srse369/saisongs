@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { globalEventBus } from '../../utils/globalEventBus';
 
 interface FeedbackDrawerProps {
   isOpen: boolean;
@@ -134,8 +135,8 @@ export const FeedbackDrawer: React.FC<FeedbackDrawerProps> = ({ isOpen, onClose 
       if (!response.ok) {
         throw new Error('Failed to submit feedback');
       }
-
       toast.success('Thank you for your feedback!');
+      globalEventBus.dispatch('feedbackSubmitted', {});
       setFeedback('');
       setEmail('');
       setCategory('other');

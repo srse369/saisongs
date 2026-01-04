@@ -7,6 +7,14 @@ export interface BackgroundElement {
 
 export type PositionType = 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
 
+export interface Feedback {
+  id: string;
+  email: string;
+  category: string;
+  message: string;
+  createdAt: Date;
+}
+
 export interface ImageElement {
   id: string;
   url: string;

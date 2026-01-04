@@ -6,7 +6,7 @@
  * to ensure they have the latest state from the backend.
  */
 
-import type { Center, Song, Singer, SongSingerPitch } from '../types';
+import type { Center, Song, Singer, SongSingerPitch, Feedback } from '../types';
 
 type EventType = 
   | 'singerCreated'
@@ -22,6 +22,7 @@ type EventType =
   | 'centerCreated'
   | 'centerUpdated'
   | 'centerDeleted'
+  | 'feedbackSubmitted'
   | 'dataRefreshNeeded';
 
 type EventDetail = 
@@ -38,7 +39,8 @@ type EventDetail =
   | { type: 'centerCreated'; center: Center | null }
   | { type: 'centerUpdated'; center: Center | null }
   | { type: 'centerDeleted'; center: Center | null }
-  | { type: 'dataRefreshNeeded'; resource: 'songs' | 'singers' | 'pitches' | 'centers' | 'all' };
+  | { type: 'feedbackSubmitted'; feedback: Feedback | null }
+  | { type: 'dataRefreshNeeded'; resource: 'songs' | 'singers' | 'pitches' | 'centers' | 'feedback' | 'all' };
 
 class GlobalEventBus {
   /**

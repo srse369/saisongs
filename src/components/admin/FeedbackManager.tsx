@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { Modal } from '../common/Modal';
 import { RefreshIcon, MobileBottomActionBar, type MobileAction } from '../common';
+import { globalEventBus } from '../../utils/globalEventBus';
 
 const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
   bug: { label: 'Bug Report', icon: '🐛' },
@@ -46,9 +47,27 @@ export const FeedbackManager: React.FC = () => {
 
   useEffect(() => {
     if (isAdmin) {
-      loadFeedback();
+      const callLoadFeedback = async () => {
+        await loadFeedback();
+      };
+      callLoadFeedback();
     }
   }, [isAdmin, filter]);
+
+  useEffect(() => {
+    let unsubscribes: (() => void)[] = [];
+    const unsubscribeFeedbackSubmitted = globalEventBus.on('feedbackSubmitted', (detail) => {
+      const callLoadFeedback = async () => {
+        await loadFeedback();
+      };
+      callLoadFeedback();
+    });
+    unsubscribes.push(unsubscribeFeedbackSubmitted);
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, []);
 
   const loadFeedback = async () => {
     try {
@@ -144,7 +163,12 @@ export const FeedbackManager: React.FC = () => {
     {
       label: 'Refresh',
       icon: 'fas fa-sync-alt',
-      onClick: () => loadFeedback(),
+      onClick: () => {
+        const callLoadFeedback = async () => {
+          await loadFeedback();
+        };
+        callLoadFeedback();
+      },
       variant: 'secondary',
       disabled: loading,
     },
@@ -202,7 +226,12 @@ export const FeedbackManager: React.FC = () => {
         <div className="hidden md:block">
           <button
             type="button"
-            onClick={() => loadFeedback()}
+            onClick={() => {
+              const callLoadFeedback = async () => {
+                await loadFeedback();
+              };
+              callLoadFeedback();
+            }}
             disabled={loading}
             title="Refresh feedback list"
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
@@ -232,12 +261,12 @@ export const FeedbackManager: React.FC = () => {
                   }
                 }}
                 className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${isMobile
-                    ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                    }`
-                    : `border rounded-lg shadow-md hover:shadow-lg ${isSelected
-                      ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
-                      : 'border-gray-200 dark:border-gray-700'
-                    }`
+                  ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                  }`
+                  : `border rounded-lg shadow-md hover:shadow-lg ${isSelected
+                    ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                    : 'border-gray-200 dark:border-gray-700'
+                  }`
                   }`}
               >
                 <div className="flex flex-col gap-1.5 md:gap-3">
@@ -365,8 +394,8 @@ export const FeedbackManager: React.FC = () => {
                 Feedback
               </label>
               <p className={`text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded-lg whitespace-pre-wrap ${isPreviewMode
-                  ? 'text-gray-500 dark:text-gray-400'
-                  : 'text-gray-900 dark:text-white'
+                ? 'text-gray-500 dark:text-gray-400'
+                : 'text-gray-900 dark:text-white'
                 }`}>
                 {selectedFeedback.feedback}
               </p>
