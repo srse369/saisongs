@@ -124,7 +124,7 @@ router.patch('/:id', async (req, res) => {
     }
 
     if (adminNotes !== undefined) {
-      updates.admin_notes = adminNotes;
+      updates.adminNotes = adminNotes.trim();
     }
 
     if (Object.keys(updates).length === 0) {
@@ -145,11 +145,22 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
+    if (!id) {
+      return res.status(400).json({ error: 'Feedback ID is required' });
+    }
+
     await cacheService.deleteFeedback(id);
 
     res.json({ message: 'Feedback deleted successfully' });
   } catch (error) {
     console.error('Error deleting feedback:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete feedback';
+    
+    // Check if it's a "not found" error
+    if (errorMessage.includes('not found') || errorMessage.includes('already deleted')) {
+      return res.status(404).json({ error: errorMessage });
+    }
+    
     res.status(500).json({ error: 'Failed to delete feedback' });
   }
 });

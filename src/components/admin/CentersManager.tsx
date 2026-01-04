@@ -638,11 +638,12 @@ export const CentersManager: React.FC = () => {
               type="text"
               value={formData.name ?? ''}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 bg-white"
               placeholder="Enter center name"
               required
               autoFocus={!isPreviewMode}
               disabled={isSubmitting || isPreviewMode}
+              autoComplete="off"
             />
           </div>
 
@@ -670,9 +671,10 @@ export const CentersManager: React.FC = () => {
                 type="text"
                 value={formData.badgeTextColor ?? '#1e40af'}
                 onChange={(e) => setFormData({ ...formData, badgeTextColor: e.target.value })}
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 font-mono bg-white"
                 placeholder="#1e40af"
                 disabled={isSubmitting || isPreviewMode}
+                autoComplete="off"
               />
             </div>
             <div className="mt-2">
@@ -698,6 +700,60 @@ export const CentersManager: React.FC = () => {
               Users who can create and edit singers for this center
             </p>
           </div>
+
+          {/* Metadata - Only show when editing/viewing existing center */}
+          {editingCenter && (
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Metadata
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {editingCenter.createdBy && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Created By
+                    </label>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {editingCenter.createdBy}
+                    </p>
+                  </div>
+                )}
+
+                {editingCenter.createdAt && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Created At
+                    </label>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {new Date(editingCenter.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+
+                {editingCenter.updatedBy && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Updated By
+                    </label>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {editingCenter.updatedBy}
+                    </p>
+                  </div>
+                )}
+
+                {editingCenter.updatedAt && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Updated At
+                    </label>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {new Date(editingCenter.updatedAt).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">

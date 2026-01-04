@@ -709,8 +709,8 @@ class DatabaseWriteService {
    */
   async createFeedbackForCache(feedback: string, category: string, email: string | null, userAgent: string | null, url: string | null, ipAddress: string | null): Promise<void> {
     await this.db.query(
-      `INSERT INTO feedback (feedback, category, email, user_agent, url, ip_address, status, created_at, updated_at)
-       VALUES (:1, :2, :3, :4, :5, :6, 'new', SYSTIMESTAMP, SYSTIMESTAMP)`,
+      `INSERT INTO feedback (feedback, category, email, user_agent, url, ip_address, status, created_at)
+       VALUES (:1, :2, :3, :4, :5, :6, 'new', CURRENT_TIMESTAMP)`,
       [
         feedback,
         category,
@@ -728,7 +728,7 @@ class DatabaseWriteService {
   async updateFeedbackForCache(id: string | number, updates: string[], params: any[]): Promise<void> {
     await this.db.query(
       `UPDATE feedback SET ${updates.join(', ')} WHERE RAWTOHEX(id) = :${params.length}`,
-      params
+      [...params, id]
     );
   }
 
@@ -736,10 +736,18 @@ class DatabaseWriteService {
    * Delete feedback (for CacheService)
    */
   async deleteFeedbackForCache(id: string | number): Promise<void> {
-    await this.db.query(
+    // Convert ID to uppercase hex string (Oracle RAWTOHEX returns uppercase)
+    const normalizedId = String(id).toUpperCase();
+    
+    // Execute delete and check if any rows were affected
+    const result = await this.db.queryWithResult(
       `DELETE FROM feedback WHERE RAWTOHEX(id) = :1`,
-      [id]
+      [normalizedId]
     );
+    
+    if (!result || result.rowsAffected === 0) {
+      throw new Error(`Feedback with id ${normalizedId} not found or already deleted`);
+    }
   }
 }
 

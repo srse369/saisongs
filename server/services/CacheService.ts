@@ -134,8 +134,7 @@ class CacheService {
    * Clear all cached data
    */
   clear(): void {
-    const size = this.cache.size;
-    console.log('Clearing cache of size: ${size}', size);
+    console.log(`Clearing cache of size: ${this.cache.size}`);
     this.cache.clear();
   }
 
@@ -681,7 +680,7 @@ class CacheService {
     if (dbSingers.length > 0) {
       const dbSinger = dbSingers[0];
       dbIsAdmin = dbSinger.is_admin ?? dbSinger.IS_ADMIN ?? 0;
-      
+
       // Parse center_ids - handle null/undefined
       const centerIdsValue = dbSinger.CENTER_IDS || dbSinger.center_ids;
       if (centerIdsValue && centerIdsValue !== 'null' && centerIdsValue !== 'undefined') {
@@ -694,7 +693,7 @@ class CacheService {
       } else {
         dbParsedCenterIds = [];
       }
-      
+
       // Parse editor_for - handle null/undefined
       const editorForValue = dbSinger.EDITOR_FOR || dbSinger.editor_for;
       if (editorForValue && editorForValue !== 'null' && editorForValue !== 'undefined') {
@@ -1213,7 +1212,7 @@ class CacheService {
    */
   async createTemplate(template: PresentationTemplate): Promise<any> {
     const created = await this.templateBackendService.createTemplate(template);
-    
+
     // Write-through: add to cache directly
     const cacheKey = 'templates:all';
     const cached = this.get(cacheKey);
@@ -1221,10 +1220,10 @@ class CacheService {
       cached.push(created);
       this.set(cacheKey, cached, this.DEFAULT_TTL_MS);
     }
-    
+
     return created;
   }
-  
+
   /**
    * Update a template with write-through cache update
    */
@@ -2025,19 +2024,41 @@ class CacheService {
     return { success: true };
   }
 
-  async mapFeedbackRow(row: any): Promise<any> {
+  mapFeedbackRow(row: any): Promise<any> {
+    // Dates are already converted to ISO strings in the SQL query using TO_CHAR
+    // Just ensure they're strings (they should already be from TO_CHAR)
+    const convertDate = (date: any): string => {
+      if (!date) return new Date().toISOString();
+      if (typeof date === 'string') {
+        // Already in ISO format from TO_CHAR, return as-is
+        return date;
+      }
+      if (date instanceof Date) {
+        return date.toISOString();
+      }
+      return new Date().toISOString(); // Fallback
+    };
+
+    // Extract ID - handle both Oracle uppercase and lowercase column names
+    const id = row.ID || row.id;
+    if (!id) {
+      console.error('⚠️  Feedback row missing ID:', row);
+      throw new Error('Feedback row is missing required ID field');
+    }
+
     return {
-      id: row.ID || row.id,
+      id: id,
       feedback: row.FEEDBACK || row.feedback,
       category: row.CATEGORY || row.category,
       email: row.EMAIL || row.email,
-      user_agent: row.USER_AGENT || row.user_agent,
+      userAgent: row.USER_AGENT || row.user_agent,
       url: row.URL || row.url,
-      ip_address: row.IP_ADDRESS || row.ip_address,
+      ipAddress: row.IP_ADDRESS || row.ip_address,
       status: row.STATUS || row.status,
-      admin_notes: row.ADMIN_NOTES || row.admin_notes,
-      createdAt: row.CREATED_AT || row.created_at,
-      updatedAt: row.UPDATED_AT || row.updated_at,
+      adminNotes: row.ADMIN_NOTES || row.admin_notes,
+      createdAt: convertDate(row.CREATED_AT || row.created_at),
+      updatedAt: convertDate(row.UPDATED_AT || row.updated_at),
+      updatedBy: row.UPDATED_BY || row.updated_by,
     };
   }
 
@@ -2109,42 +2130,49 @@ class CacheService {
       params.push(data.adminNotes);
     }
 
-    updates.push('updated_at = SYSTIMESTAMP');
-    params.push(id);
+    updates.push('updated_at = CURRENT_TIMESTAMP');
 
     await this.databaseWriteService.updateFeedbackForCache(id, updates, params);
 
-    const feedback = await this.getFeedbackById(id);
+    const feedback = await this.databaseReadService.getFeedbackByIdForCache(id)
+    const normalizedFeedback = this.mapFeedbackRow(feedback[0]);
+
     const cacheKey = 'feedback:all';
     const cached = this.get<any>(cacheKey);
     if (cached) {
-      const updated = cached.map((f: any) => f.id === id ? feedback : f);
+      const updated = cached.map((f: any) => f.id === id ? normalizedFeedback : f);
       this.set(cacheKey, updated, this.DEFAULT_TTL_MS);
     } else {
-      this.set(cacheKey, [feedback], this.DEFAULT_TTL_MS);
+      this.set(cacheKey, [normalizedFeedback], this.DEFAULT_TTL_MS);
     }
-    return feedback;
+    return normalizedFeedback;
   }
 
   /**
    * Delete a feedback item with write-through cache update
    */
   async deleteFeedback(id: string | number): Promise<void> {
-    await this.databaseWriteService.deleteFeedbackForCache(id);
+    if (id === undefined || id === null || id === '') {
+      throw new Error('Feedback ID is required');
+    }
 
-    // Normalize ID to string for comparison
+    // Normalize ID to uppercase hex string for database query
     const normalizedId = String(id).toUpperCase();
-    
+
+    // Delete from database first
+    await this.databaseWriteService.deleteFeedbackForCache(normalizedId);
+
+    // Update cache by removing the deleted item
     const cacheKey = 'feedback:all';
     const cached = this.get<any>(cacheKey);
-    if (cached) {
+    if (cached && Array.isArray(cached)) {
       const updated = cached.filter((f: any) => {
         const feedbackId = String(f.id || '').toUpperCase();
         return feedbackId !== normalizedId;
       });
       this.set(cacheKey, updated, this.DEFAULT_TTL_MS);
     }
-    
+
     // Also invalidate the cache pattern to ensure fresh data on next fetch
     this.invalidatePattern(/^feedback:/);
   }
@@ -2181,9 +2209,9 @@ function extractValue(value: any): any {
  * This reduces recursive SQL from 40k to ~2-3k
  */
 export async function warmupCache(): Promise<void> {
-  const { databaseReadService: databaseService } = await import('./DatabaseReadService.js');
   const { cacheService } = await import('./CacheService.js');
-  const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+  cacheService.clear();
 
   // Track overall success
   let successCount = 0;

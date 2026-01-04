@@ -26,19 +26,19 @@ class DatabaseReadService {
   constructor() {
     // Determine wallet path - use absolute path in production, relative in development
     let walletPath: string;
-    
+
     if (process.env.NODE_ENV === 'production') {
       walletPath = '/var/www/saisongs/wallet';
     } else {
       walletPath = path.join(path.dirname(__filename), '../../wallet');
     }
-    
+
     console.log('📁 Oracle Wallet location:', walletPath);
     console.log('ℹ️  Using Oracle thin client mode (oracledb 6.x)');
-    
+
     const walletLocation = walletPath;
     const walletPassword = process.env.ORACLE_WALLET_PASSWORD || '';
-    
+
     // Connection pool configuration for Oracle Autonomous Database Free Tier
     this.connectionConfig = {
       user: process.env.ORACLE_USER,
@@ -68,7 +68,7 @@ class DatabaseReadService {
     oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
     oracledb.autoCommit = true;
     oracledb.fetchAsString = [oracledb.CLOB];
-    
+
     // Periodic cleanup every 2 minutes
     setInterval(() => this.cleanupIdleConnections(), 2 * 60 * 1000);
   }
@@ -143,22 +143,22 @@ class DatabaseReadService {
 
     let connection: oracledb.Connection | undefined;
     const connectionStartTime = Date.now();
-    
+
     try {
       connection = await this.pool.getConnection();
       this.activeConnections.add(connection);
-      
+
       const result = await connection.execute(sql, params, {
         outFormat: oracledb.OUT_FORMAT_OBJECT,
         autoCommit: options.autoCommit !== false ? true : false,
         ...options
       });
-      
+
       return (result.rows || []) as T[];
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Database query error:', errorMessage);
-      
+
       if (errorMessage.includes('ORA-00018') || errorMessage.includes('sessions exceeded')) {
         console.error('🚨 CRITICAL: Maximum Oracle sessions exceeded!');
         if (this.pool) {
@@ -170,7 +170,7 @@ class DatabaseReadService {
           }
         }
       }
-      
+
       console.error('SQL:', sql.substring(0, 200));
       throw new Error(`Query execution failed: ${errorMessage}`);
     } finally {
@@ -178,7 +178,7 @@ class DatabaseReadService {
         try {
           this.activeConnections.delete(connection);
           await connection.close();
-          
+
           const connectionDuration = Date.now() - connectionStartTime;
           if (connectionDuration > 5000) {
             console.warn(`⚠️  Connection held for ${connectionDuration}ms`);
@@ -188,7 +188,72 @@ class DatabaseReadService {
           this.activeConnections.delete(connection);
         }
       }
-      
+
+      if (this.activeConnections.size > 5) {
+        console.warn(`⚠️  ${this.activeConnections.size} connections still active`);
+      }
+    }
+  }
+
+  /**
+   * Executes a query and returns the full result object (including rowsAffected)
+   * Used for DELETE/UPDATE operations that need to check if rows were affected
+   */
+  async queryWithResult<T = any>(sql: string, params: any[] | Record<string, any> = [], options: any = {}): Promise<oracledb.Result<T>> {
+    await this.initPool();
+
+    if (!this.pool) {
+      throw new Error('Database pool is not initialized');
+    }
+
+    let connection: oracledb.Connection | undefined;
+    const connectionStartTime = Date.now();
+
+    try {
+      connection = await this.pool.getConnection();
+      this.activeConnections.add(connection);
+
+      const result = await connection.execute(sql, params, {
+        outFormat: oracledb.OUT_FORMAT_OBJECT,
+        autoCommit: options.autoCommit !== false ? true : false,
+        ...options
+      });
+
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Database query error:', errorMessage);
+
+      if (errorMessage.includes('ORA-00018') || errorMessage.includes('sessions exceeded')) {
+        console.error('🚨 CRITICAL: Maximum Oracle sessions exceeded!');
+        if (this.pool) {
+          try {
+            await this.pool.reconfigure({ poolMin: 0, poolMax: 2 });
+            console.log('   ↻ Attempted pool cleanup');
+          } catch (reconfigError) {
+            console.error('   ⚠️  Pool cleanup failed:', reconfigError);
+          }
+        }
+      }
+
+      console.error('SQL:', sql.substring(0, 200));
+      throw new Error(`Query execution failed: ${errorMessage}`);
+    } finally {
+      if (connection) {
+        try {
+          this.activeConnections.delete(connection);
+          await connection.close();
+
+          const connectionDuration = Date.now() - connectionStartTime;
+          if (connectionDuration > 5000) {
+            console.warn(`⚠️  Connection held for ${connectionDuration}ms`);
+          }
+        } catch (err) {
+          console.error('Error closing connection:', err);
+          this.activeConnections.delete(connection);
+        }
+      }
+
       if (this.activeConnections.size > 5) {
         console.warn(`⚠️  ${this.activeConnections.size} connections still active`);
       }
@@ -208,14 +273,14 @@ class DatabaseReadService {
   async testConnection(): Promise<boolean> {
     try {
       await this.query('SELECT 1 FROM DUAL');
-      
+
       try {
         const sessionInfo = await this.query<any>(`
           SELECT COUNT(*) as current_sessions
           FROM v$session 
           WHERE username = USER
         `);
-        
+
         if (sessionInfo.length > 0) {
           const current = sessionInfo[0].CURRENT_SESSIONS || sessionInfo[0].current_sessions || 0;
           console.log(`📊 Oracle sessions: ${current} active`);
@@ -226,7 +291,7 @@ class DatabaseReadService {
       } catch (sessionCheckError) {
         console.log('ℹ️  Unable to check session count');
       }
-      
+
       return true;
     } catch (error) {
       console.error('❌ Database connection test failed:', error instanceof Error ? error.message : error);
@@ -239,15 +304,15 @@ class DatabaseReadService {
    */
   private async cleanupIdleConnections(): Promise<void> {
     if (!this.pool) return;
-    
+
     try {
       const poolStats = this.pool.getStatistics();
       const openConnections = poolStats?.connectionsOpen || 0;
       const inUse = poolStats?.connectionsInUse || 0;
       const poolAvailable = poolStats?.connectionsInPool || 0;
-      
+
       console.log(`🔍 Pool health: ${openConnections} open, ${inUse} in use, ${poolAvailable} available, ${this.activeConnections.size} tracked`);
-      
+
       if (this.activeConnections.size > 0) {
         console.warn(`⚠️  Force-closing ${this.activeConnections.size} tracked connections`);
         for (const conn of this.activeConnections) {
@@ -259,11 +324,11 @@ class DatabaseReadService {
         }
         this.activeConnections.clear();
       }
-      
+
       if (openConnections > 3) {
         console.warn(`🚨 WARNING: ${openConnections} connections open - potential leak!`);
       }
-      
+
       await this.pool.reconfigure({ poolMin: 0, poolMax: 2 });
     } catch (error) {
       console.error('Pool cleanup warning:', error instanceof Error ? error.message : error);
@@ -299,11 +364,11 @@ class DatabaseReadService {
       [email.toLowerCase().trim()]
     );
     if (users.length === 0) return null;
-    
+
     const user = users[0];
     // Get is_admin value (Oracle returns uppercase)
     const isAdminVal = user.is_admin ?? user.IS_ADMIN ?? 0;
-    
+
     return {
       id: user.id || user.ID,
       name: user.name || user.NAME,
@@ -323,7 +388,7 @@ class DatabaseReadService {
       [email.toLowerCase().trim()]
     );
     if (users.length === 0) return null;
-    
+
     const user = users[0];
     return {
       id: user.id || user.ID,
@@ -360,7 +425,7 @@ class DatabaseReadService {
       [email.toLowerCase().trim(), code]
     );
     if (records.length === 0) return null;
-    
+
     const record = records[0];
     return {
       id: record.id || record.ID,
@@ -515,7 +580,7 @@ class DatabaseReadService {
   /**
    * Get all presentation templates
    */
-async getAllTemplates(): Promise<any[]> {
+  async getAllTemplates(): Promise<any[]> {
     return await this.query<any>(`
       SELECT id, name, description, template_json, center_ids, is_default, created_at, updated_at
       FROM presentation_templates
@@ -1331,9 +1396,9 @@ async getAllTemplates(): Promise<any[]> {
   async getAllFeedbackForCache(): Promise<any[]> {
     return await this.query(`
       SELECT RAWTOHEX(id) as id, feedback, category, email, user_agent, url, ip_address, 
-              status, admin_notes, created_at, updated_at
+              status, admin_notes, created_at, updated_at, updated_by
        FROM feedback 
-       ORDER BY created_at DESC
+       ORDER BY updated_at, created_at DESC
     `);
   }
 
@@ -1341,12 +1406,14 @@ async getAllTemplates(): Promise<any[]> {
    * Get feedback by ID (for caching)
    */
   async getFeedbackByIdForCache(id: string | number): Promise<any[]> {
+    // Normalize ID to uppercase for comparison
+    const normalizedId = String(id).toUpperCase();
     return await this.query(`
       SELECT RAWTOHEX(id) as id, feedback, category, email, user_agent, url, ip_address, 
-              status, admin_notes, created_at, updated_at
+              status, admin_notes, created_at, updated_at, updated_by
        FROM feedback 
        WHERE RAWTOHEX(id) = :1`,
-      [id]
+      [normalizedId]
     );
   }
 }

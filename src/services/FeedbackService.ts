@@ -12,6 +12,7 @@ export interface Feedback {
   adminNotes?: string;
   createdAt: Date;
   updatedAt: Date;
+  updatedBy?: string;
 }
 
 export interface FeedbackListResponse {
@@ -22,6 +23,7 @@ export interface FeedbackListResponse {
 export interface FeedbackUpdateData {
   status?: 'new' | 'in-progress' | 'resolved' | 'closed';
   adminNotes?: string;
+  updatedBy?: string;
 }
 
 class FeedbackService {

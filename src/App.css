@@ -151,3 +151,24 @@ select:disabled {
   background-color: var(--disabled-bg);
   color: var(--disabled-text);
 }
+
+/* Override browser autofill yellow background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px white inset !important;
+  -webkit-text-fill-color: #111827 !important;
+  box-shadow: 0 0 0 1000px white inset !important;
+  background-color: white !important;
+}
+
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #1f2937 inset !important;
+  -webkit-text-fill-color: #f9fafb !important;
+  box-shadow: 0 0 0 1000px #1f2937 inset !important;
+  background-color: #1f2937 !important;
+}

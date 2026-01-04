@@ -21,7 +21,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export const FeedbackManager: React.FC = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, userEmail } = useAuth();
   const toast = useToast();
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +66,7 @@ export const FeedbackManager: React.FC = () => {
 
   const handleViewDetails = (item: Feedback) => {
     setSelectedFeedback(item);
-    setAdminNotes(item.adminNotes || '');
+    setAdminNotes(`\n-----------------------------------------\nUpdated by: ${item.updatedBy}\nUpdated at: ${item.updatedAt}\nAdmin Notes:\n${item.adminNotes || ''}`);
     setNewStatus(item.status);
     setIsPreviewMode(false);
     setDetailsModalOpen(true);
@@ -87,6 +87,7 @@ export const FeedbackManager: React.FC = () => {
       await feedbackService.updateFeedback(selectedFeedback.id, {
         status: newStatus,
         adminNotes: adminNotes.trim() || undefined,
+        updatedBy: userEmail || 'Unknown',
       });
 
       toast.success('Feedback updated successfully');
@@ -99,6 +100,12 @@ export const FeedbackManager: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!id) {
+      console.error('Cannot delete feedback: ID is missing', { id });
+      toast.error('Cannot delete feedback: ID is missing');
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this feedback?')) return;
 
     try {
@@ -107,7 +114,10 @@ export const FeedbackManager: React.FC = () => {
       loadFeedback();
     } catch (error) {
       console.error('Error deleting feedback:', error);
-      toast.error('Failed to delete feedback');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete feedback';
+      toast.error(errorMessage.includes('not found') || errorMessage.includes('already deleted')
+        ? 'Feedback not found or already deleted'
+        : 'Failed to delete feedback');
     }
   };
 
@@ -213,90 +223,87 @@ export const FeedbackManager: React.FC = () => {
           {feedback.map((item, index) => {
             const isSelected = selectedFeedbackId === item.id;
             return (
-            <div
-              key={item.id}
-              onClick={() => {
-                // On mobile, toggle selection on row click
-                if (isMobile) {
-                  setSelectedFeedbackId(isSelected ? null : item.id);
-                }
-              }}
-              className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${
-                isMobile 
-                  ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${
-                      isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+              <div
+                key={item.id}
+                onClick={() => {
+                  // On mobile, toggle selection on row click
+                  if (isMobile) {
+                    setSelectedFeedbackId(isSelected ? null : item.id);
+                  }
+                }}
+                className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${isMobile
+                    ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                     }`
-                  : `border rounded-lg shadow-md hover:shadow-lg ${
-                      isSelected
-                        ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
-                        : 'border-gray-200 dark:border-gray-700'
+                    : `border rounded-lg shadow-md hover:shadow-lg ${isSelected
+                      ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                      : 'border-gray-200 dark:border-gray-700'
                     }`
-              }`}
-            >
-              <div className="flex flex-col gap-1.5 md:gap-3">
-                {/* Content Section */}
-                <div className="flex-1 min-w-0">
-                  {/* Category and Status */}
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">
-                        {CATEGORY_LABELS[item.category]?.icon || '💬'}
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {CATEGORY_LABELS[item.category]?.label || 'Other'}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[item.status || 'new'] || STATUS_COLORS['new']}`}>
-                        {(item.status || 'new').replace('-', ' ')}
-                      </span>
+                  }`}
+              >
+                <div className="flex flex-col gap-1.5 md:gap-3">
+                  {/* Content Section */}
+                  <div className="flex-1 min-w-0">
+                    {/* Category and Status */}
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">
+                          {CATEGORY_LABELS[item.category]?.icon || '💬'}
+                        </span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {CATEGORY_LABELS[item.category]?.label || 'Other'}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[item.status || 'new'] || STATUS_COLORS['new']}`}>
+                          {(item.status || 'new').replace('-', ' ')}
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePreviewClick(item);
+                        }}
+                        title="View feedback details"
+                        className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
+                      >
+                        <i className="fas fa-eye text-base"></i>
+                      </button>
                     </div>
+
+                    {/* Feedback Text */}
+                    <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mb-2">
+                      {item.feedback}
+                    </p>
+
+                    {/* Metadata */}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                      <span>✉️ {item.email}</span>
+                      {item.ipAddress && <span>🌐 {item.ipAddress}</span>}
+                      <span>📅 {new Date(item.createdAt).toLocaleDateString()}</span>
+                      {item.url && <span>🔗 {new URL(item.url).pathname}</span>}
+                    </div>
+                  </div>
+
+                  {/* Actions - On separate line below horizontal separator on desktop */}
+                  <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePreviewClick(item);
-                      }}
-                      title="View feedback details"
-                      className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
+                      onClick={() => handleViewDetails(item)}
+                      title="Edit feedback status and admin notes"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                     >
-                      <i className="fas fa-eye text-base"></i>
+                      <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                    >
+                      <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
                     </button>
                   </div>
-
-                  {/* Feedback Text */}
-                  <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mb-2">
-                    {item.feedback}
-                  </p>
-
-                  {/* Metadata */}
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-                    <span>✉️ {item.email}</span>
-                    {item.ipAddress && <span>🌐 {item.ipAddress}</span>}
-                    <span>📅 {new Date(item.createdAt).toLocaleDateString()}</span>
-                    {item.url && <span>🔗 {new URL(item.url).pathname}</span>}
-                  </div>
-                </div>
-
-                {/* Actions - On separate line below horizontal separator on desktop */}
-                <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    onClick={() => handleViewDetails(item)}
-                    title="Edit feedback status and admin notes"
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                  >
-                    <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
-                  </button>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                  >
-                    <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
-                  </button>
                 </div>
               </div>
-            </div>
             );
           })}
         </div>
@@ -333,16 +340,22 @@ export const FeedbackManager: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Status
                 </label>
-                <select
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value as Feedback['status'])}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="new">New</option>
-                  <option value="in-progress">In Progress</option>
-                  <option value="resolved">Resolved</option>
-                  <option value="closed">Closed</option>
-                </select>
+                {isPreviewMode ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-lg">
+                    {newStatus.replace('-', ' ')}
+                  </p>
+                ) : (
+                  <select
+                    value={newStatus}
+                    onChange={(e) => setNewStatus(e.target.value as Feedback['status'])}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="new">New</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                )}
               </div>
             </div>
 
@@ -351,7 +364,10 @@ export const FeedbackManager: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Feedback
               </label>
-              <p className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 p-3 rounded-lg whitespace-pre-wrap">
+              <p className={`text-sm bg-gray-50 dark:bg-gray-900 p-3 rounded-lg whitespace-pre-wrap ${isPreviewMode
+                  ? 'text-gray-500 dark:text-gray-400'
+                  : 'text-gray-900 dark:text-white'
+                }`}>
                 {selectedFeedback.feedback}
               </p>
             </div>
@@ -382,6 +398,31 @@ export const FeedbackManager: React.FC = () => {
                   {new Date(selectedFeedback.createdAt).toLocaleString()}
                 </p>
               </div>
+
+              {(selectedFeedback.updatedBy || selectedFeedback.updatedAt) && (
+                <div className="sm:col-span-2">
+                  {selectedFeedback.updatedBy && (
+                    <div className="mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Updated By
+                      </label>
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        {selectedFeedback.updatedBy}
+                      </p>
+                    </div>
+                  )}
+                  {selectedFeedback.updatedAt && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Updated At
+                      </label>
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        {new Date(selectedFeedback.updatedAt).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* URL */}
@@ -418,13 +459,19 @@ export const FeedbackManager: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Admin Notes
               </label>
-              <textarea
-                value={adminNotes}
-                onChange={(e) => setAdminNotes(e.target.value)}
-                rows={4}
-                placeholder="Add internal notes about this feedback..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              {isPreviewMode ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-3 rounded-lg whitespace-pre-wrap">
+                  {adminNotes || 'No admin notes'}
+                </p>
+              ) : (
+                <textarea
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  rows={4}
+                  placeholder="Add internal notes about this feedback..."
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
             </div>
 
             {/* Actions */}
