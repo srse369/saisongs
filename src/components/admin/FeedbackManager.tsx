@@ -92,7 +92,7 @@ export const FeedbackManager: React.FC = () => {
 
       toast.success('Feedback updated successfully');
       setDetailsModalOpen(false);
-      loadFeedback();
+      await loadFeedback();
     } catch (error) {
       console.error('Error updating feedback:', error);
       toast.error('Failed to update feedback');
@@ -111,7 +111,7 @@ export const FeedbackManager: React.FC = () => {
     try {
       await feedbackService.deleteFeedback(id);
       toast.success('Feedback deleted successfully');
-      loadFeedback();
+      await loadFeedback();
     } catch (error) {
       console.error('Error deleting feedback:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete feedback';
