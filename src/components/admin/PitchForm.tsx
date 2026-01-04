@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { SongSingerPitch, CreatePitchInput, Song, Singer } from '../../types';
 import { ALL_PITCH_OPTIONS, formatPitchWithName } from '../../utils/pitchUtils';
-import { formatNormalizedPitch } from '../../utils/pitchNormalization';
+import { formatNormalizedPitch, normalizePitch } from '../../utils/pitchNormalization';
 import { useAuth } from '../../contexts/AuthContext';
 import { fetchCentersOnce } from '../common/CenterBadges';
 
@@ -17,11 +17,11 @@ interface PitchFormProps {
   defaultSingerId?: string; // Default singer ID from filter (if any)
 }
 
-export const PitchForm: React.FC<PitchFormProps> = ({ 
-  pitch, 
-  songs, 
-  singers, 
-  onSubmit, 
+export const PitchForm: React.FC<PitchFormProps> = ({
+  pitch,
+  songs,
+  singers,
+  onSubmit,
   onCancel,
   onUnsavedChangesRef,
   userSingerId,
@@ -34,8 +34,8 @@ export const PitchForm: React.FC<PitchFormProps> = ({
   const [pitchValue, setPitchValue] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [centers, setCenters] = useState<Array<{id: number; name: string}>>([]);
-  
+  const [centers, setCenters] = useState<Array<{ id: number; name: string }>>([]);
+
   // Check if user is editing mode or creating for themselves
   const isEditMode = !!pitch;
   const isViewerCreatingForSelf = !isEditor && !!userSingerId && !isEditMode;
@@ -75,7 +75,7 @@ export const PitchForm: React.FC<PitchFormProps> = ({
     }
     setErrors({});
   }, [pitch, isViewerCreatingForSelf, userSingerId, defaultSongId, defaultSingerId]);
-  
+
   // Track if form has unsaved changes
   const hasUnsavedChanges = useMemo(() => {
     if (pitch) {
@@ -103,10 +103,49 @@ export const PitchForm: React.FC<PitchFormProps> = ({
   const handleCancel = () => {
     onCancel();
   };
-  
+
   // Get selected song's reference pitches
   const selectedSong = songs.find(s => s.id === songId);
   const hasReferencePitches = selectedSong?.refGents || selectedSong?.refLadies;
+  const selectedSinger = singers.find(s => s.id === singerId);
+
+  // Auto-populate pitch based on singer gender and song reference pitches
+  useEffect(() => {
+    // Auto-populate in create mode whenever song or singer changes (even if pitch already has a value)
+    // This effect runs when songId or singerId changes and updates pitch based on reference pitches
+    if (!isEditMode && songId && singerId && selectedSong && selectedSinger) {
+      const singerGender = selectedSinger.gender;
+      let rawReferencePitch = '';
+
+      // Determine which reference pitch to use based on gender
+      if (singerGender === 'Male') {
+        // Use refGents for male singers
+        if (selectedSong.refGents) {
+          rawReferencePitch = selectedSong.refGents;
+        }
+      } else if (singerGender === 'Female' || singerGender === 'Boy' || singerGender === 'Girl') {
+        // Use refLadies for female/boy/girl singers
+        if (selectedSong.refLadies) {
+          rawReferencePitch = selectedSong.refLadies;
+        }
+      }
+      // For 'Other' gender, don't auto-populate (user can choose)
+
+      // Normalize the reference pitch and verify it matches a value in ALL_PITCH_OPTIONS
+      if (rawReferencePitch) {
+        const normalizedPitch = normalizePitch(rawReferencePitch);
+
+        // Only set if normalization succeeded and the normalized value is in ALL_PITCH_OPTIONS
+        if (normalizedPitch && ALL_PITCH_OPTIONS.includes(normalizedPitch)) {
+          setPitchValue(normalizedPitch);
+        }
+        // If normalization fails or doesn't match an option, don't auto-populate
+        // (user will need to select manually)
+      }
+    }
+    // Note: We intentionally don't include pitchValue in dependencies to avoid re-running when pitch changes
+    // We only want to auto-populate when song or singer selection changes
+  }, [songId, singerId, isEditMode, selectedSong, selectedSinger]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -153,7 +192,7 @@ export const PitchForm: React.FC<PitchFormProps> = ({
       <div>
         <label htmlFor="pitch-song" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Song <span className="text-red-500 dark:text-red-400">*</span>
-          <span 
+          <span
             title="Select which song this pitch assignment is for"
             className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
           >
@@ -164,13 +203,11 @@ export const PitchForm: React.FC<PitchFormProps> = ({
           id="pitch-song"
           value={songId}
           onChange={(e) => setSongId(e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-            isEditMode 
-              ? 'bg-gray-100 text-gray-500 cursor-not-allowed dark:!bg-gray-900 dark:!text-gray-500 dark:border-gray-700' 
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isEditMode
+              ? 'bg-gray-100 text-gray-500 cursor-not-allowed dark:!bg-gray-900 dark:!text-gray-500 dark:border-gray-700'
               : 'dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100'
-          } ${
-            errors.songId ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
-          }`}
+            } ${errors.songId ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
+            }`}
           disabled={isSubmitting || isEditMode}
         >
           <option value="">Select a song</option>
@@ -188,7 +225,7 @@ export const PitchForm: React.FC<PitchFormProps> = ({
       <div>
         <label htmlFor="pitch-singer" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Singer <span className="text-red-500 dark:text-red-400">*</span>
-          <span 
+          <span
             title="Select which singer this pitch is for"
             className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
           >
@@ -199,13 +236,11 @@ export const PitchForm: React.FC<PitchFormProps> = ({
           id="pitch-singer"
           value={singerId}
           onChange={(e) => setSingerId(e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-            (isEditMode || isViewerCreatingForSelf)
-              ? 'bg-gray-100 text-gray-500 cursor-not-allowed dark:!bg-gray-900 dark:!text-gray-500 dark:border-gray-700' 
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${(isEditMode || isViewerCreatingForSelf)
+              ? 'bg-gray-100 text-gray-500 cursor-not-allowed dark:!bg-gray-900 dark:!text-gray-500 dark:border-gray-700'
               : 'dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100'
-          } ${
-            errors.singerId ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
-          }`}
+            } ${errors.singerId ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
+            }`}
           disabled={isSubmitting || isEditMode || isViewerCreatingForSelf}
         >
           <option value="">Select a singer</option>
@@ -259,7 +294,7 @@ export const PitchForm: React.FC<PitchFormProps> = ({
       <div>
         <label htmlFor="pitch-value" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Pitch <span className="text-red-500 dark:text-red-400">*</span>
-          <span 
+          <span
             title="Musical key/pitch this singer uses for this song (e.g., C, D, F, 2 Madhyam)"
             className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
           >
@@ -270,9 +305,8 @@ export const PitchForm: React.FC<PitchFormProps> = ({
           id="pitch-value"
           value={pitchValue}
           onChange={(e) => setPitchValue(e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ${
-            errors.pitch ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
-          }`}
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 ${errors.pitch ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
+            }`}
           disabled={isSubmitting}
         >
           <option value="">Select a pitch</option>
@@ -293,10 +327,10 @@ export const PitchForm: React.FC<PitchFormProps> = ({
           onClick={handleCancel}
           disabled={isSubmitting}
           title="Discard changes and close the form"
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
-          >
-            Cancel
-          </button>
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-700 w-full sm:w-auto"
+        >
+          Cancel
+        </button>
         <button
           type="submit"
           disabled={isSubmitting}

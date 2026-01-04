@@ -34,6 +34,7 @@ interface NamedSessionContextType {
   // UI state
   clearCurrentSession: () => void;
   clearError: () => void;
+  clearState: () => void; // Clear all sessions and current session (for logout)
 }
 
 const NamedSessionContext = createContext<NamedSessionContextType | undefined>(undefined);
@@ -215,6 +216,14 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setError(null);
   }, []);
 
+  // Clear all state (for logout)
+  const clearState = useCallback(() => {
+    setSessions([]);
+    setCurrentSession(null);
+    setError(null);
+    hasLoadedRef.current = false; // Allow reloading after logout
+  }, []);
+
   const hasLoadedRef = useRef(false);
 
   // Load sessions on mount (only once)
@@ -240,6 +249,7 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     reorderSessionItems,
     clearCurrentSession,
     clearError,
+    clearState,
   };
 
   return (

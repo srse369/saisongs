@@ -134,6 +134,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                   pitchCount={song.pitchCount}
                   isSelected={isSelected}
                   onPreviewClick={() => handlePresent(song)}
+                  isAuthenticated={isAuthenticated}
                 />
 
                 {/* Audio Player - Hidden on mobile until row is selected */}

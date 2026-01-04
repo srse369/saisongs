@@ -5,9 +5,10 @@ import { songService } from '../services';
 import { useToast } from './ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../utils';
 import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
+import { globalEventBus } from '../utils/globalEventBus';
 
 const SONGS_CACHE_KEY = 'saiSongs:songsCache';
-const SONGS_CACHE_TTL_MS = 10 * 60 * 1000; // 5 minutes
+const SONGS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 interface SongContextState {
   songs: Song[];
@@ -37,58 +38,136 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
   const [hasFetched, setHasFetched] = useState<boolean>(false);
   const toast = useToast();
 
-  // Listen for pitch creation/deletion events to update pitch counts optimistically
-  // Listen for pitch events to update pitch counts optimistically
+  // Listen for song and pitch events to update state optimistically
   useEffect(() => {
     let unsubscribes: (() => void)[] = [];
-    
-    import('../utils/globalEventBus').then(({ globalEventBus }) => {
-      const unsubscribePitchCreated = globalEventBus.on('pitchCreated', (detail) => {
-        const { songId } = detail;
+
+    const unsubscribeSongCreated = globalEventBus.on('songCreated', (detail) => {
+      const { song } = detail;
+      if (song) {
         setSongs(prev => {
-          const updated = prev.map(song => 
-            song.id === songId 
+          // Check if song already exists (duplicate prevention)
+          let updated: Song[];
+          if (prev.some(s => s.id === song.id)) {
+            updated = prev.map(s => s.id === song.id ? song : s);
+          } else {
+            updated = [...prev, song].sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
+          }
+          // Update localStorage cache to keep it in sync
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(SONGS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              songs: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeSongUpdated = globalEventBus.on('songUpdated', (detail) => {
+      const { song } = detail;
+      if (song) {
+        setSongs(prev => {
+          // Check if song already exists (duplicate prevention)
+          let updated: Song[];
+          if (prev.some(s => s.id === song.id)) {
+            updated = prev.map(s => s.id === song.id ? song : s);
+          } else {
+            updated = [...prev, song].sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
+          }
+          // Update localStorage cache to keep it in sync
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(SONGS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              songs: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeSongDeleted = globalEventBus.on('songDeleted', (detail) => {
+      const { song } = detail;
+      if (song) {
+        setSongs(prev => {
+          const updated = prev.filter(s => s.id !== song.id);
+          // Update localStorage cache to keep it in sync
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(SONGS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              songs: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeSingerMerged = globalEventBus.on('singerMerged', (detail) => {
+      const { songIdsPitchCountDown } = detail;
+      if (songIdsPitchCountDown) {
+        setSongs(prev => {
+          const updated = prev.map(song => {
+            const change = songIdsPitchCountDown.get(song.id) ?? 0;
+            return { ...song, pitchCount: (song.pitchCount ?? 0) + change };
+          });
+          // Update localStorage cache to keep it in sync
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(SONGS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              songs: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribePitchCreated = globalEventBus.on('pitchCreated', (detail) => {
+      const { pitch } = detail;
+      if (pitch) {
+        setSongs(prev => {
+          const updated = prev.map(song =>
+            song.id === pitch.songId
               ? { ...song, pitchCount: (song.pitchCount ?? 0) + 1 }
               : song
           );
-          
           // Update localStorage cache to keep it in sync
           if (typeof window !== 'undefined') {
-            const cacheData = JSON.stringify({
+            setLocalStorageItem(SONGS_CACHE_KEY, JSON.stringify({
               timestamp: Date.now(),
               songs: updated,
-            });
-            setLocalStorageItem(SONGS_CACHE_KEY, cacheData);
+            }));
           }
-          
           return updated;
         });
-      });
-      
-      const unsubscribePitchDeleted = globalEventBus.on('pitchDeleted', (detail) => {
-        const { songId } = detail;
+      }
+    });
+
+    const unsubscribePitchDeleted = globalEventBus.on('pitchDeleted', (detail) => {
+      const { pitch } = detail;
+      if (pitch) {
         setSongs(prev => {
-          const updated = prev.map(song => 
-            song.id === songId 
+          const updated = prev.map(song =>
+            song.id === pitch.songId
               ? { ...song, pitchCount: Math.max(0, (song.pitchCount ?? 0) - 1) }
               : song
           );
-          
           // Update localStorage cache to keep it in sync
           if (typeof window !== 'undefined') {
-            const cacheData = JSON.stringify({
+            setLocalStorageItem(SONGS_CACHE_KEY, JSON.stringify({
               timestamp: Date.now(),
               songs: updated,
-            });
-            setLocalStorageItem(SONGS_CACHE_KEY, cacheData);
+            }));
           }
-          
           return updated;
         });
-      });
-      
-      unsubscribes.push(unsubscribePitchCreated, unsubscribePitchDeleted);
+      }
     });
+
+    unsubscribes.push(unsubscribeSongCreated, unsubscribeSongUpdated, unsubscribeSongDeleted, unsubscribeSingerMerged, unsubscribePitchCreated, unsubscribePitchDeleted);
 
     return () => {
       unsubscribes.forEach(unsub => unsub());
@@ -104,7 +183,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
     if (!forceRefresh && hasFetched && error) {
       return;
     }
-    
+
     // Reset backoff for explicit user-triggered refreshes
     if (forceRefresh && typeof window !== 'undefined') {
       const { apiClient } = await import('../services/ApiClient');
@@ -112,7 +191,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
       setError(null);
       setHasFetched(false);
     }
-    
+
     setLoading(true);
     setError(null);
     try {
@@ -192,31 +271,21 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
     setError(null);
     try {
       const song = await songService.createSong(input);
-      
-      // Add the song to local state immediately
-      setSongs(prev => {
-        // Check if song already exists (duplicate prevention)
-        if (prev.some(s => s.id === song.id)) {
-          return prev;
+
+      if (song) {
+        if (typeof window !== 'undefined') {
+          // Dispatch global event to notify other components
+          globalEventBus.dispatch('songCreated', { type: 'songCreated', song: song });
         }
-        // Insert in sorted order by name (ignoring special characters)
-        return [...prev, song].sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
-      });
-      
-      // Clear localStorage cache so it doesn't return stale data
-      if (typeof window !== 'undefined') {
-        removeLocalStorageItem(SONGS_CACHE_KEY);
-        
-        // Dispatch global event to notify other components
-        import('../utils/globalEventBus').then(({ globalEventBus }) => {
-          globalEventBus.dispatch('songCreated', { type: 'songCreated' });
-        });
+        toast.success(`Song ${song.name} created successfully`);
+        return song;
       }
-      
-      toast.success('Song created successfully');
-      return song;
+      console.error('Failed to create song', input);
+      toast.error(`Failed to create song ${input.name}`);
+      return null;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create song';
+      console.error(`Error creating song ${input}:`, err);
+      const errorMessage = err instanceof Error ? err.message : `Error creating song ${input.name}: ${err}`;
       setError({
         code: 'UNKNOWN_ERROR',
         message: errorMessage,
@@ -234,23 +303,20 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
     try {
       const song = await songService.updateSong(id, input);
       if (song) {
-        setSongs(prev => prev.map(s => s.id === id ? song : s));
-        
-        // Clear localStorage cache so it doesn't return stale data
         if (typeof window !== 'undefined') {
-          removeLocalStorageItem(SONGS_CACHE_KEY);
-          
           // Dispatch global event to notify other components
-          import('../utils/globalEventBus').then(({ globalEventBus }) => {
-            globalEventBus.dispatch('songUpdated', { type: 'songUpdated' });
-          });
+          globalEventBus.dispatch('songUpdated', { type: 'songUpdated', song: song });
         }
-        
-        toast.success('Song updated successfully');
+        toast.success(`Song ${song.name} updated successfully`);
+        return song;
+      } else {
+        console.error('Failed to update song', input);
+        toast.error(`Failed to update song ${input.name}`);
+        return null;
       }
-      return song;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update song';
+      console.error(`Error updating song ${input}:`, err);
+      const errorMessage = err instanceof Error ? err.message : `Error updating song ${input.name}: ${err}`;
       setError({
         code: 'UNKNOWN_ERROR',
         message: errorMessage,
@@ -266,33 +332,53 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const success = await songService.deleteSong(id);
-      if (success) {
-        setSongs(prev => prev.filter(song => song.id !== id));
-        
-        // Clear localStorage cache so it doesn't return stale data
-        if (typeof window !== 'undefined') {
-          removeLocalStorageItem(SONGS_CACHE_KEY);
-          
-          // Dispatch global event to notify other components
-          import('../utils/globalEventBus').then(({ globalEventBus }) => {
-            globalEventBus.dispatch('songDeleted', { type: 'songDeleted' });
-          });
+      // Get the song before deleting to know which song to update
+      // Try from state first (fast), but fallback to fetching from backend if not found
+      let songToDelete = songs.find(s => s.id === id);
+
+      // If song not in state, fetch from backend to get full song data
+      if (!songToDelete) {
+        const fetchedSong = await songService.getSongById(id);
+        if (fetchedSong) {
+          songToDelete = fetchedSong;
         }
-        
-        toast.success('Song deleted successfully');
       }
-      return success;
+
+      if (songToDelete) {
+        const success = await songService.deleteSong(id);
+        if (success) {
+          if (typeof window !== 'undefined') {
+            // Dispatch global event to notify other components
+            globalEventBus.dispatch('songDeleted', {
+              type: 'songDeleted',
+              song: songToDelete
+            });
+          }
+          toast.success(`Song ${songToDelete.name} deleted successfully`);
+          return true;
+        } else {
+          console.error(`Failed to delete song ${id}`);
+          toast.error('Failed to delete song');
+          return false;
+        }
+      } else {
+        console.error(`Failed to delete song ${id}`);
+        toast.error('Failed to delete song');
+        return false;
+      }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete song';
-      // Show toast notification but don't persist error in state
-      // since we have a persistent error display in the UI
+      console.error(`Error deleting song ${id}:`, err);
+      const errorMessage = err instanceof Error ? err.message : `Error deleting song: ${err}`;
+      setError({
+        code: 'UNKNOWN_ERROR',
+        message: errorMessage,
+      });
       toast.error(errorMessage);
       return false;
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, songs]);
 
   const searchSongs = useCallback(async (query: string) => {
     setLoading(true);

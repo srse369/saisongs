@@ -1858,8 +1858,6 @@ class CacheService {
       });
 
       this.set(cacheKey, normalizedCenters);
-      console.log('set', cacheKey, normalizedCenters);
-      console.log('immediate get', this.get(cacheKey));
       return normalizedCenters;
     } catch (error) {
       console.error('Error in getAllCenters:', error);

@@ -2,21 +2,17 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserMultiSelect } from '../common/UserMultiSelect';
 import { clearCentersCache } from '../common/CenterBadges';
-import { removeLocalStorageItem } from '../../utils/cacheUtils';
+import { removeLocalStorageItem, setLocalStorageItem } from '../../utils/cacheUtils';
 import { RefreshIcon, Modal, MobileBottomActionBar, type MobileAction } from '../common';
-
-interface Center {
-  id: number;
-  name: string;
-  badgeTextColor: string;
-  editorIds?: string[];
-  singerCount?: number;
-  createdAt: string;
-}
+import { globalEventBus } from '../../utils/globalEventBus';
+import type { Center } from '../../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || (
   import.meta.env.DEV ? '/api' : 'http://localhost:3111/api'
 );
+
+const CENTERS_CACHE_KEY = 'saiSongs:centersCache';
+const CENTERS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 export const CentersManager: React.FC = () => {
   const { isAdmin } = useAuth();
@@ -52,7 +48,7 @@ export const CentersManager: React.FC = () => {
     badgeTextColor: '#1e40af',
     editorIds: [] as string[],
   });
-  
+
   const hasFetchedRef = useRef(false);
 
   const fetchCenters = useCallback(async () => {
@@ -85,19 +81,162 @@ export const CentersManager: React.FC = () => {
 
   // Listen for data refresh requests from global event bus
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    
-    import('../../utils/globalEventBus').then(({ globalEventBus }) => {
-      unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
-        if (detail.resource === 'centers' || detail.resource === 'all') {
-          // Refresh centers data from backend to get latest counts
-          fetchCenters();
-        }
-      });
+    let unsubscribes: (() => void)[] = [];
+
+    const unsubscribeDataRefreshNeeded = globalEventBus.on('dataRefreshNeeded', (detail) => {
+      if (detail.resource === 'centers' || detail.resource === 'all') {
+        // Refresh centers data from backend to get latest counts
+        fetchCenters();
+      }
     });
 
+    const unsubscribeCenterCreated = globalEventBus.on('centerCreated', (detail) => {
+      const { center } = detail;
+      if (center) {
+        setCenters(prev => {
+          // Check if center already exists (duplicate prevention)
+          if (prev.some(c => c.id === center.id)) {
+            const updated = prev.map(c => c.id === center.id ? center : c);
+            if (typeof window !== 'undefined') {
+              setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+                timestamp: Date.now(),
+                centers: updated,
+              }));
+            }
+            return updated;
+          }
+          const updated = [...prev, center];
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              centers: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeCenterUpdated = globalEventBus.on('centerUpdated', (detail) => {
+      const { center } = detail;
+      if (center) {
+        setCenters(prev => {
+          const updated = prev.map(c => c.id === center.id ? center : c);
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              centers: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeCenterDeleted = globalEventBus.on('centerDeleted', (detail) => {
+      const { center } = detail;
+      if (center) {
+        setCenters(prev => {
+          const updated = prev.filter(c => c.id !== center.id);
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              centers: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeSingerCreated = globalEventBus.on('singerCreated', (detail) => {
+      const { singer, centerIds } = detail;
+      if (singer) {
+        setCenters(prev => {
+          const updated = prev.map(c => {
+            if (centerIds?.includes(c.id)) {
+              return { ...c, singerCount: (c.singerCount ?? 0) + 1 };
+            }
+            return c;
+          });
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              centers: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeSingerUpdated = globalEventBus.on('singerUpdated', (detail) => {
+      const { singer, centerIdsRemoved, centerIdsAdded } = detail;
+      if (singer) {
+        setCenters(prev => {
+          const updated = prev.map(c => {
+            if (centerIdsRemoved?.includes(c.id)) {
+              return { ...c, singerCount: (c.singerCount ?? 0) - 1 };
+            }
+            if (centerIdsAdded?.includes(c.id)) {
+              return { ...c, singerCount: (c.singerCount ?? 0) + 1 };
+            }
+            return c;
+          });
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              centers: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeSingerDeleted = globalEventBus.on('singerDeleted', (detail) => {
+      const { singer, centerIds } = detail;
+      if (singer) {
+        setCenters(prev => {
+          const updated = prev.map(c => {
+            if (centerIds?.includes(c.id)) {
+              return { ...c, singerCount: (c.singerCount ?? 0) - 1 };
+            }
+            return c;
+          });
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              centers: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeSingerMerged = globalEventBus.on('singerMerged', (detail) => {
+      const { singer, centerIdsSingerCountDown } = detail;
+      if (singer) {
+        setCenters(prev => {
+          const updated = prev.map(c => {
+            return { ...c, singerCount: (c.singerCount ?? 0) + (centerIdsSingerCountDown.get(String(c.id)) ?? 0) };
+          });
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              centers: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    unsubscribes.push(unsubscribeDataRefreshNeeded, unsubscribeCenterCreated, unsubscribeCenterUpdated, unsubscribeCenterDeleted, unsubscribeSingerCreated, unsubscribeSingerUpdated, unsubscribeSingerDeleted, unsubscribeSingerMerged);
+
     return () => {
-      if (unsubscribe) unsubscribe();
+      unsubscribes.forEach(unsub => unsub());
     };
   }, [fetchCenters]);
 
@@ -117,23 +256,23 @@ export const CentersManager: React.FC = () => {
 
   const handleOpenForm = (center?: Center) => {
     const initialData = center
-      ? { 
-          name: center.name ?? '', 
-          badgeTextColor: center.badgeTextColor ?? '#1e40af',
-          editorIds: center.editorIds ?? []
-        }
-      : { 
-          name: '', 
-          badgeTextColor: '#1e40af',
-          editorIds: []
-        };
+      ? {
+        name: center.name ?? '',
+        badgeTextColor: center.badgeTextColor ?? '#1e40af',
+        editorIds: center.editorIds ?? []
+      }
+      : {
+        name: '',
+        badgeTextColor: '#1e40af',
+        editorIds: []
+      };
 
     if (center) {
       setEditingCenter(center);
     } else {
       setEditingCenter(null);
     }
-    
+
     setFormData(initialData);
     setOriginalData(initialData);
     setIsPreviewMode(false);
@@ -141,8 +280,8 @@ export const CentersManager: React.FC = () => {
   };
 
   const handlePreviewClick = (center: Center) => {
-    const initialData = { 
-      name: center?.name ?? '', 
+    const initialData = {
+      name: center?.name ?? '',
       badgeTextColor: center?.badgeTextColor ?? '#1e40af',
       editorIds: center?.editorIds ?? []
     };
@@ -154,8 +293,8 @@ export const CentersManager: React.FC = () => {
   };
 
   const hasUnsavedChanges = () => {
-    const editorIdsChanged = JSON.stringify(formData.editorIds.slice().sort()) !== 
-                             JSON.stringify(originalData.editorIds.slice().sort());
+    const editorIdsChanged = JSON.stringify(formData.editorIds.slice().sort()) !==
+      JSON.stringify(originalData.editorIds.slice().sort());
     return (
       formData.name.trim() !== originalData.name.trim() ||
       formData.badgeTextColor !== originalData.badgeTextColor ||
@@ -221,17 +360,15 @@ export const CentersManager: React.FC = () => {
       }
 
       await fetchCenters();
-      
+
       // Clear caches since centers data has changed
       clearCentersCache(); // Clear the CenterBadges module-level cache
       removeLocalStorageItem('saiSongs:singersCache'); // Singers may have changed permissions
-      removeLocalStorageItem('saiSongs:centersCache'); // Clear any localStorage centers cache
-      
+      removeLocalStorageItem(CENTERS_CACHE_KEY); // Clear any localStorage centers cache
+
       // Dispatch global event to notify other components
-      import('../../utils/globalEventBus').then(({ globalEventBus }) => {
-        globalEventBus.dispatch('centerUpdated', { type: 'centerUpdated' });
-      });
-      
+      globalEventBus.dispatch('centerUpdated', { type: 'centerUpdated', center: editingCenter ?? null });
+
       setError('');
       handleCloseForm(true); // Force close without unsaved changes check
     } catch (err: any) {
@@ -255,13 +392,13 @@ export const CentersManager: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        
+
         // Log dependency details in frontend console
         if (errorData.dependencies) {
           console.log(`Cannot delete center "${center.name}" (ID: ${center.id})`);
           console.log(`Dependency type: ${errorData.dependencies.type}`);
           console.log(`Items (${errorData.dependencies.items.length}):`);
-          
+
           if (errorData.dependencies.type === 'users_with_roles') {
             errorData.dependencies.items.forEach((user: any) => {
               console.log(`  - ${user.name} (${user.email})`);
@@ -272,22 +409,20 @@ export const CentersManager: React.FC = () => {
             });
           }
         }
-        
+
         throw new Error(errorData.error || 'Failed to delete center');
       }
 
       await fetchCenters();
-      
+
       // Clear caches since centers data has changed
       clearCentersCache();
       removeLocalStorageItem('saiSongs:singersCache');
       removeLocalStorageItem('saiSongs:centersCache');
-      
+
       // Dispatch global event to notify other components
-      import('../../utils/globalEventBus').then(({ globalEventBus }) => {
-        globalEventBus.dispatch('centerUpdated', { type: 'centerUpdated' });
-      });
-      
+      globalEventBus.dispatch('centerDeleted', { type: 'centerDeleted', center: center });
+
       setError('');
     } catch (err: any) {
       console.error('Error deleting center:', err);
@@ -381,103 +516,100 @@ export const CentersManager: React.FC = () => {
           {centers.map((center, index) => {
             const isSelected = selectedCenterId === center.id;
             return (
-            <div
-              key={center.id}
-              onClick={() => {
-                // On mobile, toggle selection on row click
-                if (isMobile) {
-                  setSelectedCenterId(isSelected ? null : center.id);
-                }
-              }}
-              className={`p-2 md:p-4 bg-white dark:bg-gray-800 transition-all duration-200 ${
-                isMobile 
-                  ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${
-                      isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                    }`
-                  : `border rounded-lg shadow-md hover:shadow-lg ${
-                      isSelected
-                        ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
-                        : 'border-gray-200 dark:border-gray-700'
-                    }`
-              }`}
-            >
-              <div className="flex items-center gap-2 md:gap-4">
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-1.5 md:gap-3 flex-wrap">
-                    <div className="flex items-center gap-1.5 md:gap-3 flex-wrap">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {center.name}
-                      </h3>
-                      <span
-                        className="px-2.5 py-0.5 text-xs font-medium rounded-full border-2"
-                        style={{ 
-                          backgroundColor: (center.badgeTextColor || '#1e40af') + '20',
-                          borderColor: center.badgeTextColor || '#1e40af',
-                          color: center.badgeTextColor || '#1e40af'
+              <div
+                key={center.id}
+                onClick={() => {
+                  // On mobile, toggle selection on row click
+                  if (isMobile) {
+                    setSelectedCenterId(isSelected ? null : center.id);
+                  }
+                }}
+                className={`p-2 md:p-4 bg-white dark:bg-gray-800 transition-all duration-200 ${isMobile
+                  ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                  }`
+                  : `border rounded-lg shadow-md hover:shadow-lg ${isSelected
+                    ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                    : 'border-gray-200 dark:border-gray-700'
+                  }`
+                  }`}
+              >
+                <div className="flex items-center gap-2 md:gap-4">
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1.5 md:gap-3 flex-wrap">
+                      <div className="flex items-center gap-1.5 md:gap-3 flex-wrap">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {center.name}
+                        </h3>
+                        <span
+                          className="px-2.5 py-0.5 text-xs font-medium rounded-full border-2"
+                          style={{
+                            backgroundColor: (center.badgeTextColor || '#1e40af') + '20',
+                            borderColor: center.badgeTextColor || '#1e40af',
+                            color: center.badgeTextColor || '#1e40af'
+                          }}
+                        >
+                          {center.name}
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePreviewClick(center);
                         }}
+                        title="View center details"
+                        className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
                       >
-                        {center.name}
+                        <i className="fas fa-eye text-base"></i>
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 text-xs">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
+                        <i className="fas fa-users"></i>
+                        <span className="font-medium">{center.singerCount ?? 0}</span>
+                        <span>singer{(center.singerCount ?? 0) !== 1 ? 's' : ''}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
+                        <i className="fas fa-user-edit"></i>
+                        <span className="font-medium">{center.editorIds?.length ?? 0}</span>
+                        <span>editor{(center.editorIds?.length ?? 0) !== 1 ? 's' : ''}</span>
+                      </span>
+                      <span className="text-gray-500 dark:text-gray-400">
+                        <i className="fas fa-calendar-alt mr-1"></i>
+                        Created {(() => {
+                          if (!center.createdAt) return 'Unknown';
+                          try {
+                            const date = new Date(center.createdAt);
+                            return isNaN(date.getTime()) ? 'Unknown' : date.toLocaleDateString();
+                          } catch {
+                            return 'Unknown';
+                          }
+                        })()}
                       </span>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePreviewClick(center);
-                      }}
-                      title="View center details"
-                      className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
-                    >
-                      <i className="fas fa-eye text-base"></i>
-                    </button>
                   </div>
-                <div className="flex items-center gap-3 mt-2 text-xs">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
-                    <i className="fas fa-users"></i>
-                    <span className="font-medium">{center.singerCount ?? 0}</span>
-                    <span>singer{(center.singerCount ?? 0) !== 1 ? 's' : ''}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
-                    <i className="fas fa-user-edit"></i>
-                    <span className="font-medium">{center.editorIds?.length ?? 0}</span>
-                    <span>editor{(center.editorIds?.length ?? 0) !== 1 ? 's' : ''}</span>
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400">
-                    <i className="fas fa-calendar-alt mr-1"></i>
-                    Created {(() => {
-                      if (!center.createdAt) return 'Unknown';
-                      try {
-                        const date = new Date(center.createdAt);
-                        return isNaN(date.getTime()) ? 'Unknown' : date.toLocaleDateString();
-                      } catch {
-                        return 'Unknown';
-                      }
-                    })()}
-                  </span>
                 </div>
+
+                {/* Actions - Hidden on mobile until row is selected */}
+                <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 mt-1 md:pt-3 md:mt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => handleOpenForm(center)}
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
+                  >
+                    <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
+                  </button>
+                  <button
+                    onClick={() => handleDelete(center)}
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
+                  >
+                    <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
+                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
+                  </button>
                 </div>
               </div>
-              
-              {/* Actions - Hidden on mobile until row is selected */}
-              <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 mt-1 md:pt-3 md:mt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => handleOpenForm(center)}
-                  className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
-                >
-                  <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                  <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
-                </button>
-                <button
-                  onClick={() => handleDelete(center)}
-                  className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
-                >
-                  <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                  <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
-                </button>
-              </div>
-            </div>
             );
           })}
         </div>
@@ -494,7 +626,7 @@ export const CentersManager: React.FC = () => {
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Center Name <span className="text-red-500 dark:text-red-400">*</span>
-              <span 
+              <span
                 title="Name of the center that will be displayed throughout the app"
                 className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
               >
@@ -518,7 +650,7 @@ export const CentersManager: React.FC = () => {
           <div>
             <label htmlFor="badgeTextColor" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Badge Text Color
-              <span 
+              <span
                 title="Color used for this center's badge in the UI"
                 className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
               >

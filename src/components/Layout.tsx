@@ -7,6 +7,7 @@ import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, C
 import { FeedbackDrawer } from './common/FeedbackDrawer';
 import { clearAllCaches, checkCacheClearCooldown, CACHE_KEYS } from '../utils/cacheUtils';
 import apiClient from '../services/ApiClient';
+import { globalEventBus } from '../utils/globalEventBus';
 
 // Cache health stats for 60 seconds
 let healthStatsCache: { stats: any; timestamp: number } | null = null;
@@ -160,49 +161,45 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   useEffect(() => {
     let unsubscribes: (() => void)[] = [];
 
-    import('../utils/globalEventBus').then(({ globalEventBus }) => {
-      // When singers change, request refresh for centers (since center counts change)
-      unsubscribes.push(globalEventBus.on('singerCreated', () => {
-        globalEventBus.requestRefresh('centers');
-      }));
+    // When singers change, request refresh for centers (since center counts change)
+    unsubscribes.push(globalEventBus.on('singerCreated', () => {
+      globalEventBus.requestRefresh('centers');
+    }));
+    unsubscribes.push(globalEventBus.on('singerUpdated', () => {
+      globalEventBus.requestRefresh('centers');
+    }));
+    unsubscribes.push(globalEventBus.on('singerDeleted', () => {
+      globalEventBus.requestRefresh('centers');
+    }));
 
-      unsubscribes.push(globalEventBus.on('singerUpdated', () => {
-        globalEventBus.requestRefresh('centers');
-      }));
+    // When songs change, request refresh for songs
+    unsubscribes.push(globalEventBus.on('songCreated', () => {
+      globalEventBus.requestRefresh('songs');
+    }));
+    unsubscribes.push(globalEventBus.on('songUpdated', () => {
+      globalEventBus.requestRefresh('songs');
+    }));
+    unsubscribes.push(globalEventBus.on('songDeleted', () => {
+      globalEventBus.requestRefresh('songs');
+    }));
 
-      unsubscribes.push(globalEventBus.on('singerDeleted', () => {
-        globalEventBus.requestRefresh('centers');
-      }));
+    // When pitches change, request refresh for songs and singers (pitch counts change)
+    unsubscribes.push(globalEventBus.on('pitchCreated', () => {
+      globalEventBus.requestRefresh('songs');
+      globalEventBus.requestRefresh('singers');
+    }));
+    unsubscribes.push(globalEventBus.on('pitchDeleted', () => {
+      globalEventBus.requestRefresh('songs');
+      globalEventBus.requestRefresh('singers');
+    }));
 
-      // When pitches change, request refresh for songs and singers (pitch counts change)
-      unsubscribes.push(globalEventBus.on('pitchCreated', () => {
-        globalEventBus.requestRefresh('songs');
-        globalEventBus.requestRefresh('singers');
-      }));
-
-      unsubscribes.push(globalEventBus.on('pitchDeleted', () => {
-        globalEventBus.requestRefresh('songs');
-        globalEventBus.requestRefresh('singers');
-      }));
-
-      // When songs change, request refresh for songs
-      unsubscribes.push(globalEventBus.on('songCreated', () => {
-        globalEventBus.requestRefresh('songs');
-      }));
-
-      unsubscribes.push(globalEventBus.on('songUpdated', () => {
-        globalEventBus.requestRefresh('songs');
-      }));
-
-      unsubscribes.push(globalEventBus.on('songDeleted', () => {
-        globalEventBus.requestRefresh('songs');
-      }));
-
-      // When centers change, request refresh for centers
-      unsubscribes.push(globalEventBus.on('centerUpdated', () => {
-        globalEventBus.requestRefresh('centers');
-      }));
-    });
+    // When centers change, request refresh for centers
+    unsubscribes.push(globalEventBus.on('centerUpdated', () => {
+      globalEventBus.requestRefresh('centers');
+    }));
+    unsubscribes.push(globalEventBus.on('centerDeleted', () => {
+      globalEventBus.requestRefresh('centers');
+    }));
 
     return () => {
       unsubscribes.forEach(unsub => unsub());
@@ -231,23 +228,23 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
     const handleTouchStart = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
-      
+
       // Ignore swipe if touching an input, textarea, select, or contenteditable element
-      if (target.tagName === 'INPUT' || 
-          target.tagName === 'TEXTAREA' || 
-          target.tagName === 'SELECT' ||
-          target.isContentEditable ||
-          target.closest('input, textarea, select, [contenteditable="true"]')) {
+      if (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable ||
+        target.closest('input, textarea, select, [contenteditable="true"]')) {
         return;
       }
-      
+
       // Ignore swipe if touching a button or link
-      if (target.tagName === 'BUTTON' || 
-          target.tagName === 'A' ||
-          target.closest('button, a')) {
+      if (target.tagName === 'BUTTON' ||
+        target.tagName === 'A' ||
+        target.closest('button, a')) {
         return;
       }
-      
+
       touchStartX = e.touches[0].clientX;
       touchStartY = e.touches[0].clientY;
     };
@@ -256,27 +253,27 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       if (touchStartX === null || touchStartY === null) return;
 
       const target = e.target as HTMLElement;
-      
+
       // Ignore swipe if touching an input, textarea, select, or contenteditable element
-      if (target.tagName === 'INPUT' || 
-          target.tagName === 'TEXTAREA' || 
-          target.tagName === 'SELECT' ||
-          target.isContentEditable ||
-          target.closest('input, textarea, select, [contenteditable="true"]')) {
+      if (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable ||
+        target.closest('input, textarea, select, [contenteditable="true"]')) {
         touchStartX = null;
         touchStartY = null;
         return;
       }
-      
+
       // Ignore swipe if touching a button or link
-      if (target.tagName === 'BUTTON' || 
-          target.tagName === 'A' ||
-          target.closest('button, a')) {
+      if (target.tagName === 'BUTTON' ||
+        target.tagName === 'A' ||
+        target.closest('button, a')) {
         touchStartX = null;
         touchStartY = null;
         return;
       }
-      
+
       // Check if user is selecting text
       const selection = window.getSelection();
       if (selection && selection.toString().length > 0) {

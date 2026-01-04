@@ -238,6 +238,18 @@ export interface TemplateReference {
 
 // Core entity interfaces
 
+export interface Center {
+  id: number;
+  name: string;
+  badgeTextColor: string;
+  editorIds?: string[];
+  singerCount?: number;
+  createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
 export interface Song {
   id: string;
   name: string;

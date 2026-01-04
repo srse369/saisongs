@@ -6,30 +6,38 @@
  * to ensure they have the latest state from the backend.
  */
 
+import type { Center, Song, Singer, SongSingerPitch } from '../types';
+
 type EventType = 
   | 'singerCreated'
   | 'singerUpdated'
   | 'singerDeleted'
+  | 'singerMerged'
   | 'songCreated'
   | 'songUpdated'
   | 'songDeleted'
   | 'pitchCreated'
   | 'pitchUpdated'
   | 'pitchDeleted'
+  | 'centerCreated'
   | 'centerUpdated'
+  | 'centerDeleted'
   | 'dataRefreshNeeded';
 
 type EventDetail = 
-  | { type: 'singerCreated'; centerIds: number[] }
-  | { type: 'singerUpdated'; centerIdsRemoved: number[]; centerIdsAdded: number[] }
-  | { type: 'singerDeleted'; centerIds: number[] }
-  | { type: 'songCreated' }
-  | { type: 'songUpdated' }
-  | { type: 'songDeleted' }
-  | { type: 'pitchCreated'; singerId: string; songId: string }
-  | { type: 'pitchUpdated'; singerId: string; songId: string }
-  | { type: 'pitchDeleted'; singerId: string; songId: string }
-  | { type: 'centerUpdated' }
+  | { type: 'singerCreated'; singer: Singer | null; centerIds: number[] }
+  | { type: 'singerUpdated'; singer: Singer | null; centerIdsRemoved: number[]; centerIdsAdded: number[] }
+  | { type: 'singerDeleted'; singer: Singer | null; centerIds: number[] }
+  | { type: 'singerMerged'; singer: Singer | null; singerIdsRemoved: string[]; targetSingerPitchCountUp: number; songIdsPitchCountDown: Map<string, number>; centerIdsSingerCountDown: Map<string, number> }
+  | { type: 'songCreated'; song: Song | null }
+  | { type: 'songUpdated'; song: Song | null }
+  | { type: 'songDeleted'; song: Song | null }
+  | { type: 'pitchCreated'; pitch: SongSingerPitch | null }
+  | { type: 'pitchUpdated'; pitch: SongSingerPitch | null }
+  | { type: 'pitchDeleted'; pitch: SongSingerPitch | null }
+  | { type: 'centerCreated'; center: Center | null }
+  | { type: 'centerUpdated'; center: Center | null }
+  | { type: 'centerDeleted'; center: Center | null }
   | { type: 'dataRefreshNeeded'; resource: 'songs' | 'singers' | 'pitches' | 'centers' | 'all' };
 
 class GlobalEventBus {
@@ -46,7 +54,6 @@ class GlobalEventBus {
     });
     
     window.dispatchEvent(event);
-    document.dispatchEvent(event);
   }
 
   /**
@@ -66,12 +73,10 @@ class GlobalEventBus {
     };
 
     window.addEventListener(eventType, eventHandler);
-    document.addEventListener(eventType, eventHandler);
 
     // Return cleanup function
     return () => {
       window.removeEventListener(eventType, eventHandler);
-      document.removeEventListener(eventType, eventHandler);
     };
   }
 

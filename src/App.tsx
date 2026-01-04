@@ -52,7 +52,7 @@ function AppContent() {
   const { fetchSingers, clearState: clearSingers } = useSingers();
   const { fetchAllPitches, clearState: clearPitches } = usePitches();
   const { fetchTemplates, clearState: clearTemplates } = useTemplates();
-  const { loadSessions } = useNamedSessions();
+  const { loadSessions, clearState: clearNamedSessions } = useNamedSessions();
   const { clearSession } = useSession();
   const initialLoadDone = useRef(false);
   const authFetchDone = useRef(false);
@@ -90,9 +90,12 @@ function AppContent() {
       clearPitches();
       clearTemplates();
       clearSession(); // Clear the live session
+      clearNamedSessions(); // Clear named sessions (so logged-out users don't see center-restricted sessions)
       
       // Refetch templates to get public-only list (no center restrictions)
       fetchTemplates(true);
+      // Reload sessions to get public-only list (no center restrictions)
+      loadSessions();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]); // Fetch when authentication status changes

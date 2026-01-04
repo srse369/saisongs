@@ -4,9 +4,10 @@ import type { SongSingerPitch, CreatePitchInput, UpdatePitchInput, ServiceError 
 import { pitchService } from '../services';
 import { useToast } from './ToastContext';
 import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
+import { globalEventBus } from '../utils/globalEventBus';
 
 const PITCHES_CACHE_KEY = 'saiSongs:pitchesCache';
-const PITCHES_CACHE_TTL_MS = 10 * 60 * 1000; // 5 minutes
+const PITCHES_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 interface PitchContextState {
   pitches: SongSingerPitch[];
@@ -35,6 +36,80 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
   const [hasFetched, setHasFetched] = useState<boolean>(false);
   const toast = useToast();
 
+  // Listen for pitch creation/deletion events to update state optimistically
+  useEffect(() => {
+    let unsubscribes: (() => void)[] = [];
+
+    const unsubscribePitchCreated = globalEventBus.on('pitchCreated', (detail) => {
+      const { pitch } = detail;
+      if (pitch) {
+        setPitches(prev => {
+          // Check if pitch already exists (duplicate prevention)
+          let updated: SongSingerPitch[];
+          if (prev.some(p => p.id === pitch.id)) {
+            updated = prev.map(p => p.id === pitch.id ? pitch : p);
+          } else {
+            updated = [...prev, pitch];
+          }
+          // Update localStorage cache to keep it in sync
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(PITCHES_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              pitches: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribePitchUpdated = globalEventBus.on('pitchUpdated', (detail) => {
+      const { pitch } = detail;
+      if (pitch) {
+        setPitches(prev => {
+          // Check if pitch already exists (duplicate prevention)
+          let updated: SongSingerPitch[];
+          if (prev.some(p => p.id === pitch.id)) {
+            updated = prev.map(p => p.id === pitch.id ? pitch : p);
+          } else {
+            updated = [...prev, pitch];
+          }
+          // Update localStorage cache to keep it in sync
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(PITCHES_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              pitches: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribePitchDeleted = globalEventBus.on('pitchDeleted', (detail) => {
+      const { pitch } = detail;
+      if (pitch) {
+        setPitches(prev => {
+          const updated = prev.filter(p => p.id !== pitch.id);
+          // Update localStorage cache to keep it in sync
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(PITCHES_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              pitches: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    unsubscribes.push(unsubscribePitchCreated, unsubscribePitchUpdated, unsubscribePitchDeleted);
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, []);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -50,7 +125,7 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
     if (!forceRefresh && hasFetched && error) {
       return;
     }
-    
+
     // Reset backoff for explicit user-triggered refreshes
     if (forceRefresh && typeof window !== 'undefined') {
       const { apiClient } = await import('../services/ApiClient');
@@ -58,7 +133,7 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
       setError(null);
       setHasFetched(false);
     }
-    
+
     setLoading(true);
     setError(null);
     try {
@@ -96,7 +171,7 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
           timestamp: Date.now(),
           pitches: fetchedPitches,
         });
-        
+
         if (!setLocalStorageItem(PITCHES_CACHE_KEY, cacheData)) {
           // Silently ignore storage errors (e.g., quota exceeded on mobile)
           // Pitches will be fetched from server on next load
@@ -157,41 +232,24 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
     setError(null);
     try {
       const pitch = await pitchService.createPitch(input);
-      
-      // Add the pitch to local state immediately
-      // (PitchManager will sort by song name so it appears in the right place)
-      setPitches(prev => {
-        // Check if pitch already exists (duplicate prevention)
-        if (prev.some(p => p.id === pitch.id)) {
-          return prev;
-        }
-        return [...prev, pitch];
-      });
-      
-      // Clear localStorage cache for pitches only
-      // SongContext and SingerContext event listeners will update their caches optimistically
-      if (typeof window !== 'undefined') {
-        removeLocalStorageItem(PITCHES_CACHE_KEY);
-        
+
+      if (pitch) {
         // Dispatch global event to notify other components
-        import('../utils/globalEventBus').then(({ globalEventBus }) => {
-          globalEventBus.dispatch('pitchCreated', { 
+        if (typeof window !== 'undefined') {
+          globalEventBus.dispatch('pitchCreated', {
             type: 'pitchCreated',
-            singerId: pitch.singerId, 
-            songId: pitch.songId 
+            pitch: pitch
           });
-        });
-        
-        // Also dispatch legacy event for SongContext and SingerContext optimistic updates
-        window.dispatchEvent(new CustomEvent('pitchCreated', { 
-          detail: { singerId: pitch.singerId, songId: pitch.songId } 
-        }));
+        }
+        toast.success(`Pitch association created successfully`);
+        return pitch;
       }
-      
-      toast.success('Pitch association created successfully');
-      return pitch;
+      console.error('Failed to create pitch', input);
+      toast.error('Failed to create pitch association');
+      return null;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create pitch';
+      console.error(`Error creating pitch ${input}:`, err);
+      const errorMessage = err instanceof Error ? err.message : `Error creating pitch: ${err}`;
       setError({
         code: 'UNKNOWN_ERROR',
         message: errorMessage,
@@ -209,16 +267,23 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
     try {
       const pitch = await pitchService.updatePitch(id, input);
       if (pitch) {
-        setPitches(prev => prev.map(p => p.id === id ? pitch : p));
-        // Clear localStorage cache so fresh data is fetched next time
+        // Dispatch global event to notify other components
         if (typeof window !== 'undefined') {
-          removeLocalStorageItem(PITCHES_CACHE_KEY);
+          globalEventBus.dispatch('pitchUpdated', {
+            type: 'pitchUpdated',
+            pitch: pitch
+          });
         }
         toast.success('Pitch association updated successfully');
+        return pitch;
+      } else {
+        console.error('Failed to update pitch', input);
+        toast.error('Failed to update pitch association');
+        return null;
       }
-      return pitch;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update pitch';
+      console.error(`Error updating pitch ${input}:`, err);
+      const errorMessage = err instanceof Error ? err.message : `Error updating pitch: ${err}`;
       setError({
         code: 'UNKNOWN_ERROR',
         message: errorMessage,
@@ -232,71 +297,44 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
 
   const deletePitch = useCallback(async (id: string): Promise<void> => {
     setLoading(true);
-    // Get the pitch before deleting to know which singer/song to update
-    let pitchToDelete: SongSingerPitch | undefined;
-    
+    setError(null);
     try {
-      setPitches(prev => {
-        pitchToDelete = prev.find(p => p.id === id);
-        return prev.filter(pitch => pitch.id !== id);
-      });
-      
-      // Dispatch custom event IMMEDIATELY to update song and singer pitch counts
-      // This allows optimistic update - if API call fails, we'll need to rollback
-      if (typeof window !== 'undefined' && pitchToDelete) {
-        // Dispatch legacy event for SongContext and SingerContext optimistic updates
-        window.dispatchEvent(new CustomEvent('pitchDeleted', { 
-          detail: { singerId: pitchToDelete.singerId, songId: pitchToDelete.songId } 
-        }));
+      // Get the pitch before deleting to know which singer/song to update
+      // Try from state first (fast), but fallback to fetching from backend if not found
+      let pitchToDelete = pitches.find(p => p.id === id);
+
+      // If pitch not in state, fetch from backend to get full pitch data
+      if (!pitchToDelete) {
+        // Note: We don't have a getPitchById method, so we'll proceed with what we have
+        // The event listener will handle the state update optimistically
       }
-      
-      await pitchService.deletePitch(id);
-      
-      // Clear localStorage cache for pitches only
-      // SongContext and SingerContext event listeners will update their caches optimistically
-      removeLocalStorageItem(PITCHES_CACHE_KEY);
-      
-      // Dispatch global event to notify other components
-      if (pitchToDelete?.singerId && pitchToDelete?.songId) {
-        const { singerId, songId } = pitchToDelete;
-        import('../utils/globalEventBus').then(({ globalEventBus }) => {
-          globalEventBus.dispatch('pitchDeleted', { 
+
+      if (pitchToDelete) {
+        await pitchService.deletePitch(id);
+        if (typeof window !== 'undefined') {
+          // Dispatch global event to notify other components
+          globalEventBus.dispatch('pitchDeleted', {
             type: 'pitchDeleted',
-            singerId, 
-            songId 
+            pitch: pitchToDelete
           });
-        });
-      }
-      
-      toast.success('Pitch association deleted successfully');
-    } catch (err) {
-      // Rollback: restore the pitch to state and reverse the pitch count update
-      if (typeof window !== 'undefined' && pitchToDelete) {
-        setPitches(prev => {
-          // Check if pitch already exists (might have been restored)
-          if (prev.some(p => p.id === pitchToDelete!.id)) {
-            return prev;
-          }
-          return [...prev, pitchToDelete!];
-        });
-        
-        // Dispatch event to reverse the pitch count update
-        if (pitchToDelete) {
-          window.dispatchEvent(new CustomEvent('pitchCreated', { 
-            detail: { singerId: pitchToDelete.singerId, songId: pitchToDelete.songId } 
-          }));
         }
+        toast.success('Pitch association deleted successfully');
+      } else {
+        console.error(`Failed to delete pitch ${id}`);
+        toast.error('Failed to delete pitch association');
       }
-      
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete pitch';
-      // Only show error via toast, don't persist to state
-      // This prevents non-dismissible error banners in PitchManager
+    } catch (err) {
+      console.error(`Error deleting pitch ${id}:`, err);
+      const errorMessage = err instanceof Error ? err.message : `Error deleting pitch: ${err}`;
+      setError({
+        code: 'UNKNOWN_ERROR',
+        message: errorMessage,
+      });
       toast.error(errorMessage);
-      // Don't re-throw - error already shown via toast, prevents "Uncaught promise" console errors
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, pitches]);
 
   const value: PitchContextState = {
     pitches,

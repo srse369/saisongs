@@ -14,6 +14,7 @@ import { createSongFuzzySearch, parseNaturalQuery } from '../../utils/smartSearc
 import { compareStringsIgnoringSpecialChars } from '../../utils';
 import songService from '../../services/SongService';
 import type { Song, CreateSongInput } from '../../types';
+import { globalEventBus } from '../../utils/globalEventBus';
 
 export const SongManager: React.FC = () => {
   const {
@@ -57,14 +58,12 @@ export const SongManager: React.FC = () => {
   // Listen for data refresh requests from global event bus
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
-    
-    import('../../utils/globalEventBus').then(({ globalEventBus }) => {
-      unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
-        if (detail.resource === 'songs' || detail.resource === 'all') {
-          // Refresh songs data from backend to get latest state
-          fetchSongs(true); // Force refresh
-        }
-      });
+
+    unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
+      if (detail.resource === 'songs' || detail.resource === 'all') {
+        // Refresh songs data from backend to get latest state
+        fetchSongs(true); // Force refresh
+      }
     });
 
     return () => {
@@ -167,7 +166,7 @@ export const SongManager: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't clear search if a modal is open - let the modal handle Escape
       if (isFormModalOpen || viewingSong) return;
-      
+
       if (e.key === 'Escape') {
         setSearchTerm('');
         setAdvancedFilters({});
@@ -192,49 +191,49 @@ export const SongManager: React.FC = () => {
 
     // Apply advanced filters first (field-specific)
     if (advancedFilters.name) {
-      results = results.filter(song => 
+      results = results.filter(song =>
         matches(song.name, advancedFilters.name!, advancedFilters.nameCaseSensitive || false)
       );
     }
     if (advancedFilters.deity) {
-      results = results.filter(song => 
+      results = results.filter(song =>
         matches(song.deity, advancedFilters.deity!, advancedFilters.deityCaseSensitive || false)
       );
     }
     if (advancedFilters.language) {
-      results = results.filter(song => 
+      results = results.filter(song =>
         matches(song.language, advancedFilters.language!, advancedFilters.languageCaseSensitive || false)
       );
     }
     if (advancedFilters.raga) {
-      results = results.filter(song => 
+      results = results.filter(song =>
         matches(song.raga, advancedFilters.raga!, advancedFilters.ragaCaseSensitive || false)
       );
     }
     if (advancedFilters.tempo) {
-      results = results.filter(song => 
+      results = results.filter(song =>
         matches(song.tempo, advancedFilters.tempo!, advancedFilters.tempoCaseSensitive || false)
       );
     }
     if (advancedFilters.beat) {
-      results = results.filter(song => 
+      results = results.filter(song =>
         matches(song.beat, advancedFilters.beat!, advancedFilters.beatCaseSensitive || false)
       );
     }
     if (advancedFilters.level) {
-      results = results.filter(song => 
+      results = results.filter(song =>
         matches(song.level, advancedFilters.level!, advancedFilters.levelCaseSensitive || false)
       );
     }
     if (advancedFilters.songTags) {
-      results = results.filter(song => 
+      results = results.filter(song =>
         matches(song.songTags, advancedFilters.songTags!, advancedFilters.songTagsCaseSensitive || false)
       );
     }
 
     // Apply smart search with natural language parsing and fuzzy matching
     const query = searchTerm.trim();
-    
+
     if (!query) {
       // No search query - just apply sorting
       if (sortBy === 'pitchCount') {
@@ -252,11 +251,11 @@ export const SongManager: React.FC = () => {
             const bName = b.name.toLowerCase();
             const aStartsWith = aName.startsWith(lowerQuery);
             const bStartsWith = bName.startsWith(lowerQuery);
-            
+
             // Prefix matches come first
             if (aStartsWith && !bStartsWith) return -1;
             if (!aStartsWith && bStartsWith) return 1;
-            
+
             // If both start with query or neither does, sort alphabetically
             return compareStringsIgnoringSpecialChars(a.name, b.name);
           });
@@ -270,14 +269,14 @@ export const SongManager: React.FC = () => {
     // Direct substring search using the full query - this is the primary search
     // Search across multiple fields to cast a wide net
     const lowerQuery = query.toLowerCase();
-    const directMatches = results.filter(s => 
+    const directMatches = results.filter(s =>
       s.name.toLowerCase().includes(lowerQuery) ||
       s.deity?.toLowerCase().includes(lowerQuery) ||
       s.language?.toLowerCase().includes(lowerQuery) ||
       s.raga?.toLowerCase().includes(lowerQuery) ||
       s.songTags?.toLowerCase().includes(lowerQuery)
     );
-    
+
     // Use direct matches if found, otherwise fall back to fuzzy search
     if (directMatches.length > 0) {
       results = directMatches;
@@ -287,7 +286,7 @@ export const SongManager: React.FC = () => {
       const fuzzyIds = new Set(fuzzyResults.map(r => r.item.id));
       results = results.filter(s => fuzzyIds.has(s.id));
     }
-    
+
     // Apply sorting
     if (sortBy === 'pitchCount') {
       // Sort by pitch count (descending), then by name for ties
@@ -306,11 +305,11 @@ export const SongManager: React.FC = () => {
           const bName = b.name.toLowerCase();
           const aStartsWith = aName.startsWith(lowerQuery);
           const bStartsWith = bName.startsWith(lowerQuery);
-          
+
           // Prefix matches come first
           if (aStartsWith && !bStartsWith) return -1;
           if (!aStartsWith && bStartsWith) return 1;
-          
+
           // If both start with query or neither does, sort alphabetically
           return compareStringsIgnoringSpecialChars(a.name, b.name);
         });
@@ -508,8 +507,8 @@ export const SongManager: React.FC = () => {
         {displayedSongs.length < filteredSongs.length
           ? 'Scroll to load more songs...'
           : filteredSongs.length > 0
-          ? 'All songs loaded'
-          : null}
+            ? 'All songs loaded'
+            : null}
       </div>
 
       <Modal

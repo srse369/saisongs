@@ -9,6 +9,7 @@ import { SingerForm } from './SingerForm';
 import { SingerList } from './SingerList';
 import { Modal } from '../common/Modal';
 import type { Singer, CreateSingerInput } from '../../types';
+import { globalEventBus } from '../../utils/globalEventBus';
 
 export const SingerManager: React.FC = () => {
   const { singers, loading, error, fetchSingers, createSinger, updateSinger, deleteSinger, mergeSingers } = useSingers();
@@ -31,14 +32,12 @@ export const SingerManager: React.FC = () => {
   // Listen for data refresh requests from global event bus
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
-    
-    import('../../utils/globalEventBus').then(({ globalEventBus }) => {
-      unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
-        if (detail.resource === 'singers' || detail.resource === 'all') {
-          // Refresh singers data from backend to get latest state
-          fetchSingers(true); // Force refresh
-        }
-      });
+
+    unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
+      if (detail.resource === 'singers' || detail.resource === 'all') {
+        // Refresh singers data from backend to get latest state
+        fetchSingers(true); // Force refresh
+      }
     });
 
     return () => {
@@ -94,14 +93,14 @@ export const SingerManager: React.FC = () => {
     if (editingSinger) {
       // Check if user is updating their own email
       const isUpdatingOwnEmail = editingSinger.id === userId && input.email && input.email !== editingSinger.email;
-      
+
       const result = await updateSinger(editingSinger.id, input);
       if (result && adminFields) {
         // If admin fields provided, update them via separate API calls
         const API_BASE_URL = import.meta.env.VITE_API_URL || (
           import.meta.env.DEV ? '/api' : 'http://localhost:3111/api'
         );
-        
+
         try {
           // Update isAdmin status
           await fetch(`${API_BASE_URL}/singers/${editingSinger.id}/admin`, {
@@ -110,7 +109,7 @@ export const SingerManager: React.FC = () => {
             credentials: 'include',
             body: JSON.stringify({ isAdmin: adminFields.isAdmin ? 1 : 0 }),
           });
-          
+
           // Update editorFor
           await fetch(`${API_BASE_URL}/singers/${editingSinger.id}/editor-for`, {
             method: 'PATCH',
@@ -118,10 +117,10 @@ export const SingerManager: React.FC = () => {
             credentials: 'include',
             body: JSON.stringify({ editorFor: adminFields.editorFor }),
           });
-          
+
           // Clear centers cache since editor assignments affect center data
           removeLocalStorageItem('saiSongs:centersCache');
-          
+
           // Refresh singers to get updated data
           await fetchSingers(true);
         } catch (error) {
@@ -131,7 +130,7 @@ export const SingerManager: React.FC = () => {
       if (result) {
         setIsFormOpen(false);
         setEditingSinger(null);
-        
+
         // If user updated their own email, log them out
         if (isUpdatingOwnEmail) {
           await logout();
@@ -164,10 +163,10 @@ export const SingerManager: React.FC = () => {
   };
 
   const filteredSingers = React.useMemo(() => {
-    let result = searchTerm.trim() ? singers.filter((singer) => 
+    let result = searchTerm.trim() ? singers.filter((singer) =>
       singer.name.toLowerCase().includes(searchTerm.toLowerCase())
     ) : [...singers];
-    
+
     // Apply sorting
     if (sortBy === 'pitchCount') {
       result.sort((a, b) => (b.pitchCount ?? 0) - (a.pitchCount ?? 0));
@@ -180,11 +179,11 @@ export const SingerManager: React.FC = () => {
           const bName = b.name.toLowerCase();
           const aStartsWith = aName.startsWith(q);
           const bStartsWith = bName.startsWith(q);
-          
+
           // Prefix matches come first
           if (aStartsWith && !bStartsWith) return -1;
           if (!aStartsWith && bStartsWith) return 1;
-          
+
           // If both start with query or neither does, sort alphabetically
           return compareStringsIgnoringSpecialChars(a.name, b.name);
         });
@@ -192,7 +191,7 @@ export const SingerManager: React.FC = () => {
         result.sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
       }
     }
-    
+
     return result;
   }, [singers, searchTerm, sortBy]);
 
@@ -205,7 +204,7 @@ export const SingerManager: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't clear search if a modal is open - let the modal handle Escape
       if (isFormOpen) return;
-      
+
       if (e.key === 'Escape') {
         setSearchTerm('');
       }

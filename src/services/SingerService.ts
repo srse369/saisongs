@@ -184,7 +184,7 @@ class SingerService {
    * @param singerIdsToMerge - Array of singer IDs to merge into the target
    * @returns Result of the merge operation
    */
-  async mergeSingers(targetSingerId: string, singerIdsToMerge: string[]): Promise<{ message: string; targetSingerId: string; mergedCount: number }> {
+  async mergeSingers(targetSingerId: string, singerIdsToMerge: string[]): Promise<{ message: string; targetSingerPitchCountUp: number; songIdsPitchCountDown: Map<string, number>; centerIdsSingerCountDown: Map<number, number> }> {
     if (!targetSingerId || !singerIdsToMerge || singerIdsToMerge.length === 0) {
       throw new ValidationError('Target singer and at least one singer to merge are required', 'merge');
     }

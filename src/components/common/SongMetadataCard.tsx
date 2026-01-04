@@ -23,6 +23,7 @@ interface SongMetadataCardProps {
   isSelected?: boolean;
   alwaysShowDeityLanguage?: boolean;
   onPreviewClick?: () => void;
+  isAuthenticated?: boolean; // Hide pitch count on mobile when not authenticated
 }
 
 /**
@@ -38,6 +39,7 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
   isSelected = false,
   alwaysShowDeityLanguage = false,
   onPreviewClick,
+  isAuthenticated = true, // Default to true for backward compatibility
 }) => {
   const hasReferencePitches = song.refGents || song.refLadies;
 
@@ -62,8 +64,8 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
             {song.name}
           </span>
         )}
-        {/* Pitch count circle - only show on mobile when there are pitches */}
-        {pitchCount !== undefined && (pitchCount ?? 0) > 0 && (
+        {/* Pitch count circle - only show on mobile when there are pitches and user is authenticated */}
+        {isAuthenticated && pitchCount !== undefined && (pitchCount ?? 0) > 0 && (
           <div className="flex-shrink-0 md:hidden">
             <div className="w-6 h-6 flex items-center justify-center rounded-full bg-black dark:bg-black text-white text-xs font-semibold">
               {pitchCount}

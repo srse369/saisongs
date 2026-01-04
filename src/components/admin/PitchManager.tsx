@@ -14,32 +14,33 @@ import { RefreshIcon, MobileBottomActionBar, type MobileAction } from '../common
 import type { SongSingerPitch, CreatePitchInput, Song } from '../../types';
 import { Modal } from '../common/Modal';
 import { SongDetails } from './SongDetails';
+import { globalEventBus } from '../../utils/globalEventBus';
 
 export const PitchManager: React.FC = () => {
   const { isEditor, userId, isAuthenticated } = useAuth();
 
-  const { 
-    pitches, 
-    loading: pitchLoading, 
+  const {
+    pitches,
+    loading: pitchLoading,
     error: pitchError,
     fetchAllPitches,
-    createPitch, 
-    updatePitch, 
+    createPitch,
+    updatePitch,
     deletePitch,
     clearError: clearPitchError
   } = usePitches();
-  
-  const { 
-    songs, 
-    loading: songsLoading, 
+
+  const {
+    songs,
+    loading: songsLoading,
     error: songsError,
     fetchSongs,
     clearError: clearSongsError
   } = useSongs();
-  
-  const { 
-    singers, 
-    loading: singersLoading, 
+
+  const {
+    singers,
+    loading: singersLoading,
     error: singersError,
     fetchSingers,
     clearError: clearSingersError
@@ -69,33 +70,33 @@ export const PitchManager: React.FC = () => {
     if (!userId || !isAuthenticated) return null;
     return singers.find(s => s.id === userId);
   }, [userId, singers, isAuthenticated]);
-  
+
   // User can create pitches if they're an editor OR if they have a singer profile
   const canCreatePitch = isEditor || !!userSinger;
 
   // Sync advanced filters with URL parameters (when navigating from Songs/Singers tab)
   useEffect(() => {
     const newFilters: PitchSearchFilters = {};
-    
+
     if (songFilterId && songs.length > 0) {
       const song = songs.find(s => s.id === songFilterId);
       if (song) {
         newFilters.songName = song.name;
       }
     }
-    
+
     if (singerFilterId && singers.length > 0) {
       const singer = singers.find(s => s.id === singerFilterId);
       if (singer) {
         newFilters.singerName = singer.name;
       }
     }
-    
+
     // Only update if we have filters to set and they're different from current
     if (Object.keys(newFilters).length > 0) {
       setAdvancedFilters(prev => {
         // Only update if the values are actually different
-        const hasChanges = Object.entries(newFilters).some(([key, value]) => 
+        const hasChanges = Object.entries(newFilters).some(([key, value]) =>
           prev[key as keyof PitchSearchFilters] !== value
         );
         return hasChanges ? { ...prev, ...newFilters } : prev;
@@ -132,20 +133,12 @@ export const PitchManager: React.FC = () => {
   // Listen for data refresh requests from global event bus
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
-    
-    import('../../utils/globalEventBus').then(({ globalEventBus }) => {
-      unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
-        if (detail.resource === 'pitches' || detail.resource === 'all') {
-          // Refresh pitches data from backend to get latest state
-          fetchAllPitches(true); // Force refresh
-        }
-        if (detail.resource === 'songs' || detail.resource === 'all') {
-          fetchSongs(true);
-        }
-        if (detail.resource === 'singers' || detail.resource === 'all') {
-          fetchSingers(true);
-        }
-      });
+
+    unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
+      if (detail.resource === 'pitches' || detail.resource === 'all') {
+        // Refresh pitches data from backend to get latest state
+        fetchAllPitches(true); // Force refresh
+      }
     });
 
     return () => {
@@ -243,7 +236,7 @@ export const PitchManager: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't clear search if a modal is open - let the modal handle Escape
       if (showForm || viewingSong) return;
-      
+
       if (e.key === 'Escape') {
         setSearchTerm('');
         setDebouncedSearchTerm('');
@@ -338,12 +331,12 @@ export const PitchManager: React.FC = () => {
       const songB = songMap.get(b.songId);
       const singerA = singerMap.get(a.singerId);
       const singerB = singerMap.get(b.singerId);
-      
+
       const aSongName = songA?.name || '';
       const bSongName = songB?.name || '';
       const aSingerName = singerA?.name || '';
       const bSingerName = singerB?.name || '';
-      
+
       // Handle search term prioritization (prefix matches come first)
       if (debouncedSearchTerm.trim()) {
         const q = debouncedSearchTerm.toLowerCase();
@@ -351,15 +344,15 @@ export const PitchManager: React.FC = () => {
         const bSongStartsWith = bSongName.toLowerCase().startsWith(q);
         const aSingerStartsWith = aSingerName.toLowerCase().startsWith(q);
         const bSingerStartsWith = bSingerName.toLowerCase().startsWith(q);
-        
+
         // Prefix matches come first
         const aStartsWith = aSongStartsWith || aSingerStartsWith;
         const bStartsWith = bSongStartsWith || bSingerStartsWith;
-        
+
         if (aStartsWith && !bStartsWith) return -1;
         if (!aStartsWith && bStartsWith) return 1;
       }
-      
+
       // Apply sorting based on sortBy selection
       if (sortBy === 'singerName') {
         // Sort by singer name first, then song name
@@ -502,25 +495,25 @@ export const PitchManager: React.FC = () => {
                 onFiltersExtracted={(filters) => {
                   // Type guard: since searchType is "pitch", filters should be PitchSearchFilters
                   const pitchFilters = filters as PitchSearchFilters;
-                  
+
                   // If AI extracts songName/singerName filters, clear URL params to avoid conflicts
                   const next = new URLSearchParams(searchParams);
                   let urlChanged = false;
-                  
+
                   if (pitchFilters.songName && songFilterId) {
                     next.delete('songId');
                     urlChanged = true;
                   }
-                  
+
                   if (pitchFilters.singerName && singerFilterId) {
                     next.delete('singerId');
                     urlChanged = true;
                   }
-                  
+
                   if (urlChanged) {
                     setSearchParams(next);
                   }
-                  
+
                   // Merge AI-extracted filters with existing advanced filters
                   setAdvancedFilters(prev => ({ ...prev, ...pitchFilters }));
                 }}
@@ -578,31 +571,31 @@ export const PitchManager: React.FC = () => {
               // clear the corresponding URL param to avoid confusion
               const next = new URLSearchParams(searchParams);
               let urlChanged = false;
-              
+
               // Get current song/singer names from URL filters
-              const currentSongName = songFilterId 
-                ? songs.find(s => s.id === songFilterId)?.name 
+              const currentSongName = songFilterId
+                ? songs.find(s => s.id === songFilterId)?.name
                 : undefined;
-              const currentSingerName = singerFilterId 
-                ? singers.find(s => s.id === singerFilterId)?.name 
+              const currentSingerName = singerFilterId
+                ? singers.find(s => s.id === singerFilterId)?.name
                 : undefined;
-              
+
               // If songName filter changed and doesn't match URL filter, clear URL param
               if (newFilters.songName !== currentSongName && songFilterId) {
                 next.delete('songId');
                 urlChanged = true;
               }
-              
+
               // If singerName filter changed and doesn't match URL filter, clear URL param
               if (newFilters.singerName !== currentSingerName && singerFilterId) {
                 next.delete('singerId');
                 urlChanged = true;
               }
-              
+
               if (urlChanged) {
                 setSearchParams(next);
               }
-              
+
               setAdvancedFilters(newFilters);
             }}
             onClear={handleClearFilters}

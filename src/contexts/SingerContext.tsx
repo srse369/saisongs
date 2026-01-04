@@ -5,9 +5,10 @@ import { singerService } from '../services';
 import { useToast } from './ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../utils';
 import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
+import { globalEventBus } from '../utils/globalEventBus';
 
 const SINGERS_CACHE_KEY = 'saiSongs:singersCache';
-const SINGERS_CACHE_TTL_MS = 10 * 60 * 1000; // 5 minutes
+const SINGERS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 interface SingerContextState {
   singers: Singer[];
@@ -40,54 +41,124 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
   // Listen for pitch events to update pitch counts optimistically
   useEffect(() => {
     let unsubscribes: (() => void)[] = [];
-    
-    import('../utils/globalEventBus').then(({ globalEventBus }) => {
-      const unsubscribePitchCreated = globalEventBus.on('pitchCreated', (detail) => {
-        const { singerId } = detail;
+
+    const unsubscribeSingerCreated = globalEventBus.on('singerCreated', (detail) => {
+      const { singer } = detail;
+      if (singer) {
         setSingers(prev => {
-          const updated = prev.map(singer => 
-            singer.id === singerId 
+          // Check if singer already exists (duplicate prevention)
+          if (prev.some(s => s.id === singer.id)) {
+            const updated = prev.map(s => s.id === singer.id ? singer as Singer : s);
+            if (typeof window !== 'undefined') {
+              setLocalStorageItem(SINGERS_CACHE_KEY, JSON.stringify({
+                timestamp: Date.now(),
+                singers: updated,
+              }));
+            }
+            return updated;
+          }
+          const updated = [...prev, singer as Singer];
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(SINGERS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              singers: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeSingerUpdated = globalEventBus.on('singerUpdated', (detail) => {
+      const { singer } = detail;
+      if (singer) {
+        setSingers(prev => {
+          const updated = prev.map(s => s.id === singer.id ? singer as Singer : s);
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(SINGERS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              singers: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeSingerDeleted = globalEventBus.on('singerDeleted', (detail) => {
+      const { singer } = detail;
+      if (singer) {
+        setSingers(prev => {
+          const updated = prev.filter(s => s.id !== singer.id);
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(SINGERS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              singers: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribeSingerMerged = globalEventBus.on('singerMerged', (detail) => {
+      const { singer, singerIdsRemoved } = detail;
+      if (singer) {
+        setSingers(prev => {
+          let updated = prev.map(s => s.id === singer.id ? singer as Singer : s);
+          updated = updated.filter(s => !singerIdsRemoved.includes(s.id));
+          if (typeof window !== 'undefined') {
+            setLocalStorageItem(SINGERS_CACHE_KEY, JSON.stringify({
+              timestamp: Date.now(),
+              singers: updated,
+            }));
+          }
+          return updated;
+        });
+      }
+    });
+
+    const unsubscribePitchCreated = globalEventBus.on('pitchCreated', (detail) => {
+      const { pitch } = detail;
+      if (pitch) {
+        setSingers(prev => {
+          const updated = prev.map(singer =>
+            singer.id === pitch.singerId
               ? { ...singer, pitchCount: (singer.pitchCount ?? 0) + 1 }
               : singer
           );
-          
-          // Update localStorage cache to keep it in sync
           if (typeof window !== 'undefined') {
-            const cacheData = JSON.stringify({
+            setLocalStorageItem(SINGERS_CACHE_KEY, JSON.stringify({
               timestamp: Date.now(),
               singers: updated,
-            });
-            setLocalStorageItem(SINGERS_CACHE_KEY, cacheData);
+            }));
           }
-          
           return updated;
         });
-      });
-      
-      const unsubscribePitchDeleted = globalEventBus.on('pitchDeleted', (detail) => {
-        const { singerId } = detail;
+      }
+    });
+
+    const unsubscribePitchDeleted = globalEventBus.on('pitchDeleted', (detail) => {
+      const { pitch } = detail;
+      if (pitch) {
         setSingers(prev => {
-          const updated = prev.map(singer => 
-            singer.id === singerId 
+          const updated = prev.map(singer =>
+            singer.id === pitch.singerId
               ? { ...singer, pitchCount: Math.max(0, (singer.pitchCount ?? 0) - 1) }
               : singer
           );
-          
-          // Update localStorage cache to keep it in sync
           if (typeof window !== 'undefined') {
-            const cacheData = JSON.stringify({
+            setLocalStorageItem(SINGERS_CACHE_KEY, JSON.stringify({
               timestamp: Date.now(),
               singers: updated,
-            });
-            setLocalStorageItem(SINGERS_CACHE_KEY, cacheData);
+            }));
           }
-          
           return updated;
         });
-      });
-      
-      unsubscribes.push(unsubscribePitchCreated, unsubscribePitchDeleted);
+      }
     });
+
+    unsubscribes.push(unsubscribeSingerCreated, unsubscribeSingerUpdated, unsubscribeSingerDeleted, unsubscribeSingerMerged, unsubscribePitchCreated, unsubscribePitchDeleted);
 
     return () => {
       unsubscribes.forEach(unsub => unsub());
@@ -109,7 +180,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
     if (!forceRefresh && hasFetched && error) {
       return;
     }
-    
+
     // Reset backoff for explicit user-triggered refreshes
     if (forceRefresh && typeof window !== 'undefined') {
       const { apiClient } = await import('../services/ApiClient');
@@ -117,7 +188,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       setError(null);
       setHasFetched(false);
     }
-    
+
     setLoading(true);
     setError(null);
     try {
@@ -155,7 +226,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
           timestamp: Date.now(),
           singers: fetchedSingers,
         });
-        
+
         if (!setLocalStorageItem(SINGERS_CACHE_KEY, cacheData)) {
           // Silently ignore storage errors (e.g., quota exceeded on mobile)
           // Singers will be fetched from server on next load
@@ -199,48 +270,22 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
     setError(null);
     try {
       const singer = await singerService.createSinger(input);
-      
-      // Add the singer to local state immediately for optimistic update
-      // Also update localStorage cache with the new singer included
-      setSingers(prev => {
-        // Check if singer already exists (duplicate prevention)
-        if (prev.some(s => s.id === singer.id)) {
-          return prev;
-        }
-        // Insert in sorted order by name
-        const newList = [...prev, singer].sort((a, b) => 
-          compareStringsIgnoringSpecialChars(a.name, b.name)
-        );
-        
-        // Update localStorage cache with the updated list
-        // This ensures the cache is up-to-date for other components/tabs
+
+      if (singer) {
         if (typeof window !== 'undefined') {
-          const cacheData = JSON.stringify({
-            timestamp: Date.now(),
-            singers: newList,
-          });
-          
-          if (!setLocalStorageItem(SINGERS_CACHE_KEY, cacheData)) {
-            // Silently ignore storage errors (e.g., quota exceeded on mobile)
-            console.warn('Failed to update singers cache in localStorage due to quota.');
-          }
+          // Dispatch global event to notify other components
+          const centerIds = singer.centerIds || input.centerIds || [];
+          globalEventBus.dispatch('singerCreated', { type: 'singerCreated', singer: singer, centerIds });
         }
-        
-        return newList;
-      });
-      
-      // Dispatch global event to notify other components
-      const centerIds = singer.centerIds || input.centerIds || [];
-      if (centerIds.length > 0) {
-        import('../utils/globalEventBus').then(({ globalEventBus }) => {
-          globalEventBus.dispatch('singerCreated', { type: 'singerCreated', centerIds });
-        });
+        toast.success(`Singer ${singer.name} created successfully`);
+        return singer;
       }
-      
-      toast.success('Singer created successfully');
-      return singer;
+      console.error('Failed to create singer', input);
+      toast.error(`Failed to create singer ${input.name}`);
+      return null;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create singer';
+      console.error(`Error creating singer ${input}:`, err);
+      const errorMessage = err instanceof Error ? err.message : `Error creating singer ${input.name}: ${err.message}`;
       setError({
         code: 'UNKNOWN_ERROR',
         message: errorMessage,
@@ -259,34 +304,33 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       // Get the old singer to track center changes
       const oldSinger = singers.find(s => s.id === id);
       const oldCenterIds = oldSinger?.centerIds || [];
-      
+
       const singer = await singerService.updateSinger(id, input);
       if (singer) {
-        setSingers(prev => prev.map(s => s.id === id ? singer : s));
         // Clear localStorage cache so fresh data is fetched next time
         if (typeof window !== 'undefined') {
-          removeLocalStorageItem(SINGERS_CACHE_KEY);
-          
           // Dispatch global event to notify other components
           const newCenterIds = singer.centerIds || [];
           const centersRemoved = oldCenterIds.filter(cid => !newCenterIds.includes(cid));
           const centersAdded = newCenterIds.filter(cid => !oldCenterIds.includes(cid));
-          
-          if (centersRemoved.length > 0 || centersAdded.length > 0) {
-            import('../utils/globalEventBus').then(({ globalEventBus }) => {
-              globalEventBus.dispatch('singerUpdated', { 
-                type: 'singerUpdated',
-                centerIdsRemoved: centersRemoved,
-                centerIdsAdded: centersAdded
-              });
-            });
-          }
+
+          globalEventBus.dispatch('singerUpdated', {
+            type: 'singerUpdated',
+            singer: singer,
+            centerIdsRemoved: centersRemoved,
+            centerIdsAdded: centersAdded
+          });
         }
-        toast.success('Singer updated successfully');
+        toast.success(`Singer ${singer.name} updated successfully`);
+        return singer;
+      } else {
+        console.error('Failed to update singer', input);
+        toast.error(`Failed to update singer ${input.name}`);
+        return null;
       }
-      return singer;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update singer';
+      console.error(`Error updating singer ${input}:`, err);
+      const errorMessage = err instanceof Error ? err.message : `Error updating singer ${input.name}: ${err.message}`;
       setError({
         code: 'UNKNOWN_ERROR',
         message: errorMessage,
@@ -306,7 +350,7 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
       // Try from state first (fast), but fallback to fetching from backend if not found
       let singerToDelete = singers.find(s => s.id === id);
       let centerIds = singerToDelete?.centerIds || [];
-      
+
       // If singer not in state, fetch from backend to get centerIds
       if (!singerToDelete || !centerIds.length) {
         const fetchedSinger = await singerService.getSingerById(id);
@@ -315,119 +359,108 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
           centerIds = fetchedSinger.centerIds || [];
         }
       }
-      
-      await singerService.deleteSinger(id);
-      
-      // Update state optimistically
-      setSingers(prev => prev.filter(singer => singer.id !== id));
-      
-      // Clear localStorage cache so fresh data is fetched next time
-      if (typeof window !== 'undefined') {
-        removeLocalStorageItem(SINGERS_CACHE_KEY);
-        
-        // Dispatch global event to notify other components
-        // Always dispatch, even if no centers, so other components can refresh
-        import('../utils/globalEventBus').then(({ globalEventBus }) => {
-          globalEventBus.dispatch('singerDeleted', { 
+
+      if (singerToDelete) {
+        await singerService.deleteSinger(id);
+        if (typeof window !== 'undefined') {
+          // Dispatch global event to notify other components
+          // Always dispatch, even if no centers, so other components can refresh
+          globalEventBus.dispatch('singerDeleted', {
             type: 'singerDeleted',
+            singer: singerToDelete || null,
             centerIds: centerIds || []
           });
-          // Also request refresh for singers to ensure consistency
-          globalEventBus.requestRefresh('singers');
-        });
+        }
+        toast.success(`Singer ${singerToDelete.name} deleted successfully`);
+      } else {
+        console.error(`Failed to delete singer ${id}`);
+        toast.error('Failed to delete singer');
       }
-      
-      // Refresh from backend to ensure state is in sync
-      await fetchSingers(true);
-      
-      toast.success('Singer deleted successfully');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete singer';
-      // Show toast notification but don't persist error in state
-      // since we have a persistent error display in the UI
+      console.error(`Error deleting singer ${id}:`, err);
+      const errorMessage = err instanceof Error ? err.message : `Error deleting singer: ${err.message}`;
+      setError({
+        code: 'UNKNOWN_ERROR',
+        message: errorMessage,
+      });
       toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   }, [toast, singers]);
 
+  /*
+  * Merges multiple singers into one target singer
+  * @param targetSingerId - The singer ID to keep
+  * @param singerIdsToMerge - Array of singer IDs to merge into the target (not including the target singer)
+  * @returns Result of the merge operation
+  */
   const mergeSingers = useCallback(async (targetSingerId: string, singerIdsToMerge: string[]): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
-      // Get centerIds of singers being merged before the merge (for event dispatch)
-      const singersToMerge = singers.filter(s => singerIdsToMerge.includes(s.id));
-      const allCenterIdsFromMerged = new Set<number>();
-      singersToMerge.forEach(singer => {
-        (singer.centerIds || []).forEach(id => allCenterIdsFromMerged.add(id));
+      // Get target singer
+      let targetSinger: Singer | undefined | null = singers.find(s => s.id === targetSingerId);
+      if (!targetSinger) {
+        targetSinger = await singerService.getSingerById(targetSingerId);
+        if (!targetSinger) {
+          console.error(`Failed to get target singer ${targetSingerId}`);
+          toast.error(`Failed to get target singer ${targetSingerId}`);
+          return false;
+        }
+      }
+
+      // Get singers to merge
+      let singersToMerge: Singer[] = [];
+      singerIdsToMerge.forEach(async (singerId) => {
+        let singer: Singer | null | undefined = singers.find(s => s.id === singerId);
+        if (!singer) {
+          singer = await singerService.getSingerById(singerId);
+          if (singer) {
+            singersToMerge.push(singer);
+          } else {
+            console.error(`Failed to get singer ${singerId}, possibly a partial merge`);
+          }
+        } else {
+          singersToMerge.push(singer);
+        }
       });
-      
-      // Get target singer's centerIds before merge
-      const targetSinger = singers.find(s => s.id === targetSingerId);
+
       const targetCenterIdsBefore = targetSinger?.centerIds || [];
-      
+      console.log('targetCenterIdsBefore', targetCenterIdsBefore);
+      const allCenterIdsFromMerged = targetCenterIdsBefore.concat(singersToMerge.flatMap(s => s.centerIds || []));
+      const targetCenterIdsAfter = [...new Set(allCenterIdsFromMerged)];
+      console.log('targetCenterIdsAfter', targetCenterIdsAfter);
+      targetSinger.centerIds = targetCenterIdsAfter;
+
       const result = await singerService.mergeSingers(targetSingerId, singerIdsToMerge);
-      
-      // Clear localStorage caches for singers and pitches
-      // Note: Pitches are also affected by merge (transferred/deleted), so we clear their cache too
-      // The calling component (SingerManager) will refresh pitches after merge completes
-      if (typeof window !== 'undefined') {
-        removeLocalStorageItem(SINGERS_CACHE_KEY);
-        removeLocalStorageItem('saiSongs:pitchesCache');
-        
-        // Dispatch global events to notify other components
-        // 1. Dispatch singerDeleted for each merged singer
-        const centerIdsArray = Array.from(allCenterIdsFromMerged);
-        if (centerIdsArray.length > 0) {
-          import('../utils/globalEventBus').then(({ globalEventBus }) => {
-            // Dispatch deleted events for merged singers
-            globalEventBus.dispatch('singerDeleted', {
-              type: 'singerDeleted',
-              centerIds: centerIdsArray
-            });
+
+      if (result) {
+        const targetSingerPitchCountUp: number = result.targetSingerPitchCountUp || 0;
+        const songIdsPitchCountDown: Map<string, number> = new Map(Object.entries(result.songIdsPitchCountDown || {}));
+        const centerIdsSingerCountDown: Map<string, number> = new Map(Object.entries(result.centerIdsSingerCountDown || {}));
+
+        if (typeof window !== 'undefined') {
+          // Dispatch global events to notify other components
+          console.log('dispatching singerMerged event', targetSinger, singerIdsToMerge, targetSingerPitchCountUp, songIdsPitchCountDown, centerIdsSingerCountDown);
+          globalEventBus.dispatch('singerMerged', {
+            type: 'singerMerged',
+            singer: targetSinger || null,
+            singerIdsRemoved: singerIdsToMerge,
+            targetSingerPitchCountUp: targetSingerPitchCountUp,
+            songIdsPitchCountDown: songIdsPitchCountDown,
+            centerIdsSingerCountDown: centerIdsSingerCountDown,
           });
         }
-        
-        // 2. After refresh, we'll check if target singer's centers changed
-        // For now, dispatch a general refresh request
-        import('../utils/globalEventBus').then(({ globalEventBus }) => {
-          globalEventBus.requestRefresh('singers');
-          globalEventBus.requestRefresh('centers');
-          globalEventBus.requestRefresh('pitches');
-        });
+        toast.success(`Successfully merged ${singerIdsToMerge.length} singers into ${targetSinger?.name}`);
+        return true;
       }
-      
-      // Refresh singers list to get updated data (merged singers are deleted, target singer updated)
-      await fetchSingers(true);
-      
-      // After refresh, check if target singer's centers changed and dispatch singerUpdated if needed
-      // Use setSingers functional form to access the latest state after fetchSingers updates it
-      if (typeof window !== 'undefined') {
-        setSingers(currentSingers => {
-          const updatedTargetSinger = currentSingers.find(s => s.id === targetSingerId);
-          if (updatedTargetSinger) {
-            const targetCenterIdsAfter = updatedTargetSinger.centerIds || [];
-            const centersRemoved = targetCenterIdsBefore.filter(cid => !targetCenterIdsAfter.includes(cid));
-            const centersAdded = targetCenterIdsAfter.filter(cid => !targetCenterIdsBefore.includes(cid));
-            
-            if (centersRemoved.length > 0 || centersAdded.length > 0) {
-              import('../utils/globalEventBus').then(({ globalEventBus }) => {
-                globalEventBus.dispatch('singerUpdated', {
-                  type: 'singerUpdated',
-                  centerIdsRemoved: centersRemoved,
-                  centerIdsAdded: centersAdded
-                });
-              });
-            }
-          }
-          return currentSingers; // Return unchanged state
-        });
-      }
-      
-      toast.success(`Successfully merged ${result.mergedCount} singer(s)`);
-      return true;
+      console.error('Failed to merge singers', targetSingerId, singerIdsToMerge);
+      toast.error('Failed to merge singers');
+      return false;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to merge singers';
+      console.error(`Error merging singers ${targetSingerId}, ${singerIdsToMerge}:`, err);
+      const errorMessage = err instanceof Error ? err.message : `Error merging singers: ${err.message}`;
       setError({
         code: 'UNKNOWN_ERROR',
         message: errorMessage,
