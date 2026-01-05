@@ -313,6 +313,9 @@ export const PitchManager: React.FC = () => {
       if (advancedFilters.raga && !matches(song?.raga, advancedFilters.raga, advancedFilters.ragaCaseSensitive || false)) {
         return false;
       }
+      if (advancedFilters.tempo && !matches(song?.tempo, advancedFilters.tempo, advancedFilters.tempoCaseSensitive || false)) {
+        return false;
+      }
 
       // Apply basic search (searches across all fields)
       if (!debouncedSearchTerm.trim()) return true;

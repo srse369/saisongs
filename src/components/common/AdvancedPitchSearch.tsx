@@ -8,6 +8,7 @@ export interface PitchSearchFilters {
   deity?: string;
   language?: string;
   raga?: string;
+  tempo?: string;
   // Case sensitivity flags
   songNameCaseSensitive?: boolean;
   singerNameCaseSensitive?: boolean;
@@ -15,6 +16,7 @@ export interface PitchSearchFilters {
   deityCaseSensitive?: boolean;
   languageCaseSensitive?: boolean;
   ragaCaseSensitive?: boolean;
+  tempoCaseSensitive?: boolean;
 }
 
 interface AdvancedPitchSearchProps {
@@ -59,6 +61,7 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
       deities: getUniqueSongValues('deity'),
       languages: getUniqueSongValues('language'),
       ragas: getUniqueSongValues('raga'),
+      tempos: getUniqueSongValues('tempo'),
     };
   }, [songs, singers]);
 
@@ -308,6 +311,37 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
                   className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer"
                 />
                 <label htmlFor="pitch-raga-case-sensitive" className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
+                  Case sensitive
+                </label>
+              </div>
+            </div>
+
+            {/* Tempo Combo Box */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tempo (from song)
+              </label>
+              <input
+                list="pitch-tempo-list"
+                value={filters.tempo || ''}
+                onChange={(e) => handleFilterChange('tempo', e.target.value)}
+                placeholder="Type or select tempo..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+              />
+              <datalist id="pitch-tempo-list">
+                {uniqueValues.tempos.map(tempo => (
+                  <option key={tempo} value={tempo} />
+                ))}
+              </datalist>
+              <div className="flex items-center gap-1.5 mt-1">
+                <input
+                  type="checkbox"
+                  id="pitch-tempo-case-sensitive"
+                  checked={filters.tempoCaseSensitive || false}
+                  onChange={(e) => handleCaseSensitivityChange('tempoCaseSensitive', e.target.checked)}
+                  className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer"
+                />
+                <label htmlFor="pitch-tempo-case-sensitive" className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
                   Case sensitive
                 </label>
               </div>
