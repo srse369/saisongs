@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { useSongs } from '../../contexts/SongContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -16,7 +17,12 @@ import songService from '../../services/SongService';
 import type { Song, CreateSongInput } from '../../types';
 import { globalEventBus } from '../../utils/globalEventBus';
 
+const SONGS_SCROLL_POSITION_KEY = 'saiSongs:songsScrollPosition';
+
 export const SongManager: React.FC = () => {
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const songIdFromUrl = searchParams.get('songId') || '';
   const {
     songs,
     loading,
@@ -37,10 +43,41 @@ export const SongManager: React.FC = () => {
   const [sortBy, setSortBy] = useState<'name' | 'pitchCount'>('name');
   const [advancedFilters, setAdvancedFilters] = useState<SongSearchFilters>({});
   const [visibleCount, setVisibleCount] = useState(50);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const lastFetchedUserIdRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const songIdRef = useRef<string | null>(null);
+  const listContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Track mobile state
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Prevent body scroll on mobile when on songs tab
+  useEffect(() => {
+    if (isMobile && location.pathname === '/admin/songs') {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isMobile, location.pathname]);
+
+  // Show error as toast message
+  useEffect(() => {
+    if (error) {
+      toast.error(error.message);
+      clearError(); // Clear error after showing toast
+    }
+  }, [error, toast, clearError]);
 
   // Create fuzzy search instance for fallback
   const fuzzySearch = useMemo(() => createSongFuzzySearch(songs), [songs]);
@@ -54,6 +91,8 @@ export const SongManager: React.FC = () => {
     // Always fetch songs on mount to ensure we have latest data
     fetchSongs(); // Use cached data, only refresh if stale
   }, [fetchSongs]);
+
+
 
   // Listen for data refresh requests from global event bus
   useEffect(() => {
@@ -326,35 +365,237 @@ export const SongManager: React.FC = () => {
     setVisibleCount(50);
   }, [searchTerm, advancedFilters, songs.length]);
 
+  // Save and restore scroll position (only when not scrolling to a specific song)
+  useEffect(() => {
+    // Restore scroll position when component mounts (only if not scrolling to a song)
+    if (typeof window !== 'undefined' && !songIdFromUrl) {
+      try {
+        const savedScrollPosition = sessionStorage.getItem(SONGS_SCROLL_POSITION_KEY);
+        if (savedScrollPosition) {
+          const scrollTop = parseInt(savedScrollPosition, 10);
+          if (!isNaN(scrollTop)) {
+            // Use a small delay to ensure DOM is ready
+            setTimeout(() => {
+              window.scrollTo({ top: scrollTop, behavior: 'instant' });
+            }, 50);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to restore scroll position:', error);
+      }
+    }
+  }, []); // Only run on mount
+
+  // Save scroll position when navigating away
+  useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window !== 'undefined' && location.pathname === '/admin/songs' && !songIdRef.current) {
+        try {
+          const isMobile = window.innerWidth < 768;
+          const scrollTop = isMobile && listContainerRef.current
+            ? listContainerRef.current.scrollTop
+            : window.scrollY;
+          sessionStorage.setItem(SONGS_SCROLL_POSITION_KEY, String(scrollTop));
+        } catch (error) {
+          console.warn('Failed to save scroll position:', error);
+        }
+      }
+    };
+
+    // Save scroll position periodically while on songs tab
+    const scrollInterval = setInterval(handleScroll, 500); // Save every 500ms
+
+    // Also save on scroll events (throttled)
+    let scrollTimeout: NodeJS.Timeout;
+    const throttledScroll = () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(handleScroll, 100);
+    };
+
+    const container = listContainerRef.current;
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    
+    if (isMobile && container) {
+      container.addEventListener('scroll', throttledScroll, { passive: true });
+    } else {
+      window.addEventListener('scroll', throttledScroll, { passive: true });
+    }
+
+    // Save scroll position on unmount or when navigating away
+    return () => {
+      clearInterval(scrollInterval);
+      if (isMobile && container) {
+        container.removeEventListener('scroll', throttledScroll);
+      } else {
+        window.removeEventListener('scroll', throttledScroll);
+      }
+      if (location.pathname === '/admin/songs' && !songIdRef.current) {
+        handleScroll(); // Final save
+      }
+    };
+  }, [location.pathname]);
+
   const displayedSongs = useMemo(
     () => filteredSongs.slice(0, visibleCount),
     [filteredSongs, visibleCount]
   );
+
+  // Handle scrolling to song when songId is in URL
+  useEffect(() => {
+    if (!songIdFromUrl || filteredSongs.length === 0) {
+      songIdRef.current = null;
+      return;
+    }
+    
+    // Find the index of the target song in filteredSongs
+    const targetIndex = filteredSongs.findIndex(song => song.id === songIdFromUrl);
+    
+    if (targetIndex === -1) {
+      // Song not found in filtered results, clear the parameter
+      const next = new URLSearchParams(searchParams);
+      next.delete('songId');
+      setSearchParams(next, { replace: true });
+      songIdRef.current = null;
+      return;
+    }
+    
+    // If the song is beyond the visible count, increase visibleCount to include it
+    if (targetIndex >= visibleCount) {
+      setVisibleCount(Math.min(targetIndex + 10, filteredSongs.length));
+      songIdRef.current = songIdFromUrl;
+      return;
+    }
+    
+    // Song should be visible, mark it for scrolling
+    songIdRef.current = songIdFromUrl;
+  }, [songIdFromUrl, filteredSongs, visibleCount, searchParams, setSearchParams]);
+
+  // Scroll to song when it becomes visible in displayedSongs
+  useEffect(() => {
+    const targetSongId = songIdRef.current;
+    if (!targetSongId) return;
+    
+    const isSongVisible = displayedSongs.some(song => song.id === targetSongId);
+    
+    if (!isSongVisible) return; // Wait until song is in displayedSongs
+    
+    // Use requestAnimationFrame and setTimeout to ensure DOM is fully updated
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        // Try multiple times to find the element
+        let attempts = 0;
+        const maxAttempts = 40; // Try for up to 2 seconds
+        
+        const tryScroll = () => {
+          const element = document.getElementById(`song-${targetSongId}`);
+          if (element) {
+            // Calculate scroll position to ensure bottom border is visible
+            // Position element slightly above center so there's room below for the border
+            const isMobile = window.innerWidth < 768;
+            const container = isMobile ? listContainerRef.current : null;
+            
+            if (isMobile && container) {
+              // Mobile: scroll within container
+              const elementRect = element.getBoundingClientRect();
+              const containerRect = container.getBoundingClientRect();
+              const relativeTop = elementRect.top - containerRect.top + container.scrollTop;
+              const containerHeight = container.clientHeight;
+              const elementHeight = elementRect.height;
+              const ringWidth = 8;
+              const targetScrollTop = relativeTop - (containerHeight / 2) + (elementHeight / 2) - ringWidth;
+              container.scrollTo({
+                top: Math.max(0, targetScrollTop),
+                behavior: 'smooth'
+              });
+            } else {
+              // Desktop: scroll window
+              const elementRect = element.getBoundingClientRect();
+              const absoluteElementTop = elementRect.top + window.pageYOffset;
+              const viewportHeight = window.innerHeight;
+              const elementHeight = elementRect.height;
+              const ringWidth = 8; // ring-4 = 16px (4 * 4px)
+              // Position so element is slightly above center, leaving space below for border
+              const targetScrollTop = absoluteElementTop - (viewportHeight / 2) + (elementHeight / 2) - ringWidth;
+              window.scrollTo({
+                top: Math.max(0, targetScrollTop), // Don't scroll above top
+                behavior: 'smooth'
+              });
+            }
+            // Highlight the song for a few seconds
+            element.classList.add('ring-4', 'ring-blue-400', 'dark:ring-blue-500');
+            setTimeout(() => {
+              element.classList.remove('ring-4', 'ring-blue-400', 'dark:ring-blue-500');
+            }, 4000); // Highlight for 4 seconds
+            // Clear the URL parameter and reset ref
+            const next = new URLSearchParams(searchParams);
+            next.delete('songId');
+            setSearchParams(next, { replace: true });
+            songIdRef.current = null;
+            return true;
+          }
+          return false;
+        };
+
+        // Try immediately
+        if (!tryScroll()) {
+          // If not found, retry with interval
+          const interval = setInterval(() => {
+            attempts++;
+            if (tryScroll() || attempts >= maxAttempts) {
+              clearInterval(interval);
+              if (attempts >= maxAttempts) {
+                // Element not found after max attempts
+                console.warn(`Could not find song element with id: song-${targetSongId} after ${maxAttempts} attempts`);
+                const next = new URLSearchParams(searchParams);
+                next.delete('songId');
+                setSearchParams(next, { replace: true });
+                songIdRef.current = null;
+              }
+            }
+          }, 50);
+        }
+      }, 150);
+    });
+  }, [displayedSongs, searchParams, setSearchParams]);
 
   // Lazy-load more songs as the user scrolls near the bottom
   useEffect(() => {
     const sentinel = loadMoreRef.current;
     if (!sentinel) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry.isIntersecting) {
-          setVisibleCount((prev) =>
-            Math.min(prev + 50, filteredSongs.length)
-          );
-        }
-      },
-      {
-        root: null,
-        rootMargin: '0px',
-        threshold: 1.0,
-      }
-    );
+    // On mobile, use the container as root; on desktop, use viewport (null)
+    // Use a small delay to ensure container is ready on mobile
+    const setupObserver = () => {
+      const root = isMobile && listContainerRef.current ? listContainerRef.current : null;
 
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [filteredSongs.length]);
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          if (entry.isIntersecting) {
+            setVisibleCount((prev) =>
+              Math.min(prev + 50, filteredSongs.length)
+            );
+          }
+        },
+        {
+          root: root,
+          rootMargin: '100px', // Start loading when sentinel is 100px away from viewport/container
+          threshold: 0.1, // Trigger when 10% visible (more lenient than 1.0)
+        }
+      );
+
+      observer.observe(sentinel);
+      return () => observer.disconnect();
+    };
+
+    // On mobile, wait a bit for container to be ready
+    if (isMobile) {
+      const timeoutId = setTimeout(setupObserver, 100);
+      return () => clearTimeout(timeoutId);
+    } else {
+      return setupObserver();
+    }
+  }, [filteredSongs.length, isMobile, displayedSongs.length]);
 
   const activeFilterCount = Object.values(advancedFilters).filter(v => v && typeof v === 'string').length;
 
@@ -386,129 +627,138 @@ export const SongManager: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8 animate-fade-in">
-      <div className="mb-2 sm:mb-4">
-        <div className="flex flex-col gap-2 sm:gap-4 mb-2 sm:mb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-0">
-                Song Management
-              </h1>
-              <a
-                href="/help#songs"
-                className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                title="View help documentation for this tab"
-              >
-                <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-              </a>
+      {/* Fixed Header on Mobile - Pinned below Layout header */}
+      <div 
+        className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-2 sm:mb-4'}`}
+        style={isMobile ? {
+          top: '48px', // Position below Layout header (h-12 = 48px on mobile)
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+        } : {}}
+      >
+        <div className={`max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 ${isMobile ? 'py-2' : ''}`}>
+          <div className="flex flex-col gap-2 sm:gap-4 mb-2 sm:mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-0">
+                  Song Management
+                </h1>
+                <a
+                  href="/help#songs"
+                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                  title="View help documentation for this tab"
+                >
+                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+                </a>
+              </div>
+              <p className="hidden sm:block text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                Create and manage your song library
+              </p>
             </div>
-            <p className="hidden sm:block text-sm sm:text-base text-gray-600 dark:text-gray-400">
-              Create and manage your song library
-            </p>
-          </div>
-          <div className="flex flex-col lg:flex-row gap-3 w-full">
-            <div className="flex-1">
-              <WebLLMSearchInput
-                ref={searchInputRef}
-                value={searchTerm}
-                onChange={handleSearchChange}
-                onFiltersExtracted={(filters) => {
-                  // Merge AI-extracted filters with existing advanced filters
-                  setAdvancedFilters(prev => ({ ...prev, ...filters }));
-                }}
-                searchType="song"
-                placeholder='Ask AI: "Show me sai songs in sanskrit with fast tempo"...'
-                availableValues={availableValues}
-              />
-            </div>
-            {/* Desktop action buttons - hidden on mobile */}
-            <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'name' | 'pitchCount')}
-                title="Sort songs by name or pitch count"
-                className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              >
-                <option value="name">Sort: Name</option>
-                <option value="pitchCount">Sort: Pitch Count</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => fetchSongs(true)}
-                disabled={loading}
-                title="Reload songs from the database to see the latest updates"
-                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-              >
-                <RefreshIcon className="w-4 h-4" />
-                Refresh
-              </button>
-              {isEditor && (
+            <div className="flex flex-col lg:flex-row gap-3 w-full">
+              <div className="flex-1">
+                <WebLLMSearchInput
+                  ref={searchInputRef}
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  onFiltersExtracted={(filters) => {
+                    // Merge AI-extracted filters with existing advanced filters
+                    setAdvancedFilters(prev => ({ ...prev, ...filters }));
+                  }}
+                  searchType="song"
+                  placeholder='Ask AI: "Show me sai songs in sanskrit with fast tempo"...'
+                  availableValues={availableValues}
+                />
+              </div>
+              {/* Desktop action buttons - hidden on mobile */}
+              <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'name' | 'pitchCount')}
+                  title="Sort songs by name or pitch count"
+                  className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                >
+                  <option value="name">Sort: Name</option>
+                  <option value="pitchCount">Sort: Pitch Count</option>
+                </select>
                 <button
-                  onClick={handleCreateClick}
-                  title="Add a new song to the library with name, lyrics, translation, and metadata"
+                  type="button"
+                  onClick={() => fetchSongs(true)}
+                  disabled={loading}
+                  title="Reload songs from the database to see the latest updates"
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                 >
-                  <i className="fas fa-plus text-lg"></i>
-                  Create New Song
+                  <RefreshIcon className="w-4 h-4" />
+                  Refresh
                 </button>
-              )}
-            </div>
-          </div>
-
-          {/* Advanced Search - Shown directly on both mobile and desktop */}
-          <AdvancedSongSearch
-            filters={advancedFilters}
-            onFiltersChange={setAdvancedFilters}
-            onClear={() => setAdvancedFilters({})}
-            songs={songs}
-          />
-        </div>
-
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg animate-fade-in">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center flex-1 min-w-0">
-                <i className="fas fa-times-circle text-lg text-red-600 dark:text-red-400 mr-2 flex-shrink-0"></i>
-                <p className="text-sm font-medium text-red-800 dark:text-red-300 truncate">{error.message}</p>
+                {isEditor && (
+                  <button
+                    onClick={handleCreateClick}
+                    title="Add a new song to the library with name, lyrics, translation, and metadata"
+                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                  >
+                    <i className="fas fa-plus text-lg"></i>
+                    Create New Song
+                  </button>
+                )}
               </div>
-              <button
-                onClick={clearError}
-                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 focus:outline-none flex-shrink-0"
-                aria-label="Dismiss error">
-                <i className="fas fa-times text-lg"></i>
-              </button>
             </div>
-          </div>
-        )}
 
-        {/* Song count status */}
-        {filteredSongs.length > 0 && (
-          <div className="mb-2 text-sm text-gray-600 dark:text-gray-400">
-            {displayedSongs.length < filteredSongs.length
-              ? `Showing ${displayedSongs.length} of ${filteredSongs.length} songs`
-              : `${filteredSongs.length} song${filteredSongs.length !== 1 ? 's' : ''}`}
+            {/* Advanced Search - Shown directly on both mobile and desktop */}
+            <AdvancedSongSearch
+              filters={advancedFilters}
+              onFiltersChange={setAdvancedFilters}
+              onClear={() => setAdvancedFilters({})}
+              songs={songs}
+            />
           </div>
-        )}
+
+
+          {/* Song count status - Fixed in header on mobile */}
+          {filteredSongs.length > 0 && (
+            <div className={`text-sm text-gray-600 dark:text-gray-400 ${isMobile ? 'mb-2' : 'mb-2'}`}>
+              {displayedSongs.length < filteredSongs.length
+                ? `Showing ${displayedSongs.length} of ${filteredSongs.length} songs`
+                : `${filteredSongs.length} song${filteredSongs.length !== 1 ? 's' : ''}`}
+            </div>
+          )}
+        </div>
       </div>
 
-      <SongList
-        songs={displayedSongs}
-        onEdit={handleEditClick}
-        onDelete={handleDelete}
-        onSync={handleSync}
-        loading={loading}
-        onView={handleViewClick}
-      />
-
-      {/* Lazy-load sentinel / status */}
+      {/* List Container - Scrollable on mobile, normal on desktop */}
       <div
-        ref={loadMoreRef}
-        className="mt-4 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400"
+        ref={listContainerRef}
+        className={isMobile ? 'overflow-y-auto' : ''}
+        style={isMobile ? {
+          // Calculate height: viewport height minus Layout header (48px) + SongManager header (~280px) + bottom action bar space (~102px)
+          // Layout header: 48px (h-12 on mobile)
+          // SongManager header: ~280px (title, search, advanced search, count)
+          // Bottom action bar: ~102px
+          marginTop: '150px', // Space for Layout header (48px) + SongManager header (~280px)
+          height: 'calc(100vh - 150px - 168px)', // Viewport minus Layout header, SongManager header, and bottom bar
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain', // Prevent scroll chaining
+        } : {}}
       >
-        {displayedSongs.length < filteredSongs.length
-          ? 'Scroll to load more songs...'
-          : filteredSongs.length > 0
-            ? 'All songs loaded'
-            : null}
+        <SongList
+          songs={displayedSongs}
+          onEdit={handleEditClick}
+          onDelete={handleDelete}
+          onSync={handleSync}
+          loading={loading}
+          onView={handleViewClick}
+        />
+
+        {/* Lazy-load sentinel / status */}
+        <div
+          ref={loadMoreRef}
+          className="mt-4 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400"
+        >
+          {displayedSongs.length < filteredSongs.length
+            ? 'Scroll to load more songs...'
+            : filteredSongs.length > 0
+              ? 'All songs loaded'
+              : null}
+        </div>
       </div>
 
       <Modal

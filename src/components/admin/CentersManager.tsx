@@ -25,6 +25,7 @@ export const CentersManager: React.FC = () => {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [selectedCenterId, setSelectedCenterId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const listContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -34,6 +35,16 @@ export const CentersManager: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Prevent body scroll on mobile when on centers tab
+  useEffect(() => {
+    if (isMobile && window.location.pathname === '/admin/centers') {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isMobile]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -458,61 +469,85 @@ export const CentersManager: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-1.5 sm:px-6 py-2 sm:py-4 md:py-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">Centers</h1>
-            <a
-              href="/help#centers"
-              className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-              title="View help documentation for this tab"
-            >
-              <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-            </a>
+      {/* Fixed Header on Mobile - Pinned below Layout header */}
+      <div 
+        className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-4 sm:mb-6'}`}
+        style={isMobile ? {
+          top: '48px', // Position below Layout header (h-12 = 48px on mobile)
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+        } : {}}
+      >
+        <div className={`max-w-6xl mx-auto px-1.5 sm:px-6 ${isMobile ? 'py-2' : ''}`}>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">Centers</h1>
+                <a
+                  href="/help#centers"
+                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                  title="View help documentation for this tab"
+                >
+                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+                </a>
+              </div>
+              {!loading && centers.length > 0 && (
+                <p className={`hidden sm:block mt-1 text-sm text-gray-500 dark:text-gray-400 ${isMobile ? 'mb-2' : ''}`}>
+                  {centers.length} center{centers.length !== 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+            {/* Desktop action buttons - hidden on mobile */}
+            <div className="hidden md:flex gap-2">
+              <button
+                type="button"
+                onClick={() => fetchCenters()}
+                disabled={loading}
+                title="Refresh centers list"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              >
+                <RefreshIcon className="w-4 h-4" />
+                Refresh
+              </button>
+              <button
+                onClick={() => handleOpenForm()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              >
+                + Add Center
+              </button>
+            </div>
           </div>
-          {!loading && centers.length > 0 && (
-            <p className="hidden sm:block mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {centers.length} center{centers.length !== 1 ? 's' : ''}
-            </p>
-          )}
-        </div>
-        {/* Desktop action buttons - hidden on mobile */}
-        <div className="hidden md:flex gap-2">
-          <button
-            type="button"
-            onClick={() => fetchCenters()}
-            disabled={loading}
-            title="Refresh centers list"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-          >
-            <RefreshIcon className="w-4 h-4" />
-            Refresh
-          </button>
-          <button
-            onClick={() => handleOpenForm()}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-          >
-            + Add Center
-          </button>
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <p className="text-red-700 dark:text-red-300">{error}</p>
-        </div>
-      )}
+      {/* List Container - Scrollable on mobile, normal on desktop */}
+      <div
+        ref={listContainerRef}
+        className={isMobile ? 'overflow-y-auto' : ''}
+        style={isMobile ? {
+          // Calculate height: viewport height minus Layout header (48px) + CentersManager header (~120px) + bottom action bar space (~102px)
+          marginTop: '168px', // Space for Layout header (48px) + CentersManager header (~120px) - this doesn't scroll
+          height: 'calc(100vh - 48px - 120px - 102px)', // Viewport minus Layout header, CentersManager header, and bottom bar
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain', // Prevent scroll chaining
+        } : {}}
+      >
+        <div className={isMobile ? 'px-1.5 sm:px-6' : ''}>
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-red-700 dark:text-red-300">{error}</p>
+            </div>
+          )}
 
-      {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      ) : centers.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <p className="text-gray-500 dark:text-gray-400">No centers found. Create your first center to get started.</p>
-        </div>
-      ) : (
-        <div className="space-y-0 md:space-y-3">
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+          ) : centers.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <p className="text-gray-500 dark:text-gray-400">No centers found. Create your first center to get started.</p>
+            </div>
+          ) : (
+            <div className="space-y-0 md:space-y-3">
           {centers.map((center, index) => {
             const isSelected = selectedCenterId === center.id;
             return (
@@ -612,8 +647,10 @@ export const CentersManager: React.FC = () => {
               </div>
             );
           })}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Form Modal */}
       <Modal

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { usePitches } from '../../contexts/PitchContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
 import { PitchForm } from './PitchForm';
 import { PitchList } from './PitchList';
@@ -16,8 +17,12 @@ import { Modal } from '../common/Modal';
 import { SongDetails } from './SongDetails';
 import { globalEventBus } from '../../utils/globalEventBus';
 
+const PITCHES_SCROLL_POSITION_KEY = 'saiSongs:pitchesScrollPosition';
+
 export const PitchManager: React.FC = () => {
+  const location = useLocation();
   const { isEditor, userId, isAuthenticated } = useAuth();
+  const toast = useToast();
 
   const {
     pitches,
@@ -59,10 +64,32 @@ export const PitchManager: React.FC = () => {
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [visibleCount, setVisibleCount] = useState(100);
   const [showMyPitches, setShowMyPitches] = useState(true);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastFetchedUserIdRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const listContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Track mobile state
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Prevent body scroll on mobile when on pitches tab
+  useEffect(() => {
+    if (isMobile && location.pathname === '/admin/pitches') {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isMobile, location.pathname]);
 
   // Check if the logged-in user has a singer profile (can manage own pitches)
   // userId is now a hex string matching singer.id format
@@ -73,6 +100,88 @@ export const PitchManager: React.FC = () => {
 
   // User can create pitches if they're an editor OR if they have a singer profile
   const canCreatePitch = isEditor || !!userSinger;
+
+  // Prevent body scroll on mobile when on pitches tab
+  useEffect(() => {
+    if (isMobile && location.pathname === '/admin/pitches') {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isMobile, location.pathname]);
+
+  // Save and restore scroll position (mobile: list container, desktop: window)
+  useEffect(() => {
+    // Restore scroll position when component mounts
+    if (typeof window !== 'undefined') {
+      try {
+        const savedScrollPosition = sessionStorage.getItem(PITCHES_SCROLL_POSITION_KEY);
+        if (savedScrollPosition) {
+          const scrollTop = parseInt(savedScrollPosition, 10);
+          if (!isNaN(scrollTop)) {
+            // Use a small delay to ensure DOM is ready
+            setTimeout(() => {
+              if (isMobile && listContainerRef.current) {
+                listContainerRef.current.scrollTop = scrollTop;
+              } else {
+                window.scrollTo({ top: scrollTop, behavior: 'instant' });
+              }
+            }, 50);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to restore scroll position:', error);
+      }
+    }
+  }, [isMobile]); // Run when mobile state changes
+
+  // Save scroll position when navigating away
+  useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window !== 'undefined' && location.pathname === '/admin/pitches') {
+        try {
+          const scrollTop = isMobile && listContainerRef.current
+            ? listContainerRef.current.scrollTop
+            : window.scrollY;
+          sessionStorage.setItem(PITCHES_SCROLL_POSITION_KEY, String(scrollTop));
+        } catch (error) {
+          console.warn('Failed to save scroll position:', error);
+        }
+      }
+    };
+
+    // Save scroll position periodically while on pitches tab
+    const scrollInterval = setInterval(handleScroll, 500); // Save every 500ms
+
+    // Also save on scroll events (throttled)
+    let scrollTimeout: NodeJS.Timeout;
+    const throttledScroll = () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(handleScroll, 100);
+    };
+
+    const container = listContainerRef.current;
+    
+    if (isMobile && container) {
+      container.addEventListener('scroll', throttledScroll, { passive: true });
+    } else {
+      window.addEventListener('scroll', throttledScroll, { passive: true });
+    }
+
+    // Save scroll position on unmount or when navigating away
+    return () => {
+      clearInterval(scrollInterval);
+      if (isMobile && container) {
+        container.removeEventListener('scroll', throttledScroll);
+      } else {
+        window.removeEventListener('scroll', throttledScroll);
+      }
+      if (location.pathname === '/admin/pitches') {
+        handleScroll(); // Final save
+      }
+    };
+  }, [location.pathname, isMobile]);
 
   // Sync advanced filters with URL parameters (when navigating from Songs/Singers tab)
   useEffect(() => {
@@ -217,6 +326,22 @@ export const PitchManager: React.FC = () => {
 
   const error = pitchError || songsError || singersError;
   const loading = pitchLoading || songsLoading || singersLoading;
+
+  // Show errors as toast messages
+  useEffect(() => {
+    if (pitchError) {
+      toast.error(pitchError.message);
+      clearPitchError();
+    }
+    if (songsError) {
+      toast.error(songsError.message);
+      clearSongsError();
+    }
+    if (singersError) {
+      toast.error(singersError.message);
+      clearSingersError();
+    }
+  }, [pitchError, songsError, singersError, toast, clearPitchError, clearSongsError, clearSingersError]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -389,6 +514,9 @@ export const PitchManager: React.FC = () => {
     const sentinel = loadMoreRef.current;
     if (!sentinel) return;
 
+    // On mobile, use the container as root; on desktop, use viewport (null)
+    const root = isMobile && listContainerRef.current ? listContainerRef.current : null;
+
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
@@ -399,7 +527,7 @@ export const PitchManager: React.FC = () => {
         }
       },
       {
-        root: null,
+        root: root,
         rootMargin: '200px',
         threshold: 0.1,
       }
@@ -407,7 +535,7 @@ export const PitchManager: React.FC = () => {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [filteredPitches.length]);
+  }, [filteredPitches.length, isMobile]);
 
   const activeFilterCount = Object.values(advancedFilters).filter(v => v && typeof v === 'string').length + (songFilterId ? 1 : 0) + (singerFilterId ? 1 : 0);
 
@@ -443,231 +571,235 @@ export const PitchManager: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
-      <div className="mb-2 sm:mb-4">
-        <div className="flex flex-col gap-2 sm:gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Pitch Management</h1>
-              <a
-                href="/help#pitches"
-                className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                title="View help documentation for this tab"
-              >
-                <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-              </a>
+      {/* Fixed Header on Mobile - Pinned below Layout header */}
+      <div 
+        className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-2 sm:mb-4'}`}
+        style={isMobile ? {
+          top: '48px', // Position below Layout header (h-12 = 48px on mobile)
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+        } : {}}
+      >
+        <div className={`max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 ${isMobile ? 'py-2' : ''}`}>
+          <div className="flex flex-col gap-2 sm:gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Pitch Management</h1>
+                <a
+                  href="/help#pitches"
+                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                  title="View help documentation for this tab"
+                >
+                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+                </a>
+              </div>
+              <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Associate singers with songs and their pitch information
+              </p>
+              {(songFilterId || singerFilterId) && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                  {songFilterId && (
+                    <span className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
+                      <span className="font-medium mr-1 hidden sm:inline">Song:</span>
+                      <span className="truncate max-w-[120px] sm:max-w-none">
+                        {songs.find((s) => s.id === songFilterId)?.name || 'Unknown song'}
+                      </span>
+                    </span>
+                  )}
+                  {singerFilterId && (
+                    <span className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800">
+                      <span className="font-medium mr-1 hidden sm:inline">Singer:</span>
+                      <span className="truncate max-w-[120px] sm:max-w-none">
+                        {singers.find((s) => s.id === singerFilterId)?.name || 'Unknown singer'}
+                      </span>
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleClearFilters();
+                    }}
+                    className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border border-gray-300 dark:border-gray-600 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
             </div>
-            <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Associate singers with songs and their pitch information
-            </p>
-            {(songFilterId || singerFilterId) && (
-              <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
-                {songFilterId && (
-                  <span className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
-                    <span className="font-medium mr-1 hidden sm:inline">Song:</span>
-                    <span className="truncate max-w-[120px] sm:max-w-none">
-                      {songs.find((s) => s.id === songFilterId)?.name || 'Unknown song'}
-                    </span>
-                  </span>
-                )}
-                {singerFilterId && (
-                  <span className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800">
-                    <span className="font-medium mr-1 hidden sm:inline">Singer:</span>
-                    <span className="truncate max-w-[120px] sm:max-w-none">
-                      {singers.find((s) => s.id === singerFilterId)?.name || 'Unknown singer'}
-                    </span>
-                  </span>
-                )}
+            <div className="flex flex-col lg:flex-row gap-3 w-full">
+              <div className="flex-1">
+                <WebLLMSearchInput
+                  ref={searchInputRef}
+                  value={searchTerm}
+                  onChange={(value) => setSearchTerm(value)}
+                  onFiltersExtracted={(filters) => {
+                    // Type guard: since searchType is "pitch", filters should be PitchSearchFilters
+                    const pitchFilters = filters as PitchSearchFilters;
+
+                    // If AI extracts songName/singerName filters, clear URL params to avoid conflicts
+                    const next = new URLSearchParams(searchParams);
+                    let urlChanged = false;
+
+                    if (pitchFilters.songName && songFilterId) {
+                      next.delete('songId');
+                      urlChanged = true;
+                    }
+
+                    if (pitchFilters.singerName && singerFilterId) {
+                      next.delete('singerId');
+                      urlChanged = true;
+                    }
+
+                    if (urlChanged) {
+                      setSearchParams(next);
+                    }
+
+                    // Merge AI-extracted filters with existing advanced filters
+                    setAdvancedFilters(prev => ({ ...prev, ...pitchFilters }));
+                  }}
+                  searchType="pitch"
+                  placeholder='Ask AI: "Show me C# pitches for devi songs" or "Which singers have sanskrit songs?"...'
+                  availableValues={availableValues}
+                />
+              </div>
+              {/* Desktop action buttons - hidden on mobile */}
+              <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'songName' | 'singerName')}
+                  title="Sort pitches by song name or singer name"
+                  className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                >
+                  <option value="songName">Sort: Song</option>
+                  <option value="singerName">Sort: Singer</option>
+                </select>
                 <button
                   type="button"
                   onClick={() => {
-                    handleClearFilters();
+                    fetchSongs(true);
+                    fetchSingers(true);
+                    fetchAllPitches(true);
                   }}
-                  className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border border-gray-300 dark:border-gray-600 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  Clear
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col lg:flex-row gap-3 w-full">
-            <div className="flex-1">
-              <WebLLMSearchInput
-                ref={searchInputRef}
-                value={searchTerm}
-                onChange={(value) => setSearchTerm(value)}
-                onFiltersExtracted={(filters) => {
-                  // Type guard: since searchType is "pitch", filters should be PitchSearchFilters
-                  const pitchFilters = filters as PitchSearchFilters;
-
-                  // If AI extracts songName/singerName filters, clear URL params to avoid conflicts
-                  const next = new URLSearchParams(searchParams);
-                  let urlChanged = false;
-
-                  if (pitchFilters.songName && songFilterId) {
-                    next.delete('songId');
-                    urlChanged = true;
-                  }
-
-                  if (pitchFilters.singerName && singerFilterId) {
-                    next.delete('singerId');
-                    urlChanged = true;
-                  }
-
-                  if (urlChanged) {
-                    setSearchParams(next);
-                  }
-
-                  // Merge AI-extracted filters with existing advanced filters
-                  setAdvancedFilters(prev => ({ ...prev, ...pitchFilters }));
-                }}
-                searchType="pitch"
-                placeholder='Ask AI: "Show me C# pitches for devi songs" or "Which singers have sanskrit songs?"...'
-                availableValues={availableValues}
-              />
-            </div>
-            {/* Desktop action buttons - hidden on mobile */}
-            <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'songName' | 'singerName')}
-                title="Sort pitches by song name or singer name"
-                className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              >
-                <option value="songName">Sort: Song</option>
-                <option value="singerName">Sort: Singer</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => {
-                  fetchSongs(true);
-                  fetchSingers(true);
-                  fetchAllPitches(true);
-                }}
-                disabled={loading}
-                title="Reload pitches, songs, and singers to see the latest changes"
-                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-              >
-                <RefreshIcon className="w-4 h-4" />
-                Refresh
-              </button>
-              {!showForm && canCreatePitch && (
-                <button
-                  onClick={handleCreateClick}
-                  disabled={loading || songs.length === 0 || singers.length === 0}
-                  title={songs.length === 0 || singers.length === 0 ? "Load songs and singers first" : userSinger && !isEditor ? "Assign pitches to yourself" : "Assign a pitch/key to a singer for a specific song"}
+                  disabled={loading}
+                  title="Reload pitches, songs, and singers to see the latest changes"
                   className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                 >
-                  <i className="fas fa-plus text-lg"></i>
-                  Create New Pitch
+                  <RefreshIcon className="w-4 h-4" />
+                  Refresh
                 </button>
-              )}
+                {!showForm && canCreatePitch && (
+                  <button
+                    onClick={handleCreateClick}
+                    disabled={loading || songs.length === 0 || singers.length === 0}
+                    title={songs.length === 0 || singers.length === 0 ? "Load songs and singers first" : userSinger && !isEditor ? "Assign pitches to yourself" : "Assign a pitch/key to a singer for a specific song"}
+                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                  >
+                    <i className="fas fa-plus text-lg"></i>
+                    Create New Pitch
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Advanced Search - Shown directly on both mobile and desktop */}
+            <AdvancedPitchSearch
+              filters={advancedFilters}
+              songs={songs}
+              singers={singers}
+              onFiltersChange={(newFilters) => {
+                // If user manually changes songName/singerName in advanced search,
+                // clear the corresponding URL param to avoid confusion
+                const next = new URLSearchParams(searchParams);
+                let urlChanged = false;
+
+                // Get current song/singer names from URL filters
+                const currentSongName = songFilterId
+                  ? songs.find(s => s.id === songFilterId)?.name
+                  : undefined;
+                const currentSingerName = singerFilterId
+                  ? singers.find(s => s.id === singerFilterId)?.name
+                  : undefined;
+
+                // If songName filter changed and doesn't match URL filter, clear URL param
+                if (newFilters.songName !== currentSongName && songFilterId) {
+                  next.delete('songId');
+                  urlChanged = true;
+                }
+
+                // If singerName filter changed and doesn't match URL filter, clear URL param
+                if (newFilters.singerName !== currentSingerName && singerFilterId) {
+                  next.delete('singerId');
+                  urlChanged = true;
+                }
+
+                if (urlChanged) {
+                  setSearchParams(next);
+                }
+
+                setAdvancedFilters(newFilters);
+              }}
+              onClear={handleClearFilters}
+              rightContent={
+                userSinger ? (
+                  <button
+                    onClick={() => setShowMyPitches(!showMyPitches)}
+                    title={showMyPitches ? "Show all pitches" : "Show only my assigned pitches"}
+                    className="px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors flex items-center gap-2 whitespace-nowrap text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
+                  >
+                    <i className={`fas ${showMyPitches ? 'fa-users' : 'fa-user'} text-sm text-blue-600 dark:text-blue-400`}></i>
+                    {showMyPitches ? 'All Pitches' : 'My Pitches'}
+                  </button>
+                ) : undefined
+              }
+            />
           </div>
 
-          {/* Advanced Search - Shown directly on both mobile and desktop */}
-          <AdvancedPitchSearch
-            filters={advancedFilters}
-            songs={songs}
-            singers={singers}
-            onFiltersChange={(newFilters) => {
-              // If user manually changes songName/singerName in advanced search,
-              // clear the corresponding URL param to avoid confusion
-              const next = new URLSearchParams(searchParams);
-              let urlChanged = false;
-
-              // Get current song/singer names from URL filters
-              const currentSongName = songFilterId
-                ? songs.find(s => s.id === songFilterId)?.name
-                : undefined;
-              const currentSingerName = singerFilterId
-                ? singers.find(s => s.id === singerFilterId)?.name
-                : undefined;
-
-              // If songName filter changed and doesn't match URL filter, clear URL param
-              if (newFilters.songName !== currentSongName && songFilterId) {
-                next.delete('songId');
-                urlChanged = true;
-              }
-
-              // If singerName filter changed and doesn't match URL filter, clear URL param
-              if (newFilters.singerName !== currentSingerName && singerFilterId) {
-                next.delete('singerId');
-                urlChanged = true;
-              }
-
-              if (urlChanged) {
-                setSearchParams(next);
-              }
-
-              setAdvancedFilters(newFilters);
-            }}
-            onClear={handleClearFilters}
-            rightContent={
-              userSinger ? (
-                <button
-                  onClick={() => setShowMyPitches(!showMyPitches)}
-                  title={showMyPitches ? "Show all pitches" : "Show only my assigned pitches"}
-                  className="px-3 py-1.5 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors flex items-center gap-2 whitespace-nowrap text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
-                >
-                  <i className={`fas ${showMyPitches ? 'fa-users' : 'fa-user'} text-sm text-blue-600 dark:text-blue-400`}></i>
-                  {showMyPitches ? 'All Pitches' : 'My Pitches'}
-                </button>
-              ) : undefined
-            }
-          />
+          {/* Pitch count - Fixed in header on mobile */}
+          {filteredPitches.length > 0 && (
+            <div className={`text-sm text-gray-600 dark:text-gray-400 ${isMobile ? 'mb-2' : 'mb-4'}`}>
+              {displayedPitches.length < filteredPitches.length
+                ? `Showing ${displayedPitches.length} of ${filteredPitches.length} pitches`
+                : `${filteredPitches.length} pitch${filteredPitches.length !== 1 ? 'es' : ''}`}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 px-4 py-3 rounded-md flex justify-between items-center">
-          <span>{error.message}</span>
-          <button
-            onClick={() => {
-              clearPitchError();
-              clearSongsError();
-              clearSingersError();
-            }}
-            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
+      {/* List Container - Scrollable on mobile, normal on desktop */}
+      <div
+        ref={listContainerRef}
+        className={isMobile ? 'overflow-y-auto' : ''}
+        style={isMobile ? {
+          // Calculate height: viewport height minus Layout header (48px) + PitchManager header (~280px) + bottom action bar space (~102px)
+          marginTop: '142px', // Space for Layout header (48px) + PitchManager header (~280px)
+          height: 'calc(100vh - 142px - 166px)', // Viewport minus Layout header, PitchManager header, and bottom bar
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain', // Prevent scroll chaining
+        } : {}}
+      >
+        <PitchList
+          pitches={displayedPitches}
+          songs={songs}
+          singers={singers}
+          onEdit={handleEditClick}
+          onDelete={handleDelete}
+          onViewSong={(songId) => {
+            const song = songs.find((s) => s.id === songId) || null;
+            setViewingSong(song);
+          }}
+          loading={loading}
+          userSingerId={userSinger?.id}
+        />
+
+        {/* Lazy-load sentinel */}
+        {displayedPitches.length < filteredPitches.length && (
+          <div
+            ref={loadMoreRef}
+            className="mt-4 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400"
           >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* Pitch count */}
-      {filteredPitches.length > 0 && (
-        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-          {displayedPitches.length < filteredPitches.length
-            ? `Showing ${displayedPitches.length} of ${filteredPitches.length} pitches`
-            : `${filteredPitches.length} pitch${filteredPitches.length !== 1 ? 'es' : ''}`}
-        </div>
-      )}
-
-      {/* List */}
-      <PitchList
-        pitches={displayedPitches}
-        songs={songs}
-        singers={singers}
-        onEdit={handleEditClick}
-        onDelete={handleDelete}
-        onViewSong={(songId) => {
-          const song = songs.find((s) => s.id === songId) || null;
-          setViewingSong(song);
-        }}
-        loading={loading}
-        userSingerId={userSinger?.id}
-      />
-
-      {/* Lazy-load sentinel */}
-      {displayedPitches.length < filteredPitches.length && (
-        <div
-          ref={loadMoreRef}
-          className="mt-4 flex items-center justify-center text-xs text-gray-500 dark:text-gray-400"
-        >
-          Scroll to load more...
-        </div>
-      )}
+            Scroll to load more...
+          </div>
+        )}
+      </div>
 
       {/* Pitch Form Modal */}
       {showForm && (

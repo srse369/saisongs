@@ -245,6 +245,14 @@ export const PitchList: React.FC<PitchListProps> = ({
                   )}
                   <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Add to Session</span>
                 </button>
+                <button
+                  onClick={() => navigate(`/admin/songs?songId=${pitch.songId}`)}
+                  title="View song in Songs tab"
+                  className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                >
+                  <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400" style={{ transform: 'scaleX(-1)' }}></i>
+                  <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Song</span>
+                </button>
                 {pitch.externalSourceUrl && (
                   <a
                     href={pitch.externalSourceUrl}

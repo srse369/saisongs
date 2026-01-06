@@ -42,6 +42,7 @@ export const SessionManager: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [selectedSessionItemKey, setSelectedSessionItemKey] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const listContainerRef = React.useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -51,6 +52,16 @@ export const SessionManager: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Prevent body scroll on mobile when on live tab
+  useEffect(() => {
+    if (isMobile && window.location.pathname === '/admin/live') {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isMobile]);
 
   // Fetch songs on mount (public data)
   // Fetch singers only when authenticated (protected data)
@@ -411,23 +422,32 @@ export const SessionManager: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
-      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="min-w-60 flex-shrink">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Session</h1>
-            <a
-              href="/help#live"
-              className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-              title="View help documentation for this tab"
-            >
-              <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-            </a>
-          </div>
-          <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Build a set of songs to present together. Add songs from the Songs or Pitches tabs, then
-            present them as a continuous slideshow.
-          </p>
-        </div>
+      {/* Fixed Header on Mobile - Pinned below Layout header */}
+      <div 
+        className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-6'}`}
+        style={isMobile ? {
+          top: '48px', // Position below Layout header (h-12 = 48px on mobile)
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+        } : {}}
+      >
+        <div className={`max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 ${isMobile ? 'py-2' : ''}`}>
+          <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 ${isMobile ? '' : 'mb-6'}`}>
+            <div className="min-w-60 flex-shrink">
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Session</h1>
+                <a
+                  href="/help#live"
+                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                  title="View help documentation for this tab"
+                >
+                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+                </a>
+              </div>
+              <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Build a set of songs to present together. Add songs from the Songs or Pitches tabs, then
+                present them as a continuous slideshow.
+              </p>
+            </div>
 
         {/* Action buttons - Hidden on mobile, shown on desktop */}
         <div className="grid grid-cols-3 gap-2 w-full md:w-auto flex-shrink-0">
@@ -519,19 +539,33 @@ export const SessionManager: React.FC = () => {
             </>
           )}
         </div>
-        {/* Template selector for mobile - shown above bottom bar */}
-        <div className="md:hidden w-full">
-          <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
+            {/* Template selector for mobile - shown above bottom bar */}
+            <div className="md:hidden w-full">
+              <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
+            </div>
+          </div>
+
+          {/* Session song count - Fixed in header on mobile */}
+          {sessionItems.length > 0 && (
+            <div className={`text-sm text-gray-600 dark:text-gray-400 ${isMobile ? 'mb-2' : 'mb-4'}`}>
+              {sessionItems.length} song{sessionItems.length !== 1 ? 's' : ''} in session
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Session song count */}
-      {sessionItems.length > 0 && (
-        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-          {sessionItems.length} song{sessionItems.length !== 1 ? 's' : ''} in session
-        </div>
-      )}
-
+      {/* List Container - Scrollable on mobile, normal on desktop */}
+      <div
+        ref={listContainerRef}
+        className={isMobile ? 'overflow-y-auto' : ''}
+        style={isMobile ? {
+          // Calculate height: viewport height minus Layout header (48px) + SessionManager header (~200px) + bottom action bar space (~102px)
+          marginTop: '128px', // Space for Layout header (48px) + SessionManager header (~200px)
+          height: 'calc(100vh - 128px - 166px)', // Viewport minus Layout header, SessionManager header, and bottom bar
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain', // Prevent scroll chaining
+        } : {}}
+      >
       {sessionItems.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
@@ -621,6 +655,14 @@ export const SessionManager: React.FC = () => {
                   <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ml-11 ${isMobile && !isSelected ? 'hidden' : ''}`}
                     onClick={(e) => e.stopPropagation()}
                   >
+                    <button
+                      onClick={() => navigate(`/admin/songs?songId=${entry.songId}`)}
+                      title="View song in Songs tab"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                    >
+                      <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400" style={{ transform: 'scaleX(-1)' }}></i>
+                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Song</span>
+                    </button>
                     {song.externalSourceUrl && (
                       <a
                         href={song.externalSourceUrl}
@@ -648,6 +690,8 @@ export const SessionManager: React.FC = () => {
           })}
         </div>
       )}
+      </div>
+
       {viewingSong && (
         <Modal
           isOpen={!!viewingSong}

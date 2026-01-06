@@ -102,6 +102,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
           const isSelected = selectedSongId === song.id;
           return (
           <div
+            id={`song-${song.id}`}
             key={song.id}
             onClick={() => {
               // On mobile, toggle selection on row click

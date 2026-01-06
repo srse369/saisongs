@@ -16,9 +16,10 @@ interface SingerListProps {
   onStartSelection?: () => void;
   onPreview?: (singer: Singer) => void;
   loading?: boolean;
+  startSelectionRef?: React.MutableRefObject<(() => void) | null>;
 }
 
-export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelete, onMerge, onStartSelection, onPreview, loading = false }) => {
+export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelete, onMerge, onStartSelection, onPreview, loading = false, startSelectionRef }) => {
   const navigate = useNavigate();
   const { isEditor, isAdmin, userId } = useAuth();
   const { singers: allSingers } = useSingers();
@@ -60,6 +61,13 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
     setIsSelectionMode(true);
     onStartSelection?.();
   };
+
+  // Expose startSelection method via ref
+  useEffect(() => {
+    if (startSelectionRef) {
+      startSelectionRef.current = handleStartSelection;
+    }
+  }, [startSelectionRef]);
 
   const handleCancelSelection = () => {
     setIsSelectionMode(false);
@@ -147,56 +155,40 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
 
   return (
     <>
-      {/* Singer count and merge controls */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          {singers.length} singer{singers.length !== 1 ? 's' : ''}
-        </div>
-        {isEditor && onMerge && (
-          <div className="flex flex-wrap items-center gap-3">
-            {!isSelectionMode ? (
-              <button
-                onClick={handleStartSelection}
-                title="Merge multiple singer profiles into one, combining all their pitch information"
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center gap-2 whitespace-nowrap"
-              >
-                <i className="fas fa-code-merge text-blue-600 dark:text-blue-400"></i>
-                Merge Singers
-              </button>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                  <span className="font-semibold">{selectedSingerIds.length}</span>
-                  <span>selected</span>
-                </div>
-                {selectedSingerIds.length > 0 && (
-                  <button
-                    onClick={() => setSelectedSingerIds([])}
-                    className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline"
-                  >
-                    Clear
-                  </button>
-                )}
-                <button
-                  onClick={handleOpenMergeModal}
-                  disabled={selectedSingerIds.length < 2}
-                  title={selectedSingerIds.length < 2 ? "Select at least 2 singers to merge" : "Combine selected singers into one profile"}
-                  className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <i className="fas fa-code-merge"></i>
-                  Merge
-                </button>
-                <button
-                  onClick={handleCancelSelection}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                >
-                  Cancel
-                </button>
-              </>
-            )}
+      {/* Merge controls - shown when in selection mode */}
+      {isEditor && onMerge && isSelectionMode && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 sticky top-0 bg-white dark:bg-gray-800 z-10 py-2 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <span className="font-semibold">{selectedSingerIds.length}</span>
+            <span>selected</span>
           </div>
-        )}
-      </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {selectedSingerIds.length > 0 && (
+              <button
+                onClick={() => setSelectedSingerIds([])}
+                className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline"
+              >
+                Clear
+              </button>
+            )}
+            <button
+              onClick={handleOpenMergeModal}
+              disabled={selectedSingerIds.length < 2}
+              title={selectedSingerIds.length < 2 ? "Select at least 2 singers to merge" : "Combine selected singers into one profile"}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <i className="fas fa-code-merge"></i>
+              Merge
+            </button>
+            <button
+              onClick={handleCancelSelection}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       {/* Card layout for all screen sizes - SAME AS SONGS */}
       <div className="space-y-0 md:space-y-3">
         {singers.map((singer, index) => {

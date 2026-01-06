@@ -35,6 +35,7 @@ export const FeedbackManager: React.FC = () => {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [selectedFeedbackId, setSelectedFeedbackId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const listContainerRef = React.useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -44,6 +45,16 @@ export const FeedbackManager: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Prevent body scroll on mobile when on feedback tab
+  useEffect(() => {
+    if (isMobile && window.location.pathname === '/admin/feedback') {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isMobile]);
 
   const loadFeedback = useCallback(async () => {
     try {
@@ -167,27 +178,36 @@ export const FeedbackManager: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Feedback</h1>
-            <a
-              href="/help#overview"
-              className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-              title="View help documentation"
-            >
-              <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-            </a>
+      {/* Fixed Header on Mobile - Pinned below Layout header */}
+      <div 
+        className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : ''}`}
+        style={isMobile ? {
+          top: '48px', // Position below Layout header (h-12 = 48px on mobile)
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+        } : {}}
+      >
+        <div className={`max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 ${isMobile ? 'py-2' : ''}`}>
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Feedback</h1>
+                <a
+                  href="/help#overview"
+                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                  title="View help documentation"
+                >
+                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+                </a>
+              </div>
+              <p className={`hidden sm:block mt-1 text-sm text-gray-500 dark:text-gray-400 ${isMobile ? 'mb-2' : ''}`}>
+                {total} total submission{total !== 1 ? 's' : ''}
+              </p>
+            </div>
           </div>
-          <p className="hidden sm:block mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {total} total submission{total !== 1 ? 's' : ''}
-          </p>
-        </div>
-      </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
+          {/* Filters */}
+          <div className={`flex flex-wrap gap-2 sm:gap-4 items-center ${isMobile ? 'mt-2' : 'mt-4'}`}>
         <select
           value={filter.status || ''}
           onChange={(e) => setFilter({ ...filter, status: e.target.value || undefined })}
@@ -226,15 +246,30 @@ export const FeedbackManager: React.FC = () => {
             Refresh
           </button>
         </div>
+          </div>
+        </div>
       </div>
 
-      {/* Feedback List */}
-      {feedback.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400">No feedback found</p>
-        </div>
-      ) : (
-        <div className="space-y-0 md:space-y-3">
+      {/* List Container - Scrollable on mobile, normal on desktop */}
+      <div
+        ref={listContainerRef}
+        className={isMobile ? 'overflow-y-auto' : ''}
+        style={isMobile ? {
+          // Calculate height: viewport height minus Layout header (48px) + FeedbackManager header (~200px) + bottom action bar space (~102px)
+          marginTop: '248px', // Space for Layout header (48px) + FeedbackManager header (~200px) - this doesn't scroll
+          height: 'calc(100vh - 48px - 200px - 102px)', // Viewport minus Layout header, FeedbackManager header, and bottom bar
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain', // Prevent scroll chaining
+        } : {}}
+      >
+        <div className={isMobile ? 'px-1.5 sm:px-6 lg:px-8' : ''}>
+          {/* Feedback List */}
+          {feedback.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">No feedback found</p>
+            </div>
+          ) : (
+            <div className="space-y-0 md:space-y-3">
           {feedback.map((item, index) => {
             const isSelected = selectedFeedbackId === item.id;
             return (
@@ -321,8 +356,10 @@ export const FeedbackManager: React.FC = () => {
               </div>
             );
           })}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Details Modal */}
       <Modal
