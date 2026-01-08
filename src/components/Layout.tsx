@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAdminTabs, type AdminTab } from './admin/AdminTabs';
 import { useDatabase } from '../hooks/useDatabase';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchCentersOnce } from './common/CenterBadges';
@@ -52,6 +53,8 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { changeTab } = useAdminTabs();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [showAdminsModal, setShowAdminsModal] = useState(false);
@@ -142,7 +145,23 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Check if current path matches the link
   const isActive = (path: string) => {
+    // For admin routes, check both pathname and tab query param
+    if (path.startsWith('/admin/')) {
+      const tabFromPath = path.replace('/admin/', '') as AdminTab;
+      const currentTab = searchParams.get('tab') as AdminTab;
+      const pathnameTab = location.pathname.replace('/admin/', '') as AdminTab;
+      
+      // If tab query param exists, use it; otherwise infer from pathname
+      const activeTab = currentTab || (pathnameTab && ['songs', 'singers', 'pitches', 'templates', 'centers', 'analytics', 'feedback'].includes(pathnameTab) ? pathnameTab : null);
+      
+      return location.pathname.startsWith('/admin/') && activeTab === tabFromPath;
+    }
     return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
+
+  // Helper to handle admin tab navigation
+  const handleAdminTabClick = (tab: AdminTab) => {
+    changeTab(tab);
   };
 
   // Fetch centers on mount using cached fetch
@@ -212,13 +231,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (window.innerWidth >= 768) return;
 
     // Define tab order based on authentication
-    const tabs = [
-      { path: '/admin/songs', label: 'Songs' },
+    const adminTabs: { tab: AdminTab; label: string }[] = [
+      { tab: 'songs' as AdminTab, label: 'Songs' },
       ...(isAuthenticated ? [
-        { path: '/admin/singers', label: 'Singers' },
-        { path: '/admin/pitches', label: 'Pitches' },
+        { tab: 'singers' as AdminTab, label: 'Singers' },
+        { tab: 'pitches' as AdminTab, label: 'Pitches' },
       ] : []),
-      { path: '/session', label: 'Live' },
+    ];
+    const tabs: Array<{ path: string; label: string; tab: AdminTab | null }> = [
+      ...adminTabs.map(t => ({ path: `/admin/${t.tab}`, label: t.label, tab: t.tab })),
+      { path: '/session', label: 'Live', tab: null },
     ];
 
     let touchStartX: number | null = null;
@@ -296,9 +318,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       // Find current tab index
       const currentPath = location.pathname;
-      const currentIndex = tabs.findIndex(tab =>
-        currentPath === tab.path || currentPath.startsWith(tab.path + '/')
-      );
+      const currentTab = searchParams.get('tab') as AdminTab;
+      const currentIndex = tabs.findIndex(tab => {
+        if (tab.tab === null) {
+          return currentPath === tab.path || currentPath.startsWith(tab.path + '/');
+        }
+        return currentPath.startsWith('/admin/') && (currentTab === tab.tab || (!currentTab && tab.tab === 'songs'));
+      });
 
       if (currentIndex === -1) {
         touchStartX = null;
@@ -311,12 +337,22 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         if (deltaX > 0) {
           // Swipe right - go to previous tab
           if (currentIndex > 0) {
-            navigate(tabs[currentIndex - 1].path);
+            const prevTab = tabs[currentIndex - 1];
+            if (prevTab.tab) {
+              handleAdminTabClick(prevTab.tab);
+            } else {
+              navigate(prevTab.path);
+            }
           }
         } else {
           // Swipe left - go to next tab
           if (currentIndex < tabs.length - 1) {
-            navigate(tabs[currentIndex + 1].path);
+            const nextTab = tabs[currentIndex + 1];
+            if (nextTab.tab) {
+              handleAdminTabClick(nextTab.tab);
+            } else {
+              navigate(nextTab.path);
+            }
           }
         }
       }
@@ -361,22 +397,22 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
-              <Link to="/admin/songs" className={getLinkClasses('/admin/songs')}>
+              <button onClick={() => handleAdminTabClick('songs')} className={getLinkClasses('/admin/songs')}>
                 <SongIcon className="w-4 h-4 mr-1.5" />
                 Songs
-              </Link>
+              </button>
 
               {/* Singers and Pitches tabs visible to all authenticated users */}
               {isAuthenticated && (
                 <>
-                  <Link to="/admin/singers" className={getLinkClasses('/admin/singers')}>
+                  <button onClick={() => handleAdminTabClick('singers')} className={getLinkClasses('/admin/singers')}>
                     <i className="fas fa-users w-4 h-4 mr-1.5"></i>
                     Singers
-                  </Link>
-                  <Link to="/admin/pitches" className={getLinkClasses('/admin/pitches')}>
+                  </button>
+                  <button onClick={() => handleAdminTabClick('pitches')} className={getLinkClasses('/admin/pitches')}>
                     <MusicIcon className="w-4 h-4 mr-1.5" />
                     Pitches
-                  </Link>
+                  </button>
                 </>
               )}
 
@@ -386,10 +422,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Link>
 
               {(userRole === 'admin' || userRole === 'editor') && (
-                <Link to="/admin/templates" className={getLinkClasses('/admin/templates')}>
+                <button onClick={() => handleAdminTabClick('templates')} className={getLinkClasses('/admin/templates')}>
                   <i className="fas fa-layer-group w-4 h-4 mr-1.5"></i>
                   Templates
-                </Link>
+                </button>
               )}
 
               {/* Help, Database connection indicator + Auth controls */}
@@ -437,8 +473,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </nav>
 
-            {/* Mobile menu - hamburger menu only */}
-            <div className="md:hidden flex items-center">
+            {/* Mobile menu - feedback button and hamburger menu */}
+            <div className="md:hidden flex items-center gap-2">
+              {/* Feedback Button - Mobile only, permanent fixture */}
+              <button
+                onClick={() => setIsFeedbackOpen(true)}
+                title="Send feedback, report bugs, or request new features"
+                className="p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-label="Send feedback"
+              >
+                <i className="fas fa-comment text-xl"></i>
+              </button>
+              {/* Hamburger menu */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -744,43 +790,49 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg z-30">
         <div className="flex items-stretch justify-around py-3">
           {/* Songs */}
-          <Link
-            to="/admin/songs"
+          <button
+            onClick={() => {
+              handleAdminTabClick('songs');
+              setIsMobileMenuOpen(false);
+            }}
             className={`flex flex-col items-center justify-center gap-0 px-2 transition-colors flex-1 ${isActive('/admin/songs')
               ? 'text-blue-600 dark:text-blue-400'
               : 'text-gray-600 dark:text-gray-400'
               }`}
-            onClick={() => setIsMobileMenuOpen(false)}
           >
             <SongIcon />
             <span className="text-[9px] font-medium leading-none">Songs</span>
-          </Link>
+          </button>
 
           {/* Singers and Pitches tabs visible to all authenticated users */}
           {isAuthenticated && (
             <>
-              <Link
-                to="/admin/singers"
+              <button
+                onClick={() => {
+                  handleAdminTabClick('singers');
+                  setIsMobileMenuOpen(false);
+                }}
                 className={`flex flex-col items-center justify-center gap-0 px-2 transition-colors flex-1 ${isActive('/admin/singers')
                   ? 'text-blue-600 dark:text-blue-400'
                   : 'text-gray-600 dark:text-gray-400'
                   }`}
-                onClick={() => setIsMobileMenuOpen(false)}
               >
                 <i className="fas fa-users text-lg"></i>
                 <span className="text-[9px] font-medium leading-none">Singers</span>
-              </Link>
-              <Link
-                to="/admin/pitches"
+              </button>
+              <button
+                onClick={() => {
+                  handleAdminTabClick('pitches');
+                  setIsMobileMenuOpen(false);
+                }}
                 className={`flex flex-col items-center justify-center gap-0 px-2 transition-colors flex-1 ${isActive('/admin/pitches')
                   ? 'text-blue-600 dark:text-blue-400'
                   : 'text-gray-600 dark:text-gray-400'
                   }`}
-                onClick={() => setIsMobileMenuOpen(false)}
               >
                 <MusicIcon className="w-5 h-5" />
                 <span className="text-[9px] font-medium leading-none">Pitches</span>
-              </Link>
+              </button>
             </>
           )}
 
@@ -814,11 +866,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </footer>
 
-      {/* Feedback Button - Almost Hidden */}
+      {/* Feedback Button - Desktop only (mobile version is in header) */}
       <button
         onClick={() => setIsFeedbackOpen(true)}
         title="Send feedback, report bugs, or request new features"
-        className="fixed bottom-25 md:bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-30"
+        className="hidden md:block fixed bottom-4 right-4 w-10 h-10 rounded-full bg-gray-400 dark:bg-gray-600 hover:bg-gray-500 dark:hover:bg-gray-500 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-30"
         aria-label="Send feedback"
       >
         <i className="fas fa-comment text-lg mx-auto"></i>

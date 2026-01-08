@@ -17,9 +17,11 @@ import { Modal } from '../common/Modal';
 import { SongDetails } from './SongDetails';
 import { globalEventBus } from '../../utils/globalEventBus';
 
-const PITCHES_SCROLL_POSITION_KEY = 'saiSongs:pitchesScrollPosition';
+interface PitchManagerProps {
+  isActive?: boolean;
+}
 
-export const PitchManager: React.FC = () => {
+export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) => {
   const location = useLocation();
   const { isEditor, userId, isAuthenticated } = useAuth();
   const toast = useToast();
@@ -65,11 +67,16 @@ export const PitchManager: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(100);
   const [showMyPitches, setShowMyPitches] = useState(true);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastFetchedUserIdRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listContainerRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  
+  // State for dynamic list container positioning on mobile
+  const [listContainerStyle, setListContainerStyle] = useState<React.CSSProperties>({});
 
   // Track mobile state
   useEffect(() => {
@@ -81,15 +88,89 @@ export const PitchManager: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Prevent body scroll on mobile when on pitches tab
+  // Prevent body scroll on mobile when tab is active
   useEffect(() => {
-    if (isMobile && location.pathname === '/admin/pitches') {
+    if (isMobile && isActive) {
       document.body.style.overflow = 'hidden';
       return () => {
         document.body.style.overflow = '';
       };
     }
-  }, [isMobile, location.pathname]);
+  }, [isMobile, isActive]);
+
+  // Calculate list container positioning on mobile (after DOM is ready)
+  useEffect(() => {
+    if (!isMobile || !isActive) {
+      setListContainerStyle({});
+      return;
+    }
+
+    const calculatePosition = () => {
+      const header = headerRef.current;
+      if (!header) return;
+
+      const bottomBarHeight = 108;
+      const headerRect = header.getBoundingClientRect();
+      const bottomBarTop = window.innerHeight - bottomBarHeight;
+      const calculatedHeight = bottomBarTop - headerRect.bottom;
+      
+      // Ensure height is positive and reasonable
+      const finalHeight = calculatedHeight > 0 ? calculatedHeight : 400;
+      
+      setListContainerStyle({
+        top: `${headerRect.bottom + 6}px`,
+        left: '1%',
+        width: '98%',
+        height: `${finalHeight}px`,
+        minHeight: `${finalHeight}px`,
+        maxHeight: `${finalHeight}px`,
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+        overscrollBehaviorY: 'contain',
+        touchAction: 'pan-y',
+      });
+    };
+
+    // Calculate using requestAnimationFrame to ensure DOM is laid out
+    const rafId = requestAnimationFrame(() => {
+      calculatePosition();
+    });
+    
+    // Also recalculate after delays to ensure bottom bar is rendered
+    const timeoutId1 = setTimeout(calculatePosition, 100);
+    const timeoutId2 = setTimeout(calculatePosition, 300);
+    const timeoutId3 = setTimeout(calculatePosition, 500);
+
+    // Recalculate on resize
+    window.addEventListener('resize', calculatePosition);
+    
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
+      window.removeEventListener('resize', calculatePosition);
+    };
+  }, [isMobile, isActive, pitches.length, debouncedSearchTerm]);
+
+  // Track scroll position for scroll-to-top button (only when active)
+  useEffect(() => {
+    if (!isActive || !isMobile || !listContainerRef.current) return;
+
+    const container = listContainerRef.current;
+    const handleScroll = () => {
+      setShowScrollToTop(container.scrollTop > 200);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [isMobile, isActive]);
+
+  const scrollToTop = () => {
+    if (listContainerRef.current) {
+      listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Check if the logged-in user has a singer profile (can manage own pitches)
   // userId is now a hex string matching singer.id format
@@ -100,88 +181,6 @@ export const PitchManager: React.FC = () => {
 
   // User can create pitches if they're an editor OR if they have a singer profile
   const canCreatePitch = isEditor || !!userSinger;
-
-  // Prevent body scroll on mobile when on pitches tab
-  useEffect(() => {
-    if (isMobile && location.pathname === '/admin/pitches') {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
-  }, [isMobile, location.pathname]);
-
-  // Save and restore scroll position (mobile: list container, desktop: window)
-  useEffect(() => {
-    // Restore scroll position when component mounts
-    if (typeof window !== 'undefined') {
-      try {
-        const savedScrollPosition = sessionStorage.getItem(PITCHES_SCROLL_POSITION_KEY);
-        if (savedScrollPosition) {
-          const scrollTop = parseInt(savedScrollPosition, 10);
-          if (!isNaN(scrollTop)) {
-            // Use a small delay to ensure DOM is ready
-            setTimeout(() => {
-              if (isMobile && listContainerRef.current) {
-                listContainerRef.current.scrollTop = scrollTop;
-              } else {
-                window.scrollTo({ top: scrollTop, behavior: 'instant' });
-              }
-            }, 50);
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to restore scroll position:', error);
-      }
-    }
-  }, [isMobile]); // Run when mobile state changes
-
-  // Save scroll position when navigating away
-  useEffect(() => {
-    const handleScroll = () => {
-      if (typeof window !== 'undefined' && location.pathname === '/admin/pitches') {
-        try {
-          const scrollTop = isMobile && listContainerRef.current
-            ? listContainerRef.current.scrollTop
-            : window.scrollY;
-          sessionStorage.setItem(PITCHES_SCROLL_POSITION_KEY, String(scrollTop));
-        } catch (error) {
-          console.warn('Failed to save scroll position:', error);
-        }
-      }
-    };
-
-    // Save scroll position periodically while on pitches tab
-    const scrollInterval = setInterval(handleScroll, 500); // Save every 500ms
-
-    // Also save on scroll events (throttled)
-    let scrollTimeout: NodeJS.Timeout;
-    const throttledScroll = () => {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(handleScroll, 100);
-    };
-
-    const container = listContainerRef.current;
-    
-    if (isMobile && container) {
-      container.addEventListener('scroll', throttledScroll, { passive: true });
-    } else {
-      window.addEventListener('scroll', throttledScroll, { passive: true });
-    }
-
-    // Save scroll position on unmount or when navigating away
-    return () => {
-      clearInterval(scrollInterval);
-      if (isMobile && container) {
-        container.removeEventListener('scroll', throttledScroll);
-      } else {
-        window.removeEventListener('scroll', throttledScroll);
-      }
-      if (location.pathname === '/admin/pitches') {
-        handleScroll(); // Final save
-      }
-    };
-  }, [location.pathname, isMobile]);
 
   // Sync advanced filters with URL parameters (when navigating from Songs/Singers tab)
   useEffect(() => {
@@ -226,18 +225,35 @@ export const PitchManager: React.FC = () => {
     }
   }, [singerFilterId, songFilterId]);
 
-  // Always fetch data on mount to ensure we have latest data
+  // Only fetch data when tab is active (only if not already loaded)
   useEffect(() => {
-    // Fetch all data in parallel for faster loading
+    if (!isActive) return;
+    
+    // Only fetch if data isn't already loaded to avoid unnecessary network requests
+    // The fetch functions will use cache if available, so this is just to prevent
+    // unnecessary calls when data is already present
+    const promises: Promise<void>[] = [];
+    
+    if (songs.length === 0) {
+      promises.push(fetchSongs());
+    }
+    
+    if (singers.length === 0) {
+      promises.push(fetchSingers());
+    }
+    
+    if (pitches.length === 0) {
+      promises.push(fetchAllPitches());
+    }
+    
+    // Fetch all needed data in parallel for faster loading
     // The fetch functions handle their own loading state and caching
-    Promise.all([
-      fetchSongs(), // Will use cache if available and fresh
-      fetchSingers(), // Will use cache if available and fresh
-      fetchAllPitches() // Will use cache if available and fresh
-    ]).catch(error => {
-      console.error('Error fetching data in parallel:', error);
-    });
-  }, [fetchSongs, fetchSingers, fetchAllPitches]);
+    if (promises.length > 0) {
+      Promise.all(promises).catch(error => {
+        console.error('Error fetching data in parallel:', error);
+      });
+    }
+  }, [fetchSongs, fetchSingers, fetchAllPitches, isActive, songs.length, singers.length, pitches.length]);
 
   // Listen for data refresh requests from global event bus
   useEffect(() => {
@@ -573,6 +589,8 @@ export const PitchManager: React.FC = () => {
     <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
       {/* Fixed Header on Mobile - Pinned below Layout header */}
       <div 
+        ref={headerRef}
+        id="pitch-manager-header"
         className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-2 sm:mb-4'}`}
         style={isMobile ? {
           top: '48px', // Position below Layout header (h-12 = 48px on mobile)
@@ -767,14 +785,16 @@ export const PitchManager: React.FC = () => {
       {/* List Container - Scrollable on mobile, normal on desktop */}
       <div
         ref={listContainerRef}
-        className={isMobile ? 'overflow-y-auto' : ''}
+        className={isMobile ? 'fixed overflow-y-auto' : 'overflow-y-auto'}
         style={isMobile ? {
-          // Calculate height: viewport height minus Layout header (48px) + PitchManager header (~280px) + bottom action bar space (~102px)
-          marginTop: '142px', // Space for Layout header (48px) + PitchManager header (~280px)
-          height: 'calc(100vh - 142px - 166px)', // Viewport minus Layout header, PitchManager header, and bottom bar
-          WebkitOverflowScrolling: 'touch',
-          overscrollBehavior: 'contain', // Prevent scroll chaining
-        } : {}}
+          ...listContainerStyle,
+          // Ensure overflow is always set
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        } : {
+          minHeight: '400px',
+          maxHeight: 'calc(100vh - 200px)', // Leave space for header and padding
+        }}
       >
         <PitchList
           pitches={displayedPitches}
@@ -832,6 +852,18 @@ export const PitchManager: React.FC = () => {
         >
           <SongDetails song={viewingSong} />
         </Modal>
+      )}
+
+      {/* Scroll to Top Button - Mobile only */}
+      {isMobile && showScrollToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-24 right-4 z-50 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
+          title="Scroll to top"
+          aria-label="Scroll to top"
+        >
+          <i className="fas fa-arrow-up text-lg"></i>
+        </button>
       )}
 
       {/* Mobile Bottom Action Bar */}

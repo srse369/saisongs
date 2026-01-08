@@ -37,6 +37,16 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
   rightContent,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Extract unique values for dropdowns
   const uniqueValues = useMemo(() => {
@@ -137,7 +147,15 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
 
       {/* Advanced Search Fields */}
       {isExpanded && (
-        <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 animate-fade-in">
+        <div 
+          className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 animate-fade-in"
+          style={isMobile ? {
+            maxHeight: 'calc(100vh - 300px)', // Adjust as needed to leave space for header/buttons
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+          } : {}}
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {/* Song Name */}
             <div>

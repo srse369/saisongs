@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { feedbackService, type Feedback } from '../../services/FeedbackService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -21,7 +22,12 @@ const STATUS_COLORS: Record<string, string> = {
   closed: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
 };
 
-export const FeedbackManager: React.FC = () => {
+interface FeedbackManagerProps {
+  isActive?: boolean;
+}
+
+export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = true }) => {
+  const location = useLocation();
   const { isAdmin, userEmail } = useAuth();
   const toast = useToast();
   const [feedback, setFeedback] = useState<Feedback[]>([]);
@@ -35,7 +41,14 @@ export const FeedbackManager: React.FC = () => {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [selectedFeedbackId, setSelectedFeedbackId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const listContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const headerRef = React.useRef<HTMLDivElement | null>(null);
+  
+  // State for dynamic list container positioning on mobile
+  const [listContainerStyle, setListContainerStyle] = React.useState<React.CSSProperties>(() => {
+    return {};
+  });
 
   useEffect(() => {
     const checkMobile = () => {
@@ -46,15 +59,89 @@ export const FeedbackManager: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Prevent body scroll on mobile when on feedback tab
+  // Prevent body scroll on mobile when tab is active
   useEffect(() => {
-    if (isMobile && window.location.pathname === '/admin/feedback') {
+    if (isMobile && isActive) {
       document.body.style.overflow = 'hidden';
       return () => {
         document.body.style.overflow = '';
       };
     }
-  }, [isMobile]);
+  }, [isMobile, isActive]);
+
+  // Calculate list container positioning on mobile (after DOM is ready)
+  useEffect(() => {
+    if (!isMobile || !isActive) {
+      setListContainerStyle({});
+      return;
+    }
+
+    const calculatePosition = () => {
+      const header = headerRef.current;
+      if (!header) return;
+
+      const bottomBarHeight = 108;
+      const headerRect = header.getBoundingClientRect();
+      const bottomBarTop = window.innerHeight - bottomBarHeight;
+      const calculatedHeight = bottomBarTop - headerRect.bottom;
+      
+      // Ensure height is positive and reasonable
+      const finalHeight = calculatedHeight > 0 ? calculatedHeight : 400;
+      
+      setListContainerStyle({
+        top: `${headerRect.bottom + 6}px`,
+        left: '1%',
+        width: '98%',
+        height: `${finalHeight}px`,
+        minHeight: `${finalHeight}px`,
+        maxHeight: `${finalHeight}px`,
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+        overscrollBehaviorY: 'contain',
+        touchAction: 'pan-y',
+      });
+    };
+
+    // Calculate using requestAnimationFrame to ensure DOM is laid out
+    const rafId = requestAnimationFrame(() => {
+      calculatePosition();
+    });
+    
+    // Also recalculate after delays to ensure bottom bar is rendered
+    const timeoutId1 = setTimeout(calculatePosition, 100);
+    const timeoutId2 = setTimeout(calculatePosition, 300);
+    const timeoutId3 = setTimeout(calculatePosition, 500);
+
+    // Recalculate on resize
+    window.addEventListener('resize', calculatePosition);
+    
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
+      window.removeEventListener('resize', calculatePosition);
+    };
+  }, [isMobile, isActive, feedback.length, loading]);
+
+  // Track scroll position for scroll-to-top button (only when active)
+  useEffect(() => {
+    if (!isActive || !isMobile || !listContainerRef.current) return;
+
+    const container = listContainerRef.current;
+    const handleScroll = () => {
+      setShowScrollToTop(container.scrollTop > 200);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [isMobile, isActive]);
+
+  const scrollToTop = () => {
+    if (listContainerRef.current) {
+      listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   const loadFeedback = useCallback(async () => {
     try {
@@ -71,10 +158,11 @@ export const FeedbackManager: React.FC = () => {
   }, [filter, toast]);
 
   useEffect(() => {
-    if (isAdmin) {
+    // Only fetch feedback when tab is active and user is admin (only if not already loaded)
+    if (isAdmin && isActive && feedback.length === 0) {
       loadFeedback();
     }
-  }, [isAdmin, loadFeedback]);
+  }, [isAdmin, isActive, loadFeedback, feedback.length]);
 
   useEffect(() => {
     let unsubscribes: (() => void)[] = [];
@@ -180,6 +268,8 @@ export const FeedbackManager: React.FC = () => {
     <div className="space-y-4 sm:space-y-6">
       {/* Fixed Header on Mobile - Pinned below Layout header */}
       <div 
+        ref={headerRef}
+        id="feedback-manager-header"
         className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : ''}`}
         style={isMobile ? {
           top: '48px', // Position below Layout header (h-12 = 48px on mobile)
@@ -253,14 +343,16 @@ export const FeedbackManager: React.FC = () => {
       {/* List Container - Scrollable on mobile, normal on desktop */}
       <div
         ref={listContainerRef}
-        className={isMobile ? 'overflow-y-auto' : ''}
+        className={isMobile ? 'fixed overflow-y-auto' : 'overflow-y-auto'}
         style={isMobile ? {
-          // Calculate height: viewport height minus Layout header (48px) + FeedbackManager header (~200px) + bottom action bar space (~102px)
-          marginTop: '248px', // Space for Layout header (48px) + FeedbackManager header (~200px) - this doesn't scroll
-          height: 'calc(100vh - 48px - 200px - 102px)', // Viewport minus Layout header, FeedbackManager header, and bottom bar
-          WebkitOverflowScrolling: 'touch',
-          overscrollBehavior: 'contain', // Prevent scroll chaining
-        } : {}}
+          ...listContainerStyle,
+          // Ensure overflow is always set
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        } : {
+          minHeight: '400px',
+          maxHeight: 'calc(100vh - 200px)', // Leave space for header and padding
+        }}
       >
         <div className={isMobile ? 'px-1.5 sm:px-6 lg:px-8' : ''}>
           {/* Feedback List */}
@@ -549,6 +641,18 @@ export const FeedbackManager: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* Scroll to Top Button - Mobile only */}
+      {isMobile && showScrollToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-24 right-4 z-50 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
+          title="Scroll to top"
+          aria-label="Scroll to top"
+        >
+          <i className="fas fa-arrow-up text-lg"></i>
+        </button>
+      )}
 
       {/* Mobile Bottom Action Bar */}
       <MobileBottomActionBar

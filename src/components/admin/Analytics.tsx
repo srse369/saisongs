@@ -14,7 +14,11 @@ interface AnalyticsSummary {
   locationMarkers: { lat: number; lon: number; city: string; country: string; visits: number }[];
 }
 
-export const Analytics: React.FC = () => {
+interface AnalyticsProps {
+  isActive?: boolean;
+}
+
+export const Analytics: React.FC<AnalyticsProps> = ({ isActive = true }) => {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [timeRange, setTimeRange] = useState(30); // days

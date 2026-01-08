@@ -162,7 +162,7 @@ function slideToYaml(slide: { background?: any; images?: any[]; videos?: any[]; 
       // Legacy yPosition for backward compatibility
       if (style.yPosition !== undefined) lines.push(`${indent}  yPosition: ${style.yPosition}`);
     };
-    
+
     outputSongStyle('songTitleStyle', slide.songTitleStyle);
     outputSongStyle('songLyricsStyle', slide.songLyricsStyle);
     outputSongStyle('songTranslationStyle', slide.songTranslationStyle);
@@ -232,7 +232,7 @@ function escapeYamlString(str: string): string {
  */
 function formatTextContent(content: string, indent: string): string[] {
   if (!content) return [`${indent}content: ''`];
-  
+
   // Check if content has newlines
   if (content.includes('\n')) {
     // Use YAML literal block scalar (|) for multiline content
@@ -242,12 +242,16 @@ function formatTextContent(content: string, indent: string): string[] {
     });
     return lines;
   }
-  
+
   // Single line content - use regular escaping
   return [`${indent}content: ${escapeYamlString(content)}`];
 }
 
-export const TemplateManager: React.FC = () => {
+interface TemplateManagerProps {
+  isActive?: boolean;
+}
+
+export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = true }) => {
   const { isAdmin, isEditor, editorFor } = useAuth();
   const {
     templates,
@@ -294,8 +298,16 @@ export const TemplateManager: React.FC = () => {
   const [pendingPptxFile, setPendingPptxFile] = useState<File | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const pptxInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const listContainerRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  
+  // State for dynamic list container positioning on mobile - initialize with fallback values
+  const [listContainerStyle, setListContainerStyle] = useState<React.CSSProperties>(() => {
+    return {};
+  });
 
   useEffect(() => {
     const checkMobile = () => {
@@ -305,12 +317,96 @@ export const TemplateManager: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
+
+  // Prevent body scroll on mobile when tab is active
+  useEffect(() => {
+    if (isMobile && isActive) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isMobile, isActive]);
+
+  // Calculate list container positioning on mobile (after DOM is ready)
+  useEffect(() => {
+    if (!isMobile || !isActive) {
+      setListContainerStyle({});
+      return;
+    }
+
+    const calculatePosition = () => {
+      const header = headerRef.current;
+      if (!header) return;
+
+      const bottomBarHeight = 108;
+      const headerRect = header.getBoundingClientRect();
+      const bottomBarTop = window.innerHeight - bottomBarHeight;      
+      const calculatedHeight = bottomBarTop - headerRect.bottom;
+      
+      // Ensure height is positive and reasonable
+      const finalHeight = calculatedHeight > 0 ? calculatedHeight : 400;
+      
+      setListContainerStyle({
+        top: `${headerRect.bottom + 6}px`,
+        left: '1%',
+        width: '98%',
+        height: `${finalHeight}px`,
+        minHeight: `${finalHeight}px`,
+        maxHeight: `${finalHeight}px`,
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+        overscrollBehaviorY: 'contain',
+        touchAction: 'pan-y',
+      });
+    };
+
+    // Calculate using requestAnimationFrame to ensure DOM is laid out
+    const rafId = requestAnimationFrame(() => {
+      calculatePosition();
+    });
+    
+    // Also recalculate after delays to ensure bottom bar is rendered
+    const timeoutId1 = setTimeout(calculatePosition, 100);
+    const timeoutId2 = setTimeout(calculatePosition, 300);
+    const timeoutId3 = setTimeout(calculatePosition, 500);
+
+    // Recalculate on resize
+    window.addEventListener('resize', calculatePosition);
+    
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
+      window.removeEventListener('resize', calculatePosition);
+    };
+  }, [isMobile, isActive, templates.length, loading, searchTerm]);
+
+  // Track scroll position for scroll-to-top button (only when active)
+  useEffect(() => {
+    if (!isActive || !isMobile || !listContainerRef.current) return;
+
+    const container = listContainerRef.current;
+    const handleScroll = () => {
+      setShowScrollToTop(container.scrollTop > 200);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [isMobile, isActive]);
+
+  const scrollToTop = () => {
+    if (listContainerRef.current) {
+      listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   // Check if template has unsaved changes
   const hasUnsavedChanges = React.useMemo(() => {
     if (!editingTemplate) return false;
     if (!originalTemplate) return true; // New template always has "changes"
-    
+
     // Compare key fields to detect changes
     const current = JSON.stringify({
       name: editingTemplate.name,
@@ -336,7 +432,7 @@ export const TemplateManager: React.FC = () => {
     const handleFullscreenChange = () => {
       setPreviewFullscreen(!!document.fullscreenElement);
     };
-    
+
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
@@ -358,10 +454,12 @@ export const TemplateManager: React.FC = () => {
 
   const previewReferenceIndex = previewTemplate?.referenceSlideIndex ?? 0;
 
-  // Load templates on mount
+  // Load templates when tab is active (only if not already loaded)
   useEffect(() => {
-    fetchTemplates();
-  }, [fetchTemplates]);
+    if (isActive && templates.length === 0) {
+      fetchTemplates();
+    }
+  }, [fetchTemplates, isActive, templates.length]);
 
   // Handle escape key to close preview modal, and arrow keys to navigate slides
   useEffect(() => {
@@ -378,7 +476,7 @@ export const TemplateManager: React.FC = () => {
 
       // Check if any modal is open
       const hasModalOpen = previewTemplate || showForm || showMediaExportModal || duplicatingTemplate;
-      
+
       if (!hasModalOpen) {
         // When no modal is open, Escape focuses the search bar
         if (event.key === 'Escape' && searchInputRef.current) {
@@ -391,7 +489,7 @@ export const TemplateManager: React.FC = () => {
       if (previewTemplate && event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
-        
+
         // Check if any dropdowns/selects are open (focused)
         const activeElement = document.activeElement as HTMLElement;
         if (activeElement && (activeElement.tagName === 'SELECT' || activeElement.classList.contains('dropdown-open'))) {
@@ -399,7 +497,7 @@ export const TemplateManager: React.FC = () => {
           activeElement.blur();
           return;
         }
-        
+
         // If in fullscreen, exit fullscreen first
         if (previewFullscreen || document.fullscreenElement) {
           if (document.fullscreenElement) {
@@ -408,7 +506,7 @@ export const TemplateManager: React.FC = () => {
           setPreviewFullscreen(false);
           return;
         }
-        
+
         // Finally, close the preview
         setPreviewTemplate(null);
         setPreviewSlideIndex(0);
@@ -418,26 +516,26 @@ export const TemplateManager: React.FC = () => {
       // Handle arrow keys for slide navigation in multi-slide templates (only when preview is open)
       if (previewTemplate) {
         switch (event.key) {
-        case 'ArrowLeft':
-        case 'ArrowUp':
-          event.preventDefault();
-          setPreviewSlideIndex(prev => Math.max(0, prev - 1));
-          break;
-        case 'ArrowRight':
-        case 'ArrowDown':
-          event.preventDefault();
-          setPreviewSlideIndex(prev => Math.min(previewSlides.length - 1, prev + 1));
-          break;
-        case 'Home':
-          event.preventDefault();
-          setPreviewSlideIndex(0);
-          break;
-        case 'End':
-          event.preventDefault();
-          setPreviewSlideIndex(previewSlides.length - 1);
-          break;
-        default:
-          break;
+          case 'ArrowLeft':
+          case 'ArrowUp':
+            event.preventDefault();
+            setPreviewSlideIndex(prev => Math.max(0, prev - 1));
+            break;
+          case 'ArrowRight':
+          case 'ArrowDown':
+            event.preventDefault();
+            setPreviewSlideIndex(prev => Math.min(previewSlides.length - 1, prev + 1));
+            break;
+          case 'Home':
+            event.preventDefault();
+            setPreviewSlideIndex(0);
+            break;
+          case 'End':
+            event.preventDefault();
+            setPreviewSlideIndex(previewSlides.length - 1);
+            break;
+          default:
+            break;
         }
       }
     };
@@ -472,7 +570,7 @@ export const TemplateManager: React.FC = () => {
       },
       '16:9'
     );
-    
+
     const newTemplate: PresentationTemplate = {
       name: 'New Template',
       description: '',
@@ -512,7 +610,7 @@ export const TemplateManager: React.FC = () => {
 
   const handleMediaExportConfirm = async (cloudConfig: CloudStorageConfig | undefined) => {
     setShowMediaExportModal(false);
-    
+
     if (!pendingPptxFile) return;
 
     const file = pendingPptxFile;
@@ -524,17 +622,17 @@ export const TemplateManager: React.FC = () => {
     try {
       // Extract template name from filename
       const templateName = file.name.replace('.pptx', '');
-      
+
       // Import the PowerPoint file with optional cloud storage configuration
       const importedTemplate = await pptxImportService.importPptxFile(
-        file, 
+        file,
         templateName,
         cloudConfig,
         (current, total, message) => {
           setImportProgress(message);
         }
       );
-      
+
       // Set it as the editing template
       setEditingTemplate(importedTemplate);
       setOriginalTemplate(null); // Imported template has no original
@@ -542,16 +640,16 @@ export const TemplateManager: React.FC = () => {
       setYamlContent('');
       setValidationError('');
       setShowForm(true);
-      
+
       const skipUpload = (cloudConfig as any)?.skipUpload;
       const mediaMessage = skipUpload
         ? 'Media files reused from previous upload'
-        : cloudConfig 
-        ? `Media files uploaded to ${cloudConfig.provider}` 
-        : 'Media embedded as data URLs';
+        : cloudConfig
+          ? `Media files uploaded to ${cloudConfig.provider}`
+          : 'Media embedded as data URLs';
       setSuccessMessage(`Successfully imported ${importedTemplate.slides?.length || 0} slides from PowerPoint! ${mediaMessage}`);
       setImportProgress('');
-      
+
       // Clear success message after 5 seconds
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
@@ -569,10 +667,10 @@ export const TemplateManager: React.FC = () => {
 
   const handleExportPptx = async (template: PresentationTemplate) => {
     if (exportingPptx) return; // Already exporting
-    
+
     setExportingPptx(template.id || 'new');
     setValidationError('');
-    
+
     try {
       await pptxExportService.exportTemplate(template);
       setSuccessMessage(`Successfully exported "${template.name}" as PowerPoint!`);
@@ -588,12 +686,12 @@ export const TemplateManager: React.FC = () => {
   const handleEditClick = (template: PresentationTemplate) => {
     // Deep clone the template to preserve original state
     const clonedTemplate = JSON.parse(JSON.stringify(template));
-    
+
     // Ensure reference slide has song content styles with defaults
     let templateWithDefaults = { ...template };
     const aspectRatio: AspectRatio = template.aspectRatio || '16:9';
     const referenceIndex = template.referenceSlideIndex ?? 0;
-    
+
     if (templateWithDefaults.slides && templateWithDefaults.slides.length > 0) {
       const updatedSlides = [...templateWithDefaults.slides];
       updatedSlides[referenceIndex] = ensureSongContentStyles(
@@ -605,7 +703,7 @@ export const TemplateManager: React.FC = () => {
         slides: updatedSlides,
       };
     }
-    
+
     setEditingTemplate(templateWithDefaults);
     setOriginalTemplate(clonedTemplate);
     setCenterIds(template.centerIds || []); // Load existing center IDs
@@ -617,22 +715,22 @@ export const TemplateManager: React.FC = () => {
   const handleDuplicateClick = (template: PresentationTemplate) => {
     // Generate timestamp-based name
     const now = new Date();
-    const timestamp = now.toLocaleString('en-US', { 
-      month: '2-digit', 
-      day: '2-digit', 
-      year: 'numeric', 
-      hour: '2-digit', 
-      minute: '2-digit', 
+    const timestamp = now.toLocaleString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
       second: '2-digit',
-      hour12: false 
+      hour12: false
     }).replace(/,/g, '');
     const newName = `${template.name} (${timestamp})`;
-    
+
     // Set center assignment based on user role
     // Admin: no centers (global template)
     // Editor: all centers user is editor for
     const newCenterIds = isAdmin ? [] : (editorFor || []);
-    
+
     setDuplicatingTemplate({ ...template, name: newName });
     setCenterIds(newCenterIds);
   };
@@ -646,7 +744,7 @@ export const TemplateManager: React.FC = () => {
         duplicatingTemplate.name,
         centerIds
       );
-      
+
       if (result) {
         setDuplicatingTemplate(null);
         setSuccessMessage(`Template duplicated as "${duplicatingTemplate.name}"`);
@@ -697,7 +795,7 @@ export const TemplateManager: React.FC = () => {
       // Ensure reference slide has song content styles with defaults
       const aspectRatio: AspectRatio = editingTemplate.aspectRatio || '16:9';
       const referenceIndex = editingTemplate.referenceSlideIndex ?? 0;
-      
+
       // Apply defaults to reference slide if song content styles are missing
       let templateWithDefaults = { ...editingTemplate };
       if (templateWithDefaults.slides && templateWithDefaults.slides.length > 0) {
@@ -714,7 +812,7 @@ export const TemplateManager: React.FC = () => {
 
       // Determine the final YAML content based on editor mode
       let finalYamlContent: string;
-      
+
       if (editorMode === 'wysiwyg') {
         // In WYSIWYG mode, always generate YAML from the current template (with defaults applied)
         finalYamlContent = templateToYaml(templateWithDefaults);
@@ -814,275 +912,310 @@ export const TemplateManager: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
-      {/* Header Section */}
-      <div className="mb-2 sm:mb-4 md:mb-8">
-        <div className="flex flex-col gap-2 sm:gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Presentation Templates</h1>
-              <a
-                href="/help#templates"
-                className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                title="View help documentation for this tab"
-              >
-                <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-              </a>
+      {/* Fixed Header on Mobile - Pinned below Layout header */}
+      <div
+        ref={headerRef}
+        id="template-manager-header"
+        className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700' : 'mb-2 sm:mb-4 md:mb-8'}`}
+        style={isMobile ? {
+          top: '48px', // Position below Layout header (h-12 = 48px on mobile)
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+        } : {}}
+      >
+        <div className={`max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 ${isMobile ? 'py-2' : ''}`}>
+          <div className="flex flex-col gap-2 sm:gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Presentation Templates</h1>
+                <a
+                  href="/help#templates"
+                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
+                  title="View help documentation for this tab"
+                >
+                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+                </a>
+              </div>
+              <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Manage presentation templates for slide shows
+              </p>
             </div>
-            <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Manage presentation templates for slide shows
-            </p>
-          </div>
 
-          {/* Controls */}
-          <div className="flex flex-col lg:flex-row gap-3 w-full">
-            <div className="relative flex-1 lg:min-w-[300px]">
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search templates..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
-                className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
-              {searchTerm && (
+            {/* Controls */}
+            <div className="flex flex-col lg:flex-row gap-3 w-full">
+              <div className="relative flex-1 lg:min-w-[300px]">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search templates..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
+                  className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <i className="fas fa-times text-sm"></i>
+                  </button>
+                )}
+              </div>
+              {/* Desktop action buttons - hidden on mobile */}
+              <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
                 <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                  aria-label="Clear search"
+                  type="button"
+                  onClick={() => fetchTemplates(true)}
+                  disabled={loading}
+                  title="Reload templates from the database"
+                  className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                 >
-                  <i className="fas fa-times text-sm"></i>
+                  <RefreshIcon className="w-4 h-4" />
+                  Refresh
                 </button>
-              )}
-            </div>
-            {/* Desktop action buttons - hidden on mobile */}
-            <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => fetchTemplates(true)}
-                disabled={loading}
-                title="Reload templates from the database"
-                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-              >
-                <RefreshIcon className="w-4 h-4" />
-                Refresh
-              </button>
-              {!showForm && (
-                <>
-                  <button
-                    onClick={handleCreateClick}
-                    disabled={loading}
-                    title="Create a new presentation template with custom slides and styling"
-                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    <i className="fas fa-plus text-lg"></i>
-                    Create Template
-                  </button>
-                  
-                  {/* Import PowerPoint Button */}
-                  <button
-                    onClick={() => pptxInputRef.current?.click()}
-                    disabled={loading || importingPptx}
-                    title="Import slides from a PowerPoint file (.pptx) to create a new template"
-                    className="w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    <i className="fas fa-upload text-lg"></i>
-                    {importingPptx ? 'Importing...' : 'Import PowerPoint'}
-                  </button>
-                  
-                  {/* Hidden file input for PowerPoint import */}
-                  <input
-                    ref={pptxInputRef}
-                    type="file"
-                    accept=".pptx"
-                    onChange={handleImportPptx}
-                    className="hidden"
-                  />
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Import Progress Message */}
-      {importProgress && (
-        <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 px-4 py-3 rounded-md flex items-center gap-3">
-          <i className="fas fa-spinner fa-spin text-lg text-blue-600 dark:text-blue-400"></i>
-          <span>{importProgress}</span>
-        </div>
-      )}
-
-      {/* Success Message */}
-      {successMessage && (
-        <div className="mb-6 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300 px-4 py-3 rounded-md">
-          {successMessage}
-        </div>
-      )}
-
-      {/* Error Message */}
-      {error && (
-        <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 px-4 py-3 rounded-md flex justify-between items-center">
-          <span>{error.message}</span>
-          <button
-            onClick={clearError}
-            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* Template count status */}
-      {!loading && filteredTemplates.length > 0 && (
-        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-          {searchTerm.trim() && filteredTemplates.length !== templates.length
-            ? `Showing ${filteredTemplates.length} of ${templates.length} templates`
-            : `${filteredTemplates.length} template${filteredTemplates.length !== 1 ? 's' : ''}`}
-        </div>
-      )}
-
-      {/* Templates List */}
-      <div className="space-y-0 md:space-y-3">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
-            <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">Loading templates...</p>
-          </div>
-        ) : filteredTemplates.length > 0 ? (
-          filteredTemplates.map((template, index) => {
-            const isSelected = selectedTemplateId === template.id;
-            return (
-            <div
-              key={template.id}
-              onClick={() => {
-                // On mobile, toggle selection on row click
-                if (isMobile) {
-                  setSelectedTemplateId(isSelected ? null : template.id || null);
-                }
-              }}
-              className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${
-                isMobile 
-                  ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${
-                      isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                    }`
-                  : `md:border md:border-gray-200 md:dark:border-gray-700 md:rounded-lg md:hover:shadow-md ${
-                      index > 0 ? 'md:border-t-0' : ''
-                    }`
-              }`}
-            >
-              <div className="flex flex-col gap-1.5 md:gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                      {template.name}
-                    </h3>
-                    {template.isDefault && (
-                      <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded">
-                        ⭐ Default
-                      </span>
-                    )}
-                  </div>
-                  {template.description && (
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                      {template.description}
-                    </p>
-                  )}
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
-                    {/* Aspect ratio indicator */}
-                    <span className={`inline-flex items-center px-2 py-1 rounded ${
-                      template.aspectRatio === '4:3' 
-                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                        : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                    }`}>
-                      📐 {template.aspectRatio || '16:9'}
-                      </span>
-                    {/* Slide count indicator */}
-                    <span className="inline-flex items-center px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
-                      📑 {template.slides?.length || 1} slide{(template.slides?.length || 1) !== 1 ? 's' : ''} (ref: {(template.referenceSlideIndex ?? 0) + 1})
-                        </span>
-                    {/* Center badges - show actual centers for all users */}
-                    <CenterBadges centerIds={template.centerIds || []} />
-                    </div>
-                </div>
-
-                {/* Actions Row - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}
-                <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    onClick={() => handlePreview(template)}
-                    title="Preview this template with sample content"
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors flex items-center justify-center"
-                  >
-                    <i className="fas fa-eye text-lg text-purple-600 dark:text-purple-400"></i>
-                  </button>
-                  {canEditTemplate(template) && (
+                {!showForm && (
+                  <>
                     <button
-                      onClick={() => handleEditClick(template)}
-                      title="Edit template layout, styling, and slide configuration"
-                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                      onClick={handleCreateClick}
+                      disabled={loading}
+                      title="Create a new presentation template with custom slides and styling"
+                      className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                     >
-                      <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
+                      <i className="fas fa-plus text-lg"></i>
+                      Create Template
                     </button>
-                  )}
-                  {/* Anyone can duplicate a template */}
-                  <button
-                    onClick={() => handleDuplicateClick(template)}
-                    title="Create a copy of this template that you can modify"
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                  >
-                    <i className="fas fa-copy text-lg text-green-600 dark:text-green-400"></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Duplicate</span>
-                  </button>
-                  {/* Export PowerPoint */}
-                  <button
-                    onClick={() => handleExportPptx(template)}
-                    disabled={exportingPptx === template.id}
-                    title="Download this template as a PowerPoint file (.pptx)"
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <i className={`fas ${exportingPptx === template.id ? 'fa-spinner fa-spin' : 'fa-download'} text-lg text-purple-600 dark:text-purple-400`}></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">
-                      {exportingPptx === template.id ? 'Exporting...' : 'Export'}
-                    </span>
-                  </button>
-                  {/* Set Default - only for admins */}
-                  {isAdmin && canEditTemplate(template) && !template.isDefault && (
+
+                    {/* Import PowerPoint Button */}
                     <button
-                      onClick={() => handleSetDefault(template.id!)}
-                      title="Make this the default template for new presentations"
-                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                      onClick={() => pptxInputRef.current?.click()}
+                      disabled={loading || importingPptx}
+                      title="Import slides from a PowerPoint file (.pptx) to create a new template"
+                      className="w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                     >
-                      <i className="fas fa-star text-lg text-yellow-500 dark:text-yellow-400"></i>
-                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Set Default</span>
+                      <i className="fas fa-upload text-lg"></i>
+                      {importingPptx ? 'Importing...' : 'Import PowerPoint'}
                     </button>
-                  )}
-                  {canEditTemplate(template) && (
-                    <button
-                      onClick={() => handleDelete(template.id!)}
-                      title="Permanently delete this template"
-                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                    >
-                      <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                      <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
-                    </button>
-                  )}
-                </div>
+
+                    {/* Hidden file input for PowerPoint import */}
+                    <input
+                      ref={pptxInputRef}
+                      type="file"
+                      accept=".pptx"
+                      onChange={handleImportPptx}
+                      className="hidden"
+                    />
+                  </>
+                )}
               </div>
             </div>
-            );
-          })
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">
-              {templates.length === 0 ? 'No templates yet' : 'No templates match your search'}
-            </p>
+
+            {/* Template count status - Fixed in header on mobile */}
+            {!loading && filteredTemplates.length > 0 && (
+              <div className={`text-sm text-gray-600 dark:text-gray-400 ${isMobile ? 'border-gray-200 dark:border-gray-700' : 'mt-4'}`}>
+                {searchTerm.trim() && filteredTemplates.length !== templates.length
+                  ? `Showing ${filteredTemplates.length} of ${templates.length} templates`
+                  : `${filteredTemplates.length} template${filteredTemplates.length !== 1 ? 's' : ''}`}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
+
+      {/* List Container - Scrollable on mobile, normal on desktop */}
+      <div
+        ref={listContainerRef}
+        className={isMobile ? 'fixed overflow-y-auto' : 'overflow-y-auto'}
+        style={isMobile ? {
+          ...listContainerStyle,
+          // Ensure overflow is always set
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        } : {
+          minHeight: '400px',
+          maxHeight: 'calc(100vh - 200px)', // Leave space for header and padding
+        }}
+      >
+        <div className={isMobile ? 'px-1.5 sm:px-6 lg:px-8' : ''}>
+          {/* Import Progress Message */}
+          {importProgress && (
+            <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 px-4 py-3 rounded-md flex items-center gap-3">
+              <i className="fas fa-spinner fa-spin text-lg text-blue-600 dark:text-blue-400"></i>
+              <span>{importProgress}</span>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {successMessage && (
+            <div className="mb-6 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300 px-4 py-3 rounded-md">
+              {successMessage}
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 px-4 py-3 rounded-md flex justify-between items-center">
+              <span>{error.message}</span>
+              <button
+                onClick={clearError}
+                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Templates List */}
+          <div className="space-y-0 md:space-y-3">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
+                <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">Loading templates...</p>
+              </div>
+            ) : filteredTemplates.length > 0 ? (
+              filteredTemplates.map((template, index) => {
+                const isSelected = selectedTemplateId === template.id;
+                return (
+                  <div
+                    key={template.id}
+                    onClick={() => {
+                      // On mobile, toggle selection on row click
+                      if (isMobile) {
+                        setSelectedTemplateId(isSelected ? null : template.id || null);
+                      }
+                    }}
+                    className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${isMobile
+                        ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                        }`
+                        : `md:border md:border-gray-200 md:dark:border-gray-700 md:rounded-lg md:hover:shadow-md ${index > 0 ? 'md:border-t-0' : ''
+                        }`
+                      }`}
+                  >
+                    <div className="flex flex-col gap-1.5 md:gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                            {template.name}
+                          </h3>
+                          {template.isDefault && (
+                            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded">
+                              ⭐ Default
+                            </span>
+                          )}
+                        </div>
+                        {template.description && (
+                          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                            {template.description}
+                          </p>
+                        )}
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
+                          {/* Aspect ratio indicator */}
+                          <span className={`inline-flex items-center px-2 py-1 rounded ${template.aspectRatio === '4:3'
+                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                              : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                            }`}>
+                            📐 {template.aspectRatio || '16:9'}
+                          </span>
+                          {/* Slide count indicator */}
+                          <span className="inline-flex items-center px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                            📑 {template.slides?.length || 1} slide{(template.slides?.length || 1) !== 1 ? 's' : ''} (ref: {(template.referenceSlideIndex ?? 0) + 1})
+                          </span>
+                          {/* Center badges - show actual centers for all users */}
+                          <CenterBadges centerIds={template.centerIds || []} />
+                        </div>
+                      </div>
+
+                      {/* Actions Row - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}
+                      <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => handlePreview(template)}
+                          title="Preview this template with sample content"
+                          className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors flex items-center justify-center"
+                        >
+                          <i className="fas fa-eye text-lg text-purple-600 dark:text-purple-400"></i>
+                        </button>
+                        {canEditTemplate(template) && (
+                          <button
+                            onClick={() => handleEditClick(template)}
+                            title="Edit template layout, styling, and slide configuration"
+                            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                          >
+                            <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
+                            <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
+                          </button>
+                        )}
+                        {/* Anyone can duplicate a template */}
+                        <button
+                          onClick={() => handleDuplicateClick(template)}
+                          title="Create a copy of this template that you can modify"
+                          className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                        >
+                          <i className="fas fa-copy text-lg text-green-600 dark:text-green-400"></i>
+                          <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Duplicate</span>
+                        </button>
+                        {/* Export PowerPoint */}
+                        <button
+                          onClick={() => handleExportPptx(template)}
+                          disabled={exportingPptx === template.id}
+                          title="Download this template as a PowerPoint file (.pptx)"
+                          className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <i className={`fas ${exportingPptx === template.id ? 'fa-spinner fa-spin' : 'fa-download'} text-lg text-purple-600 dark:text-purple-400`}></i>
+                          <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">
+                            {exportingPptx === template.id ? 'Exporting...' : 'Export'}
+                          </span>
+                        </button>
+                        {/* Set Default - only for admins */}
+                        {isAdmin && canEditTemplate(template) && !template.isDefault && (
+                          <button
+                            onClick={() => handleSetDefault(template.id!)}
+                            title="Make this the default template for new presentations"
+                            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                          >
+                            <i className="fas fa-star text-lg text-yellow-500 dark:text-yellow-400"></i>
+                            <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Set Default</span>
+                          </button>
+                        )}
+                        {canEditTemplate(template) && (
+                          <button
+                            onClick={() => handleDelete(template.id!)}
+                            title="Permanently delete this template"
+                            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                          >
+                            <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
+                            <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-gray-500 dark:text-gray-400">
+                  {templates.length === 0 ? 'No templates yet' : 'No templates match your search'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Scroll to Top Button - Mobile only */}
+      {isMobile && showScrollToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-24 right-4 z-50 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
+          title="Scroll to top"
+          aria-label="Scroll to top"
+        >
+          <i className="fas fa-arrow-up text-lg"></i>
+        </button>
+      )}
 
       {/* Template Form Modal */}
       <Modal
@@ -1100,21 +1233,20 @@ export const TemplateManager: React.FC = () => {
                 if (editorMode === 'yaml' && yamlContent.trim()) {
                   // Sync YAML changes before switching - await to ensure template is updated first
                   const validation = await validateYaml(yamlContent);
-                    if (validation.valid && validation.template && editingTemplate) {
-                      setEditingTemplate({
-                        ...editingTemplate,
-                        ...validation.template,
-                      });
-                    }
+                  if (validation.valid && validation.template && editingTemplate) {
+                    setEditingTemplate({
+                      ...editingTemplate,
+                      ...validation.template,
+                    });
+                  }
                 }
                 setEditorMode('wysiwyg');
               }}
               title="Visual drag-and-drop editor - design your template with a live preview"
-              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-                editorMode === 'wysiwyg'
+              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${editorMode === 'wysiwyg'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
-              }`}
+                }`}
             >
               🖱️ WYSIWYG
             </button>
@@ -1128,11 +1260,10 @@ export const TemplateManager: React.FC = () => {
                 setEditorMode('yaml');
               }}
               title="Advanced text-based editor - directly edit template configuration as YAML code"
-              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-                editorMode === 'yaml'
+              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${editorMode === 'yaml'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
-              }`}
+                }`}
             >
               ⚙️ YAML
             </button>
@@ -1160,7 +1291,7 @@ export const TemplateManager: React.FC = () => {
                   const newYaml = templateToYaml(templateWithDefaults);
                   setYamlContent(newYaml);
                   setEditorMode('yaml');
-                  
+
                   // After switching, scroll to the slide in YAML
                   // Find the line that starts with "  - # Slide X" (1-based)
                   setTimeout(() => {
@@ -1207,7 +1338,7 @@ export const TemplateManager: React.FC = () => {
                     const newYaml = e.target.value;
                     setYamlContent(newYaml);
                     setValidationError('');
-                    
+
                     // Auto-sync YAML changes back to template in real-time
                     if (newYaml.trim()) {
                       validateYaml(newYaml).then(validation => {
@@ -1236,64 +1367,64 @@ export const TemplateManager: React.FC = () => {
 
           {/* Template Properties - Always visible */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
-                  Template Name
-                  <span 
-                    title="Unique name to identify this template"
-                    className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
-                  >
-                    <i className="fas fa-info-circle text-xs"></i>
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  value={editingTemplate?.name || ''}
-                  onChange={(e) =>
-                    setEditingTemplate(
-                      editingTemplate
-                        ? { ...editingTemplate, name: e.target.value }
-                        : null
-                    )
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <div>
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                Template Name
+                <span
+                  title="Unique name to identify this template"
+                  className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+                >
+                  <i className="fas fa-info-circle text-xs"></i>
+                </span>
+              </label>
+              <input
+                type="text"
+                value={editingTemplate?.name || ''}
+                onChange={(e) =>
+                  setEditingTemplate(
+                    editingTemplate
+                      ? { ...editingTemplate, name: e.target.value }
+                      : null
+                  )
+                }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Template name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
-                  Description
-                  <span 
-                    title="Brief description of this template's purpose or style"
-                    className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
-                  >
-                    <i className="fas fa-info-circle text-xs"></i>
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  value={editingTemplate?.description || ''}
-                  onChange={(e) =>
-                    setEditingTemplate(
-                      editingTemplate
-                        ? { ...editingTemplate, description: e.target.value }
-                        : null
-                    )
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                Description
+                <span
+                  title="Brief description of this template's purpose or style"
+                  className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
+                >
+                  <i className="fas fa-info-circle text-xs"></i>
+                </span>
+              </label>
+              <input
+                type="text"
+                value={editingTemplate?.description || ''}
+                onChange={(e) =>
+                  setEditingTemplate(
+                    editingTemplate
+                      ? { ...editingTemplate, description: e.target.value }
+                      : null
+                  )
+                }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Template description"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
                 Aspect Ratio
-                <span 
+                <span
                   title="Slide dimensions - 16:9 for widescreen displays, 4:3 for older projectors"
                   className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
                 >
                   <i className="fas fa-info-circle text-xs"></i>
                 </span>
-                </label>
+              </label>
               <select
                 value={editingTemplate?.aspectRatio || '16:9'}
                 onChange={(e) =>
@@ -1308,15 +1439,15 @@ export const TemplateManager: React.FC = () => {
                 <option value="16:9">16:9 (1920×1080)</option>
                 <option value="4:3">4:3 (1600×1200)</option>
               </select>
-              </div>
-                </div>
+            </div>
+          </div>
 
           {/* Center Assignment */}
           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
             <div className="mb-2">
               <label className="block text-sm font-medium text-gray-900 dark:text-white">
                 {isAdmin ? "Centers" : "Centers"}
-                <span 
+                <span
                   title={isAdmin ? "Assign this template to specific centers, or leave empty to make it available to all centers" : "Select which centers can use this template"}
                   className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
                 >

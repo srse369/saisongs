@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useSession } from '../../contexts/SessionContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
 import { useNamedSessions } from '../../contexts/NamedSessionContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import type { Song, PresentationTemplate } from '../../types';
 import { Modal } from '../common/Modal';
 import { CenterBadges } from '../common/CenterBadges';
@@ -20,7 +20,10 @@ import { pptxExportService } from '../../services/PptxExportService';
 import ApiClient from '../../services/ApiClient';
 import { getSelectedTemplateId, setSelectedTemplateId } from '../../utils/cacheUtils';
 
+const SESSION_SCROLL_POSITION_KEY = 'saiSongs:sessionScrollPosition';
+
 export const SessionManager: React.FC = () => {
+  const location = useLocation();
   const { entries, removeSong, clearSession, reorderSession, addSong } = useSession();
   const { songs, fetchSongs } = useSongs();
   const { singers, fetchSingers } = useSingers();
@@ -42,6 +45,7 @@ export const SessionManager: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [selectedSessionItemKey, setSelectedSessionItemKey] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const listContainerRef = React.useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -62,6 +66,112 @@ export const SessionManager: React.FC = () => {
       };
     }
   }, [isMobile]);
+
+  // Track scroll position for scroll-to-top button
+  useEffect(() => {
+    if (!isMobile || !listContainerRef.current) return;
+
+    const container = listContainerRef.current;
+    const handleScroll = () => {
+      setShowScrollToTop(container.scrollTop > 200);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [isMobile]);
+
+  const scrollToTop = () => {
+    if (listContainerRef.current) {
+      listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Save and restore scroll position (mobile: list container, desktop: window)
+  useEffect(() => {
+    // Restore scroll position when component mounts
+    if (typeof window !== 'undefined' && (location.pathname === '/session' || location.pathname === '/admin/live')) {
+      try {
+        const savedScrollPosition = sessionStorage.getItem(SESSION_SCROLL_POSITION_KEY);
+        if (savedScrollPosition) {
+          const scrollTop = parseInt(savedScrollPosition, 10);
+          if (!isNaN(scrollTop)) {
+            // Wait for container to be ready, especially on mobile
+            const restoreScroll = () => {
+              if (isMobile && listContainerRef.current) {
+                listContainerRef.current.scrollTop = scrollTop;
+              } else {
+                window.scrollTo({ top: scrollTop, behavior: 'instant' });
+              }
+            };
+            
+            // Try immediately, then retry if container not ready
+            if (isMobile && !listContainerRef.current) {
+              // Wait for container to be ready
+              const checkInterval = setInterval(() => {
+                if (listContainerRef.current) {
+                  clearInterval(checkInterval);
+                  restoreScroll();
+                }
+              }, 50);
+              // Give up after 2 seconds
+              setTimeout(() => clearInterval(checkInterval), 2000);
+            } else {
+              setTimeout(restoreScroll, 50);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to restore scroll position:', error);
+      }
+    }
+  }, [isMobile, location.pathname]); // Run when mobile state or path changes
+
+  // Save scroll position when navigating away
+  useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window !== 'undefined' && (location.pathname === '/session' || location.pathname === '/admin/live')) {
+        try {
+          const scrollTop = isMobile && listContainerRef.current
+            ? listContainerRef.current.scrollTop
+            : window.scrollY;
+          sessionStorage.setItem(SESSION_SCROLL_POSITION_KEY, String(scrollTop));
+        } catch (error) {
+          console.warn('Failed to save scroll position:', error);
+        }
+      }
+    };
+
+    // Save scroll position periodically while on session tab
+    const scrollInterval = setInterval(handleScroll, 500); // Save every 500ms
+
+    // Also save on scroll events (throttled)
+    let scrollTimeout: NodeJS.Timeout;
+    const throttledScroll = () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(handleScroll, 100);
+    };
+
+    const container = listContainerRef.current;
+    
+    if (isMobile && container) {
+      container.addEventListener('scroll', throttledScroll, { passive: true });
+    } else {
+      window.addEventListener('scroll', throttledScroll, { passive: true });
+    }
+
+    // Save scroll position on unmount or when navigating away
+    return () => {
+      clearInterval(scrollInterval);
+      if (isMobile && container) {
+        container.removeEventListener('scroll', throttledScroll);
+      } else {
+        window.removeEventListener('scroll', throttledScroll);
+      }
+      if (location.pathname === '/session' || location.pathname === '/admin/live') {
+        handleScroll(); // Final save
+      }
+    };
+  }, [location.pathname, isMobile]);
 
   // Fetch songs on mount (public data)
   // Fetch singers only when authenticated (protected data)
@@ -884,6 +994,18 @@ export const SessionManager: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Scroll to Top Button - Mobile only */}
+      {isMobile && showScrollToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-24 right-4 z-50 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
+          title="Scroll to top"
+          aria-label="Scroll to top"
+        >
+          <i className="fas fa-arrow-up text-lg"></i>
+        </button>
+      )}
 
       {/* Mobile Bottom Action Bar - Always show so users can access Load button */}
       <MobileBottomActionBar

@@ -17,9 +17,11 @@ import songService from '../../services/SongService';
 import type { Song, CreateSongInput } from '../../types';
 import { globalEventBus } from '../../utils/globalEventBus';
 
-const SONGS_SCROLL_POSITION_KEY = 'saiSongs:songsScrollPosition';
+interface SongManagerProps {
+  isActive?: boolean;
+}
 
-export const SongManager: React.FC = () => {
+export const SongManager: React.FC<SongManagerProps> = ({ isActive = true }) => {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const songIdFromUrl = searchParams.get('songId') || '';
@@ -44,12 +46,17 @@ export const SongManager: React.FC = () => {
   const [advancedFilters, setAdvancedFilters] = useState<SongSearchFilters>({});
   const [visibleCount, setVisibleCount] = useState(50);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const lastFetchedUserIdRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const songIdRef = useRef<string | null>(null);
   const listContainerRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  
+  // State for dynamic list container positioning on mobile
+  const [listContainerStyle, setListContainerStyle] = useState<React.CSSProperties>({});
 
   // Track mobile state
   useEffect(() => {
@@ -61,15 +68,70 @@ export const SongManager: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Prevent body scroll on mobile when on songs tab
+  // Prevent body scroll on mobile when tab is active
   useEffect(() => {
-    if (isMobile && location.pathname === '/admin/songs') {
+    if (isMobile && isActive) {
       document.body.style.overflow = 'hidden';
       return () => {
         document.body.style.overflow = '';
       };
     }
-  }, [isMobile, location.pathname]);
+  }, [isMobile, isActive]);
+
+  // Calculate list container positioning on mobile (after DOM is ready)
+  useEffect(() => {
+    if (!isMobile || !isActive) {
+      setListContainerStyle({});
+      return;
+    }
+
+    const calculatePosition = () => {
+      const header = headerRef.current;
+      if (!header) return;
+
+      const bottomBarHeight = 108;
+      const headerRect = header.getBoundingClientRect();
+      const bottomBarTop = window.innerHeight - bottomBarHeight;
+      const calculatedHeight = bottomBarTop - headerRect.bottom;
+      
+      // Ensure height is positive and reasonable
+      const finalHeight = calculatedHeight > 0 ? calculatedHeight : 400;
+      
+      setListContainerStyle({
+        top: `${headerRect.bottom + 6}px`,
+        left: '1%',
+        width: '98%',
+        height: `${finalHeight}px`,
+        minHeight: `${finalHeight}px`,
+        maxHeight: `${finalHeight}px`,
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+        overscrollBehaviorY: 'contain',
+        touchAction: 'pan-y',
+      });
+    };
+
+    // Calculate using requestAnimationFrame to ensure DOM is laid out
+    const rafId = requestAnimationFrame(() => {
+      calculatePosition();
+    });
+    
+    // Also recalculate after delays to ensure bottom bar is rendered
+    const timeoutId1 = setTimeout(calculatePosition, 100);
+    const timeoutId2 = setTimeout(calculatePosition, 300);
+    const timeoutId3 = setTimeout(calculatePosition, 500);
+
+    // Recalculate on resize
+    window.addEventListener('resize', calculatePosition);
+    
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
+      window.removeEventListener('resize', calculatePosition);
+    };
+  }, [isMobile, isActive, songs.length, searchTerm]);
 
   // Show error as toast message
   useEffect(() => {
@@ -78,6 +140,25 @@ export const SongManager: React.FC = () => {
       clearError(); // Clear error after showing toast
     }
   }, [error, toast, clearError]);
+
+  // Track scroll position for scroll-to-top button (only when active)
+  useEffect(() => {
+    if (!isActive || !isMobile || !listContainerRef.current) return;
+
+    const container = listContainerRef.current;
+    const handleScroll = () => {
+      setShowScrollToTop(container.scrollTop > 200);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [isMobile, isActive]);
+
+  const scrollToTop = () => {
+    if (listContainerRef.current) {
+      listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Create fuzzy search instance for fallback
   const fuzzySearch = useMemo(() => createSongFuzzySearch(songs), [songs]);
@@ -88,9 +169,11 @@ export const SongManager: React.FC = () => {
   }, [songs]);
 
   useEffect(() => {
-    // Always fetch songs on mount to ensure we have latest data
-    fetchSongs(); // Use cached data, only refresh if stale
-  }, [fetchSongs]);
+    // Only fetch songs when tab is active (only if not already loaded)
+    if (isActive && songs.length === 0) {
+      fetchSongs(); // Use cached data, only refresh if stale
+    }
+  }, [fetchSongs, isActive, songs.length]);
 
 
 
@@ -365,84 +448,14 @@ export const SongManager: React.FC = () => {
     setVisibleCount(50);
   }, [searchTerm, advancedFilters, songs.length]);
 
-  // Save and restore scroll position (only when not scrolling to a specific song)
-  useEffect(() => {
-    // Restore scroll position when component mounts (only if not scrolling to a song)
-    if (typeof window !== 'undefined' && !songIdFromUrl) {
-      try {
-        const savedScrollPosition = sessionStorage.getItem(SONGS_SCROLL_POSITION_KEY);
-        if (savedScrollPosition) {
-          const scrollTop = parseInt(savedScrollPosition, 10);
-          if (!isNaN(scrollTop)) {
-            // Use a small delay to ensure DOM is ready
-            setTimeout(() => {
-              window.scrollTo({ top: scrollTop, behavior: 'instant' });
-            }, 50);
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to restore scroll position:', error);
-      }
-    }
-  }, []); // Only run on mount
-
-  // Save scroll position when navigating away
-  useEffect(() => {
-    const handleScroll = () => {
-      if (typeof window !== 'undefined' && location.pathname === '/admin/songs' && !songIdRef.current) {
-        try {
-          const isMobile = window.innerWidth < 768;
-          const scrollTop = isMobile && listContainerRef.current
-            ? listContainerRef.current.scrollTop
-            : window.scrollY;
-          sessionStorage.setItem(SONGS_SCROLL_POSITION_KEY, String(scrollTop));
-        } catch (error) {
-          console.warn('Failed to save scroll position:', error);
-        }
-      }
-    };
-
-    // Save scroll position periodically while on songs tab
-    const scrollInterval = setInterval(handleScroll, 500); // Save every 500ms
-
-    // Also save on scroll events (throttled)
-    let scrollTimeout: NodeJS.Timeout;
-    const throttledScroll = () => {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(handleScroll, 100);
-    };
-
-    const container = listContainerRef.current;
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    
-    if (isMobile && container) {
-      container.addEventListener('scroll', throttledScroll, { passive: true });
-    } else {
-      window.addEventListener('scroll', throttledScroll, { passive: true });
-    }
-
-    // Save scroll position on unmount or when navigating away
-    return () => {
-      clearInterval(scrollInterval);
-      if (isMobile && container) {
-        container.removeEventListener('scroll', throttledScroll);
-      } else {
-        window.removeEventListener('scroll', throttledScroll);
-      }
-      if (location.pathname === '/admin/songs' && !songIdRef.current) {
-        handleScroll(); // Final save
-      }
-    };
-  }, [location.pathname]);
-
   const displayedSongs = useMemo(
     () => filteredSongs.slice(0, visibleCount),
     [filteredSongs, visibleCount]
   );
 
-  // Handle scrolling to song when songId is in URL
+  // Handle scrolling to song when songId is in URL (only when active)
   useEffect(() => {
-    if (!songIdFromUrl || filteredSongs.length === 0) {
+    if (!isActive || !songIdFromUrl || filteredSongs.length === 0) {
       songIdRef.current = null;
       return;
     }
@@ -468,10 +481,11 @@ export const SongManager: React.FC = () => {
     
     // Song should be visible, mark it for scrolling
     songIdRef.current = songIdFromUrl;
-  }, [songIdFromUrl, filteredSongs, visibleCount, searchParams, setSearchParams]);
+  }, [songIdFromUrl, filteredSongs, visibleCount, searchParams, setSearchParams, isActive]);
 
-  // Scroll to song when it becomes visible in displayedSongs
+  // Scroll to song when it becomes visible in displayedSongs (only when active)
   useEffect(() => {
+    if (!isActive) return;
     const targetSongId = songIdRef.current;
     if (!targetSongId) return;
     
@@ -556,10 +570,11 @@ export const SongManager: React.FC = () => {
         }
       }, 150);
     });
-  }, [displayedSongs, searchParams, setSearchParams]);
+  }, [displayedSongs, searchParams, setSearchParams, isActive]);
 
-  // Lazy-load more songs as the user scrolls near the bottom
+  // Lazy-load more songs as the user scrolls near the bottom (only when active)
   useEffect(() => {
+    if (!isActive) return;
     const sentinel = loadMoreRef.current;
     if (!sentinel) return;
 
@@ -595,7 +610,7 @@ export const SongManager: React.FC = () => {
     } else {
       return setupObserver();
     }
-  }, [filteredSongs.length, isMobile, displayedSongs.length]);
+  }, [filteredSongs.length, isMobile, displayedSongs.length, isActive]);
 
   const activeFilterCount = Object.values(advancedFilters).filter(v => v && typeof v === 'string').length;
 
@@ -629,6 +644,8 @@ export const SongManager: React.FC = () => {
     <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8 animate-fade-in">
       {/* Fixed Header on Mobile - Pinned below Layout header */}
       <div 
+        ref={headerRef}
+        id="song-manager-header"
         className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-2 sm:mb-4'}`}
         style={isMobile ? {
           top: '48px', // Position below Layout header (h-12 = 48px on mobile)
@@ -727,17 +744,16 @@ export const SongManager: React.FC = () => {
       {/* List Container - Scrollable on mobile, normal on desktop */}
       <div
         ref={listContainerRef}
-        className={isMobile ? 'overflow-y-auto' : ''}
+        className={isMobile ? 'fixed overflow-y-auto' : 'overflow-y-auto'}
         style={isMobile ? {
-          // Calculate height: viewport height minus Layout header (48px) + SongManager header (~280px) + bottom action bar space (~102px)
-          // Layout header: 48px (h-12 on mobile)
-          // SongManager header: ~280px (title, search, advanced search, count)
-          // Bottom action bar: ~102px
-          marginTop: '150px', // Space for Layout header (48px) + SongManager header (~280px)
-          height: 'calc(100vh - 150px - 168px)', // Viewport minus Layout header, SongManager header, and bottom bar
-          WebkitOverflowScrolling: 'touch',
-          overscrollBehavior: 'contain', // Prevent scroll chaining
-        } : {}}
+          ...listContainerStyle,
+          // Ensure overflow is always set
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        } : {
+          minHeight: '400px',
+          maxHeight: 'calc(100vh - 200px)', // Leave space for header and padding
+        }}
       >
         <SongList
           songs={displayedSongs}
@@ -783,6 +799,18 @@ export const SongManager: React.FC = () => {
         >
           <SongDetails song={viewingSong} />
         </Modal>
+      )}
+
+      {/* Scroll to Top Button - Mobile only */}
+      {isMobile && showScrollToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-24 right-4 z-50 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
+          title="Scroll to top"
+          aria-label="Scroll to top"
+        >
+          <i className="fas fa-arrow-up text-lg"></i>
+        </button>
       )}
 
       {/* Mobile Bottom Action Bar */}

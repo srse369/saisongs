@@ -12,9 +12,11 @@ import { Modal } from '../common/Modal';
 import type { Singer, CreateSingerInput } from '../../types';
 import { globalEventBus } from '../../utils/globalEventBus';
 
-const SINGERS_SCROLL_POSITION_KEY = 'saiSongs:singersScrollPosition';
+interface SingerManagerProps {
+  isActive?: boolean;
+}
 
-export const SingerManager: React.FC = () => {
+export const SingerManager: React.FC<SingerManagerProps> = ({ isActive = true }) => {
   const location = useLocation();
   const { singers, loading, error, fetchSingers, createSinger, updateSinger, deleteSinger, mergeSingers } = useSingers();
   const { fetchAllPitches } = usePitches();
@@ -25,11 +27,18 @@ export const SingerManager: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'pitchCount'>('name');
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const lastFetchedUserIdRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listContainerRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLDivElement | null>(null);
   const startSelectionRef = useRef<(() => void) | null>(null);
+  
+  // State for dynamic list container positioning on mobile
+  const [listContainerStyle, setListContainerStyle] = useState<React.CSSProperties>(() => {
+    return {};
+  });
 
   // Track mobile state
   useEffect(() => {
@@ -41,95 +50,111 @@ export const SingerManager: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Prevent body scroll on mobile when tab is active
   useEffect(() => {
-    // Always fetch singers on mount to ensure we have latest data
-    fetchSingers(); // Use cached data, only refresh if stale
-  }, [fetchSingers]);
-
-  // Prevent body scroll on mobile when on singers tab
-  useEffect(() => {
-    if (isMobile && location.pathname === '/admin/singers') {
+    if (isMobile && isActive) {
       document.body.style.overflow = 'hidden';
       return () => {
         document.body.style.overflow = '';
       };
     }
-  }, [isMobile, location.pathname]);
+  }, [isMobile, isActive]);
 
-  // Save and restore scroll position (mobile: list container, desktop: window)
+  // Calculate list container positioning on mobile (after DOM is ready)
   useEffect(() => {
-    // Restore scroll position when component mounts
-    if (typeof window !== 'undefined') {
-      try {
-        const savedScrollPosition = sessionStorage.getItem(SINGERS_SCROLL_POSITION_KEY);
-        if (savedScrollPosition) {
-          const scrollTop = parseInt(savedScrollPosition, 10);
-          if (!isNaN(scrollTop)) {
-            // Use a small delay to ensure DOM is ready
-            setTimeout(() => {
-              if (isMobile && listContainerRef.current) {
-                listContainerRef.current.scrollTop = scrollTop;
-              } else {
-                window.scrollTo({ top: scrollTop, behavior: 'instant' });
-              }
-            }, 50);
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to restore scroll position:', error);
-      }
+    if (!isMobile || !isActive) {
+      setListContainerStyle({});
+      return;
     }
-  }, [isMobile]); // Run when mobile state changes
 
-  // Save scroll position when navigating away
+    const calculatePosition = () => {
+      const header = headerRef.current;
+      if (!header) return;
+
+      const bottomBarHeight = 108;
+      const headerRect = header.getBoundingClientRect();
+      const bottomBarTop = window.innerHeight - bottomBarHeight;
+      const calculatedHeight = bottomBarTop - headerRect.bottom;
+      
+      // Ensure height is positive and reasonable
+      const finalHeight = calculatedHeight > 0 ? calculatedHeight : 400;
+      
+      setListContainerStyle({
+        top: `${headerRect.bottom + 6}px`,
+        left: '1%',
+        width: '98%',
+        height: `${finalHeight}px`,
+        minHeight: `${finalHeight}px`,
+        maxHeight: `${finalHeight}px`,
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+        overscrollBehaviorY: 'contain',
+        touchAction: 'pan-y',
+      });
+    };
+
+    // Calculate using requestAnimationFrame to ensure DOM is laid out
+    const rafId = requestAnimationFrame(() => {
+      calculatePosition();
+    });
+    
+    // Also recalculate after delays to ensure bottom bar is rendered
+    const timeoutId1 = setTimeout(calculatePosition, 100);
+    const timeoutId2 = setTimeout(calculatePosition, 300);
+    const timeoutId3 = setTimeout(calculatePosition, 500);
+
+    // Recalculate on resize
+    window.addEventListener('resize', calculatePosition);
+    
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
+      window.removeEventListener('resize', calculatePosition);
+    };
+  }, [isMobile, isActive, singers.length, loading, searchTerm]);
+
+  // Track scroll position for scroll-to-top button (only when active)
   useEffect(() => {
-    const handleScroll = () => {
-      if (typeof window !== 'undefined' && location.pathname === '/admin/singers') {
-        try {
-          const scrollTop = isMobile && listContainerRef.current
-            ? listContainerRef.current.scrollTop
-            : window.scrollY;
-          sessionStorage.setItem(SINGERS_SCROLL_POSITION_KEY, String(scrollTop));
-        } catch (error) {
-          console.warn('Failed to save scroll position:', error);
-        }
-      }
-    };
-
-    // Save scroll position periodically while on singers tab
-    const scrollInterval = setInterval(handleScroll, 500); // Save every 500ms
-
-    // Also save on scroll events (throttled)
-    let scrollTimeout: NodeJS.Timeout;
-    const throttledScroll = () => {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(handleScroll, 100);
-    };
+    if (!isActive || !isMobile || !listContainerRef.current) return;
 
     const container = listContainerRef.current;
-    
-    if (isMobile && container) {
-      container.addEventListener('scroll', throttledScroll, { passive: true });
-    } else {
-      window.addEventListener('scroll', throttledScroll, { passive: true });
-    }
-
-    // Save scroll position on unmount or when navigating away
-    return () => {
-      clearInterval(scrollInterval);
-      if (isMobile && container) {
-        container.removeEventListener('scroll', throttledScroll);
-      } else {
-        window.removeEventListener('scroll', throttledScroll);
-      }
-      if (location.pathname === '/admin/singers') {
-        handleScroll(); // Final save
-      }
+    const handleScroll = () => {
+      setShowScrollToTop(container.scrollTop > 200);
     };
-  }, [location.pathname, isMobile]);
 
-  // Listen for data refresh requests from global event bus
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [isMobile, isActive]);
+
+  const scrollToTop = () => {
+    if (listContainerRef.current) {
+      listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   useEffect(() => {
+    // Only fetch singers when tab is active (only if not already loaded)
+    if (isActive && singers.length === 0) {
+      fetchSingers(); // Use cached data, only refresh if stale
+    }
+  }, [fetchSingers, isActive, singers.length]);
+
+  // Prevent body scroll on mobile when tab is active
+  useEffect(() => {
+    if (isMobile && isActive) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isMobile, isActive]);
+
+  // Listen for data refresh requests from global event bus (only when active)
+  useEffect(() => {
+    if (!isActive) return;
+
     let unsubscribe: (() => void) | undefined;
 
     unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
@@ -142,7 +167,7 @@ export const SingerManager: React.FC = () => {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [fetchSingers]);
+  }, [fetchSingers, isActive]);
 
   // Focus search bar on Escape key
   useEffect(() => {
@@ -338,10 +363,12 @@ export const SingerManager: React.FC = () => {
     }] : []),
   ];
 
-  return (
+  const body = (
     <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
       {/* Fixed Header on Mobile - Pinned below Layout header */}
       <div 
+        ref={headerRef}
+        id="singer-manager-header"
         className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-2 sm:mb-4'}`}
         style={isMobile ? {
           top: '48px', // Position below Layout header (h-12 = 48px on mobile)
@@ -448,17 +475,16 @@ export const SingerManager: React.FC = () => {
       {/* List Container - Scrollable on mobile, normal on desktop */}
       <div
         ref={listContainerRef}
-        className={isMobile ? 'overflow-y-auto' : ''}
+        className={isMobile ? 'fixed overflow-y-auto' : 'overflow-y-auto'}
         style={isMobile ? {
-          // Calculate height: viewport height minus Layout header (48px) + SingerManager header (~180px) + bottom action bar space (~102px)
-          // Layout header: 48px (h-12 on mobile)
-          // SingerManager header: ~180px
-          // Bottom action bar: ~102px
-          marginTop: '115px', // Space for Layout header (48px) + SingerManager header (~180px)
-          height: 'calc(100vh - 115px - 167px)', // Viewport minus Layout header, SingerManager header, and bottom bar
-          WebkitOverflowScrolling: 'touch',
-          overscrollBehavior: 'contain', // Prevent scroll chaining
-        } : {}}
+          ...listContainerStyle,
+          // Ensure overflow is always set
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        } : {
+          minHeight: '400px',
+          maxHeight: 'calc(100vh - 200px)', // Leave space for header and padding
+        }}
       >
         <SingerList
           singers={filteredSingers}
@@ -471,6 +497,18 @@ export const SingerManager: React.FC = () => {
           startSelectionRef={startSelectionRef}
         />
       </div>
+
+      {/* Scroll to Top Button - Mobile only */}
+      {isMobile && showScrollToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-24 right-4 z-50 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
+          title="Scroll to top"
+          aria-label="Scroll to top"
+        >
+          <i className="fas fa-arrow-up text-lg"></i>
+        </button>
+      )}
 
       <Modal
         isOpen={isFormOpen}
@@ -492,6 +530,8 @@ export const SingerManager: React.FC = () => {
       />
     </div>
   );
+  
+  return body;  
 };
 
 export default SingerManager;

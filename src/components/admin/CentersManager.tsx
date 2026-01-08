@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserMultiSelect } from '../common/UserMultiSelect';
 import { clearCentersCache } from '../common/CenterBadges';
@@ -13,8 +14,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || (
 
 const CENTERS_CACHE_KEY = 'saiSongs:centersCache';
 const CENTERS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+interface CentersManagerProps {
+  isActive?: boolean;
+}
 
-export const CentersManager: React.FC = () => {
+export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true }) => {
+  const location = useLocation();
   const { isAdmin } = useAuth();
   const [centers, setCenters] = useState<Center[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +30,14 @@ export const CentersManager: React.FC = () => {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [selectedCenterId, setSelectedCenterId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const listContainerRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  
+  // State for dynamic list container positioning on mobile
+  const [listContainerStyle, setListContainerStyle] = useState<React.CSSProperties>(() => {
+    return {};
+  });
 
   useEffect(() => {
     const checkMobile = () => {
@@ -36,15 +48,89 @@ export const CentersManager: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Prevent body scroll on mobile when on centers tab
+  // Prevent body scroll on mobile when tab is active
   useEffect(() => {
-    if (isMobile && window.location.pathname === '/admin/centers') {
+    if (isMobile && isActive) {
       document.body.style.overflow = 'hidden';
       return () => {
         document.body.style.overflow = '';
       };
     }
-  }, [isMobile]);
+  }, [isMobile, isActive]);
+
+  // Calculate list container positioning on mobile (after DOM is ready)
+  useEffect(() => {
+    if (!isMobile || !isActive) {
+      setListContainerStyle({});
+      return;
+    }
+
+    const calculatePosition = () => {
+      const header = headerRef.current;
+      if (!header) return;
+
+      const bottomBarHeight = 108;
+      const headerRect = header.getBoundingClientRect();
+      const bottomBarTop = window.innerHeight - bottomBarHeight;
+      const calculatedHeight = bottomBarTop - headerRect.bottom;
+      
+      // Ensure height is positive and reasonable
+      const finalHeight = calculatedHeight > 0 ? calculatedHeight : 400;
+      
+      setListContainerStyle({
+        top: `${headerRect.bottom + 6}px`,
+        left: '1%',
+        width: '98%',
+        height: `${finalHeight}px`,
+        minHeight: `${finalHeight}px`,
+        maxHeight: `${finalHeight}px`,
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+        overscrollBehaviorY: 'contain',
+        touchAction: 'pan-y',
+      });
+    };
+
+    // Calculate using requestAnimationFrame to ensure DOM is laid out
+    const rafId = requestAnimationFrame(() => {
+      calculatePosition();
+    });
+    
+    // Also recalculate after delays to ensure bottom bar is rendered
+    const timeoutId1 = setTimeout(calculatePosition, 100);
+    const timeoutId2 = setTimeout(calculatePosition, 300);
+    const timeoutId3 = setTimeout(calculatePosition, 500);
+
+    // Recalculate on resize
+    window.addEventListener('resize', calculatePosition);
+    
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
+      window.removeEventListener('resize', calculatePosition);
+    };
+  }, [isMobile, isActive, centers.length, loading]);
+
+  // Track scroll position for scroll-to-top button (only when active)
+  useEffect(() => {
+    if (!isActive || !isMobile || !listContainerRef.current) return;
+
+    const container = listContainerRef.current;
+    const handleScroll = () => {
+      setShowScrollToTop(container.scrollTop > 200);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [isMobile, isActive]);
+
+  const scrollToTop = () => {
+    if (listContainerRef.current) {
+      listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Form state
   const [formData, setFormData] = useState({
@@ -85,10 +171,12 @@ export const CentersManager: React.FC = () => {
     }
   }, []);
 
-  // Always refresh centers data on mount to ensure we have latest data
+  // Only fetch centers when tab is active (only if not already loaded)
   useEffect(() => {
-    fetchCenters();
-  }, [fetchCenters]);
+    if (isActive && centers.length === 0) {
+      fetchCenters();
+    }
+  }, [fetchCenters, isActive, centers.length]);
 
   // Listen for data refresh requests from global event bus
   useEffect(() => {
@@ -470,7 +558,9 @@ export const CentersManager: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto px-1.5 sm:px-6 py-2 sm:py-4 md:py-6">
       {/* Fixed Header on Mobile - Pinned below Layout header */}
-      <div 
+      <div
+        ref={headerRef}
+        id="centers-manager-header" 
         className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-4 sm:mb-6'}`}
         style={isMobile ? {
           top: '48px', // Position below Layout header (h-12 = 48px on mobile)
@@ -522,14 +612,16 @@ export const CentersManager: React.FC = () => {
       {/* List Container - Scrollable on mobile, normal on desktop */}
       <div
         ref={listContainerRef}
-        className={isMobile ? 'overflow-y-auto' : ''}
+        className={isMobile ? 'fixed overflow-y-auto' : 'overflow-y-auto'}
         style={isMobile ? {
-          // Calculate height: viewport height minus Layout header (48px) + CentersManager header (~120px) + bottom action bar space (~102px)
-          marginTop: '168px', // Space for Layout header (48px) + CentersManager header (~120px) - this doesn't scroll
-          height: 'calc(100vh - 48px - 120px - 102px)', // Viewport minus Layout header, CentersManager header, and bottom bar
-          WebkitOverflowScrolling: 'touch',
-          overscrollBehavior: 'contain', // Prevent scroll chaining
-        } : {}}
+          ...listContainerStyle,
+          // Ensure overflow is always set
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        } : {
+          minHeight: '400px',
+          maxHeight: 'calc(100vh - 200px)', // Leave space for header and padding
+        }}
       >
         <div className={isMobile ? 'px-1.5 sm:px-6' : ''}>
           {error && (
@@ -816,6 +908,18 @@ export const CentersManager: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Scroll to Top Button - Mobile only */}
+      {isMobile && showScrollToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-24 right-4 z-50 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
+          title="Scroll to top"
+          aria-label="Scroll to top"
+        >
+          <i className="fas fa-arrow-up text-lg"></i>
+        </button>
+      )}
 
       {/* Mobile Bottom Action Bar */}
       <MobileBottomActionBar

@@ -19,9 +19,7 @@ import { usePageTracking } from './hooks/usePageTracking';
 import { useVersionCheck } from './hooks/useVersionCheck';
 
 // Lazy load admin components for better initial load performance
-const SongManager = lazy(() => import('./components/admin/SongManager'));
-const SingerManager = lazy(() => import('./components/admin/SingerManager'));
-const PitchManager = lazy(() => import('./components/admin/PitchManager'));
+const AdminTabs = lazy(() => import('./components/admin/AdminTabs').then(module => ({ default: module.AdminTabs })));
 const TemplateManager = lazy(() => import('./components/admin/TemplateManager'));
 const CentersManager = lazy(() => import('./components/admin/CentersManager'));
 const Analytics = lazy(() => import('./components/admin/Analytics'));
@@ -157,53 +155,51 @@ function AppContent() {
             </ProtectedRoute>
           } />
           
-          {/* Public route - Song list */}
+          {/* Admin tabs - consolidated route */}
           <Route path="/admin/songs" element={
             <Suspense fallback={<LoadingFallback />}>
-              <SongManager />
+              <AdminTabs initialTab="songs" />
             </Suspense>
           } />
-          
-          {/* Protected routes */}
           <Route path="/admin/singers" element={
             <ProtectedRoute>
               <Suspense fallback={<LoadingFallback />}>
-                <SingerManager />
+                <AdminTabs initialTab="singers" />
               </Suspense>
             </ProtectedRoute>
           } />
           <Route path="/admin/pitches" element={
             <ProtectedRoute>
               <Suspense fallback={<LoadingFallback />}>
-                <PitchManager />
-              </Suspense>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/analytics" element={
-            <ProtectedRoute requireAdmin={true}>
-              <Suspense fallback={<LoadingFallback />}>
-                <Analytics />
-              </Suspense>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/feedback" element={
-            <ProtectedRoute requireAdmin={true}>
-              <Suspense fallback={<LoadingFallback />}>
-                <FeedbackManager />
+                <AdminTabs initialTab="pitches" />
               </Suspense>
             </ProtectedRoute>
           } />
           <Route path="/admin/templates" element={
             <ProtectedRoute requireEditor={true}>
               <Suspense fallback={<LoadingFallback />}>
-                <TemplateManager />
+                <AdminTabs initialTab="templates" />
               </Suspense>
             </ProtectedRoute>
           } />
           <Route path="/admin/centers" element={
             <ProtectedRoute requireAdmin={true}>
               <Suspense fallback={<LoadingFallback />}>
-                <CentersManager />
+                <AdminTabs initialTab="centers" />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/analytics" element={
+            <ProtectedRoute requireAdmin={true}>
+              <Suspense fallback={<LoadingFallback />}>
+                <AdminTabs initialTab="analytics" />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/feedback" element={
+            <ProtectedRoute requireAdmin={true}>
+              <Suspense fallback={<LoadingFallback />}>
+                <AdminTabs initialTab="feedback" />
               </Suspense>
             </ProtectedRoute>
           } />
