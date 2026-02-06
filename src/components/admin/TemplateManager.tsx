@@ -3,7 +3,7 @@ import { useTemplates } from '../../contexts/TemplateContext';
 import { useAuth } from '../../contexts/AuthContext';
 import type { PresentationTemplate, Slide, TemplateSlide, AspectRatio } from '../../types';
 import { ensureSongContentStyles } from '../../types';
-import { RefreshIcon, Modal, CenterMultiSelect, CenterBadges, MobileBottomActionBar, type MobileAction } from '../common';
+import { RefreshIcon, Modal, CenterMultiSelect, CenterBadges, type MobileAction } from '../common';
 import { PresentationModal } from '../presentation/PresentationModal';
 import { TemplateWysiwygEditor } from './TemplateWysiwygEditor';
 import { MediaExportModal } from './MediaExportModal';
@@ -11,6 +11,8 @@ import { isMultiSlideTemplate } from '../../utils/templateUtils';
 import { pptxImportService } from '../../services/PptxImportService';
 import { pptxExportService } from '../../services/PptxExportService';
 import type { CloudStorageConfig } from '../../services/CloudStorageService';
+import { BaseManager } from './BaseManager';
+import { useBaseManager } from '../../hooks/useBaseManager';
 
 /**
  * Format a dimension value (x, y, width, height) as an integer string
@@ -267,6 +269,21 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
     clearError,
   } = useTemplates();
 
+  // Use base manager hook for common functionality
+  const baseManager = useBaseManager({
+    resourceName: 'templates',
+    isActive,
+    onDataRefresh: () => fetchTemplates(true),
+    onEscapeKey: () => {
+      // When no modal is open, focus the search bar
+      if (!previewTemplate && !showForm && !showMediaExportModal && !duplicatingTemplate) {
+        if (baseManager.searchInputRef.current) {
+          baseManager.searchInputRef.current.focus();
+        }
+      }
+    },
+  });
+
   // Check if user can edit a template
   const canEditTemplate = useCallback((template: PresentationTemplate) => {
     if (isAdmin) return true;
@@ -297,110 +314,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
   const [showMediaExportModal, setShowMediaExportModal] = useState(false);
   const [pendingPptxFile, setPendingPptxFile] = useState<File | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
-  const [showScrollToTop, setShowScrollToTop] = useState(false);
   const pptxInputRef = useRef<HTMLInputElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const listContainerRef = useRef<HTMLDivElement | null>(null);
-  const headerRef = useRef<HTMLDivElement | null>(null);
-  
-  // State for dynamic list container positioning on mobile - initialize with fallback values
-  const [listContainerStyle, setListContainerStyle] = useState<React.CSSProperties>(() => {
-    return {};
-  });
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Prevent body scroll on mobile when tab is active
-  useEffect(() => {
-    if (isMobile && isActive) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
-  }, [isMobile, isActive]);
-
-  // Calculate list container positioning on mobile (after DOM is ready)
-  useEffect(() => {
-    if (!isMobile || !isActive) {
-      setListContainerStyle({});
-      return;
-    }
-
-    const calculatePosition = () => {
-      const header = headerRef.current;
-      if (!header) return;
-
-      const bottomBarHeight = 108;
-      const headerRect = header.getBoundingClientRect();
-      const bottomBarTop = window.innerHeight - bottomBarHeight;      
-      const calculatedHeight = bottomBarTop - headerRect.bottom;
-      
-      // Ensure height is positive and reasonable
-      const finalHeight = calculatedHeight > 0 ? calculatedHeight : 400;
-      
-      setListContainerStyle({
-        top: `${headerRect.bottom + 6}px`,
-        left: '1%',
-        width: '98%',
-        height: `${finalHeight}px`,
-        minHeight: `${finalHeight}px`,
-        maxHeight: `${finalHeight}px`,
-        WebkitOverflowScrolling: 'touch',
-        overscrollBehavior: 'contain',
-        overscrollBehaviorY: 'contain',
-        touchAction: 'pan-y',
-      });
-    };
-
-    // Calculate using requestAnimationFrame to ensure DOM is laid out
-    const rafId = requestAnimationFrame(() => {
-      calculatePosition();
-    });
-    
-    // Also recalculate after delays to ensure bottom bar is rendered
-    const timeoutId1 = setTimeout(calculatePosition, 100);
-    const timeoutId2 = setTimeout(calculatePosition, 300);
-    const timeoutId3 = setTimeout(calculatePosition, 500);
-
-    // Recalculate on resize
-    window.addEventListener('resize', calculatePosition);
-    
-    return () => {
-      cancelAnimationFrame(rafId);
-      clearTimeout(timeoutId1);
-      clearTimeout(timeoutId2);
-      clearTimeout(timeoutId3);
-      window.removeEventListener('resize', calculatePosition);
-    };
-  }, [isMobile, isActive, templates.length, loading, searchTerm]);
-
-  // Track scroll position for scroll-to-top button (only when active)
-  useEffect(() => {
-    if (!isActive || !isMobile || !listContainerRef.current) return;
-
-    const container = listContainerRef.current;
-    const handleScroll = () => {
-      setShowScrollToTop(container.scrollTop > 200);
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [isMobile, isActive]);
-
-  const scrollToTop = () => {
-    if (listContainerRef.current) {
-      listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
 
   // Check if template has unsaved changes
   const hasUnsavedChanges = React.useMemo(() => {
@@ -910,187 +824,155 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
     ] : []),
   ];
 
-  return (
-    <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
-      {/* Fixed Header on Mobile - Pinned below Layout header */}
-      <div
-        ref={headerRef}
-        id="template-manager-header"
-        className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700' : 'mb-2 sm:mb-4 md:mb-8'}`}
-        style={isMobile ? {
-          top: '48px', // Position below Layout header (h-12 = 48px on mobile)
-          paddingTop: 'env(safe-area-inset-top, 0px)',
-        } : {}}
-      >
-        <div className={`max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 ${isMobile ? 'py-2' : ''}`}>
-          <div className="flex flex-col gap-2 sm:gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Presentation Templates</h1>
-                <a
-                  href="/help#templates"
-                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                  title="View help documentation for this tab"
-                >
-                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-                </a>
-              </div>
-              <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Manage presentation templates for slide shows
-              </p>
-            </div>
-
-            {/* Controls */}
-            <div className="flex flex-col lg:flex-row gap-3 w-full">
-              <div className="relative flex-1 lg:min-w-[300px]">
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search templates..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
-                  className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                    aria-label="Clear search"
-                  >
-                    <i className="fas fa-times text-sm"></i>
-                  </button>
-                )}
-              </div>
-              {/* Desktop action buttons - hidden on mobile */}
-              <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={() => fetchTemplates(true)}
-                  disabled={loading}
-                  title="Reload templates from the database"
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                >
-                  <RefreshIcon className="w-4 h-4" />
-                  Refresh
-                </button>
-                {!showForm && (
-                  <>
-                    <button
-                      onClick={handleCreateClick}
-                      disabled={loading}
-                      title="Create a new presentation template with custom slides and styling"
-                      className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                    >
-                      <i className="fas fa-plus text-lg"></i>
-                      Create Template
-                    </button>
-
-                    {/* Import PowerPoint Button */}
-                    <button
-                      onClick={() => pptxInputRef.current?.click()}
-                      disabled={loading || importingPptx}
-                      title="Import slides from a PowerPoint file (.pptx) to create a new template"
-                      className="w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                    >
-                      <i className="fas fa-upload text-lg"></i>
-                      {importingPptx ? 'Importing...' : 'Import PowerPoint'}
-                    </button>
-
-                    {/* Hidden file input for PowerPoint import */}
-                    <input
-                      ref={pptxInputRef}
-                      type="file"
-                      accept=".pptx"
-                      onChange={handleImportPptx}
-                      className="hidden"
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Template count status - Fixed in header on mobile */}
-            {!loading && filteredTemplates.length > 0 && (
-              <div className={`text-sm text-gray-600 dark:text-gray-400 ${isMobile ? 'border-gray-200 dark:border-gray-700' : 'mt-4'}`}>
-                {searchTerm.trim() && filteredTemplates.length !== templates.length
-                  ? `Showing ${filteredTemplates.length} of ${templates.length} templates`
-                  : `${filteredTemplates.length} template${filteredTemplates.length !== 1 ? 's' : ''}`}
-              </div>
-            )}
-          </div>
-        </div>
+  // Header actions content
+  const headerActions = (
+    <>
+      <div className="relative flex-1 lg:min-w-[300px]">
+        <input
+          ref={baseManager.searchInputRef}
+          type="text"
+          placeholder="Search templates..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
+          className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            aria-label="Clear search"
+          >
+            <i className="fas fa-times text-sm"></i>
+          </button>
+        )}
       </div>
+      {/* Desktop action buttons - hidden on mobile */}
+      <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => fetchTemplates(true)}
+          disabled={loading}
+          title="Reload templates from the database"
+          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+        >
+          <RefreshIcon className="w-4 h-4" />
+          Refresh
+        </button>
+        {!showForm && (
+          <>
+            <button
+              onClick={handleCreateClick}
+              disabled={loading}
+              title="Create a new presentation template with custom slides and styling"
+              className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              <i className="fas fa-plus text-lg"></i>
+              Create Template
+            </button>
 
-      {/* List Container - Scrollable on mobile, normal on desktop */}
-      <div
-        ref={listContainerRef}
-        className={isMobile ? 'fixed overflow-y-auto' : 'overflow-y-auto'}
-        style={isMobile ? {
-          ...listContainerStyle,
-          // Ensure overflow is always set
-          overflowY: 'auto',
-          overflowX: 'hidden',
-        } : {
-          minHeight: '400px',
-          maxHeight: 'calc(100vh - 200px)', // Leave space for header and padding
-        }}
-      >
-        <div className={isMobile ? 'px-1.5 sm:px-6 lg:px-8' : ''}>
-          {/* Import Progress Message */}
-          {importProgress && (
-            <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 px-4 py-3 rounded-md flex items-center gap-3">
-              <i className="fas fa-spinner fa-spin text-lg text-blue-600 dark:text-blue-400"></i>
-              <span>{importProgress}</span>
+            {/* Import PowerPoint Button */}
+            <button
+              onClick={() => pptxInputRef.current?.click()}
+              disabled={loading || importingPptx}
+              title="Import slides from a PowerPoint file (.pptx) to create a new template"
+              className="w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              <i className="fas fa-upload text-lg"></i>
+              {importingPptx ? 'Importing...' : 'Import PowerPoint'}
+            </button>
+
+            {/* Hidden file input for PowerPoint import */}
+            <input
+              ref={pptxInputRef}
+              type="file"
+              accept=".pptx"
+              onChange={handleImportPptx}
+              className="hidden"
+            />
+          </>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <BaseManager
+      isActive={isActive}
+      isMobile={baseManager.isMobile}
+      showScrollToTop={baseManager.showScrollToTop}
+      listContainerStyle={baseManager.listContainerStyle}
+      listContainerRef={baseManager.listContainerRef}
+      headerRef={baseManager.headerRef}
+      title="Presentation Templates"
+      subtitle="Manage presentation templates for slide shows"
+      helpHref="/help#templates"
+      headerActions={headerActions}
+      headerBelow={!loading && filteredTemplates.length > 0 ? (
+        <div className={`text-sm text-gray-600 dark:text-gray-400 ${baseManager.isMobile ? '' : 'mt-2'}`}>
+          {searchTerm.trim() && filteredTemplates.length !== templates.length
+            ? `Showing ${filteredTemplates.length} of ${templates.length} templates`
+            : `${filteredTemplates.length} template${filteredTemplates.length !== 1 ? 's' : ''}`}
+        </div>
+      ) : undefined}
+      mobileActions={mobileActions}
+      onScrollToTop={baseManager.scrollToTop}
+      loading={loading}
+    >
+        {/* Import Progress Message */}
+        {importProgress && (
+          <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 px-4 py-3 rounded-md flex items-center gap-3">
+            <i className="fas fa-spinner fa-spin text-lg text-blue-600 dark:text-blue-400"></i>
+            <span>{importProgress}</span>
+          </div>
+        )}
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="mb-6 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300 px-4 py-3 rounded-md">
+            {successMessage}
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 px-4 py-3 rounded-md flex justify-between items-center">
+            <span>{error.message}</span>
+            <button
+              onClick={clearError}
+              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Templates List */}
+        <div className="space-y-0 md:space-y-3">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
+              <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">Loading templates...</p>
             </div>
-          )}
-
-          {/* Success Message */}
-          {successMessage && (
-            <div className="mb-6 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300 px-4 py-3 rounded-md">
-              {successMessage}
-            </div>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 px-4 py-3 rounded-md flex justify-between items-center">
-              <span>{error.message}</span>
-              <button
-                onClick={clearError}
-                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          {/* Templates List */}
-          <div className="space-y-0 md:space-y-3">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
-                <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm">Loading templates...</p>
-              </div>
-            ) : filteredTemplates.length > 0 ? (
-              filteredTemplates.map((template, index) => {
-                const isSelected = selectedTemplateId === template.id;
-                return (
-                  <div
-                    key={template.id}
-                    onClick={() => {
-                      // On mobile, toggle selection on row click
-                      if (isMobile) {
-                        setSelectedTemplateId(isSelected ? null : template.id || null);
-                      }
-                    }}
-                    className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${isMobile
-                        ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                        }`
-                        : `md:border md:border-gray-200 md:dark:border-gray-700 md:rounded-lg md:hover:shadow-md ${index > 0 ? 'md:border-t-0' : ''
-                        }`
-                      }`}
+          ) : filteredTemplates.length > 0 ? (
+            filteredTemplates.map((template, index) => {
+              const isSelected = selectedTemplateId === template.id;
+              return (
+                <div
+                  key={template.id}
+                  onClick={() => {
+                    // On mobile, toggle selection on row click
+                    if (baseManager.isMobile) {
+                      setSelectedTemplateId(isSelected ? null : template.id || null);
+                    }
+                  }}
+                  className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${baseManager.isMobile
+                      ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                      }`
+                      : `md:border md:border-gray-200 md:dark:border-gray-700 md:rounded-lg md:hover:shadow-md ${index > 0 ? 'md:border-t-0' : ''
+                      }`
+                    }`}
                   >
                     <div className="flex flex-col gap-1.5 md:gap-3">
                       <div className="flex-1 min-w-0">
@@ -1127,7 +1009,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                       </div>
 
                       {/* Actions Row - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}
-                      <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
+                      <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${baseManager.isMobile && !isSelected ? 'hidden' : ''}`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
@@ -1202,20 +1084,6 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
               </div>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Scroll to Top Button - Mobile only */}
-      {isMobile && showScrollToTop && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-24 right-4 z-50 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
-          title="Scroll to top"
-          aria-label="Scroll to top"
-        >
-          <i className="fas fa-arrow-up text-lg"></i>
-        </button>
-      )}
 
       {/* Template Form Modal */}
       <Modal
@@ -1623,11 +1491,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
         </div>
       )}
 
-      {/* Mobile Bottom Action Bar */}
-      <MobileBottomActionBar
-        actions={mobileActions}
-      />
-    </div>
+    </BaseManager>
   );
 }
 

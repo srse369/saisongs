@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserMultiSelect } from '../common/UserMultiSelect';
 import { clearCentersCache } from '../common/CenterBadges';
 import { removeLocalStorageItem, setLocalStorageItem } from '../../utils/cacheUtils';
-import { RefreshIcon, Modal, MobileBottomActionBar, type MobileAction } from '../common';
+import { RefreshIcon, Modal, type MobileAction } from '../common';
 import { globalEventBus } from '../../utils/globalEventBus';
 import type { Center } from '../../types';
+import { BaseManager } from './BaseManager';
+import { useBaseManager } from '../../hooks/useBaseManager';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || (
   import.meta.env.DEV ? '/api' : 'http://localhost:3111/api'
@@ -21,7 +23,25 @@ interface CentersManagerProps {
 export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true }) => {
   const location = useLocation();
   const { isAdmin } = useAuth();
+
+  // Use base manager hook for common functionality
+  const baseManager = useBaseManager({
+    resourceName: 'centers',
+    isActive,
+    onEscapeKey: () => {
+      if (isFormOpen) {
+        handleCloseForm();
+      } else if (searchTermRef.current) {
+        setSearchTerm('');
+        baseManager.searchInputRef.current?.focus();
+      }
+    },
+  });
+
   const [centers, setCenters] = useState<Center[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const searchTermRef = useRef(searchTerm);
+  searchTermRef.current = searchTerm;
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -29,108 +49,6 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
   const [editingCenter, setEditingCenter] = useState<Center | null>(null);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [selectedCenterId, setSelectedCenterId] = useState<number | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const [showScrollToTop, setShowScrollToTop] = useState(false);
-  const listContainerRef = useRef<HTMLDivElement | null>(null);
-  const headerRef = useRef<HTMLDivElement | null>(null);
-  
-  // State for dynamic list container positioning on mobile
-  const [listContainerStyle, setListContainerStyle] = useState<React.CSSProperties>(() => {
-    return {};
-  });
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Prevent body scroll on mobile when tab is active
-  useEffect(() => {
-    if (isMobile && isActive) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
-  }, [isMobile, isActive]);
-
-  // Calculate list container positioning on mobile (after DOM is ready)
-  useEffect(() => {
-    if (!isMobile || !isActive) {
-      setListContainerStyle({});
-      return;
-    }
-
-    const calculatePosition = () => {
-      const header = headerRef.current;
-      if (!header) return;
-
-      const bottomBarHeight = 108;
-      const headerRect = header.getBoundingClientRect();
-      const bottomBarTop = window.innerHeight - bottomBarHeight;
-      const calculatedHeight = bottomBarTop - headerRect.bottom;
-      
-      // Ensure height is positive and reasonable
-      const finalHeight = calculatedHeight > 0 ? calculatedHeight : 400;
-      
-      setListContainerStyle({
-        top: `${headerRect.bottom + 6}px`,
-        left: '1%',
-        width: '98%',
-        height: `${finalHeight}px`,
-        minHeight: `${finalHeight}px`,
-        maxHeight: `${finalHeight}px`,
-        WebkitOverflowScrolling: 'touch',
-        overscrollBehavior: 'contain',
-        overscrollBehaviorY: 'contain',
-        touchAction: 'pan-y',
-      });
-    };
-
-    // Calculate using requestAnimationFrame to ensure DOM is laid out
-    const rafId = requestAnimationFrame(() => {
-      calculatePosition();
-    });
-    
-    // Also recalculate after delays to ensure bottom bar is rendered
-    const timeoutId1 = setTimeout(calculatePosition, 100);
-    const timeoutId2 = setTimeout(calculatePosition, 300);
-    const timeoutId3 = setTimeout(calculatePosition, 500);
-
-    // Recalculate on resize
-    window.addEventListener('resize', calculatePosition);
-    
-    return () => {
-      cancelAnimationFrame(rafId);
-      clearTimeout(timeoutId1);
-      clearTimeout(timeoutId2);
-      clearTimeout(timeoutId3);
-      window.removeEventListener('resize', calculatePosition);
-    };
-  }, [isMobile, isActive, centers.length, loading]);
-
-  // Track scroll position for scroll-to-top button (only when active)
-  useEffect(() => {
-    if (!isActive || !isMobile || !listContainerRef.current) return;
-
-    const container = listContainerRef.current;
-    const handleScroll = () => {
-      setShowScrollToTop(container.scrollTop > 200);
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [isMobile, isActive]);
-
-  const scrollToTop = () => {
-    if (listContainerRef.current) {
-      listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
 
   // Form state
   const [formData, setFormData] = useState({
@@ -147,6 +65,12 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
   });
 
   const hasFetchedRef = useRef(false);
+
+  const filteredCenters = useMemo(() => {
+    if (!searchTerm.trim()) return centers;
+    const q = searchTerm.toLowerCase().trim();
+    return centers.filter((c) => (c.name ?? '').toLowerCase().includes(q));
+  }, [centers, searchTerm]);
 
   const fetchCenters = useCallback(async () => {
     try {
@@ -339,19 +263,7 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
     };
   }, [fetchCenters]);
 
-  // Handle escape key press
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFormOpen) {
-        handleCloseForm();
-      }
-    };
-
-    if (isFormOpen) {
-      document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
-    }
-  }, [isFormOpen, formData, originalData]);
+  // Escape key is handled by useBaseManager's onEscapeKey callback
 
   const handleOpenForm = (center?: Center) => {
     const initialData = center
@@ -555,75 +467,80 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
     },
   ];
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+
+  // Header actions content
+  const headerActions = (
+    <>
+      <div className="relative flex-1 lg:min-w-[300px]">
+        <input
+          ref={baseManager.searchInputRef}
+          type="text"
+          value={searchTerm}
+          onChange={handleSearchChange}
+          placeholder="Search centers by name..."
+          autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
+          className="w-full pl-9 pr-9 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+        />
+        <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            aria-label="Clear search"
+          >
+            <i className="fas fa-times text-sm"></i>
+          </button>
+        )}
+      </div>
+      {/* Desktop action buttons - hidden on mobile */}
+      <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => fetchCenters()}
+          disabled={loading}
+          title="Refresh centers list"
+          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+        >
+          <RefreshIcon className="w-4 h-4" />
+          Refresh
+        </button>
+        <button
+          onClick={() => handleOpenForm()}
+          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+        >
+          <i className="fas fa-plus text-lg"></i>
+          Add Center
+        </button>
+      </div>
+    </>
+  );
+
   return (
-    <div className="max-w-6xl mx-auto px-1.5 sm:px-6 py-2 sm:py-4 md:py-6">
-      {/* Fixed Header on Mobile - Pinned below Layout header */}
-      <div
-        ref={headerRef}
-        id="centers-manager-header" 
-        className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-4 sm:mb-6'}`}
-        style={isMobile ? {
-          top: '48px', // Position below Layout header (h-12 = 48px on mobile)
-          paddingTop: 'env(safe-area-inset-top, 0px)',
-        } : {}}
-      >
-        <div className={`max-w-6xl mx-auto px-1.5 sm:px-6 ${isMobile ? 'py-2' : ''}`}>
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">Centers</h1>
-                <a
-                  href="/help#centers"
-                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                  title="View help documentation for this tab"
-                >
-                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-                </a>
-              </div>
-              {!loading && centers.length > 0 && (
-                <p className={`hidden sm:block mt-1 text-sm text-gray-500 dark:text-gray-400 ${isMobile ? 'mb-2' : ''}`}>
-                  {centers.length} center{centers.length !== 1 ? 's' : ''}
-                </p>
-              )}
-            </div>
-            {/* Desktop action buttons - hidden on mobile */}
-            <div className="hidden md:flex gap-2">
-              <button
-                type="button"
-                onClick={() => fetchCenters()}
-                disabled={loading}
-                title="Refresh centers list"
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-              >
-                <RefreshIcon className="w-4 h-4" />
-                Refresh
-              </button>
-              <button
-                onClick={() => handleOpenForm()}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-              >
-                + Add Center
-              </button>
-            </div>
+    <BaseManager
+      isActive={isActive}
+      isMobile={baseManager.isMobile}
+      showScrollToTop={baseManager.showScrollToTop}
+      listContainerStyle={baseManager.listContainerStyle}
+      listContainerRef={baseManager.listContainerRef}
+      headerRef={baseManager.headerRef}
+      title="Centers"
+      subtitle="Manage centers and editors"
+      helpHref="/help#centers"
+      headerActions={headerActions}
+      headerBelow={!loading && (centers.length > 0 || filteredCenters.length > 0) ? (
+        <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 pt-3">
+          <div className={`text-sm text-gray-600 dark:text-gray-400 ${baseManager.isMobile ? 'mt-2' : 'mb-2'}`}>
+            {searchTerm.trim() ? `${filteredCenters.length} of ${centers.length} center${centers.length !== 1 ? 's' : ''}` : `${centers.length} center${centers.length !== 1 ? 's' : ''}`}
           </div>
         </div>
-      </div>
-
-      {/* List Container - Scrollable on mobile, normal on desktop */}
-      <div
-        ref={listContainerRef}
-        className={isMobile ? 'fixed overflow-y-auto' : 'overflow-y-auto'}
-        style={isMobile ? {
-          ...listContainerStyle,
-          // Ensure overflow is always set
-          overflowY: 'auto',
-          overflowX: 'hidden',
-        } : {
-          minHeight: '400px',
-          maxHeight: 'calc(100vh - 200px)', // Leave space for header and padding
-        }}
-      >
-        <div className={isMobile ? 'px-1.5 sm:px-6' : ''}>
+      ) : undefined}
+      mobileActions={mobileActions}
+      onScrollToTop={baseManager.scrollToTop}
+      loading={loading}
+    >
           {error && (
             <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
               <p className="text-red-700 dark:text-red-300">{error}</p>
@@ -634,24 +551,24 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
-          ) : centers.length === 0 ? (
+          ) : filteredCenters.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <p className="text-gray-500 dark:text-gray-400">No centers found. Create your first center to get started.</p>
+              <p className="text-gray-500 dark:text-gray-400">{searchTerm.trim() ? 'No centers match your search.' : 'No centers found. Create your first center to get started.'}</p>
             </div>
           ) : (
             <div className="space-y-0 md:space-y-3">
-          {centers.map((center, index) => {
+          {filteredCenters.map((center, index) => {
             const isSelected = selectedCenterId === center.id;
             return (
               <div
                 key={center.id}
                 onClick={() => {
                   // On mobile, toggle selection on row click
-                  if (isMobile) {
+                  if (baseManager.isMobile) {
                     setSelectedCenterId(isSelected ? null : center.id);
                   }
                 }}
-                className={`p-2 md:p-4 bg-white dark:bg-gray-800 transition-all duration-200 ${isMobile
+                className={`p-2 md:p-4 bg-white dark:bg-gray-800 transition-all duration-200 ${baseManager.isMobile
                   ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                   }`
                   : `border rounded-lg shadow-md hover:shadow-lg ${isSelected
@@ -718,7 +635,7 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
                 </div>
 
                 {/* Actions - Hidden on mobile until row is selected */}
-                <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 mt-1 md:pt-3 md:mt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
+                <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 mt-1 md:pt-3 md:mt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${baseManager.isMobile && !isSelected ? 'hidden' : ''}`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
@@ -741,8 +658,6 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
           })}
             </div>
           )}
-        </div>
-      </div>
 
       {/* Form Modal */}
       <Modal
@@ -909,23 +824,7 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
         </form>
       </Modal>
 
-      {/* Scroll to Top Button - Mobile only */}
-      {isMobile && showScrollToTop && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-24 right-4 z-50 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
-          title="Scroll to top"
-          aria-label="Scroll to top"
-        >
-          <i className="fas fa-arrow-up text-lg"></i>
-        </button>
-      )}
-
-      {/* Mobile Bottom Action Bar */}
-      <MobileBottomActionBar
-        actions={mobileActions}
-      />
-    </div>
+    </BaseManager>
   );
 };
 

@@ -782,7 +782,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-7xl mx-auto py-2 sm:py-4 md:py-6 lg:py-8 px-2 sm:px-6 lg:px-8 pb-24 md:pb-2">
+      <main className="flex-1 w-full max-w-7xl mx-auto py-2 sm:py-4 md:py-4 lg:py-4 px-2 sm:px-6 lg:px-8 pb-24 md:pb-2 grid">
         {children}
       </main>
 

@@ -184,12 +184,14 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
       return;
     }
 
-    // Reset backoff for explicit user-triggered refreshes
-    if (forceRefresh && typeof window !== 'undefined') {
+    // Reset backoff for explicit user-triggered refreshes or initial mount (first fetch)
+    if ((forceRefresh || !hasFetched) && typeof window !== 'undefined') {
       const { apiClient } = await import('../services/ApiClient');
       apiClient.resetBackoff('/songs');
-      setError(null);
-      setHasFetched(false);
+      if (forceRefresh) {
+        setError(null);
+        setHasFetched(false);
+      }
     }
 
     setLoading(true);

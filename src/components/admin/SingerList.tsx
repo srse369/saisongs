@@ -157,7 +157,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
     <>
       {/* Merge controls - shown when in selection mode */}
       {isEditor && onMerge && isSelectionMode && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 sticky top-0 bg-white dark:bg-gray-800 z-10 py-2 border-b border-gray-200 dark:border-gray-700">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 sticky top-12 bg-white dark:bg-gray-800 z-10 py-2 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <span className="font-semibold">{selectedSingerIds.length}</span>
             <span>selected</span>

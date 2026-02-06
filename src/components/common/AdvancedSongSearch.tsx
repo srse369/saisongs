@@ -11,7 +11,6 @@ export interface SongSearchFilters {
   beat?: string;
   level?: string;
   songTags?: string;
-  // Case sensitivity flags
   nameCaseSensitive?: boolean;
   deityCaseSensitive?: boolean;
   languageCaseSensitive?: boolean;
@@ -26,28 +25,52 @@ interface AdvancedSongSearchProps {
   filters: SongSearchFilters;
   onFiltersChange: (filters: SongSearchFilters) => void;
   onClear: () => void;
-  songs?: Song[]; // Add songs to extract unique values
+  onApply?: () => void;
+  songs?: Song[];
 }
 
 export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
   filters,
   onFiltersChange,
   onClear,
+  onApply,
   songs = [],
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Extract unique values for dropdowns
+  /**
+   * FIX: 2026 Layout Recalculation
+   * Force the browser to reset the visual viewport to 100% after keyboard hide.
+   */
+  const handleMobileDismissal = (callback?: () => void) => {
+    // 1. Dismiss Keyboard immediately
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    // 2. Allow a delay for the keyboard dismissal animation to start
+    // Closing the dialog too fast causes the 'blank screen' bug.
+    setTimeout(() => {
+      if (callback) callback();
+      setIsExpanded(false);
+
+      // 3. Force a DOM Reflow (The "Nuclear Option" for repaints)
+      document.body.style.display = 'none';
+      document.body.offsetHeight; // Forces engine to recalculate layout
+      document.body.style.display = '';
+
+      // 4. Reset scroll to fix viewport displacement
+      window.scrollTo(window.scrollX, window.scrollY);
+    }, 150); 
+  };
+
   const uniqueValues = useMemo(() => {
     const getUniqueValues = (field: keyof Song) => {
       const values = new Set<string>();
@@ -59,7 +82,6 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
       });
       return Array.from(values).sort((a, b) => a.localeCompare(b));
     };
-
     return {
       deities: getUniqueValues('deity'),
       languages: getUniqueValues('language'),
@@ -71,43 +93,18 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
   }, [songs]);
 
   const handleFilterChange = (field: keyof SongSearchFilters, value: string) => {
-    onFiltersChange({
-      ...filters,
-      [field]: value || undefined,
-    });
+    onFiltersChange({ ...filters, [field]: value || undefined });
   };
 
   const handleCaseSensitivityChange = (field: keyof SongSearchFilters, checked: boolean) => {
-    onFiltersChange({
-      ...filters,
-      [field]: checked,
-    });
+    onFiltersChange({ ...filters, [field]: checked });
   };
 
-  const hasActiveFilters = Object.values(filters).some(v => v);
-  const activeFilterCount = Object.values(filters).filter(v => v).length;
-
-  // Close on Enter/Return key press on mobile
-  useEffect(() => {
-    if (!isExpanded) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle on mobile (screen width < 768px)
-      if (window.innerWidth >= 768) return;
-      
-      if (e.key === 'Enter' || e.key === 'Return') {
-        e.preventDefault();
-        setIsExpanded(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isExpanded]);
+  const hasActiveFilters = Object.values(filters).some(v => v === true || (typeof v === 'string' && v.length > 0));
+  const activeFilterCount = Object.values(filters).filter(v => v === true || (typeof v === 'string' && v.length > 0)).length;
 
   return (
     <div className="space-y-3">
-      {/* Toggle Button */}
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -125,37 +122,36 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
         {hasActiveFilters && (
           <button
             type="button"
-            onClick={onClear}
-            className="text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+            onPointerDown={(e) => {
+              e.preventDefault(); // Prevents click-stealing
+              handleMobileDismissal(onClear);
+            }}
+            className="text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 transition-colors"
           >
-            Clear all filters
+            Clear all
           </button>
         )}
       </div>
 
-      {/* Advanced Search Fields */}
       {isExpanded && (
         <div 
-          className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 animate-fade-in"
+          className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 animate-fade-in"
           style={isMobile ? {
-            maxHeight: 'calc(100vh - 300px)', // Leave space for header, search bar, and buttons
+            maxHeight: 'calc(100vh - 280px)', // Reserve space for header, search bar, and bottom action bar
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
-            overscrollBehavior: 'contain',
           } : {}}
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {/* Song Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Song Name
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Song Name</label>
               <input
                 type="text"
                 value={filters.name || ''}
                 onChange={(e) => handleFilterChange('name', e.target.value)}
                 placeholder="Search by name..."
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
               <div className="flex items-center gap-1.5 mt-1">
                 <input
@@ -170,18 +166,16 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
                 </label>
               </div>
             </div>
-            
-            {/* Deity Combo Box */}
+
+            {/* Deity */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Deity
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deity</label>
               <input
                 list="deity-list"
                 value={filters.deity || ''}
                 onChange={(e) => handleFilterChange('deity', e.target.value)}
-                placeholder="Type or select deity..."
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                placeholder="Type or select..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
               <datalist id="deity-list">
                 {uniqueValues.deities.map(deity => (
@@ -202,17 +196,15 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
               </div>
             </div>
 
-            {/* Language Combo Box */}
+            {/* Language */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Language
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Language</label>
               <input
                 list="language-list"
                 value={filters.language || ''}
                 onChange={(e) => handleFilterChange('language', e.target.value)}
-                placeholder="Type or select language..."
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                placeholder="Type or select..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
               <datalist id="language-list">
                 {uniqueValues.languages.map(language => (
@@ -233,17 +225,15 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
               </div>
             </div>
 
-            {/* Raga Combo Box */}
+            {/* Raga */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Raga
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Raga</label>
               <input
                 list="raga-list"
                 value={filters.raga || ''}
                 onChange={(e) => handleFilterChange('raga', e.target.value)}
-                placeholder="Type or select raga..."
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                placeholder="Type or select..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
               <datalist id="raga-list">
                 {uniqueValues.ragas.map(raga => (
@@ -264,17 +254,15 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
               </div>
             </div>
 
-            {/* Tempo Combo Box */}
+            {/* Tempo */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tempo
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tempo</label>
               <input
                 list="tempo-list"
                 value={filters.tempo || ''}
                 onChange={(e) => handleFilterChange('tempo', e.target.value)}
-                placeholder="Type or select tempo..."
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                placeholder="Type or select..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
               <datalist id="tempo-list">
                 {uniqueValues.tempos.map(tempo => (
@@ -295,17 +283,15 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
               </div>
             </div>
 
-            {/* Beat Combo Box */}
+            {/* Beat */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Beat
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Beat</label>
               <input
                 list="beat-list"
                 value={filters.beat || ''}
                 onChange={(e) => handleFilterChange('beat', e.target.value)}
-                placeholder="Type or select beat..."
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                placeholder="Type or select..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
               <datalist id="beat-list">
                 {uniqueValues.beats.map(beat => (
@@ -326,17 +312,15 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
               </div>
             </div>
 
-            {/* Level Combo Box */}
+            {/* Level */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Level
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Level</label>
               <input
                 list="level-list"
                 value={filters.level || ''}
                 onChange={(e) => handleFilterChange('level', e.target.value)}
-                placeholder="Type or select level..."
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                placeholder="Type or select..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
               <datalist id="level-list">
                 {uniqueValues.levels.map(level => (
@@ -359,15 +343,13 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
 
             {/* Tags */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tags
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags</label>
               <input
                 type="text"
                 value={filters.songTags || ''}
                 onChange={(e) => handleFilterChange('songTags', e.target.value)}
                 placeholder="Search by tags..."
-                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
               <div className="flex items-center gap-1.5 mt-1">
                 <input
@@ -384,45 +366,26 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
             </div>
           </div>
 
-          {/* Active Filters Summary */}
-          {hasActiveFilters && (
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Active filters:</span>
-              {Object.entries(filters).map(([key, value]) => 
-                value ? (
-                  <span
-                    key={key}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded text-xs"
-                  >
-                    <span className="font-medium">{key}:</span>
-                    <span>{value}</span>
-                    <button
-                      onClick={() => handleFilterChange(key as keyof SongSearchFilters, '')}
-                      className="ml-1 hover:text-blue-900 dark:hover:text-blue-100"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ) : null
-              )}
-            </div>
-          )}
-
-          {/* Cancel and Apply Buttons */}
-          <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-2">
             <button
               type="button"
-              onClick={() => setIsExpanded(false)}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                handleMobileDismissal();
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-md"
             >
-              Cancel
+              Close
             </button>
             <button
               type="button"
-              onClick={() => setIsExpanded(false)}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                handleMobileDismissal(onApply);
+              }}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 shadow-sm"
             >
-              Apply
+              Apply Filters
             </button>
           </div>
         </div>
@@ -430,5 +393,3 @@ export const AdvancedSongSearch: React.FC<AdvancedSongSearchProps> = ({
     </div>
   );
 };
-
-

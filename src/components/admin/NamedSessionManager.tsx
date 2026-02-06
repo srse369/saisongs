@@ -8,9 +8,11 @@ import { NamedSessionForm } from './NamedSessionForm';
 import { NamedSessionList } from './NamedSessionList';
 import { Modal } from '../common/Modal';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { SearchBar } from '../common/SearchBar';
+import { RefreshIcon, type MobileAction } from '../common';
 import { ALL_PITCH_OPTIONS, formatPitchWithName } from '../../utils/pitchUtils';
 import type { NamedSession, Song, Singer } from '../../types';
+import { BaseManager } from './BaseManager';
+import { useBaseManager } from '../../hooks/useBaseManager';
 
 interface SessionItemEdit {
   songId: string;
@@ -18,11 +20,16 @@ interface SessionItemEdit {
   pitch?: string;
 }
 
-export const NamedSessionManager: React.FC = () => {
+interface NamedSessionManagerProps {
+  isActive?: boolean;
+}
+
+export const NamedSessionManager: React.FC<NamedSessionManagerProps> = ({ isActive = true }) => {
   const {
     sessions,
     currentSession,
     loading,
+    loadSessions,
     createSession,
     updateSession,
     deleteSession,
@@ -37,27 +44,28 @@ export const NamedSessionManager: React.FC = () => {
   const { setSessionSongs } = useSession();
   const { userRole } = useAuth();
 
+  // Use base manager hook for common functionality
+  const baseManager = useBaseManager({
+    resourceName: 'sessions',
+    isActive,
+    onDataRefresh: () => loadSessions?.(),
+    onEscapeKey: () => {
+      if (!showCreateModal && !editingSession && !managingSession) {
+        if (baseManager.searchInputRef.current) {
+          baseManager.searchInputRef.current.focus();
+        }
+      }
+    },
+  });
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingSession, setEditingSession] = useState<NamedSession | null>(null);
   const [managingSession, setManagingSession] = useState<NamedSession | null>(null);
   const [sessionItems, setLocalSessionItems] = useState<SessionItemEdit[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Editor and admin can create/modify sessions
   const canEdit = userRole === 'editor' || userRole === 'admin';
-
-  // Focus search bar on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && searchInputRef.current) {
-        searchInputRef.current.focus();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   // Filter sessions by search query
   const filteredSessions = sessions.filter(session =>
@@ -164,80 +172,100 @@ export const NamedSessionManager: React.FC = () => {
     setLocalSessionItems(newItems);
   };
 
-  return (
-    <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-4 sm:py-8">
-      <div className="mb-4 sm:mb-8">
-        <div className="flex flex-col gap-4 mb-4 sm:mb-6">
-          {/* Header */}
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-1">
-                Named Sessions
-              </h1>
-              <a
-                href="/help#live"
-                className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                title="View help documentation for sessions"
-              >
-                <i className="fas fa-question-circle text-xl"></i>
-              </a>
-            </div>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-              Manage saved session configurations
-            </p>
-          </div>
+  // Mobile actions for bottom bar
+  const mobileActions: MobileAction[] = [
+    {
+      label: 'Refresh',
+      icon: 'fas fa-sync-alt',
+      onClick: () => loadSessions(),
+      variant: 'secondary' as const,
+      disabled: loading,
+    },
+    ...(canEdit ? [{
+      label: 'Create',
+      icon: 'fas fa-plus',
+      onClick: () => setShowCreateModal(true),
+      variant: 'primary' as const,
+    }] : []),
+  ];
 
-          {/* Search and buttons */}
-          <div className="flex flex-col lg:flex-row gap-3 w-full">
-            <div className="relative flex-1 lg:min-w-[300px]">
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search sessions..."
-                className="w-full pl-10 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
-              />
-              <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                  aria-label="Clear search"
-                >
-                  <i className="fas fa-times text-sm"></i>
-                </button>
-              )}
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-              {canEdit && (
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  title="Create a new named session to save a set of songs with singers and pitches"
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                >
-                  <i className="fas fa-plus text-lg"></i>
-                  Create Session
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+  // Header actions content
+  const headerActions = (
+    <>
+      <div className="relative flex-1 lg:min-w-[300px]">
+        <input
+          ref={baseManager.searchInputRef}
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search sessions..."
+          autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
+          className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+        />
+        <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery('')}
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            aria-label="Clear search"
+          >
+            <i className="fas fa-times text-sm"></i>
+          </button>
+        )}
       </div>
+      {/* Desktop action buttons - hidden on mobile */}
+      <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => loadSessions()}
+          disabled={loading}
+          title="Reload sessions from the database"
+          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+        >
+          <RefreshIcon className="w-4 h-4" />
+          Refresh
+        </button>
+        {canEdit && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            title="Create a new named session to save a set of songs with singers and pitches"
+            className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+          >
+            <i className="fas fa-plus text-lg"></i>
+            Create Session
+          </button>
+        )}
+      </div>
+    </>
+  );
 
+  return (
+    <BaseManager
+      isActive={isActive}
+      isMobile={baseManager.isMobile}
+      showScrollToTop={baseManager.showScrollToTop}
+      listContainerStyle={baseManager.listContainerStyle}
+      listContainerRef={baseManager.listContainerRef}
+      headerRef={baseManager.headerRef}
+      title="Named Sessions"
+      subtitle="Manage saved session configurations"
+      helpHref="/help#live"
+      headerActions={headerActions}
+      headerBelow={!loading && filteredSessions.length > 0 ? (
+        <div className={`text-sm text-gray-600 dark:text-gray-400 ${baseManager.isMobile ? '' : 'mt-2'}`}>
+          {searchQuery.trim() && filteredSessions.length !== sessions.length
+            ? `Showing ${filteredSessions.length} of ${sessions.length} sessions`
+            : `${filteredSessions.length} session${filteredSessions.length !== 1 ? 's' : ''}`}
+        </div>
+      ) : undefined}
+      mobileActions={mobileActions}
+      onScrollToTop={baseManager.scrollToTop}
+      loading={loading}
+    >
       {/* Loading state */}
       {loading && !currentSession && (
         <div className="flex justify-center py-8">
           <LoadingSpinner />
-        </div>
-      )}
-
-      {/* Session count status */}
-      {!loading && filteredSessions.length > 0 && (
-        <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-          {searchQuery.trim() && filteredSessions.length !== sessions.length
-            ? `Showing ${filteredSessions.length} of ${sessions.length} sessions`
-            : `${filteredSessions.length} session${filteredSessions.length !== 1 ? 's' : ''}`}
         </div>
       )}
 
@@ -396,7 +424,7 @@ export const NamedSessionManager: React.FC = () => {
           </div>
         </div>
       </Modal>
-    </div>
+    </BaseManager>
   );
 };
 

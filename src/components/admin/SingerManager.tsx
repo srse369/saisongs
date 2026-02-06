@@ -5,12 +5,13 @@ import { usePitches } from '../../contexts/PitchContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
 import { removeLocalStorageItem } from '../../utils/cacheUtils';
-import { RefreshIcon, MobileBottomActionBar, type MobileAction } from '../common';
+import { RefreshIcon, type MobileAction } from '../common';
 import { SingerForm } from './SingerForm';
 import { SingerList } from './SingerList';
 import { Modal } from '../common/Modal';
 import type { Singer, CreateSingerInput } from '../../types';
-import { globalEventBus } from '../../utils/globalEventBus';
+import { BaseManager } from './BaseManager';
+import { useBaseManager } from '../../hooks/useBaseManager';
 
 interface SingerManagerProps {
   isActive?: boolean;
@@ -21,116 +22,41 @@ export const SingerManager: React.FC<SingerManagerProps> = ({ isActive = true })
   const { singers, loading, error, fetchSingers, createSinger, updateSinger, deleteSinger, mergeSingers } = useSingers();
   const { fetchAllPitches } = usePitches();
   const { isEditor, userId, logout } = useAuth();
+  
+  // Use base manager hook for common functionality
+  const baseManager = useBaseManager({
+    resourceName: 'singers',
+    isActive,
+    onDataRefresh: () => fetchSingers(true),
+    onEscapeKey: () => {
+      if (baseManager.searchInputRef.current) {
+        baseManager.searchInputRef.current.focus();
+      }
+    },
+  });
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSinger, setEditingSinger] = useState<Singer | null>(null);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [previewSinger, setPreviewSinger] = useState<Singer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'pitchCount'>('name');
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
-  const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const [selectedSingersForMerge, setSelectedSingersForMerge] = useState<string[]>([]);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const lastFetchedUserIdRef = useRef<string | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const listContainerRef = useRef<HTMLDivElement | null>(null);
-  const headerRef = useRef<HTMLDivElement | null>(null);
   const startSelectionRef = useRef<(() => void) | null>(null);
-  
-  // State for dynamic list container positioning on mobile
-  const [listContainerStyle, setListContainerStyle] = useState<React.CSSProperties>(() => {
-    return {};
-  });
 
-  // Track mobile state
+  // Show error as toast message
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Prevent body scroll on mobile when tab is active
-  useEffect(() => {
-    if (isMobile && isActive) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
+    if (error) {
+      console.error('SingerManager error:', error);
+      // You could add toast notification here if needed
     }
-  }, [isMobile, isActive]);
-
-  // Calculate list container positioning on mobile (after DOM is ready)
-  useEffect(() => {
-    if (!isMobile || !isActive) {
-      setListContainerStyle({});
-      return;
-    }
-
-    const calculatePosition = () => {
-      const header = headerRef.current;
-      if (!header) return;
-
-      const bottomBarHeight = 108;
-      const headerRect = header.getBoundingClientRect();
-      const bottomBarTop = window.innerHeight - bottomBarHeight;
-      const calculatedHeight = bottomBarTop - headerRect.bottom;
-      
-      // Ensure height is positive and reasonable
-      const finalHeight = calculatedHeight > 0 ? calculatedHeight : 400;
-      
-      setListContainerStyle({
-        top: `${headerRect.bottom + 6}px`,
-        left: '1%',
-        width: '98%',
-        height: `${finalHeight}px`,
-        minHeight: `${finalHeight}px`,
-        maxHeight: `${finalHeight}px`,
-        WebkitOverflowScrolling: 'touch',
-        overscrollBehavior: 'contain',
-        overscrollBehaviorY: 'contain',
-        touchAction: 'pan-y',
-      });
-    };
-
-    // Calculate using requestAnimationFrame to ensure DOM is laid out
-    const rafId = requestAnimationFrame(() => {
-      calculatePosition();
-    });
-    
-    // Also recalculate after delays to ensure bottom bar is rendered
-    const timeoutId1 = setTimeout(calculatePosition, 100);
-    const timeoutId2 = setTimeout(calculatePosition, 300);
-    const timeoutId3 = setTimeout(calculatePosition, 500);
-
-    // Recalculate on resize
-    window.addEventListener('resize', calculatePosition);
-    
-    return () => {
-      cancelAnimationFrame(rafId);
-      clearTimeout(timeoutId1);
-      clearTimeout(timeoutId2);
-      clearTimeout(timeoutId3);
-      window.removeEventListener('resize', calculatePosition);
-    };
-  }, [isMobile, isActive, singers.length, loading, searchTerm]);
-
-  // Track scroll position for scroll-to-top button (only when active)
-  useEffect(() => {
-    if (!isActive || !isMobile || !listContainerRef.current) return;
-
-    const container = listContainerRef.current;
-    const handleScroll = () => {
-      setShowScrollToTop(container.scrollTop > 200);
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [isMobile, isActive]);
+  }, [error]);
 
   const scrollToTop = () => {
-    if (listContainerRef.current) {
-      listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    if (baseManager.listContainerRef.current) {
+      baseManager.listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -140,46 +66,6 @@ export const SingerManager: React.FC<SingerManagerProps> = ({ isActive = true })
       fetchSingers(); // Use cached data, only refresh if stale
     }
   }, [fetchSingers, isActive, singers.length]);
-
-  // Prevent body scroll on mobile when tab is active
-  useEffect(() => {
-    if (isMobile && isActive) {
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = '';
-      };
-    }
-  }, [isMobile, isActive]);
-
-  // Listen for data refresh requests from global event bus (only when active)
-  useEffect(() => {
-    if (!isActive) return;
-
-    let unsubscribe: (() => void) | undefined;
-
-    unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
-      if (detail.resource === 'singers' || detail.resource === 'all') {
-        // Refresh singers data from backend to get latest state
-        fetchSingers(true); // Force refresh
-      }
-    });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [fetchSingers, isActive]);
-
-  // Focus search bar on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && searchInputRef.current) {
-        searchInputRef.current.focus();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   const handleCreateClick = () => {
     setEditingSinger(null);
@@ -221,8 +107,8 @@ export const SingerManager: React.FC<SingerManagerProps> = ({ isActive = true })
       const result = await updateSinger(editingSinger.id, input);
       if (result && adminFields) {
         // If admin fields provided, update them via separate API calls
-        const API_BASE_URL = import.meta.env.VITE_API_URL || (
-          import.meta.env.DEV ? '/api' : 'http://localhost:3111/api'
+        const API_BASE_URL = (window as any).__API_URL__ || (
+          (window as any).__DEV__ ? '/api' : 'http://localhost:3111/api'
         );
 
         try {
@@ -363,175 +249,169 @@ export const SingerManager: React.FC<SingerManagerProps> = ({ isActive = true })
     }] : []),
   ];
 
-  const body = (
-    <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
-      {/* Fixed Header on Mobile - Pinned below Layout header */}
-      <div 
-        ref={headerRef}
-        id="singer-manager-header"
-        className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-2 sm:mb-4'}`}
-        style={isMobile ? {
-          top: '48px', // Position below Layout header (h-12 = 48px on mobile)
-          paddingTop: 'env(safe-area-inset-top, 0px)',
-        } : {}}
-      >
-        <div className={`max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 ${isMobile ? 'py-2' : ''}`}>
-          <div className="flex flex-col gap-2 sm:gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Singer Management</h1>
-                <a
-                  href="/help#singers"
-                  className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
-                  title="View help documentation for this tab"
-                >
-                  <i className="fas fa-question-circle text-lg sm:text-xl"></i>
-                </a>
-              </div>
-              <p className="hidden sm:block mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Manage singers and their profiles
-              </p>
-            </div>
-            <div className="flex flex-col lg:flex-row gap-3 w-full">
-              <div className="relative flex-1 lg:min-w-[300px]">
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                  placeholder="Search singers by name..."
-                  autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
-                  className="w-full pl-9 pr-9 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                />
-                <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
-                {searchTerm && (
-                  <button
-                    onClick={() => handleSearchChange({ target: { value: '' } } as React.ChangeEvent<HTMLInputElement>)}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                    aria-label="Clear search"
-                  >
-                    <i className="fas fa-times text-sm"></i>
-                  </button>
-                )}
-              </div>
-              {/* Desktop action buttons - hidden on mobile */}
-              <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'name' | 'pitchCount')}
-                  title="Sort singers by name or pitch count"
-                  className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                >
-                  <option value="name">Sort: Name</option>
-                  <option value="pitchCount">Sort: Pitch Count</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() => fetchSingers(true)}
-                  disabled={loading}
-                  title="Reload singers from the database to see the latest changes"
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                >
-                  <RefreshIcon className="w-4 h-4" />
-                  Refresh
-                </button>
-                {isEditor && (
-                  <button
-                    onClick={handleCreateClick}
-                    title="Create a new singer profile with name, gender, and pitch information"
-                    className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    <i className="fas fa-plus text-lg"></i>
-                    Add Singer
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Singer count and merge controls - Fixed in header on mobile */}
-        <div className={`max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 ${isMobile ? 'pb-2 border-b border-gray-200 dark:border-gray-700' : ''}`}>
-          <div className={`flex flex-wrap items-center justify-between gap-3 ${isMobile ? 'mb-0' : 'mb-4'}`}>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              {filteredSingers.length} singer{filteredSingers.length !== 1 ? 's' : ''}
-            </div>
-            {isEditor && (
-              <button
-                onClick={() => {
-                  startSelectionRef.current?.();
-                }}
-                title="Merge multiple singer profiles into one, combining all their pitch information"
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center gap-2 whitespace-nowrap"
-              >
-                <i className="fas fa-code-merge text-blue-600 dark:text-blue-400"></i>
-                Merge Singers
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* List Container - Scrollable on mobile, normal on desktop */}
-      <div
-        ref={listContainerRef}
-        className={isMobile ? 'fixed overflow-y-auto' : 'overflow-y-auto'}
-        style={isMobile ? {
-          ...listContainerStyle,
-          // Ensure overflow is always set
-          overflowY: 'auto',
-          overflowX: 'hidden',
-        } : {
-          minHeight: '400px',
-          maxHeight: 'calc(100vh - 200px)', // Leave space for header and padding
-        }}
-      >
-        <SingerList
-          singers={filteredSingers}
-          onEdit={handleEditClick}
-          onDelete={handleDelete}
-          onMerge={handleMerge}
-          onStartSelection={() => searchInputRef.current?.focus()}
-          onPreview={handlePreviewClick}
-          loading={loading}
-          startSelectionRef={startSelectionRef}
+  // Header actions content
+  const headerActions = (
+    <div className="flex flex-col lg:flex-row gap-3 w-full">
+      <div className="relative flex-1 lg:min-w-[300px]">
+        <input
+          ref={baseManager.searchInputRef}
+          type="text"
+          value={searchTerm}
+          onChange={handleSearchChange}
+          placeholder="Search singers by name..."
+          autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
+          className="w-full pl-9 pr-9 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
         />
+        <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
+        {searchTerm && (
+          <button
+            onClick={() => handleSearchChange({ target: { value: '' } } as React.ChangeEvent<HTMLInputElement>)}
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            aria-label="Clear search"
+          >
+            <i className="fas fa-times text-sm"></i>
+          </button>
+        )}
+      </div>
+      {/* Desktop action buttons - hidden on mobile */}
+      <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as 'name' | 'pitchCount')}
+          title="Sort singers by name or pitch count"
+          className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+        >
+          <option value="name">Sort: Name</option>
+          <option value="pitchCount">Sort: Pitch Count</option>
+        </select>
+        <button
+          type="button"
+          onClick={() => fetchSingers(true)}
+          disabled={loading}
+          title="Reload singers from the database to see the latest updates"
+          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+        >
+          <RefreshIcon className="w-4 h-4" />
+          Refresh
+        </button>
+        {isEditor && (
+          <button
+            onClick={handleCreateClick}
+            title="Add a new singer to the database with name and profile information"
+            className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+          >
+            <i className="fas fa-plus text-lg"></i>
+            Add New Singer
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <BaseManager
+      isActive={isActive}
+      isMobile={baseManager.isMobile}
+      showScrollToTop={baseManager.showScrollToTop}
+      listContainerStyle={baseManager.listContainerStyle}
+      listContainerRef={baseManager.listContainerRef}
+      headerRef={baseManager.headerRef}
+      title="Singer Management"
+      subtitle="Manage singers and their profiles"
+      helpHref="/help#singers"
+      headerActions={headerActions}
+      headerBelow={filteredSingers.length > 0 ? (
+        <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 pt-3">
+          <div className={`text-sm text-gray-600 dark:text-gray-400 ${baseManager.isMobile ? 'mt-2' : 'mb-2'}`}>
+            {filteredSingers.length} singer{filteredSingers.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+      ) : undefined}
+      mobileActions={mobileActions}
+      onScrollToTop={baseManager.scrollToTop}
+      loading={loading}
+    >
+      <div className="flex flex-col gap-2 sm:gap-4">
+        {/* Desktop merge controls - hidden on mobile */}
+        {selectedSingersForMerge.length >= 2 && (
+          <div className="hidden md:flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <span className="text-sm text-blue-800 dark:text-blue-200">
+              {selectedSingersForMerge.length} singers selected for merge
+            </span>
+            <button
+              onClick={() => selectedSingersForMerge.length >= 2 && handleMerge(selectedSingersForMerge[0], selectedSingersForMerge.slice(1))}
+              disabled={loading || selectedSingersForMerge.length < 2}
+              className="px-3 py-1 text-sm font-medium text-blue-800 dark:text-blue-200 bg-blue-100 dark:bg-blue-800/30 border border-blue-300 dark:border-blue-700 rounded hover:bg-blue-200 dark:hover:bg-blue-800/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            >
+              <i className="fas fa-code-merge text-blue-600 dark:text-blue-400"></i>
+              Merge Singers
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Scroll to Top Button - Mobile only */}
-      {isMobile && showScrollToTop && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-24 right-4 z-50 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200"
-          title="Scroll to top"
-          aria-label="Scroll to top"
-        >
-          <i className="fas fa-arrow-up text-lg"></i>
-        </button>
-      )}
+      <SingerList
+        singers={filteredSingers}
+        onEdit={handleEditClick}
+        onDelete={handleDelete}
+        onMerge={handleMerge}
+        onStartSelection={() => baseManager.searchInputRef.current?.focus()}
+        onPreview={handlePreviewClick}
+        loading={loading}
+        startSelectionRef={startSelectionRef}
+      />
 
+      {/* Modal */}
       <Modal
         isOpen={isFormOpen}
         onClose={handleFormCancel}
-        title={isPreviewMode ? 'View Singer' : editingSinger ? 'Edit Singer' : 'Create New Singer'}
+        title={editingSinger ? 'Edit Singer' : 'Add New Singer'}
       >
         <SingerForm
           singer={editingSinger}
           onSubmit={handleFormSubmit}
           onCancel={handleFormCancel}
           onUnsavedChangesRef={checkUnsavedChangesRef}
-          readOnly={isPreviewMode}
         />
       </Modal>
 
-      {/* Mobile Bottom Action Bar */}
-      <MobileBottomActionBar
-        actions={mobileActions}
-      />
-    </div>
-  );
-  
-  return body;  
+      {/* Preview Modal */}
+      {previewSinger && (
+        <Modal
+          isOpen={!!previewSinger}
+          onClose={() => setPreviewSinger(null)}
+          title="Singer Details"
+        >
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                <i className="fas fa-user text-2xl text-gray-500 dark:text-gray-400"></i>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                {previewSinger.name}
+              </h3>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium text-gray-700 dark:text-gray-300">Total Songs:</span>
+                <span className="text-gray-900 dark:text-white">{previewSinger.pitchCount || 0}</span>
+              </div>
+              
+              {previewSinger.createdAt && (
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-gray-700 dark:text-gray-300">Created:</span>
+                  <span className="text-gray-900 dark:text-white">
+                    {new Date(previewSinger.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+    </BaseManager>
+  );  
 };
 
 export default SingerManager;

@@ -106,8 +106,8 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
         </p>
       </div>
 
-      {/* Search and filter controls */}
-      <div className="mb-6 space-y-3 sm:space-y-4">
+      {/* Search and filter controls (sticky under header) */}
+      <div className="fixed mb-6 space-y-3 sm:space-y-4 sticky top-12 z-40 bg-white dark:bg-gray-800 py-2 border-b border-gray-200 dark:border-gray-700">
         <SearchBar
           value={searchQuery}
           onChange={setSearchQuery}
@@ -115,7 +115,7 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
           debounceMs={300}
         />
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+        <div className="fixed lex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
           <label htmlFor="singer-filter" className="text-sm font-medium text-gray-700 dark:text-gray-300 sm:whitespace-nowrap">
             Filter by Singer:
           </label>

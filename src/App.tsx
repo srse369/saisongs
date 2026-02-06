@@ -296,7 +296,7 @@ function HomePage() {
           </div>
         ) : (
           <div className="mt-8 space-y-4">
-            <p className="text-xl sm:text-2xl text-gray-700 dark:text-gray-300">
+            <p className="grid text-xl sm:text-2xl text-gray-700 dark:text-gray-300">
               Welcome to Sai Songs
             </p>
             <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">

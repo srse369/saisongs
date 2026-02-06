@@ -11,12 +11,10 @@ export interface MobileAction {
 
 interface MobileBottomActionBarProps {
   actions: MobileAction[];
-  filterCount?: number;
 }
 
 export const MobileBottomActionBar: React.FC<MobileBottomActionBarProps> = ({
   actions,
-  filterCount = 0,
 }) => {
 
 

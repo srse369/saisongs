@@ -94,8 +94,14 @@ export class ApiClient {
   }
 
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    // Check if we should back off
-    this.shouldAllowRequest(endpoint);
+    // Check if we should back off - catch the error and re-throw it as a proper rejection
+    try {
+      this.shouldAllowRequest(endpoint);
+    } catch (backoffError) {
+      // If we're in a backoff period, reject the promise with the backoff message
+      // This allows callers to handle it appropriately (e.g., show a toast, wait, or reset)
+      throw backoffError;
+    }
 
     const url = `${this.baseUrl}${endpoint}`;
     

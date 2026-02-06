@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { feedbackService, type Feedback } from '../../services/FeedbackService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,7 +28,7 @@ interface FeedbackManagerProps {
   isActive?: boolean;
 }
 
-export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = true }) => {
+export const FeedbackManagerRefactored: React.FC<FeedbackManagerProps> = ({ isActive = true }) => {
   const location = useLocation();
   const { isAdmin, userEmail } = useAuth();
   const toast = useToast();
@@ -37,20 +37,12 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
   const baseManager = useBaseManager({
     resourceName: 'feedback',
     isActive,
-    onEscapeKey: () => {
-      if (searchTermRef.current) {
-        setSearchTerm('');
-        baseManager.searchInputRef.current?.focus();
-      }
-    },
+    // onDataRefresh will be set after loadFeedback is defined
   });
 
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<{ status?: string; category?: string }>({});
-  const [searchTerm, setSearchTerm] = useState('');
-  const searchTermRef = useRef(searchTerm);
-  searchTermRef.current = searchTerm;
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [adminNotes, setAdminNotes] = useState('');
@@ -73,6 +65,19 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
     }
   }, [filter, toast]);
 
+  // Subscribe to global data refresh events and call loadFeedback when relevant
+  useEffect(() => {
+    const unsubscribe = globalEventBus.on('dataRefreshNeeded', (detail) => {
+      if (detail.resource === 'feedback' || detail.resource === 'all') {
+        loadFeedback();
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [loadFeedback]);
+
   useEffect(() => {
     // Only fetch feedback when tab is active and user is admin (only if not already loaded)
     if (isAdmin && isActive && feedback.length === 0) {
@@ -82,7 +87,7 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
 
   useEffect(() => {
     let unsubscribes: (() => void)[] = [];
-    const unsubscribeFeedbackSubmitted = globalEventBus.on('feedbackSubmitted', (detail) => {
+    const unsubscribeFeedbackSubmitted = globalEventBus.on('feedbackSubmitted', (_detail) => {
       loadFeedback();
     });
     unsubscribes.push(unsubscribeFeedbackSubmitted);
@@ -91,16 +96,6 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
       unsubscribes.forEach(unsub => unsub());
     };
   }, [loadFeedback]);
-
-  const filteredFeedback = useMemo(() => {
-    if (!searchTerm.trim()) return feedback;
-    const q = searchTerm.toLowerCase().trim();
-    return feedback.filter(
-      (item) =>
-        (item.feedback ?? '').toLowerCase().includes(q) ||
-        (item.email ?? '').toLowerCase().includes(q)
-    );
-  }, [feedback, searchTerm]);
 
   const handleViewDetails = (item: Feedback) => {
     setSelectedFeedback(item);
@@ -161,104 +156,6 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
 
   if (!isAdmin) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500 dark:text-gray-400">
-          You do not have permission to view this page.
-        </p>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  // Mobile actions for bottom bar
-  const mobileActions: MobileAction[] = [
-    {
-      label: 'Refresh',
-      icon: 'fas fa-sync-alt',
-      onClick: () => {
-        loadFeedback();
-      },
-      variant: 'secondary',
-      disabled: loading,
-    },
-  ];
-
-  // Header actions content
-  const headerActions = (
-    <div className="flex flex-col lg:flex-row gap-3 w-full">
-      <div className="relative flex-1 lg:min-w-[300px]">
-        <input
-          ref={baseManager.searchInputRef}
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search by message or email..."
-          autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
-          className="w-full pl-9 pr-9 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-        />
-        <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
-        {searchTerm && (
-          <button
-            onClick={() => setSearchTerm('')}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-            aria-label="Clear search"
-          >
-            <i className="fas fa-times text-sm"></i>
-          </button>
-        )}
-      </div>
-      <div className={`flex flex-wrap gap-2 sm:gap-4 items-center ${baseManager.isMobile ? '' : 'lg:justify-start'}`}>
-        <select
-          value={filter.status || ''}
-          onChange={(e) => setFilter({ ...filter, status: e.target.value || undefined })}
-          className="flex-1 sm:flex-none min-w-[140px] px-3 sm:px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">All Status</option>
-          <option value="new">New</option>
-          <option value="in-progress">In Progress</option>
-          <option value="resolved">Resolved</option>
-          <option value="closed">Closed</option>
-        </select>
-
-        <select
-          value={filter.category || ''}
-          onChange={(e) => setFilter({ ...filter, category: e.target.value || undefined })}
-          className="flex-1 sm:flex-none min-w-[140px] px-3 sm:px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">All Categories</option>
-          <option value="bug">🐛 Bug Report</option>
-          <option value="feature">✨ Feature Request</option>
-          <option value="improvement">🚀 Improvement</option>
-          <option value="question">❓ Question</option>
-          <option value="other">💬 Other</option>
-        </select>
-
-        {/* Desktop refresh button - hidden on mobile */}
-        <div className="hidden md:block">
-          <button
-            type="button"
-            onClick={() => loadFeedback()}
-            disabled={loading}
-            title="Refresh feedback list"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-          >
-            <RefreshIcon className="w-4 h-4" />
-            Refresh
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (!isAdmin) {
-    return (
       <BaseManager
         isActive={isActive}
         isMobile={baseManager.isMobile}
@@ -290,6 +187,63 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
     );
   }
 
+  // Mobile actions for bottom bar
+  const mobileActions: MobileAction[] = [
+    {
+      label: 'Refresh',
+      icon: 'fas fa-sync-alt',
+      onClick: () => {
+        loadFeedback();
+      },
+      variant: 'secondary',
+      disabled: loading,
+    },
+  ];
+
+  // Header actions content
+  const headerActions = (
+    <div className={`flex flex-wrap gap-2 sm:gap-4 items-center ${baseManager.isMobile ? 'mt-2' : 'mt-4'}`}>
+      <select
+        value={filter.status || ''}
+        onChange={(e) => setFilter({ ...filter, status: e.target.value || undefined })}
+        className="flex-1 sm:flex-none min-w-[140px] px-3 sm:px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">All Status</option>
+        <option value="new">New</option>
+        <option value="in-progress">In Progress</option>
+        <option value="resolved">Resolved</option>
+        <option value="closed">Closed</option>
+      </select>
+
+      <select
+        value={filter.category || ''}
+        onChange={(e) => setFilter({ ...filter, category: e.target.value || undefined })}
+        className="flex-1 sm:flex-none min-w-[140px] px-3 sm:px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">All Categories</option>
+        <option value="bug">🐛 Bug Report</option>
+        <option value="feature">✨ Feature Request</option>
+        <option value="improvement">🚀 Improvement</option>
+        <option value="question">❓ Question</option>
+        <option value="other">💬 Other</option>
+      </select>
+
+      {/* Desktop refresh button - hidden on mobile */}
+      <div className="hidden md:block">
+        <button
+          type="button"
+          onClick={() => loadFeedback()}
+          disabled={loading}
+          title="Refresh feedback list"
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+        >
+          <RefreshIcon className="w-4 h-4" />
+          Refresh
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <BaseManager
       isActive={isActive}
@@ -299,29 +253,22 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
       listContainerRef={baseManager.listContainerRef}
       headerRef={baseManager.headerRef}
       title="Feedback"
-      subtitle="User feedback and suggestions"
+      subtitle={`${total} total submission${total !== 1 ? 's' : ''}`}
       helpHref="/help#overview"
       headerActions={headerActions}
-      headerBelow={(
-        <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 pt-3">
-          <div className={`text-sm text-gray-600 dark:text-gray-400 ${baseManager.isMobile ? 'mt-2' : 'mb-2'}`}>
-            {searchTerm.trim() ? `${filteredFeedback.length} of ${total} submission${total !== 1 ? 's' : ''}` : `${total} total submission${total !== 1 ? 's' : ''}`}
-          </div>
-        </div>
-      )}
       mobileActions={mobileActions}
       onScrollToTop={baseManager.scrollToTop}
       loading={loading}
     >
       <div className={baseManager.isMobile ? 'px-1.5 sm:px-6 lg:px-8' : ''}>
         {/* Feedback List */}
-        {filteredFeedback.length === 0 ? (
+        {feedback.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 dark:text-gray-400">{searchTerm.trim() ? 'No feedback matches your search.' : 'No feedback found'}</p>
+            <p className="text-gray-500 dark:text-gray-400">No feedback found</p>
           </div>
         ) : (
           <div className="space-y-0 md:space-y-3">
-            {filteredFeedback.map((item, index) => {
+            {feedback.map((item, index) => {
               const isSelected = selectedFeedbackId === item.id;
               return (
                 <div
@@ -603,4 +550,4 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
   );
 };
 
-export default FeedbackManager;
+export default FeedbackManagerRefactored;

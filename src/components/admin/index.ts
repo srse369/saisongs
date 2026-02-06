@@ -1,6 +1,6 @@
 export { SongForm } from './SongForm';
 export { SongList } from './SongList';
-export { SongManager } from './SongManager';
+export { SongManagerRefactored as SongManager } from './SongManagerRefactored';
 export { SongDetails } from './SongDetails';
 export { SingerForm } from './SingerForm';
 export { SingerList } from './SingerList';

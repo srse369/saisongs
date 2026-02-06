@@ -531,7 +531,7 @@ export const SessionManager: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
+    <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-4">
       {/* Fixed Header on Mobile - Pinned below Layout header */}
       <div 
         className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-6'}`}

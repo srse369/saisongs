@@ -154,7 +154,38 @@ export const DraggableText: React.FC<{
     }, 100);
 
     // Watch for PresentationModal opening and hide overlay
+    let lastCheckTime = 0;
+    const MODAL_CHECK_DEBOUNCE_MS = 1000; // Increased debounce to prevent excessive checks
+    
+    // Check if Cursor's visual editor is active (it adds specific attributes/classes)
+    // This is a lightweight check that doesn't use MutationObserver
+    const isCursorEditorActive = () => {
+      // Cursor visual editor typically adds data attributes or classes
+      try {
+        // Use a simple, fast check - just look for the most common indicator
+        return !!document.querySelector('[data-cursor-element-id]');
+      } catch (e) {
+        return false;
+      }
+    };
+    
     const checkForPresentationModal = () => {
+      const now = Date.now();
+      // Skip checks if Cursor editor is active to prevent hanging
+      if (isCursorEditorActive()) {
+        // If editor is active, just show overlay (don't hide it)
+        if (overlay.parentElement) {
+          overlay.style.display = 'block';
+        }
+        return;
+      }
+      
+      // Debounce to prevent excessive DOM queries
+      if (now - lastCheckTime < MODAL_CHECK_DEBOUNCE_MS) {
+        return;
+      }
+      lastCheckTime = now;
+      
       // Look specifically for PresentationModal which has data-presentation-modal or specific structure
       const hasPresentationModal = document.querySelector('.presentation-modal-backdrop, [data-presentation-modal="true"]') !== null;
       if (hasPresentationModal && overlay.parentElement) {
@@ -167,14 +198,17 @@ export const DraggableText: React.FC<{
     // Check immediately
     checkForPresentationModal();
 
-    // Set up observer for modal changes
-    const observer = new MutationObserver(checkForPresentationModal);
-    observer.observe(document.body, { childList: true, subtree: true });
+    // Use ONLY polling approach - no MutationObserver to avoid conflicts with visual editors
+    // Poll every 1000ms (1 second) - this is much less aggressive and won't conflict with editors
+    // The modal check doesn't need to be instant, 1 second delay is acceptable
+    const modalCheckInterval = setInterval(() => {
+      checkForPresentationModal();
+    }, 1000);
 
     // Cleanup
     return () => {
       clearInterval(animationCheckInterval);
-      observer.disconnect();
+      clearInterval(modalCheckInterval);
       
       // Remove scroll listeners
       if (scrollContainer) {

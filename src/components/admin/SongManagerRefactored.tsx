@@ -11,20 +11,21 @@ import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedSongSearch, type SongSearchFilters } from '../common/AdvancedSongSearch';
 import { WebLLMService } from '../../services/WebLLMService';
 import { RefreshIcon, type MobileAction } from '../common';
-import { createSongFuzzySearch, parseNaturalQuery } from '../../utils/smartSearch';
-import { compareStringsIgnoringSpecialChars } from '../../utils';
 import songService from '../../services/SongService';
 import type { Song, CreateSongInput } from '../../types';
 import { BaseManager } from './BaseManager';
 import { useBaseManager } from '../../hooks/useBaseManager';
+import { createSongFuzzySearch } from '../../utils/smartSearch';
+import { compareStringsIgnoringSpecialChars } from '../../utils';
 
 interface SongManagerProps {
   isActive?: boolean;
 }
 
-export const SongManager: React.FC<SongManagerProps> = ({ isActive = true }) => {
+export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = true }) => {
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const songIdFromUrl = searchParams.get('songId') || '';
   const {
     songs,
     loading,
@@ -64,115 +65,11 @@ export const SongManager: React.FC<SongManagerProps> = ({ isActive = true }) => 
   const [advancedFilters, setAdvancedFilters] = useState<SongSearchFilters>({});
   const [visibleCount, setVisibleCount] = useState(50);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
+  const songIdRef = useRef<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-
-  // Show error as toast message
-  useEffect(() => {
-    if (error) {
-      toast.error(error.message);
-      clearError(); // Clear error after showing toast
-    }
-  }, [error, toast, clearError]);
-
-  const scrollToTop = () => {
-    if (baseManager.listContainerRef.current) {
-      baseManager.listContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
 
   // Create fuzzy search instance for fallback
   const fuzzySearch = useMemo(() => createSongFuzzySearch(songs), [songs]);
-
-  // Extract available values for WebLLM
-  const availableValues = useMemo(() => {
-    return WebLLMService.extractAvailableValues(songs, []);
-  }, [songs]);
-
-  useEffect(() => {
-    // Only fetch songs when tab is active (only if not already loaded)
-    if (isActive && songs.length === 0) {
-      fetchSongs(); // Use cached data, only refresh if stale
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, songs.length]); // fetchSongs is stable from context
-
-  const handleCreateClick = () => {
-    setEditingSong(null);
-    setIsFormModalOpen(true);
-  };
-
-  const handleEditClick = async (song: Song) => {
-    // Fetch full song details (including CLOB fields like lyrics, meaning)
-    const fullSong = await songService.getSongById(song.id);
-    if (fullSong) {
-      setEditingSong(fullSong);
-    } else {
-      setEditingSong(song);
-    }
-    setIsFormModalOpen(true);
-  };
-
-  const handleViewClick = (song: Song) => {
-    setViewingSong(song);
-  };
-
-  const handleFormCancel = () => {
-    // Check for unsaved changes before closing
-    if (checkUnsavedChangesRef.current && checkUnsavedChangesRef.current()) {
-      const confirmed = window.confirm(
-        'You have unsaved changes. Are you sure you want to close without saving?'
-      );
-      if (!confirmed) {
-        return;
-      }
-    }
-    setIsFormModalOpen(false);
-    setEditingSong(null);
-  };
-
-  const handleFormSubmit = async (input: CreateSongInput) => {
-    try {
-      if (editingSong) {
-        const result = await updateSong(editingSong.id, input);
-        if (result) {
-          setIsFormModalOpen(false);
-          setEditingSong(null);
-        }
-      } else {
-        const result = await createSong(input);
-        if (result) {
-          setIsFormModalOpen(false);
-        }
-      }
-    } catch (err) {
-      // Error is handled by context
-      console.error('Error submitting song:', err);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    await deleteSong(id);
-  };
-
-  const handleSync = async (id: string) => {
-    try {
-      const result = await songService.syncSong(id);
-      if (result) {
-        toast.success(`Song synced: ${result.message}`);
-        // Refresh songs to get updated data
-        await fetchSongs();
-      } else {
-        toast.error('Failed to sync song');
-      }
-    } catch (err) {
-      console.error('Error syncing song:', err);
-      toast.error('Error syncing song');
-    }
-  };
-
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-  };
 
   const filteredSongs = useMemo(() => {
     let results = [...songs]; // Create a copy instead of a reference
@@ -318,7 +215,7 @@ export const SongManager: React.FC<SongManagerProps> = ({ isActive = true }) => 
     return results;
   }, [songs, searchTerm, advancedFilters, fuzzySearch, sortBy]);
 
-  // Create a stable key from filter values to detect changes reliably
+  // Create a stable key from filter values to detect changes
   const filterKey = useMemo(() => {
     return Object.entries(advancedFilters)
       .filter(([_, v]) => v && typeof v === 'string')
@@ -344,32 +241,279 @@ export const SongManager: React.FC<SongManagerProps> = ({ isActive = true }) => 
     [filteredSongs, visibleCount]
   );
 
-  // Simple lazy-load: load more when user scrolls near bottom
+  // Show error as toast message
+  useEffect(() => {
+    if (error) {
+      toast.error(error.message);
+      clearError(); // Clear error after showing toast
+    }
+  }, [error, toast, clearError]);
+
+  // Extract available values for WebLLM
+  const availableValues = useMemo(() => {
+    return WebLLMService.extractAvailableValues(songs, []);
+  }, [songs]);
+
+  useEffect(() => {
+    // Only fetch songs when tab is active (only if not already loaded)
+    if (isActive && songs.length === 0) {
+      fetchSongs(); // Use cached data, only refresh if stale
+    }
+  }, [fetchSongs, isActive, songs.length]);
+
+  const handleCreateClick = () => {
+    setEditingSong(null);
+    setIsFormModalOpen(true);
+  };
+
+  const handleEditClick = async (song: Song) => {
+    // Fetch full song details (including CLOB fields like lyrics, meaning)
+    const fullSong = await songService.getSongById(song.id);
+    if (fullSong) {
+      setEditingSong(fullSong);
+    } else {
+      setEditingSong(song);
+    }
+    setIsFormModalOpen(true);
+  };
+
+  const handleViewClick = (song: Song) => {
+    setViewingSong(song);
+  };
+
+  const handleFormCancel = () => {
+    // Check for unsaved changes before closing
+    if (checkUnsavedChangesRef.current && checkUnsavedChangesRef.current()) {
+      const confirmed = window.confirm(
+        'You have unsaved changes. Are you sure you want to close without saving?'
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    setIsFormModalOpen(false);
+    setEditingSong(null);
+  };
+
+  const handleFormSubmit = async (input: CreateSongInput) => {
+    try {
+      if (editingSong) {
+        const result = await updateSong(editingSong.id, input);
+        if (result) {
+          setIsFormModalOpen(false);
+          setEditingSong(null);
+        }
+      } else {
+        const result = await createSong(input);
+        if (result) {
+          setIsFormModalOpen(false);
+        }
+      }
+    } catch (err) {
+      // Error is handled by context
+      console.error('Error submitting song:', err);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteSong(id);
+  };
+
+  const handleSync = async (id: string) => {
+    try {
+      const result = await songService.syncSong(id);
+      if (result) {
+        toast.success(`Song synced: ${result.message}`);
+        // Refresh songs to get updated data
+        await fetchSongs();
+      } else {
+        toast.error('Failed to sync song');
+      }
+    } catch (err) {
+      console.error('Error syncing song:', err);
+      toast.error('Error syncing song');
+    }
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+  };
+
+  // Clear search when Escape key is pressed while on this tab (only if no modal is open)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't clear search if a modal is open - let the modal handle Escape
+      if (isFormModalOpen || viewingSong) return;
+
+      if (e.key === 'Escape') {
+        setSearchTerm('');
+        setAdvancedFilters({});
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFormModalOpen, viewingSong]);
+
+
+  // Handle scrolling to song when songId is in URL (only when active)
+  useEffect(() => {
+    if (!isActive || !songIdFromUrl || filteredSongs.length === 0) {
+      songIdRef.current = null;
+      return;
+    }
+    
+    // Find the index of the target song in filteredSongs
+    const targetIndex = filteredSongs.findIndex(song => song.id === songIdFromUrl);
+    
+    if (targetIndex === -1) {
+      // Song not found in filtered results, clear the parameter
+      const next = new URLSearchParams(searchParams);
+      next.delete('songId');
+      setSearchParams(next, { replace: true });
+      songIdRef.current = null;
+      return;
+    }
+    
+    // If the song is beyond the visible count, increase visibleCount to include it
+    if (targetIndex >= visibleCount) {
+      setVisibleCount(Math.min(targetIndex + 10, filteredSongs.length));
+      songIdRef.current = songIdFromUrl;
+      return;
+    }
+    
+    // Song should be visible, mark it for scrolling
+    songIdRef.current = songIdFromUrl;
+  }, [songIdFromUrl, filteredSongs, visibleCount, searchParams, setSearchParams, isActive]);
+
+  // Scroll to song when it becomes visible in displayedSongs (only when active)
+  useEffect(() => {
+    if (!isActive) return;
+    const targetSongId = songIdRef.current;
+    if (!targetSongId) return;
+    
+    const isSongVisible = displayedSongs.some(song => song.id === targetSongId);
+    
+    if (!isSongVisible) return; // Wait until song is in displayedSongs
+    
+    // Use requestAnimationFrame and setTimeout to ensure DOM is fully updated
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        // Try multiple times to find the element
+        let attempts = 0;
+        const maxAttempts = 40; // Try for up to 2 seconds
+        
+        const tryScroll = () => {
+          const element = document.getElementById(`song-${targetSongId}`);
+          if (element) {
+            // Calculate scroll position to ensure bottom border is visible
+            // Position element slightly above center so there's room below for the border
+            const isMobile = baseManager.isMobile;
+            const container = isMobile ? baseManager.listContainerRef.current : null;
+            
+            if (isMobile && container) {
+              // Mobile: scroll within container
+              const elementRect = element.getBoundingClientRect();
+              const containerRect = container.getBoundingClientRect();
+              const relativeTop = elementRect.top - containerRect.top + container.scrollTop;
+              const containerHeight = container.clientHeight;
+              const elementHeight = elementRect.height;
+              const ringWidth = 8;
+              const targetScrollTop = relativeTop - (containerHeight / 2) + (elementHeight / 2) - ringWidth;
+              container.scrollTo({
+                top: Math.max(0, targetScrollTop),
+                behavior: 'smooth'
+              });
+            } else {
+              // Desktop: scroll window
+              const elementRect = element.getBoundingClientRect();
+              const absoluteElementTop = elementRect.top + window.pageYOffset;
+              const viewportHeight = window.innerHeight;
+              const elementHeight = elementRect.height;
+              const ringWidth = 8; // ring-4 = 16px (4 * 4px)
+              // Position so element is slightly above center, leaving space below for border
+              const targetScrollTop = absoluteElementTop - (viewportHeight / 2) + (elementHeight / 2) - ringWidth;
+              window.scrollTo({
+                top: Math.max(0, targetScrollTop), // Don't scroll above top
+                behavior: 'smooth'
+              });
+            }
+            // Highlight the song for a few seconds
+            element.classList.add('ring-4', 'ring-blue-400', 'dark:ring-blue-500');
+            setTimeout(() => {
+              element.classList.remove('ring-4', 'ring-blue-400', 'dark:ring-blue-500');
+            }, 4000); // Highlight for 4 seconds
+            // Clear the URL parameter and reset ref
+            const next = new URLSearchParams(searchParams);
+            next.delete('songId');
+            setSearchParams(next, { replace: true });
+            songIdRef.current = null;
+            return true;
+          }
+          return false;
+        };
+
+        // Try immediately
+        if (!tryScroll()) {
+          // If not found, retry with interval
+          const interval = setInterval(() => {
+            attempts++;
+            if (tryScroll() || attempts >= maxAttempts) {
+              clearInterval(interval);
+              if (attempts >= maxAttempts) {
+                // Element not found after max attempts
+                console.warn(`Could not find song element with id: song-${targetSongId} after ${maxAttempts} attempts`);
+                const next = new URLSearchParams(searchParams);
+                next.delete('songId');
+                setSearchParams(next, { replace: true });
+                songIdRef.current = null;
+              }
+            }
+          }, 50);
+        }
+      }, 150);
+    });
+  }, [displayedSongs, searchParams, setSearchParams, isActive, baseManager.isMobile, baseManager.listContainerRef]);
+
+  // Lazy-load more songs as the user scrolls near the bottom (only when active)
   useEffect(() => {
     if (!isActive) return;
     const sentinel = loadMoreRef.current;
     if (!sentinel) return;
 
-    const root = baseManager.isMobile && baseManager.listContainerRef.current 
-      ? baseManager.listContainerRef.current 
-      : null;
+    // On mobile, use the container as root; on desktop, use viewport (null)
+    // Use a small delay to ensure container is ready on mobile
+    const setupObserver = () => {
+      const root = baseManager.isMobile && baseManager.listContainerRef.current ? baseManager.listContainerRef.current : null;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleCount((prev) => Math.min(prev + 50, filteredSongs.length));
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          if (entry.isIntersecting) {
+            setVisibleCount((prev) =>
+              Math.min(prev + 50, filteredSongs.length)
+            );
+          }
+        },
+        {
+          root: root,
+          rootMargin: '100px', // Start loading when sentinel is 100px away from viewport/container
+          threshold: 0.1, // Trigger when 10% visible (more lenient than 1.0)
         }
-      },
-      {
-        root: root,
-        rootMargin: '200px',
-        threshold: 0.1,
-      }
-    );
+      );
 
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [filteredSongs.length, baseManager.isMobile, isActive]);
+      observer.observe(sentinel);
+      return () => observer.disconnect();
+    };
+
+    // On mobile, wait a bit for container to be ready
+    if (baseManager.isMobile) {
+      const timeoutId = setTimeout(setupObserver, 100);
+      return () => clearTimeout(timeoutId);
+    } else {
+      return setupObserver();
+    }
+  }, [filteredSongs.length, baseManager.isMobile, displayedSongs.length, isActive, baseManager.listContainerRef]);
 
   const activeFilterCount = Object.values(advancedFilters).filter(v => v && typeof v === 'string').length;
 
@@ -463,28 +607,35 @@ export const SongManager: React.FC<SongManagerProps> = ({ isActive = true }) => 
       subtitle="Create and manage your song library"
       helpHref="/help#songs"
       headerActions={headerActions}
+      headerBelow={(
+        <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 pt-3">
+          {filteredSongs.length > 0 && (
+            <div className={`text-sm text-gray-600 dark:text-gray-400 ${baseManager.isMobile ? 'mt-2' : 'mb-2'}`}>
+              {displayedSongs.length < filteredSongs.length
+                ? `Showing ${displayedSongs.length} of ${filteredSongs.length} songs`
+                : `${filteredSongs.length} song${filteredSongs.length !== 1 ? 's' : ''}`}
+            </div>
+          )}
+          <AdvancedSongSearch
+            filters={advancedFilters}
+            onFiltersChange={(newFilters) => {
+              setAdvancedFilters(newFilters);
+            }}
+            onClear={() => {
+              setAdvancedFilters({});
+            }}
+            onApply={() => {
+              // No action needed - filters are already applied via onFiltersChange
+            }}
+            songs={songs}
+          />
+        </div>
+      )}
       mobileActions={mobileActions}
       onScrollToTop={baseManager.scrollToTop}
       loading={loading}
     >
-      {/* Advanced Search - Shown directly on both mobile and desktop */}
-      <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8">
-        <AdvancedSongSearch
-          filters={advancedFilters}
-          onFiltersChange={setAdvancedFilters}
-          onClear={() => setAdvancedFilters({})}
-          songs={songs}
-        />
-
-        {/* Song count status - Fixed in header on mobile */}
-        {filteredSongs.length > 0 && (
-          <div className={`text-sm text-gray-600 dark:text-gray-400 ${baseManager.isMobile ? 'ml-20' : 'mb-2'}`}>
-            {displayedSongs.length < filteredSongs.length
-              ? `Showing ${displayedSongs.length} of ${filteredSongs.length} songs`
-              : `${filteredSongs.length} song${filteredSongs.length !== 1 ? 's' : ''}`}
-          </div>
-        )}
-      </div>
+      
 
       <SongList
         songs={displayedSongs}
@@ -535,4 +686,4 @@ export const SongManager: React.FC<SongManagerProps> = ({ isActive = true }) => 
   );
 };
 
-export default SongManager;
+export default SongManagerRefactored;

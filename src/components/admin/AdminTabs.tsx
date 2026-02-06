@@ -1,9 +1,9 @@
-import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
+import React, { Suspense, lazy, useCallback } from 'react';
 import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 // Lazy load manager components
-const SongManager = lazy(() => import('./SongManager').then(module => ({ default: module.SongManager })));
+const SongManager = lazy(() => import('./SongManagerRefactored').then(module => ({ default: module.SongManagerRefactored })));
 const SingerManager = lazy(() => import('./SingerManager').then(module => ({ default: module.SingerManager })));
 const PitchManager = lazy(() => import('./PitchManager').then(module => ({ default: module.PitchManager })));
 const TemplateManager = lazy(() => import('./TemplateManager'));
@@ -30,17 +30,16 @@ interface AdminTabsProps {
 }
 
 export const AdminTabs: React.FC<AdminTabsProps> = ({ initialTab }) => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const location = useLocation();
   const { isAuthenticated, userRole, isAdmin } = useAuth();
   
-  // Get tab from URL query param, or use initialTab, or default to 'songs'
+  // Get tab from URL - simplified
   const getTabFromUrl = (): AdminTab => {
     const tabParam = searchParams.get('tab') as AdminTab;
     if (tabParam && ['songs', 'singers', 'pitches', 'templates', 'centers', 'analytics', 'feedback'].includes(tabParam)) {
       return tabParam;
     }
-    // If no tab param, try to infer from pathname
     const pathTab = location.pathname.replace('/admin/', '') as AdminTab;
     if (pathTab && ['songs', 'singers', 'pitches', 'templates', 'centers', 'analytics', 'feedback'].includes(pathTab)) {
       return pathTab;
@@ -48,94 +47,52 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({ initialTab }) => {
     return initialTab || 'songs';
   };
 
-  const [activeTab, setActiveTab] = useState<AdminTab>(() => getTabFromUrl());
+  const activeTab = getTabFromUrl();
 
-  // Update active tab when URL changes (for deep linking)
-  useEffect(() => {
-    const tabFromUrl = getTabFromUrl();
-    setActiveTab(prevTab => {
-      if (tabFromUrl !== prevTab) {
-        return tabFromUrl;
-      }
-      return prevTab;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, location.pathname]);
-
-  // Update URL when tab changes (for bookmarking and back button)
-  const handleTabChange = (tab: AdminTab) => {
-    setActiveTab(tab);
-    const newSearchParams = new URLSearchParams(searchParams);
-    newSearchParams.set('tab', tab);
-    // Preserve other query params like songId
-    setSearchParams(newSearchParams, { replace: true });
-  };
-
-  // Expose tab change function via context or prop if needed
-  // For now, we'll handle it internally
-
+  // Simple conditional rendering - unmount inactive tabs for better performance
   return (
     <div className="w-full">
-      {/* Songs Tab */}
-      <div style={{ display: activeTab === 'songs' ? 'block' : 'none' }}>
+      {activeTab === 'songs' && (
         <Suspense fallback={<LoadingFallback />}>
-          <SongManager isActive={activeTab === 'songs'} />
+          <SongManager isActive={true} />
         </Suspense>
-      </div>
+      )}
 
-      {/* Singers Tab - Only for authenticated users */}
-      <div style={{ display: (isAuthenticated && activeTab === 'singers') ? 'block' : 'none' }}>
-        {isAuthenticated && (
-          <Suspense fallback={<LoadingFallback />}>
-            <SingerManager isActive={activeTab === 'singers'} />
-          </Suspense>
-        )}
-      </div>
+      {isAuthenticated && activeTab === 'singers' && (
+        <Suspense fallback={<LoadingFallback />}>
+          <SingerManager isActive={true} />
+        </Suspense>
+      )}
 
-      {/* Pitches Tab - Only for authenticated users */}
-      <div style={{ display: (isAuthenticated && activeTab === 'pitches') ? 'block' : 'none' }}>
-        {isAuthenticated && (
-          <Suspense fallback={<LoadingFallback />}>
-            <PitchManager isActive={activeTab === 'pitches'} />
-          </Suspense>
-        )}
-      </div>
+      {isAuthenticated && activeTab === 'pitches' && (
+        <Suspense fallback={<LoadingFallback />}>
+          <PitchManager isActive={true} />
+        </Suspense>
+      )}
 
-      {/* Templates Tab - Only for editors/admins */}
-      <div style={{ display: ((userRole === 'admin' || userRole === 'editor') && activeTab === 'templates') ? 'block' : 'none' }}>
-        {(userRole === 'admin' || userRole === 'editor') && (
-          <Suspense fallback={<LoadingFallback />}>
-            <TemplateManager isActive={activeTab === 'templates'} />
-          </Suspense>
-        )}
-      </div>
+      {(userRole === 'admin' || userRole === 'editor') && activeTab === 'templates' && (
+        <Suspense fallback={<LoadingFallback />}>
+          <TemplateManager isActive={true} />
+        </Suspense>
+      )}
 
-      {/* Centers Tab - Only for admins */}
-      <div style={{ display: (isAdmin && activeTab === 'centers') ? 'block' : 'none' }}>
-        {isAdmin && (
-          <Suspense fallback={<LoadingFallback />}>
-            <CentersManager isActive={activeTab === 'centers'} />
-          </Suspense>
-        )}
-      </div>
+      {isAdmin && activeTab === 'centers' && (
+        <Suspense fallback={<LoadingFallback />}>
+          <CentersManager isActive={true} />
+        </Suspense>
+      )}
 
-      {/* Analytics Tab - Only for admins */}
-      <div style={{ display: (isAdmin && activeTab === 'analytics') ? 'block' : 'none' }}>
-        {isAdmin && (
-          <Suspense fallback={<LoadingFallback />}>
-            <Analytics isActive={activeTab === 'analytics'} />
-          </Suspense>
-        )}
-      </div>
+      {isAdmin && activeTab === 'analytics' && (
+        <Suspense fallback={<LoadingFallback />}>
+          <Analytics isActive={true} />
+        </Suspense>
+      )}
 
-      {/* Feedback Tab - Only for admins */}
-      <div style={{ display: (isAdmin && activeTab === 'feedback') ? 'block' : 'none' }}>
-        {isAdmin && (
-          <Suspense fallback={<LoadingFallback />}>
-            <FeedbackManager isActive={activeTab === 'feedback'} />
-          </Suspense>
-        )}
-      </div>
+      {isAdmin && activeTab === 'feedback' && (
+        <Suspense fallback={<LoadingFallback />}>
+          <FeedbackManager isActive={true} />
+        </Suspense>
+      )}
     </div>
   );
 };
