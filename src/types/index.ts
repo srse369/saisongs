@@ -97,6 +97,8 @@ export interface SongContentStyle {
   y: number;
   width: number;
   height?: number;
+  /** Stacking order (higher = on top). Use with images/videos on reference slide. */
+  zIndex?: number;
   // Font styling
   fontSize: string;         // e.g., "48px", "3rem"
   fontWeight: 'normal' | 'bold';
@@ -136,6 +138,16 @@ export const ASPECT_RATIO_DIMENSIONS = {
   '4:3': { width: 1600, height: 1200 },
 } as const;
 
+/**
+ * Returns slide dimensions for preview/overlay scaling. Use this so 4:3 templates
+ * always use 1600×1200 and 16:9 use 1920×1080 (avoids gap when image width/position
+ * were designed for one aspect ratio).
+ */
+export function getSlideDimensionsForPreview(template: PresentationTemplate | null | undefined): { width: number; height: number } {
+  const ratio = template?.aspectRatio || '16:9';
+  return ASPECT_RATIO_DIMENSIONS[ratio] || ASPECT_RATIO_DIMENSIONS['16:9'];
+}
+
 // Default song content styles for reference slides
 // These are used when a template doesn't have explicit styles defined
 export const DEFAULT_SONG_TITLE_STYLE: SongContentStyle = {
@@ -143,6 +155,7 @@ export const DEFAULT_SONG_TITLE_STYLE: SongContentStyle = {
   y: 54, // ~5% of 1080
   width: 1840,
   height: 100, // auto-size if not specified
+  zIndex: 20,
   fontSize: '48px',
   fontWeight: 'bold',
   textAlign: 'center',
@@ -154,6 +167,7 @@ export const DEFAULT_SONG_LYRICS_STYLE: SongContentStyle = {
   y: 216, // ~20% of 1080
   width: 1840,
   height: 500, // ~46% of 1080
+  zIndex: 21,
   fontSize: '36px',
   fontWeight: 'bold',
   textAlign: 'center',
@@ -165,6 +179,7 @@ export const DEFAULT_SONG_TRANSLATION_STYLE: SongContentStyle = {
   y: 810, // ~75% of 1080
   width: 1840,
   height: 200, // ~18% of 1080
+  zIndex: 22,
   fontSize: '24px',
   fontWeight: 'normal',
   textAlign: 'center',

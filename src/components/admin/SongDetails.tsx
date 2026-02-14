@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Song } from '../../types';
 import ApiClient from '../../services/ApiClient';
+import { formatNormalizedPitch } from '../../utils/pitchNormalization';
 
 interface SongDetailsProps {
   song: Song;
@@ -101,6 +102,14 @@ export const SongDetails: React.FC<SongDetailsProps> = ({ song }) => {
       <div>
         <div className="font-semibold text-gray-900 dark:text-white">Golden Voice</div>
         <div>{fullSong.goldenVoice ? 'Yes' : 'No'}</div>
+      </div>
+      <div>
+        <div className="font-semibold text-gray-900 dark:text-white">Ref (men's / gents scale)</div>
+        <div>{fullSong.refGents ? formatNormalizedPitch(fullSong.refGents) : '—'}</div>
+      </div>
+      <div>
+        <div className="font-semibold text-gray-900 dark:text-white">Ref (ladies / women's scale)</div>
+        <div>{fullSong.refLadies ? formatNormalizedPitch(fullSong.refLadies) : '—'}</div>
       </div>
       <div>
         <div className="font-semibold text-gray-900 dark:text-white">Lyrics</div>

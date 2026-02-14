@@ -3,7 +3,10 @@
  */
 
 import apiClient from './ApiClient';
+import { CACHE_KEYS, getLocalStorageItem, setLocalStorageItem } from '../utils/cacheUtils';
 import type { PresentationTemplate, TemplateReference } from '../types';
+
+const DEFAULT_TEMPLATE_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 // Simple in-memory cache for individual templates (5 second TTL)
 interface TemplateCache {
@@ -38,6 +41,14 @@ class TemplateService {
           });
         }
       });
+      // Also cache the default template for use in new tabs (presentation preview)
+      const defaultT = templates.find((t) => t.isDefault);
+      if (defaultT && typeof window !== 'undefined') {
+        setLocalStorageItem(
+          CACHE_KEYS.SAI_SONGS_DEFAULT_TEMPLATE,
+          JSON.stringify({ timestamp: Date.now(), template: defaultT })
+        );
+      }
       return templates;
     } catch (error) {
       console.error('❌ Error fetching templates:', error);
@@ -86,11 +97,45 @@ class TemplateService {
   }
 
   /**
-   * Get default template
+   * Get default template (uses localStorage cache first to avoid backend fetch in new tabs)
    */
   async getDefaultTemplate(): Promise<PresentationTemplate | null> {
+    // 1. Try dedicated default template cache (survives new tab / page reload)
+    if (typeof window !== 'undefined') {
+      const cachedRaw = getLocalStorageItem(CACHE_KEYS.SAI_SONGS_DEFAULT_TEMPLATE);
+      if (cachedRaw) {
+        try {
+          const { timestamp, template } = JSON.parse(cachedRaw) as { timestamp: number; template: PresentationTemplate };
+          if (template && Date.now() - timestamp < DEFAULT_TEMPLATE_CACHE_TTL_MS) {
+            return template;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+      // 2. Try templates list cache - find default (populated when user visited Templates tab)
+      const templatesRaw = getLocalStorageItem(CACHE_KEYS.SAI_SONGS_TEMPLATES);
+      if (templatesRaw) {
+        try {
+          const { timestamp, templates } = JSON.parse(templatesRaw) as { timestamp: number; templates: PresentationTemplate[] };
+          if (Array.isArray(templates) && Date.now() - timestamp < DEFAULT_TEMPLATE_CACHE_TTL_MS) {
+            const defaultT = templates.find((t) => t.isDefault);
+            if (defaultT) return defaultT;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+    // 3. Fetch from backend and cache on success
     try {
       const template = await apiClient.get<PresentationTemplate>('/templates/default');
+      if (template && typeof window !== 'undefined') {
+        setLocalStorageItem(
+          CACHE_KEYS.SAI_SONGS_DEFAULT_TEMPLATE,
+          JSON.stringify({ timestamp: Date.now(), template })
+        );
+      }
       return template;
     } catch (error) {
       console.error('⚠️ No default template found:', error);

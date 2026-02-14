@@ -52,6 +52,22 @@ export const URLImage: React.FC<URLImageProps> = ({
             y: Math.round(e.target.y()),
           });
         }}
+        onTransformEnd={(e) => {
+          const node = e.target as Konva.Group;
+          const scaleX = node.scaleX();
+          const scaleY = node.scaleY();
+          node.scaleX(1);
+          node.scaleY(1);
+          const newWidth = Math.round(Math.max(20, element.width * scaleX));
+          const newHeight = Math.round(Math.max(20, element.height * scaleY));
+          onChange({
+            x: Math.round(node.x()),
+            y: Math.round(node.y()),
+            width: newWidth,
+            height: newHeight,
+            rotation: Math.round(node.rotation()),
+          });
+        }}
       >
         {/* Placeholder background */}
         <Rect
@@ -107,6 +123,23 @@ export const URLImage: React.FC<URLImageProps> = ({
         onChange({
           x: Math.round(e.target.x()),
           y: Math.round(e.target.y()),
+        });
+      }}
+      onTransformEnd={(e) => {
+        const node = shapeRef.current;
+        if (!node) return;
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
+        node.scaleX(1);
+        node.scaleY(1);
+        const newWidth = Math.round(Math.max(20, node.width() * scaleX));
+        const newHeight = Math.round(Math.max(20, node.height() * scaleY));
+        onChange({
+          x: Math.round(node.x()),
+          y: Math.round(node.y()),
+          width: newWidth,
+          height: newHeight,
+          rotation: Math.round(node.rotation()),
         });
       }}
     />

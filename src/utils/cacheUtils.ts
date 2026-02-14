@@ -14,6 +14,8 @@ export const CACHE_KEYS = {
   SAI_SONGS_SINGERS: 'saiSongs:singersCache',
   SAI_SONGS_PITCHES: 'saiSongs:pitchesCache',
   SAI_SONGS_TEMPLATES: 'saiSongs:templatesCache',
+  SAI_SONGS_DEFAULT_TEMPLATE: 'saiSongs:defaultTemplateCache',
+  SAI_SONGS_SONG_PREFIX: 'saiSongs:song:', // Individual song cache: saiSongs:song:{id}
   SAI_SONGS_CENTERS: 'saiSongs:centersCache',
   
   // Other app data

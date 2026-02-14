@@ -89,8 +89,9 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
     });
   };
 
-  const hasActiveFilters = Object.values(filters).some(v => v);
-  const activeFilterCount = Object.values(filters).filter(v => v).length;
+  const filterKeys = ['songName', 'singerName', 'pitch', 'deity', 'language', 'raga', 'tempo'] as const;
+  const hasActiveFilters = filterKeys.some(key => !!filters[key]);
+  const activeFilterCount = filterKeys.filter(key => !!filters[key]).length;
 
   // Close on Enter/Return key press on mobile
   useEffect(() => {
@@ -370,23 +371,26 @@ export const AdvancedPitchSearch: React.FC<AdvancedPitchSearchProps> = ({
           {hasActiveFilters && (
             <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Active filters:</span>
-              {Object.entries(filters).map(([key, value]) => 
-                value ? (
+              {filterKeys.map((key) => {
+                const value = filters[key];
+                if (!value) return null;
+                const label = key === 'songName' ? 'Song' : key === 'singerName' ? 'Singer' : key === 'pitch' ? 'Pitch' : key === 'deity' ? 'Deity' : key === 'language' ? 'Language' : key === 'raga' ? 'Raga' : 'Tempo';
+                return (
                   <span
                     key={key}
                     className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded text-xs"
                   >
-                    <span className="font-medium">{key}:</span>
+                    <span className="font-medium">{label}:</span>
                     <span>{value}</span>
                     <button
-                      onClick={() => handleFilterChange(key as keyof PitchSearchFilters, '')}
+                      onClick={() => handleFilterChange(key, '')}
                       className="ml-1 hover:text-blue-900 dark:hover:text-blue-100"
                     >
                       ×
                     </button>
                   </span>
-                ) : null
-              )}
+                );
+              })}
             </div>
           )}
 

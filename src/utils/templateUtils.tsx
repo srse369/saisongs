@@ -282,40 +282,75 @@ export const getPositionClasses = (
  * Get inline styles for positioned elements
  */
 /**
- * Helper to convert pixel position to percentage for proper scaling
- * Returns the value as-is if it's already a percentage string
+ * Helper to convert pixel position to percentage for proper scaling.
+ * Returns the value as-is if it's already a percentage string.
+ * Handles negative x/y (e.g. -100 or "-100px") so positioning off the left/top scales correctly.
  */
 const getPositionPercentage = (value: string | number | undefined, slideSize: number): string | undefined => {
   if (value === undefined) return undefined;
-  
+  if (slideSize <= 0) return undefined;
+
   // If it's already a percentage string, return as-is
   if (typeof value === 'string' && value.endsWith('%')) {
     return value;
   }
-  
-  // Convert pixel value to percentage
-  const pixelValue = typeof value === 'number' ? value : parseFloat(value);
+
+  // Convert pixel value to percentage (strip "px" so "-100px" parses as -100)
+  const str = typeof value === 'number' ? String(value) : String(value).replace(/px$/i, '').trim();
+  const pixelValue = typeof value === 'number' ? value : parseFloat(str);
   if (isNaN(pixelValue)) return undefined;
-  
+
+  return `${(pixelValue / slideSize) * 100}%`;
+};
+
+/** Convert width/height (px or number) to percentage of slide dimension for responsive scaling. */
+const getSizePercentage = (value: string | number | undefined, slideSize: number): string | undefined => {
+  if (value === undefined) return undefined;
+  if (typeof value === 'string' && value.endsWith('%')) return value;
+  const pixelValue = typeof value === 'number' ? value : parseFloat(String(value).replace(/px$/i, ''));
+  if (isNaN(pixelValue)) return undefined;
   return `${(pixelValue / slideSize) * 100}%`;
 };
 
 export const getElementStyles = (element: any, slideWidth: number = 1920, slideHeight: number = 1080): React.CSSProperties => {
+  // Use percentage for width/height so overlays scale with the slide (slide is 100% of container, not 1920px)
+  const widthPct = getSizePercentage(element.width, slideWidth);
+  const heightPct = getSizePercentage(element.height, slideHeight);
+  // Prefer percentage so preview scales; when one dimension is set, fallback the other to 100% so both scale (avoid width/height staying in px)
+  const widthValue =
+    widthPct ??
+    (heightPct != null ? '100%' : undefined) ??
+    (typeof element.width === 'string' ? element.width : element.width != null ? `${element.width}px` : undefined);
+  const heightValue =
+    heightPct ??
+    (widthPct != null ? '100%' : undefined) ??
+    (typeof element.height === 'string' ? element.height : element.height != null ? `${element.height}px` : undefined);
   const styles: React.CSSProperties = {
-    width: element.width,
-    height: element.height,
+    width: widthValue,
+    height: heightValue,
     opacity: element.opacity ?? 1,
     zIndex: element.zIndex || 0,
+    // Override Tailwind Preflight (img { max-width: 100% }) so overlay can extend past slide (e.g. 110.75%)
+    maxWidth: widthValue != null ? 'none' : undefined,
+    maxHeight: heightValue != null ? 'none' : undefined,
   };
 
-  // Add custom x/y positioning if provided - use percentage for proper scaling
+  // Add custom x/y positioning if provided - use percentage for proper scaling (including negative x/y)
   if (element.x !== undefined) {
     const percentValue = getPositionPercentage(element.x, slideWidth);
-    styles.left = percentValue || (typeof element.x === 'number' ? `${element.x}px` : element.x);
+    if (percentValue != null) {
+      styles.left = percentValue;
+    } else {
+      styles.left = typeof element.x === 'number' ? `${element.x}px` : element.x;
+    }
   }
   if (element.y !== undefined) {
     const percentValue = getPositionPercentage(element.y, slideHeight);
-    styles.top = percentValue || (typeof element.y === 'number' ? `${element.y}px` : element.y);
+    if (percentValue != null) {
+      styles.top = percentValue;
+    } else {
+      styles.top = typeof element.y === 'number' ? `${element.y}px` : element.y;
+    }
   }
 
    // Apply rotation for elements that use explicit x/y positioning (no predefined position classes)
@@ -451,7 +486,7 @@ export const TemplateImages: React.FC<{ template: PresentationTemplate | null }>
           key={image.id}
           src={image.url}
           alt={`overlay-${image.id}`}
-          className={`absolute ${getPositionClasses(image.position)}`}
+          className={getPositionClasses(image.position)}
           style={getElementStyles(image)}
         />
       ))}
@@ -515,7 +550,7 @@ export const TemplateVideos: React.FC<{ template: PresentationTemplate | null }>
             return (
               <div
                 key={video.id}
-                className={`absolute ${getPositionClasses(video.position)}`}
+                className={getPositionClasses(video.position)}
                 style={{
                   ...elementStyles,
                   top: topPosition,  // Position video off-screen, controls at top
@@ -545,7 +580,7 @@ export const TemplateVideos: React.FC<{ template: PresentationTemplate | null }>
           return (
             <div
               key={video.id}
-              className={`absolute ${getPositionClasses(video.position)}`}
+              className={getPositionClasses(video.position)}
               style={{
                 ...elementStyles,
                 display: 'block',
@@ -572,7 +607,7 @@ export const TemplateVideos: React.FC<{ template: PresentationTemplate | null }>
             <iframe
               key={video.id}
               src={getYouTubeEmbedUrl(video.url, autoPlay)}
-              className={`absolute ${getPositionClasses(video.position)}`}
+              className={getPositionClasses(video.position)}
               style={{ ...getElementStyles(video), border: 'none' }}
               allow="autoplay; encrypted-media; picture-in-picture"
               allowFullScreen
@@ -589,7 +624,7 @@ export const TemplateVideos: React.FC<{ template: PresentationTemplate | null }>
             loop={video.loop ?? true}
             muted={video.muted ?? true}
             playsInline
-            className={`absolute ${getPositionClasses(video.position)}`}
+            className={getPositionClasses(video.position)}
             style={getElementStyles(video)}
           />
         );
@@ -615,7 +650,7 @@ export const TemplateAudios: React.FC<{ template: PresentationTemplate | null }>
         return (
           <div
             key={audio.id}
-            className={`absolute ${getPositionClasses(audio.position)}`}
+            className={getPositionClasses(audio.position)}
             style={{
               ...getElementStyles(audio),
               width: audio.width || '1200px',
@@ -695,7 +730,7 @@ export const TemplateText: React.FC<{ template: PresentationTemplate | null }> =
         return (
           <div
             key={textElement.id}
-            className={`absolute ${getPositionClasses(textElement.position)}`}
+            className={getPositionClasses(textElement.position)}
             style={boxStyles}
           >
             {renderStyledText(textElement.content)}
@@ -786,15 +821,20 @@ export const SlideImages: React.FC<{ templateSlide: TemplateSlide | null; slideW
 
   return (
     <>
-      {templateSlide.images.map((image) => (
-        <img
-          key={image.id}
-          src={image.url}
-          alt={`overlay-${image.id}`}
-          className={`absolute ${getPositionClasses(image.position)}`}
-          style={getElementStyles(image, slideWidth, slideHeight)}
-        />
-      ))}
+      {templateSlide.images.map((image) => {
+        const positionClasses = (image as any).x !== undefined || (image as any).y !== undefined
+          ? 'absolute'
+          : getPositionClasses(image.position);
+        return (
+          <img
+            key={image.id}
+            src={image.url}
+            alt={`overlay-${image.id}`}
+            className={positionClasses}
+            style={{ ...getElementStyles(image, slideWidth, slideHeight), objectFit: 'fill', display: 'block' }}
+          />
+        );
+      })}
     </>
   );
 };
@@ -864,7 +904,7 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null; slideW
             return (
               <div
                 key={video.id}
-                className={`absolute ${getPositionClasses(video.position)}`}
+                className={getPositionClasses(video.position)}
                 style={{
                   ...baseStyles,
                   top: topPosition,  // Position video off-screen, controls at top
@@ -893,7 +933,7 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null; slideW
           return (
             <div
               key={video.id}
-              className={`absolute ${getPositionClasses(video.position)}`}
+              className={getPositionClasses(video.position)}
               style={{
                 ...baseStyles,
                 display: 'block',
@@ -918,7 +958,7 @@ export const SlideVideos: React.FC<{ templateSlide: TemplateSlide | null; slideW
         return (
           <div
             key={video.id}
-            className={`absolute ${getPositionClasses(video.position)}`}
+            className={getPositionClasses(video.position)}
             style={{
               ...baseStyles,
               width,
@@ -977,7 +1017,7 @@ export const SlideAudios: React.FC<{ templateSlide: TemplateSlide | null; slideW
         return (
           <div
             key={audio.id}
-            className={`absolute ${getPositionClasses(audio.position)}`}
+            className={getPositionClasses(audio.position)}
             style={{
               ...baseStyles,
               width: audio.width || '1200px',
@@ -1063,12 +1103,170 @@ export const SlideText: React.FC<{ templateSlide: TemplateSlide | null; slideWid
         return (
           <div
             key={textElement.id}
-            className={`absolute ${getPositionClasses(textElement.position)}`}
+            className={getPositionClasses(textElement.position)}
             style={boxStyles}
           >
             {renderStyledText(textElement.content)}
           </div>
         );
+      })}
+    </>
+  );
+};
+
+// Overlay item for z-order sorting (images, videos, audios, text from a template slide)
+type OverlayItem =
+  | { type: 'image'; element: TemplateSlide['images'] extends (infer I)[] ? I : never; zIndex: number }
+  | { type: 'video'; element: TemplateSlide['videos'] extends (infer V)[] ? V : never; zIndex: number }
+  | { type: 'audio'; element: TemplateSlide['audios'] extends (infer A)[] ? A : never; zIndex: number }
+  | { type: 'text'; element: TemplateSlide['text'] extends (infer T)[] ? T : never; zIndex: number };
+
+function getOverlayItemsInZOrder(templateSlide: TemplateSlide | null): OverlayItem[] {
+  if (!templateSlide) return [];
+  const items: OverlayItem[] = [];
+  (templateSlide.images || []).forEach((el) => items.push({ type: 'image', element: el, zIndex: (el as any).zIndex ?? 0 }));
+  (templateSlide.videos || []).forEach((el) => items.push({ type: 'video', element: el, zIndex: (el as any).zIndex ?? 0 }));
+  (templateSlide.audios || []).forEach((el) => items.push({ type: 'audio', element: el, zIndex: (el as any).zIndex ?? 0 }));
+  (templateSlide.text || []).forEach((el) => items.push({ type: 'text', element: el, zIndex: (el as any).zIndex ?? 0 }));
+  items.sort((a, b) => a.zIndex - b.zIndex);
+  return items;
+}
+
+/**
+ * Renders all template overlay elements (images, videos, audios, text) in a single list
+ * sorted by z-index (lowest first = back, highest last = on top) so stacking in preview
+ * matches the template editor and "text behind image" shows correctly where the image doesn't cover.
+ */
+export const SlideOverlaysInZOrder: React.FC<{
+  templateSlide: TemplateSlide | null;
+  slideWidth?: number;
+  slideHeight?: number;
+  skipAudio?: boolean;
+}> = ({ templateSlide, slideWidth = 1920, slideHeight = 1080, skipAudio = false }) => {
+  const items = React.useMemo(() => getOverlayItemsInZOrder(templateSlide), [templateSlide]);
+  if (items.length === 0) return null;
+
+  return (
+    <>
+      {items.map((item) => {
+        if (item.type === 'image') {
+          const image = item.element as any;
+          // When x/y are set, use only "absolute" so left/top/width/height control placement.
+          // Position classes (e.g. center's -translate-x-1/2) would shift the image and cause a gap on the right.
+          const positionClasses = image.x !== undefined || image.y !== undefined
+            ? 'absolute'
+            : getPositionClasses(image.position);
+          return (
+            <img
+              key={image.id}
+              src={image.url}
+              alt={`overlay-${image.id}`}
+              className={positionClasses}
+              style={{ ...getElementStyles(image, slideWidth, slideHeight), objectFit: 'fill', display: 'block' }}
+            />
+          );
+        }
+        if (item.type === 'text') {
+          const textElement = item.element as any;
+          const boxStyles: React.CSSProperties = {
+            opacity: textElement.opacity ?? 1,
+            zIndex: textElement.zIndex ?? 0,
+          };
+          if (textElement.x !== undefined) {
+            const pct = getPositionPercentage(textElement.x, slideWidth);
+            boxStyles.left = pct ?? (typeof textElement.x === 'number' ? `${textElement.x}px` : textElement.x);
+          }
+          if (textElement.y !== undefined) {
+            const pct = getPositionPercentage(textElement.y, slideHeight);
+            boxStyles.top = pct ?? (typeof textElement.y === 'number' ? `${textElement.y}px` : textElement.y);
+          }
+          if (textElement.width) boxStyles.width = typeof textElement.width === 'number' ? `${textElement.width}px` : textElement.width;
+          else if (textElement.maxWidth) boxStyles.width = textElement.maxWidth;
+          if (textElement.rotation !== undefined && !textElement.position) {
+            boxStyles.transform = `rotate(${textElement.rotation}deg)`;
+            boxStyles.transformOrigin = 'center center';
+          }
+          boxStyles.fontSize = textElement.fontSize;
+          boxStyles.color = textElement.color;
+          boxStyles.fontWeight = textElement.fontWeight;
+          boxStyles.fontStyle = textElement.fontStyle || 'normal';
+          boxStyles.fontFamily = getFontFamily(textElement.fontFamily);
+          boxStyles.textAlign = textElement.textAlign || 'center';
+          boxStyles.whiteSpace = 'pre-wrap';
+          boxStyles.lineHeight = 1;
+          return (
+            <div
+              key={textElement.id}
+              className={getPositionClasses(textElement.position)}
+              style={boxStyles}
+            >
+              {renderStyledText(textElement.content)}
+            </div>
+          );
+        }
+        if (item.type === 'video') {
+          const video = item.element as any;
+          const autoPlay = video.autoPlay ?? true;
+          const baseStyles = getElementStyles(video, slideWidth, slideHeight);
+          const width = video.width || '320px';
+          const height = video.height || '180px';
+          const isYouTube = isYouTubeUrl(video.url);
+          const hideVideo = video.hideVideo ?? false;
+          const hideAudio = video.hideAudio ?? false;
+          const visualHidden = video.visualHidden ?? false;
+          if (visualHidden || hideAudio) {
+            if (isYouTube) {
+              return (
+                <iframe key={video.id} src={getYouTubeEmbedUrl(video.url, autoPlay)} style={{ display: 'none' }}
+                  allow="autoplay; encrypted-media" title={`Hidden ${video.id}`} />
+              );
+            }
+            return (
+              <video key={video.id} src={video.url} autoPlay={autoPlay} loop={video.loop ?? true}
+                muted={video.muted ?? true} playsInline style={{ display: 'none' }} />
+            );
+          }
+          if (hideVideo && isYouTube) {
+            return (
+              <div key={video.id} className={getPositionClasses(video.position)}
+                style={{ ...baseStyles, top: '-340px', height: '400px', width: baseStyles.width || '1200px', zIndex: Math.max((baseStyles.zIndex as number) || 0, 1), overflow: 'visible' }}>
+                <iframe src={getYouTubeEmbedUrl(video.url, autoPlay)} className="w-full h-full" style={{ border: 'none' }}
+                  allow="autoplay; encrypted-media" title={`Audio ${video.id}`} />
+              </div>
+            );
+          }
+          if (hideVideo) {
+            return (
+              <div key={video.id} className={getPositionClasses(video.position)} style={{ ...baseStyles, width: '1200px', zIndex: Math.max((baseStyles.zIndex as number) || 0, 1) }}>
+                <audio src={video.url} autoPlay={autoPlay} loop={video.loop ?? true} controls className="w-full" style={{ height: video.height || 'auto' }} />
+              </div>
+            );
+          }
+          return (
+            <div key={video.id} className={getPositionClasses(video.position)} style={{ ...baseStyles, width, height, backgroundColor: '#000' }}>
+              {isYouTube && video.url ? (
+                <iframe src={getYouTubeEmbedUrl(video.url, autoPlay)} className="w-full h-full" style={{ border: 'none' }}
+                  allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen title={`Video ${video.id}`} />
+              ) : (
+                <video src={video.url} autoPlay={autoPlay} loop={video.loop ?? true} muted={video.muted ?? true} playsInline controls={!autoPlay} className="w-full h-full object-cover" />
+              )}
+            </div>
+          );
+        }
+        if (item.type === 'audio' && !skipAudio) {
+          const audio = item.element as any;
+          const autoPlay = audio.autoPlay ?? true;
+          const visualHidden = audio.visualHidden ?? false;
+          const baseStyles = getElementStyles(audio, slideWidth, slideHeight);
+          return (
+            <div key={audio.id} className={getPositionClasses(audio.position)} style={{ ...baseStyles, width: audio.width || '1200px', display: 'block' }}>
+              <audio src={audio.url} autoPlay={autoPlay} loop={audio.loop ?? false} controls={!visualHidden} className="w-full"
+                style={{ height: audio.height || 'auto', display: visualHidden ? 'none' : 'block' }} />
+            </div>
+          );
+        }
+        if (item.type === 'audio' && skipAudio) return null;
+        return null;
       })}
     </>
   );

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, forwardRef } from 'react';
-import { getWebLLMService, checkWebGPUSupport, type LLMSearchResult, type SearchType, type AvailableValues } from '../../services/WebLLMService';
-import type { InitProgressReport } from '@mlc-ai/web-llm';
+import { getWebLLMService, type LLMSearchResult, type SearchType, type AvailableValues } from '../../services/WebLLMService';
 import type { SongSearchFilters } from './AdvancedSongSearch';
 import type { PitchSearchFilters } from './AdvancedPitchSearch';
 
@@ -21,20 +20,10 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
   placeholder = 'Ask me: "Show me sai songs in sanskrit with fast tempo"...',
   availableValues,
 }, ref) => {
-  const [llmEnabled, setLlmEnabled] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadProgress, setLoadProgress] = useState<string>('');
-  const [loadPercentage, setLoadPercentage] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [hasWebGPU, setHasWebGPU] = useState(() => typeof window !== 'undefined' && checkWebGPUSupport());
   const [isProcessing, setIsProcessing] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    setHasWebGPU(checkWebGPUSupport());
-  }, []);
-
-  // Update available values when they change or when LLM is enabled
   useEffect(() => {
     if (availableValues) {
       const service = getWebLLMService();
@@ -42,52 +31,8 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
     }
   }, [availableValues]);
 
-  const handleEnableLLM = async () => {
-    if (!hasWebGPU) {
-      setError('WebGPU not supported in your browser. Please use Chrome/Edge 113+ or Safari 17+');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    
-    const service = getWebLLMService();
-    
-    // Set available values before or after initialization
-    if (availableValues) {
-      service.setAvailableValues(availableValues);
-    }
-    
-    try {
-      await service.initialize((report: InitProgressReport) => {
-        setLoadProgress(report.text);
-        setLoadPercentage(report.progress * 100);
-      });
-      
-      // Ensure available values are set after initialization
-      if (availableValues) {
-        service.setAvailableValues(availableValues);
-      }
-      
-      setLlmEnabled(true);
-      setIsLoading(false);
-      setLoadProgress('');
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to load AI model. Try refreshing the page.';
-      setError(errorMsg);
-      setIsLoading(false);
-      console.error('WebLLM initialization error:', err);
-    }
-  };
-
-  const handleDisableLLM = async () => {
-    const service = getWebLLMService();
-    await service.unload();
-    setLlmEnabled(false);
-  };
-
   const handleSearch = async () => {
-    if (!llmEnabled || !value.trim()) return;
+    if (!value.trim()) return;
 
     setIsProcessing(true);
     setError(null);
@@ -96,7 +41,7 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
       const service = getWebLLMService();
       const result: LLMSearchResult = await service.parseNaturalLanguageQuery(value, searchType);
       
-      console.log('🤖 AI Search Result:', {
+      console.log('Natural language search result:', {
         query: value,
         searchType,
         extractedFilters: result.filters,
@@ -143,48 +88,34 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
         }
       }
     } catch (err) {
-      setError('AI search failed. Using regular search instead.');
-      console.error('❌ AI Search Error:', err);
+      setError('Could not parse query. Try being more specific.');
+      console.error('Natural language parse error:', err);
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && llmEnabled && !isProcessing) {
+    if (e.key === 'Enter' && !isProcessing) {
       handleSearch();
     }
   };
 
   return (
     <div className="flex-1 space-y-3">
-      {/* Search Input with integrated AI Toggle */}
       <div className="relative flex items-center">
-        {/* Search Icon */}
-        <i className={`fas fa-search text-base absolute left-3 ${llmEnabled ? 'text-purple-500' : 'text-gray-400'}`}></i>
-
-        {/* Search Input - larger touch target on mobile */}
+        <i className="fas fa-search text-base absolute left-3 text-gray-400"></i>
         <input
           ref={ref}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={llmEnabled ? placeholder : 'Search (Enable AI for natural language)...'}
+          placeholder={placeholder}
           autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
-          className={`
-            w-full pl-10 pr-32 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
-            ${llmEnabled 
-              ? 'border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/10' 
-              : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800'
-            }
-            dark:text-gray-100
-          `}
+          className="w-full pl-10 pr-24 py-1 text-sm border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 dark:text-gray-100"
         />
-
-        {/* Right side controls */}
         <div className="absolute right-2 sm:right-3 flex items-center gap-1 sm:gap-2">
-          {/* Clear button - larger touch target on mobile */}
           {value && (
             <button
               onClick={() => onChange('')}
@@ -194,69 +125,9 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
               <i className="fas fa-times text-base"></i>
             </button>
           )}
-
-          {/* Divider */}
-          <div className="h-5 w-px bg-gray-300 dark:bg-gray-600" />
-
-          {/* AI Toggle */}
-          <div className="flex items-center gap-1.5">
-            <span className={`text-xs font-medium ${llmEnabled ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
-              AI
-            </span>
-            <button
-              onClick={llmEnabled ? handleDisableLLM : handleEnableLLM}
-              disabled={isLoading || !hasWebGPU}
-              className={`
-                relative inline-flex h-5 w-9 items-center rounded-full transition-colors
-                ${llmEnabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'}
-                ${!hasWebGPU ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'}
-              `}
-              title={!hasWebGPU ? 'WebGPU not supported' : llmEnabled ? 'Disable AI' : 'Enable AI'}
-            >
-              <span
-                className={`
-                  inline-block h-3 w-3 transform rounded-full bg-white transition-transform
-                  ${llmEnabled ? 'translate-x-5' : 'translate-x-1'}
-                `}
-              />
-            </button>
-            {llmEnabled && (
-              <i className="fas fa-check-circle text-xs text-green-500"></i>
-            )}
-          </div>
         </div>
       </div>
 
-      {/* Helper text for WebGPU warning */}
-      {!hasWebGPU && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">
-          ⚠️ WebGPU required for AI search (Chrome/Edge 113+, Safari 17+)
-        </p>
-      )}
-
-      {/* Loading Progress */}
-      {isLoading && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 animate-fade-in">
-          <div className="flex items-center gap-3 mb-2">
-            <i className="fas fa-spinner fa-spin text-lg text-blue-600 dark:text-blue-400"></i>
-            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-              Loading AI Model... {Math.round(loadPercentage)}%
-            </span>
-          </div>
-          <p className="text-xs text-blue-700 dark:text-blue-300 ml-8">{loadProgress}</p>
-          <div className="mt-2 ml-8 w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
-            <div 
-              className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${loadPercentage}%` }}
-            />
-          </div>
-          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 ml-8">
-            This will download ~100-150MB model. First time only, cached for future use.
-          </p>
-        </div>
-      )}
-
-      {/* Success Message */}
       {successMessage && (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 flex items-start gap-2 animate-fade-in">
           <i className="fas fa-check-circle text-lg text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5"></i>
@@ -264,7 +135,6 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
         </div>
       )}
 
-      {/* Error Message */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start gap-2">
           <i className="fas fa-times-circle text-lg text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"></i>
@@ -272,8 +142,7 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
         </div>
       )}
 
-      {/* Ask AI Button - only show when AI is enabled and there's a query */}
-      {llmEnabled && value.trim() && !isLoading && (
+      {value.trim() && (
         <button
           onClick={handleSearch}
           disabled={isProcessing}
@@ -282,35 +151,32 @@ export const WebLLMSearchInput = forwardRef<HTMLInputElement, WebLLMSearchInputP
           {isProcessing ? (
             <>
               <i className="fas fa-spinner fa-spin text-base"></i>
-              Processing...
+              Applying…
             </>
           ) : (
             <>
               <i className="fas fa-bolt text-base"></i>
-              Ask AI (or press Enter)
+              Apply filters (or Enter)
             </>
           )}
         </button>
       )}
 
-      {/* AI Hint */}
-      {llmEnabled && !isProcessing && !value.trim() && (
+      {!value.trim() && (
         <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
-          <p className="text-xs text-purple-900 dark:text-purple-100 font-medium mb-1">💡 AI Search Examples:</p>
+          <p className="text-xs text-purple-900 dark:text-purple-100 font-medium mb-1">Natural language examples:</p>
           <ul className="text-xs text-purple-700 dark:text-purple-300 space-y-1">
             {searchType === 'song' ? (
               <>
-                <li>• "Show me sai bhajans in sanskrit with slow tempo"</li>
-                <li>• "Find hamsadhwani raga songs"</li>
-                <li>• "Devi songs that are simple level"</li>
-                <li>• "Fast tempo krishna songs in mohanam raga"</li>
+                <li>• &quot;Show me sai bhajans in sanskrit with slow tempo&quot;</li>
+                <li>• &quot;Find hamsadhwani raga songs&quot;</li>
+                <li>• &quot;Devi songs that are simple level&quot;</li>
               </>
             ) : (
               <>
-                <li>• "Show me C# pitches for sai songs"</li>
-                <li>• "Find pitches for devi songs in hamsadhwani raga"</li>
-                <li>• "D# pitch for sanskrit songs"</li>
-                <li>• "Which singers have krishna bhajans"</li>
+                <li>• &quot;Show me C# pitches for sai songs&quot;</li>
+                <li>• &quot;Find pitches for devi songs in hamsadhwani raga&quot;</li>
+                <li>• &quot;D# pitch for sanskrit songs&quot;</li>
               </>
             )}
           </ul>

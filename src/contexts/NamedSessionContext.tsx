@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import type {
   NamedSession,
   NamedSessionWithItems,
@@ -40,6 +41,9 @@ interface NamedSessionContextType {
 const NamedSessionContext = createContext<NamedSessionContextType | undefined>(undefined);
 
 export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
+  const isPresentationOnly = location.pathname.startsWith('/presentation') || location.pathname.startsWith('/session/present');
+
   const [sessions, setSessions] = useState<NamedSession[]>([]);
   const [currentSession, setCurrentSession] = useState<NamedSessionWithItems | null>(null);
   const [loading, setLoading] = useState(false);
@@ -226,13 +230,14 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const hasLoadedRef = useRef(false);
 
-  // Load sessions on mount (only once)
+  // Load sessions on mount - skip on presentation route to avoid concurrent fetches
   useEffect(() => {
+    if (isPresentationOnly) return;
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
       loadSessions();
     }
-  }, [loadSessions]);
+  }, [loadSessions, isPresentationOnly]);
 
   const value: NamedSessionContextType = {
     sessions,

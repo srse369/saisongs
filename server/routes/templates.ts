@@ -3,25 +3,42 @@ import cacheService from '../services/CacheService.js';
 import type { PresentationTemplate } from '../services/CacheService.js';
 import { parseYaml } from '../services/CacheService.js';
 import { requireAuth, requireEditor, optionalAuth } from '../middleware/simpleAuth.js';
+import { databaseReadService } from '../services/DatabaseReadService.js';
 
 const router = express.Router();
+
+/** Normalize to numbers and merge centerIds + editorFor for access check */
+function getAccessibleCenterIds(centerIds: number[] | undefined, editorFor: number[] | undefined): number[] {
+  const a = (centerIds || []).map((id: number | string) => Number(id)).filter((n) => !Number.isNaN(n));
+  const b = (editorFor || []).map((id: number | string) => Number(id)).filter((n) => !Number.isNaN(n));
+  return [...new Set([...a, ...b])];
+}
 
 // Get all templates (uses cache)
 // Uses optionalAuth to populate req.user if session exists, but doesn't require authentication
 router.get('/', optionalAuth, async (req, res) => {
   try {
     const allTemplates = await cacheService.getAllTemplates();
-    
-    // Filter templates by center access for all users (authenticated and public)
+
     let templates: PresentationTemplate[];
     if (req.user) {
-      const accessibleCenterIds = [...(req.user.centerIds || []), ...(req.user.editorFor || [])];
+      let accessibleCenterIds = getAccessibleCenterIds(req.user.centerIds, req.user.editorFor);
+      // If editor has no centers in session (e.g. stale session after being granted access), re-fetch from DB
+      if (req.user.role === 'editor' && accessibleCenterIds.length === 0 && req.user.email) {
+        try {
+          const freshUser = await databaseReadService.getUserByEmail(req.user.email);
+          if (freshUser) {
+            accessibleCenterIds = getAccessibleCenterIds(freshUser.centerIds, freshUser.editorFor);
+          }
+        } catch (_) {
+          // use session data as-is
+        }
+      }
       templates = cacheService.filterByCenterAccess<PresentationTemplate>(allTemplates, req.user.role, accessibleCenterIds);
     } else {
-      // Public/unauthenticated users should only see templates with no center restrictions
-      templates = allTemplates.filter(t => !t.centerIds || t.centerIds.length === 0);
+      templates = allTemplates.filter((t) => !t.centerIds || t.centerIds.length === 0);
     }
-    
+
     res.json(templates);
   } catch (error) {
     console.error('Error fetching templates:', error);
@@ -34,17 +51,23 @@ router.get('/', optionalAuth, async (req, res) => {
 router.get('/default', optionalAuth, async (req, res) => {
   try {
     const allTemplates = await cacheService.getAllTemplates();
-    
-    // Filter templates based on user's center access
+
     let accessibleTemplates: PresentationTemplate[];
     if (req.user) {
-      const accessibleCenterIds = [...(req.user.centerIds || []), ...(req.user.editorFor || [])];
+      let accessibleCenterIds = getAccessibleCenterIds(req.user.centerIds, req.user.editorFor);
+      if (req.user.role === 'editor' && accessibleCenterIds.length === 0 && req.user.email) {
+        try {
+          const freshUser = await databaseReadService.getUserByEmail(req.user.email);
+          if (freshUser) {
+            accessibleCenterIds = getAccessibleCenterIds(freshUser.centerIds, freshUser.editorFor);
+          }
+        } catch (_) {}
+      }
       accessibleTemplates = cacheService.filterByCenterAccess(allTemplates, req.user.role, accessibleCenterIds);
     } else {
-      // Public users only see templates with no center restrictions
-      accessibleTemplates = allTemplates.filter(t => !t.centerIds || t.centerIds.length === 0);
+      accessibleTemplates = allTemplates.filter((t) => !t.centerIds || t.centerIds.length === 0);
     }
-    
+
     // Find default template from accessible templates
     const template = accessibleTemplates.find(t => t.isDefault);
     if (!template) {
@@ -114,15 +137,19 @@ router.post('/', requireAuth, async (req, res) => {
       });
     }
 
-    // For editors, validate they have access to all template centers
+    // For editors, require at least one center (cannot create public templates) and must have access
     if (user.role === 'editor') {
       const templateCenterIds = template.centerIds || [];
       const editableCenterIds = user.editorFor || [];
+      if (templateCenterIds.length === 0) {
+        return res.status(400).json({
+          error: 'Editors must assign the template to at least one center. Public templates are only for admins.'
+        });
+      }
       const hasAccess = templateCenterIds.every(cid => editableCenterIds.includes(cid));
-      
       if (!hasAccess) {
-        return res.status(403).json({ 
-          error: 'Access denied: You can only create templates for centers you manage' 
+        return res.status(403).json({
+          error: 'Access denied: You can only create templates for centers you manage'
         });
       }
     }
@@ -133,7 +160,8 @@ router.post('/', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error creating template:', error);
     const errorMessage = error instanceof Error ? error.message : 'Failed to create template';
-    res.status(500).json({ error: errorMessage });
+    const isDuplicateName = errorMessage.includes('already exists') || (error instanceof Error && error.message.includes('ORA-00001'));
+    res.status(isDuplicateName ? 409 : 500).json({ error: errorMessage });
   }
 });
 
@@ -178,18 +206,21 @@ router.put('/:id', requireAuth, async (req, res) => {
         });
       }
 
-      // If updating centerIds, validate new centers too
-      if (updates.centerIds) {
+      // If updating centerIds, validate: editors cannot make template public (empty centerIds)
+      if (updates.centerIds !== undefined) {
+        if (updates.centerIds.length === 0) {
+          return res.status(400).json({
+            error: 'Editors cannot make a template public. Assign at least one center you manage.'
+          });
+        }
         const allNewCenters = updates.centerIds.every(cid => editableCenterIds.includes(cid));
         if (!allNewCenters) {
-          // Get center names for better error message
           const allCenters = await cacheService.getAllCenters();
           const invalidCenterIds = updates.centerIds.filter(cid => !editableCenterIds.includes(cid));
           const invalidCenterNames = invalidCenterIds
             .map(cid => allCenters.find(c => c.id === cid)?.name || `Center ${cid}`)
             .join(', ');
-          
-          return res.status(403).json({ 
+          return res.status(403).json({
             error: 'Access denied',
             message: `You can only assign templates to centers you manage. Missing access to: ${invalidCenterNames}`
           });

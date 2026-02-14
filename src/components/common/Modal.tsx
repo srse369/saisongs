@@ -31,12 +31,18 @@ export const Modal: React.FC<ModalProps> = ({
     if (isOpen) {
       // Use capture phase to handle before other handlers
       document.addEventListener('keydown', handleEscape, true);
+      // Prevent layout shift when scrollbar disappears (reserve its width)
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.overflow = 'hidden';
+      if (scrollbarWidth > 0) {
+        document.body.style.paddingRight = `${scrollbarWidth}px`;
+      }
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape, true);
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
     };
   }, [isOpen, onClose]);
 

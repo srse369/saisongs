@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useParams, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useParams, useSearchParams, Outlet, useLocation } from 'react-router-dom';
 import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { OTPLoginDialog } from './components/admin';
 import { SongList, PresentationMode } from './components/presentation';
@@ -43,6 +43,9 @@ function LoadingFallback() {
 }
 
 function AppContent() {
+  const location = useLocation();
+  const isPresentationOnly = location.pathname.startsWith('/presentation') || location.pathname.startsWith('/session/present');
+
   // Initialize admin keyboard shortcut (Ctrl+Shift+I or Cmd+Shift+I)
   const { isPasswordDialogOpen, closePasswordDialog } = useAdminShortcut();
   const { isAuthenticated, isLoading, setAuthenticatedUser } = useAuth();
@@ -62,18 +65,20 @@ function AppContent() {
   // Track page views for analytics
   usePageTracking();
 
-  // Warm up cache for public data (songs) on mount
+  // Warm up cache for public data (songs) on mount - skip on presentation route (it fetches its own song)
   useEffect(() => {
+    if (isPresentationOnly) return;
     if (!initialLoadDone.current) {
       initialLoadDone.current = true;
-      fetchSongs(); // Always fetch public data
+      fetchSongs();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty deps - only run once on mount
+  }, [isPresentationOnly]);
 
   // Warm up cache for protected data (singers, pitches, templates) when user authenticates
-  // Clear protected data when logging out
+  // Skip on presentation route to avoid concurrent fetches that can cause "Failed to fetch" errors
   useEffect(() => {
+    if (isPresentationOnly) return;
     if (isAuthenticated && !authFetchDone.current) {
       authFetchDone.current = true;
       fetchSingers();
@@ -96,7 +101,7 @@ function AppContent() {
       loadSessions();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]); // Fetch when authentication status changes
+  }, [isAuthenticated, isPresentationOnly]); // Fetch when authentication status changes
 
   // Show loading state during initial auth check
   if (isLoading) {
@@ -324,10 +329,16 @@ function PresentationSongListPage() {
 function PresentationModePage() {
   const { songId } = useParams<{ songId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const closeOnExit = searchParams.get('closeOnExit') === '1';
 
   const handleExit = () => {
-    // When exiting presentation, go back to the previous page (Songs tab, Pitches tab, or Session list)
-    // If there is no meaningful history, fall back to the session list
+    // When opened in new tab with ?closeOnExit=1, close the tab instead of navigating
+    if (closeOnExit) {
+      window.close();
+      return;
+    }
+    // Otherwise go back to the previous page (Songs tab, Pitches tab, or Session list)
     if (window.history.length > 1) {
       navigate(-1);
     } else {

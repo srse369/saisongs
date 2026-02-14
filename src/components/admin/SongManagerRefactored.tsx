@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useSongs } from '../../contexts/SongContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -7,9 +7,7 @@ import { SongForm } from './SongForm';
 import { SongList } from './SongList';
 import { SongDetails } from './SongDetails';
 import { Modal } from '../common/Modal';
-import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedSongSearch, type SongSearchFilters } from '../common/AdvancedSongSearch';
-import { WebLLMService } from '../../services/WebLLMService';
 import { RefreshIcon, type MobileAction } from '../common';
 import songService from '../../services/SongService';
 import type { Song, CreateSongInput } from '../../types';
@@ -24,6 +22,7 @@ interface SongManagerProps {
 
 export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = true }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const songIdFromUrl = searchParams.get('songId') || '';
   const {
@@ -45,10 +44,9 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
     isActive,
     onDataRefresh: () => fetchSongs(true),
     onEscapeKey: () => {
-      // Clear search when Escape key is pressed (only if no modal is open)
+      // Clear only search term when Escape is pressed (never clear filters so closing preview keeps filters)
       if (!isFormModalOpen && !viewingSong) {
         setSearchTerm('');
-        setAdvancedFilters({});
       }
       // Focus search bar
       if (baseManager.searchInputRef.current) {
@@ -61,12 +59,70 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
   const [editingSong, setEditingSong] = useState<Song | null>(null);
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'pitchCount'>('name');
   const [advancedFilters, setAdvancedFilters] = useState<SongSearchFilters>({});
   const [visibleCount, setVisibleCount] = useState(50);
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const songIdRef = useRef<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const previewOpenedByNavigationRef = useRef(false);
+  const pendingScrollRestoreRef = useRef<{ songId: string; requiredCount: number } | null>(null);
+
+  // Apply filters passed from Ask the app (clear existing filters and search, then set rule filters)
+  useEffect(() => {
+    const llmFilters = location.state?.llmFilters as Record<string, string> | undefined;
+    if (llmFilters && typeof llmFilters === 'object' && Object.keys(llmFilters).length > 0) {
+      setSearchTerm('');
+      setAdvancedFilters({ ...llmFilters });
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.state, navigate]);
+
+  // Open song preview when LLM asks (e.g. "show preview of Om Ram")
+  useEffect(() => {
+    const openSongPreview = location.state?.openSongPreview as string | undefined;
+    if (openSongPreview && songs.length > 0) {
+      const song = songs.find((s) => s.id === openSongPreview);
+      if (song) {
+        previewOpenedByNavigationRef.current = true;
+        setViewingSong(song);
+      }
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.state, navigate, songs]);
+
+  // When returning from presentation, restore list position (tab remounts so state was lost)
+  useEffect(() => {
+    if (!isActive) return;
+    try {
+      const id = sessionStorage.getItem('songsScrollToId');
+      if (!id) return;
+      sessionStorage.removeItem('songsScrollToId');
+      const visibleCountStr = sessionStorage.getItem('songsScrollToVisibleCount');
+      sessionStorage.removeItem('songsScrollToScrollTop');
+      sessionStorage.removeItem('songsScrollToVisibleCount');
+      const savedVisibleCount = visibleCountStr != null ? Number(visibleCountStr) : 0;
+      if (Number.isFinite(savedVisibleCount) && savedVisibleCount > 0) {
+        setVisibleCount(Math.min(savedVisibleCount, filteredSongs.length || savedVisibleCount));
+        pendingScrollRestoreRef.current = { songId: id, requiredCount: savedVisibleCount };
+      } else {
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('songId', id);
+          return next;
+        }, { replace: true });
+      }
+    } catch {
+      // ignore
+    }
+  }, [isActive, setSearchParams]);
+
+  // Debounce search term so filtering runs after user pauses typing (avoids lag on every keystroke)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 250);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Create fuzzy search instance for fallback
   const fuzzySearch = useMemo(() => createSongFuzzySearch(songs), [songs]);
@@ -125,8 +181,8 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
       );
     }
 
-    // Apply smart search with natural language parsing and fuzzy matching
-    const query = searchTerm.trim();
+    // Apply smart search (use debounced term)
+    const query = debouncedSearchTerm.trim();
 
     if (!query) {
       // No search query - just apply sorting
@@ -160,51 +216,56 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
       return results;
     }
 
-    // Direct substring search using the full query - this is the primary search
-    // Search across multiple fields to cast a wide net
-    const lowerQuery = query.toLowerCase();
-    const directMatches = results.filter(s =>
-      s.name.toLowerCase().includes(lowerQuery) ||
-      s.deity?.toLowerCase().includes(lowerQuery) ||
-      s.language?.toLowerCase().includes(lowerQuery) ||
-      s.raga?.toLowerCase().includes(lowerQuery) ||
-      s.songTags?.toLowerCase().includes(lowerQuery)
-    );
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
 
-    // Use direct matches if found, otherwise fall back to fuzzy search
-    if (directMatches.length > 0) {
-      results = directMatches;
+    // Multi-word query: require every word to appear in at least one field (fast, no Fuse)
+    if (words.length > 1) {
+      results = results.filter(song => {
+        const name = song.name?.toLowerCase() ?? '';
+        const deity = song.deity?.toLowerCase() ?? '';
+        const language = song.language?.toLowerCase() ?? '';
+        const raga = song.raga?.toLowerCase() ?? '';
+        const songTags = song.songTags?.toLowerCase() ?? '';
+        const combined = `${name} ${deity} ${language} ${raga} ${songTags}`;
+        return words.every(word => combined.includes(word));
+      });
     } else {
-      // Fuzzy search as last resort for typo tolerance
-      const fuzzyResults = fuzzySearch.search(query);
-      const fuzzyIds = new Set(fuzzyResults.map(r => r.item.id));
-      results = results.filter(s => fuzzyIds.has(s.id));
+      // Single word: try direct substring first, then Fuse only if no matches (Fuse is slow for long phrases)
+      const lowerQuery = query.toLowerCase();
+      const directMatches = results.filter(s =>
+        s.name.toLowerCase().includes(lowerQuery) ||
+        s.deity?.toLowerCase().includes(lowerQuery) ||
+        s.language?.toLowerCase().includes(lowerQuery) ||
+        s.raga?.toLowerCase().includes(lowerQuery) ||
+        s.songTags?.toLowerCase().includes(lowerQuery)
+      );
+      if (directMatches.length > 0) {
+        results = directMatches;
+      } else {
+        const fuzzyResults = fuzzySearch.search(query);
+        const fuzzyIds = new Set(fuzzyResults.map(r => r.item.id));
+        results = results.filter(s => fuzzyIds.has(s.id));
+      }
     }
 
-    // Apply sorting
+    // Apply sorting (keep comparator cheap for large result sets)
     if (sortBy === 'pitchCount') {
-      // Sort by pitch count (descending), then by name for ties
       results.sort((a, b) => {
         const pitchCompare = (b.pitchCount ?? 0) - (a.pitchCount ?? 0);
         if (pitchCompare !== 0) return pitchCompare;
         return compareStringsIgnoringSpecialChars(a.name, b.name);
       });
     } else {
-      // Sort by name
-      if (searchTerm.trim() || advancedFilters.name) {
-        const query = searchTerm.trim() || advancedFilters.name || '';
-        const lowerQuery = query.toLowerCase();
+      // Sort by name. For single-word query only, put "name starts with query" first; else alphabetical (faster).
+      const singleWord = words.length === 1 ? words[0] : '';
+      if (singleWord && !advancedFilters.name) {
         results.sort((a, b) => {
           const aName = a.name.toLowerCase();
           const bName = b.name.toLowerCase();
-          const aStartsWith = aName.startsWith(lowerQuery);
-          const bStartsWith = bName.startsWith(lowerQuery);
-
-          // Prefix matches come first
+          const aStartsWith = aName.startsWith(singleWord);
+          const bStartsWith = bName.startsWith(singleWord);
           if (aStartsWith && !bStartsWith) return -1;
           if (!aStartsWith && bStartsWith) return 1;
-
-          // If both start with query or neither does, sort alphabetically
           return compareStringsIgnoringSpecialChars(a.name, b.name);
         });
       } else {
@@ -213,7 +274,7 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
     }
 
     return results;
-  }, [songs, searchTerm, advancedFilters, fuzzySearch, sortBy]);
+  }, [songs, debouncedSearchTerm, advancedFilters, fuzzySearch, sortBy]);
 
   // Create a stable key from filter values to detect changes
   const filterKey = useMemo(() => {
@@ -227,7 +288,7 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
   // Reset visible songs when search or underlying list changes
   useEffect(() => {
     setVisibleCount(50);
-  }, [searchTerm, filterKey, songs.length]);
+  }, [debouncedSearchTerm, filterKey, songs.length]);
 
   // Recalculate mobile position when filters change (header height changes)
   useEffect(() => {
@@ -241,6 +302,20 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
     [filteredSongs, visibleCount]
   );
 
+  // After returning from presentation: scroll to the previewed song row by ID (reliable regardless of layout timing)
+  useEffect(() => {
+    const pending = pendingScrollRestoreRef.current;
+    if (pending === null || displayedSongs.length < pending.requiredCount) return;
+    pendingScrollRestoreRef.current = null;
+    const { songId } = pending;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const row = document.getElementById(`song-${songId}`);
+        if (row) row.scrollIntoView({ block: 'center', behavior: 'auto' });
+      });
+    });
+  }, [displayedSongs.length]);
+
   // Show error as toast message
   useEffect(() => {
     if (error) {
@@ -248,11 +323,6 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
       clearError(); // Clear error after showing toast
     }
   }, [error, toast, clearError]);
-
-  // Extract available values for WebLLM
-  const availableValues = useMemo(() => {
-    return WebLLMService.extractAvailableValues(songs, []);
-  }, [songs]);
 
   useEffect(() => {
     // Only fetch songs when tab is active (only if not already loaded)
@@ -335,19 +405,12 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
     }
   };
 
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-  };
-
-  // Clear search when Escape key is pressed while on this tab (only if no modal is open)
+  // Clear only search term on Escape (never clear advanced filters so closing preview doesn't alter filters)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't clear search if a modal is open - let the modal handle Escape
       if (isFormModalOpen || viewingSong) return;
-
       if (e.key === 'Escape') {
         setSearchTerm('');
-        setAdvancedFilters({});
       }
     };
 
@@ -546,19 +609,27 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
   // Header actions content
   const headerActions = (
     <>
-      <div className="flex-1">
-        <WebLLMSearchInput
+      <div className="relative flex-1 min-w-0">
+        <input
           ref={baseManager.searchInputRef}
+          type="text"
           value={searchTerm}
-          onChange={handleSearchChange}
-          onFiltersExtracted={(filters) => {
-            // Merge AI-extracted filters with existing advanced filters
-            setAdvancedFilters(prev => ({ ...prev, ...filters }));
-          }}
-          searchType="song"
-          placeholder='Ask AI: "Show me sai songs in sanskrit with fast tempo"...'
-          availableValues={availableValues}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search songs by name, deity, language..."
+          autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
+          className="w-full pl-9 pr-9 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
         />
+        <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5" aria-hidden />
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={() => setSearchTerm('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            aria-label="Clear search"
+          >
+            <i className="fas fa-times text-sm" />
+          </button>
+        )}
       </div>
       {/* Desktop action buttons - hidden on mobile */}
       <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">
@@ -676,7 +747,22 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
       {viewingSong && (
         <Modal
           isOpen={!!viewingSong}
-          onClose={() => setViewingSong(null)}
+          onClose={() => {
+            if (previewOpenedByNavigationRef.current) {
+              previewOpenedByNavigationRef.current = false;
+              navigate(-1);
+              setViewingSong(null);
+              return;
+            }
+            const songIdToShow = viewingSong.id;
+            setViewingSong(null);
+            // After modal closes, only scroll if the song row is not already in view (avoids unnecessary shift)
+            setTimeout(() => {
+              const row = document.getElementById(`song-${songIdToShow}`);
+              if (!row) return;
+              row.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+            }, 100);
+          }}
           title="Song Details"
         >
           <SongDetails song={viewingSong} />

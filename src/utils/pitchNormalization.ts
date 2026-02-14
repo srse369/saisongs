@@ -127,17 +127,9 @@ const PITCH_MAPPINGS: Record<string, string> = {
   '7Pancham/B': 'B',
   '1.5Pancham/C#': 'C#',
   '2.5Pancham/D#': 'D#',
-  '3.5Pancham/F': 'F',
   '4.5Pancham/F#': 'F#',
   '5.5Pancham/G#': 'G#',
-  '6.5Pancham/A#': 'A#',
-  '7.5Pancham/C': 'C',
-  // Also handle without the # symbol in combined format
-  '1Pancham/C#': 'C#',
-  '2Pancham/D#': 'D#',
-  '4Pancham/F#': 'F#',
-  '5Pancham/G#': 'G#',
-  '6Pancham/A#': 'A#'
+  '6.5Pancham/A#': 'A#'
 };
 
 /**

@@ -1,8 +1,8 @@
 import React from 'react';
 import type { Slide, PresentationTemplate, TemplateSlide, SongContentStyle } from '../../types';
-import { DEFAULT_SONG_TITLE_STYLE, DEFAULT_SONG_LYRICS_STYLE, DEFAULT_SONG_TRANSLATION_STYLE } from '../../types';
+import { DEFAULT_SONG_TITLE_STYLE, DEFAULT_SONG_LYRICS_STYLE, DEFAULT_SONG_TRANSLATION_STYLE, getSlideDimensionsForPreview } from '../../types';
 import { formatPitch } from '../../utils/pitchUtils';
-import { getBackgroundStyles, getSlideBackgroundStyles, getReferenceSlide, TemplateBackground, TemplateImages, TemplateVideos, TemplateAudios, TemplateText, SlideBackground, SlideImages, SlideVideos, SlideAudios, SlideText, renderStyledText } from '../../utils/templateUtils';
+import { getBackgroundStyles, getSlideBackgroundStyles, getReferenceSlide, TemplateBackground, TemplateImages, TemplateVideos, TemplateAudios, TemplateText, SlideBackground, SlideOverlaysInZOrder, renderStyledText } from '../../utils/templateUtils';
 import { getFontFamily } from '../../utils/fonts';
 
 interface SlideViewProps {
@@ -52,9 +52,8 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
     ))
   };
   
-  // Get slide dimensions based on template aspect ratio
-  const slideWidth = template?.aspectRatio === '4:3' ? 1600 : 1920;
-  const slideHeight = template?.aspectRatio === '4:3' ? 1200 : 1080;
+  // Get slide dimensions from template so 4:3 uses 1600×1200 and preview scaling matches editor
+  const { width: slideWidth, height: slideHeight } = getSlideDimensionsForPreview(template);
   
   // Bottom text styles with defaults (defined after slideWidth/slideHeight)
   const defaultBottomLeftStyle: SongContentStyle = {
@@ -218,11 +217,8 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         {/* Static slide background */}
         <SlideBackground templateSlide={slide.templateSlide} />
         
-        {/* Static slide overlays */}
-        <SlideImages templateSlide={slide.templateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
-        <SlideVideos templateSlide={slide.templateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
-        {!skipAudio && <SlideAudios templateSlide={slide.templateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />}
-        <SlideText templateSlide={slide.templateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
+        {/* Static slide overlays (z-order matches template editor) */}
+        <SlideOverlaysInZOrder templateSlide={slide.templateSlide} slideWidth={slideWidth} slideHeight={slideHeight} skipAudio={skipAudio} />
 
         {/* Next-song hint - positioned using template style from reference slide */}
         {(() => {
@@ -234,12 +230,13 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
           return shouldRender;
         })() && (
           <div 
-            className="absolute z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1 overflow-hidden inline-block"
+            className="absolute opacity-80 bg-gray-900/50 rounded-lg px-2 py-1 overflow-hidden inline-block"
             style={{
               top: getTopPosition(bottomRightStyle),
               right: `${((slideWidth - bottomRightStyle.x - (bottomRightStyle.width || 0)) / slideWidth) * 100}%`,
               maxWidth: getWidth(bottomRightStyle),
               textAlign: (bottomRightStyle.textAlign || 'right') as any,
+              zIndex: bottomRightStyle.zIndex ?? 24,
             }}
           >
             <div
@@ -317,12 +314,13 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
 
       {/* Song name - positioned using template style */}
       <div 
-        className="absolute z-10"
+        className="absolute"
         style={{ 
           top: getTopPosition(titleStyle),
           left: getLeftPosition(titleStyle),
           width: getWidth(titleStyle),
           textAlign: (titleStyle.textAlign || 'center') as any,
+          zIndex: titleStyle.zIndex ?? 20,
         }}
       >
         <h1 
@@ -341,13 +339,14 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
 
       {/* Song lyrics - positioned using template style */}
       <div 
-        className="absolute z-10 overflow-auto"
+        className="absolute overflow-auto"
         style={{ 
           top: contentScale < 1.0 ? getScaledLyricsTopPosition() : getTopPosition(lyricsStyle),
           left: getLeftPosition(lyricsStyle),
           width: getWidth(lyricsStyle),
           height: getHeight(lyricsStyle),
           maxHeight: lyricsStyle.height !== undefined ? getHeight(lyricsStyle) : lyricsMaxHeight,
+          zIndex: lyricsStyle.zIndex ?? 21,
         }}
       >
         <p 
@@ -368,13 +367,14 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
       {/* Translation (if available and showTranslation is true) - positioned using template style */}
       {hasTranslation && slide.translation && (
         <div 
-          className="absolute z-10 overflow-auto"
+          className="absolute overflow-auto"
           style={{ 
             top: contentScale < 1.0 ? getScaledTranslationTopPosition() : getTopPosition(translationStyle),
             left: getLeftPosition(translationStyle),
             width: getWidth(translationStyle),
             height: getHeight(translationStyle),
             maxHeight: translationStyle.height !== undefined ? getHeight(translationStyle) : '25%',
+            zIndex: translationStyle.zIndex ?? 22,
           }}
         >
           <div 
@@ -396,12 +396,13 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
       {/* Singer / pitch (when available) - positioned using template style */}
       {(slide.singerName || slide.pitch) && (
         <div 
-          className="absolute z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1 overflow-hidden inline-block"
+          className="absolute opacity-80 bg-gray-900/50 rounded-lg px-2 py-1 overflow-hidden inline-block"
           style={{
             top: getTopPosition(bottomLeftStyle),
             left: getLeftPosition(bottomLeftStyle),
             maxWidth: getWidth(bottomLeftStyle),
             textAlign: (bottomLeftStyle.textAlign || 'left') as any,
+            zIndex: bottomLeftStyle.zIndex ?? 23,
           }}
         >
           <div
@@ -445,12 +446,13 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         return slide.nextSongName || slide.nextSlideTopCenterText;
       })() && (
         <div 
-          className="absolute z-[1000] opacity-80 bg-gray-900/50 rounded-lg px-2 py-1 overflow-hidden inline-block"
+          className="absolute opacity-80 bg-gray-900/50 rounded-lg px-2 py-1 overflow-hidden inline-block"
           style={{
             top: getTopPosition(bottomRightStyle),
             right: `${((slideWidth - bottomRightStyle.x - (bottomRightStyle.width || 0)) / slideWidth) * 100}%`,
             maxWidth: getWidth(bottomRightStyle),
             textAlign: (bottomRightStyle.textAlign || 'right') as any,
+            zIndex: bottomRightStyle.zIndex ?? 24,
           }}
         >
           <div
@@ -494,14 +496,9 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
         </div>
       )}
 
-      {/* Template overlays (from reference slide) */}
+      {/* Template overlays (from reference slide; z-order matches template editor) */}
       {effectiveSlide ? (
-        <>
-          <SlideImages templateSlide={effectiveSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
-          <SlideVideos templateSlide={effectiveSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
-          {!skipAudio && <SlideAudios templateSlide={effectiveSlide} slideWidth={slideWidth} slideHeight={slideHeight} />}
-          <SlideText templateSlide={effectiveSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
-        </>
+        <SlideOverlaysInZOrder templateSlide={effectiveSlide} slideWidth={slideWidth} slideHeight={slideHeight} skipAudio={skipAudio} />
       ) : (
         <>
           <TemplateImages template={template} />

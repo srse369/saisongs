@@ -123,14 +123,16 @@ export const PitchList: React.FC<PitchListProps> = ({
 
   const handlePresent = (pitch: PitchWithDetails) => {
     const params = new URLSearchParams();
+    params.set('closeOnExit', '1');
     if (pitch.singerName) {
       params.set('singerName', pitch.singerName);
     }
     if (pitch.pitch) {
       params.set('pitch', pitch.pitch);
     }
-    const query = params.toString();
-    navigate(`/presentation/${pitch.songId}${query ? `?${query}` : ''}`);
+    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+    const path = `${base}/presentation/${pitch.songId}`.replace(/\/\/+/g, '/');
+    window.open(`${window.location.origin}${path}?${params.toString()}`, '_blank', 'noopener,noreferrer');
   };
 
   if (loading) {

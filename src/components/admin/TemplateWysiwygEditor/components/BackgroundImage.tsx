@@ -6,12 +6,13 @@ interface BackgroundImageProps {
   url: string;
   width: number;
   height: number;
+  zIndex?: number;
 }
 
 /**
  * BackgroundImage component for slide backgrounds
  */
-export const BackgroundImage: React.FC<BackgroundImageProps> = ({ url, width, height }) => {
+export const BackgroundImage: React.FC<BackgroundImageProps> = ({ url, width, height, zIndex = 0 }) => {
   const [image] = useImage(url);
 
   if (!image) {
@@ -26,6 +27,7 @@ export const BackgroundImage: React.FC<BackgroundImageProps> = ({ url, width, he
       width={width}
       height={height}
       listening={false}
+      zIndex={zIndex}
     />
   );
 };

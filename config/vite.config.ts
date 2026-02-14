@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
@@ -8,9 +9,14 @@ const packageJson = JSON.parse(
   readFileSync(resolve(__dirname, '../package.json'), 'utf-8')
 )
 
+const useHttps = process.env.HTTPS === 'true'
+
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  plugins: [react()],
+  plugins: [
+    ...(useHttps ? [basicSsl()] : []),
+    react(),
+  ],
   // Always deploy to VPS with root path
   base: '/',
   // Inject version as environment variable
@@ -26,6 +32,7 @@ export default defineConfig(() => ({
   // Proxy API requests to backend server in development
   server: {
     port: 5111,
+    https: useHttps,
     proxy: {
       '/api': {
         target: 'http://localhost:3111',

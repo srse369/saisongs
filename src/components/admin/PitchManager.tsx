@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { usePitches } from '../../contexts/PitchContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
@@ -8,9 +8,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
 import { PitchForm } from './PitchForm';
 import { PitchList } from './PitchList';
-import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedPitchSearch, type PitchSearchFilters } from '../common/AdvancedPitchSearch';
-import { WebLLMService } from '../../services/WebLLMService';
 import { RefreshIcon, type MobileAction } from '../common';
 import { BaseManager } from './BaseManager';
 import { useBaseManager } from '../../hooks/useBaseManager';
@@ -25,6 +23,7 @@ interface PitchManagerProps {
 
 export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { isEditor, userId, isAuthenticated } = useAuth();
   const toast = useToast();
 
@@ -129,10 +128,18 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
     }
   }, [songFilterId, singerFilterId, songs, singers]);
 
-  // Extract available values for WebLLM
-  const availableValues = useMemo(() => {
-    return WebLLMService.extractAvailableValues(songs, singers);
-  }, [songs, singers]);
+  // Apply filters passed from Ask the app (clear existing filters and search, then set rule filters)
+  useEffect(() => {
+    const llmFilters = location.state?.llmFilters as Record<string, string> | undefined;
+    const llmShowMyPitches = location.state?.llmShowMyPitches as boolean | undefined;
+    if (llmFilters && typeof llmFilters === 'object' && Object.keys(llmFilters).length > 0) {
+      setSearchTerm('');
+      setAdvancedFilters({ ...llmFilters });
+      if (llmShowMyPitches === true) setShowMyPitches(true);
+      if (llmShowMyPitches === false) setShowMyPitches(false);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   // When navigating from a singer's or song's pitches button, switch to "All Pitches" mode
   // so the filter can work correctly (otherwise "My Pitches" filter would conflict)
@@ -275,10 +282,6 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
       clearSingersError();
     }
   }, [pitchError, songsError, singersError, toast, clearPitchError, clearSongsError, clearSingersError]);
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  };
 
   // Debounce search term for better performance
   useEffect(() => {
@@ -520,37 +523,27 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
 
   const headerActions = (
     <>
-      <div className="flex-1">
-        <WebLLMSearchInput
+      <div className="relative flex-1 min-w-0">
+        <input
           ref={baseManager.searchInputRef}
+          type="text"
           value={searchTerm}
-          onChange={(value) => setSearchTerm(value)}
-          onFiltersExtracted={(filters) => {
-            const pitchFilters = filters as PitchSearchFilters;
-
-            const next = new URLSearchParams(searchParams);
-            let urlChanged = false;
-
-            if (pitchFilters.songName && songFilterId) {
-              next.delete('songId');
-              urlChanged = true;
-            }
-
-            if (pitchFilters.singerName && singerFilterId) {
-              next.delete('singerId');
-              urlChanged = true;
-            }
-
-            if (urlChanged) {
-              setSearchParams(next);
-            }
-
-            setAdvancedFilters(prev => ({ ...prev, ...pitchFilters }));
-          }}
-          searchType="pitch"
-          placeholder='Ask AI: "Show me C# pitches for devi songs" or "Which singers have sanskrit songs?"...'
-          availableValues={availableValues}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search pitches by song or singer..."
+          autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
+          className="w-full pl-9 pr-9 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
         />
+        <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5" aria-hidden />
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={() => setSearchTerm('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            aria-label="Clear search"
+          >
+            <i className="fas fa-times text-sm" />
+          </button>
+        )}
       </div>
 
       {/* Desktop action buttons - hidden on mobile */}
@@ -638,6 +631,12 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
                 urlChanged = true;
               }
               if (urlChanged) setSearchParams(next);
+
+              // When a singer name is entered in advanced search, switch to "All Pitches"
+              // so the filter applies across all pitches (not just "My Pitches")
+              if (newFilters.singerName?.trim()) {
+                setShowMyPitches(false);
+              }
 
               setAdvancedFilters(newFilters);
             }}

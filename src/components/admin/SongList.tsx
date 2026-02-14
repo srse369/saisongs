@@ -69,8 +69,10 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
   };
 
   const handlePresent = (song: Song) => {
-    // Single-song presentation uses the /presentation/:songId route
-    navigate(`/presentation/${song.id}`);
+    // Open in new tab so the Songs tab stays mounted and preserves scroll position
+    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+    const path = `${base}/presentation/${song.id}`.replace(/\/\/+/g, '/');
+    window.open(`${window.location.origin}${path}?closeOnExit=1`, '_blank', 'noopener,noreferrer');
   };
 
   const handleViewPitches = (song: Song) => {
@@ -125,7 +127,11 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
             {/* Unified layout for all screen sizes */}
             <div className="flex flex-col gap-1.5 md:gap-3">
               {/* Content Section - First */}
-              <div className="flex-1 min-w-0">
+              <div className="flex flex-1 min-w-0 items-start gap-2">
+                <span className="flex-shrink-0 text-sm font-medium text-gray-400 dark:text-gray-500 tabular-nums" title={`Song #${index + 1} in list`}>
+                  #{index + 1}
+                </span>
+                <div className="flex-1 min-w-0">
                 {/* Song Metadata Section - Reusable component */}
                 <SongMetadataCard
                   song={song}
@@ -152,6 +158,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                     </audio>
                   </div>
                 )}
+                </div>
               </div>
 
               {/* Action Icons - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}

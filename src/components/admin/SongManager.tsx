@@ -7,9 +7,7 @@ import { SongForm } from './SongForm';
 import { SongList } from './SongList';
 import { SongDetails } from './SongDetails';
 import { Modal } from '../common/Modal';
-import { WebLLMSearchInput } from '../common/WebLLMSearchInput';
 import { AdvancedSongSearch, type SongSearchFilters } from '../common/AdvancedSongSearch';
-import { WebLLMService } from '../../services/WebLLMService';
 import { RefreshIcon, type MobileAction } from '../common';
 import { createSongFuzzySearch, parseNaturalQuery } from '../../utils/smartSearch';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
@@ -82,11 +80,6 @@ export const SongManager: React.FC<SongManagerProps> = ({ isActive = true }) => 
 
   // Create fuzzy search instance for fallback
   const fuzzySearch = useMemo(() => createSongFuzzySearch(songs), [songs]);
-
-  // Extract available values for WebLLM
-  const availableValues = useMemo(() => {
-    return WebLLMService.extractAvailableValues(songs, []);
-  }, [songs]);
 
   useEffect(() => {
     // Only fetch songs when tab is active (only if not already loaded)
@@ -168,10 +161,6 @@ export const SongManager: React.FC<SongManagerProps> = ({ isActive = true }) => 
       console.error('Error syncing song:', err);
       toast.error('Error syncing song');
     }
-  };
-
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
   };
 
   const filteredSongs = useMemo(() => {
@@ -402,19 +391,27 @@ export const SongManager: React.FC<SongManagerProps> = ({ isActive = true }) => 
   // Header actions content
   const headerActions = (
     <>
-      <div className="flex-1">
-        <WebLLMSearchInput
+      <div className="relative flex-1 min-w-0">
+        <input
           ref={baseManager.searchInputRef}
+          type="text"
           value={searchTerm}
-          onChange={handleSearchChange}
-          onFiltersExtracted={(filters) => {
-            // Merge AI-extracted filters with existing advanced filters
-            setAdvancedFilters(prev => ({ ...prev, ...filters }));
-          }}
-          searchType="song"
-          placeholder='Ask AI: "Show me sai songs in sanskrit with fast tempo"...'
-          availableValues={availableValues}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search songs by name, deity, language..."
+          autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
+          className="w-full pl-9 pr-9 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
         />
+        <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5" aria-hidden />
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={() => setSearchTerm('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+            aria-label="Clear search"
+          >
+            <i className="fas fa-times text-sm" />
+          </button>
+        )}
       </div>
       {/* Desktop action buttons - hidden on mobile */}
       <div className="hidden md:flex flex-col sm:flex-row gap-2 lg:justify-start flex-shrink-0">

@@ -183,6 +183,19 @@ describe('pitchNormalization', () => {
       });
     });
 
+    describe('Pancham format (reference pitches)', () => {
+      it('should normalize Pancham / Western combined format', () => {
+        expect(normalizePitch('2 Pancham / D')).toBe('D');
+        expect(normalizePitch('6 Pancham / A')).toBe('A');
+        expect(normalizePitch('1 Pancham / C')).toBe('C');
+        expect(normalizePitch('5 Pancham / G')).toBe('G');
+      });
+      it('should normalize plain Pancham format', () => {
+        expect(normalizePitch('2Pancham')).toBe('D');
+        expect(normalizePitch('6Pancham')).toBe('A');
+      });
+    });
+
     describe('whitespace handling', () => {
       it('should trim leading and trailing whitespace', () => {
         expect(normalizePitch('  C  ')).toBe('C');

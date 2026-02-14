@@ -345,21 +345,19 @@ export const SessionManager: React.FC = () => {
 
   const handlePreviewSong = (songId: string) => {
     const item = sessionItems.find(({ entry }) => entry.songId === songId);
-    if (!item) {
-      navigate(`/presentation/${songId}`);
-      return;
-    }
-
     const params = new URLSearchParams();
-    if (item.singer?.name) {
-      params.set('singerName', item.singer.name);
+    params.set('closeOnExit', '1');
+    if (item) {
+      if (item.singer?.name) {
+        params.set('singerName', item.singer.name);
+      }
+      if (item.entry.pitch) {
+        params.set('pitch', item.entry.pitch);
+      }
     }
-    if (item.entry.pitch) {
-      params.set('pitch', item.entry.pitch);
-    }
-    // Template will be loaded from localStorage, no need to pass in URL
-    const query = params.toString();
-    navigate(`/presentation/${songId}${query ? `?${query}` : ''}`);
+    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+    const path = `${base}/presentation/${songId}`.replace(/\/\/+/g, '/');
+    window.open(`${window.location.origin}${path}?${params.toString()}`, '_blank', 'noopener,noreferrer');
   };
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, fromIndex: number) => {

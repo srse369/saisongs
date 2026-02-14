@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { fetchCentersOnce } from './common/CenterBadges';
 import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, CenterBadges, Modal } from './common';
 import { FeedbackDrawer } from './common/FeedbackDrawer';
+import { LLMDrawer } from './common/LLMDrawer';
 import { clearAllCaches, checkCacheClearCooldown, CACHE_KEYS } from '../utils/cacheUtils';
 import apiClient from '../services/ApiClient';
 import { globalEventBus } from '../utils/globalEventBus';
@@ -57,6 +58,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { changeTab } = useAdminTabs();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isLLMOpen, setIsLLMOpen] = useState(false);
   const [showAdminsModal, setShowAdminsModal] = useState(false);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [loadingAdmins, setLoadingAdmins] = useState(false);
@@ -66,8 +68,29 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [reloadingBackendCache, setReloadingBackendCache] = useState(false);
   const [reloadMessage, setReloadMessage] = useState<string | null>(null);
   const [centers, setCenters] = useState<Center[]>([]);
+  const [showDesktopScrollToTop, setShowDesktopScrollToTop] = useState(false);
   const { isConnected, connectionError, resetConnection } = useDatabase();
   const { isAuthenticated, userRole, userName, userEmail, logout, centerIds, editorFor, isAdmin } = useAuth();
+
+  // Track window scroll for desktop scroll-to-top button (desktop uses window scroll)
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerWidth >= 768) setShowDesktopScrollToTop(window.scrollY > 200);
+      else setShowDesktopScrollToTop(false);
+    };
+    const handleResize = () => handleScroll();
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  const handleDesktopScrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleShowAdmins = async () => {
     setIsMobileMenuOpen(false);
@@ -218,6 +241,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     }));
     unsubscribes.push(globalEventBus.on('centerDeleted', () => {
       globalEventBus.requestRefresh('centers');
+    }));
+
+    unsubscribes.push(globalEventBus.on('openLLM', () => {
+      setIsLLMOpen(true);
     }));
 
     return () => {
@@ -428,7 +455,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </button>
               )}
 
-              {/* Help, Database connection indicator + Auth controls */}
+              {/* Help, LLM, Database connection indicator + Auth controls */}
               <div className="ml-2 flex items-center space-x-2">
                 <Link
                   to="/help"
@@ -437,6 +464,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 >
                   <i className="fas fa-question-circle text-lg"></i>
                 </Link>
+
+                {isAuthenticated && (
+                  <button
+                    onClick={() => setIsLLMOpen(true)}
+                    title="Ask the app (e.g. show Shiva songs, go to Pitches)"
+                    className="p-2 rounded-full text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all duration-200"
+                    aria-label="Ask the app"
+                  >
+                    <i className="fas fa-wand-magic-sparkles text-lg"></i>
+                  </button>
+                )}
 
                 {/* Only show database status to authenticated users */}
                 <DatabaseStatusDropdown
@@ -473,8 +511,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </nav>
 
-            {/* Mobile menu - feedback button and hamburger menu */}
+            {/* Mobile menu - LLM, feedback button and hamburger menu */}
             <div className="md:hidden flex items-center gap-2">
+              {isAuthenticated && (
+                <button
+                  onClick={() => setIsLLMOpen(true)}
+                  title="Ask the app"
+                  className="p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label="Ask the app"
+                >
+                  <i className="fas fa-wand-magic-sparkles text-xl"></i>
+                </button>
+              )}
               {/* Feedback Button - Mobile only, permanent fixture */}
               <button
                 onClick={() => setIsFeedbackOpen(true)}
@@ -499,9 +547,14 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
           </div>
 
-          {/* Mobile Navigation - Hamburger menu for other items */}
-          {isMobileMenuOpen && (
-            <nav className="md:hidden py-4 space-y-1 border-t border-gray-200 dark:border-gray-700 animate-fade-in">
+          {/* Mobile Navigation - Hamburger menu, slides down from top when open */}
+          <div
+            className={`md:hidden grid transition-[grid-template-rows] duration-300 ease-out ${
+              isMobileMenuOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+            }`}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <nav className="py-4 space-y-1 border-t border-gray-200 dark:border-gray-700">
               {(userRole === 'admin' || userRole === 'editor') && (
                 <Link
                   to="/admin/templates"
@@ -776,8 +829,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   Version {import.meta.env.VITE_APP_VERSION || 'dev'}
                 </p>
               </div>
-            </nav>
-          )}
+              </nav>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -866,6 +920,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </footer>
 
+      {/* Scroll to Top Button - Desktop only, above feedback */}
+      {showDesktopScrollToTop && (
+        <button
+          onClick={handleDesktopScrollToTop}
+          title="Scroll to top"
+          className="hidden md:flex fixed bottom-16 right-4 w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg items-center justify-center transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 z-30"
+          aria-label="Scroll to top"
+        >
+          <i className="fas fa-arrow-up text-lg"></i>
+        </button>
+      )}
+
       {/* Feedback Button - Desktop only (mobile version is in header) */}
       <button
         onClick={() => setIsFeedbackOpen(true)}
@@ -878,6 +944,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Feedback Drawer */}
       <FeedbackDrawer isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
+
+      {/* LLM Drawer - Ask the app */}
+      <LLMDrawer isOpen={isLLMOpen} onClose={() => setIsLLMOpen(false)} />
 
       {/* Admins Modal */}
       <Modal

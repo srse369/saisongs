@@ -10,6 +10,8 @@ interface CenterBadgesProps {
   centerIds: number[];
   showAllIfEmpty?: boolean; // Show "All Centers" badge if centerIds is empty
   showWarningIfEmpty?: boolean; // Show warning badge if centerIds is empty (for singers)
+  /** Label when no centers = available to all. Default "Public Session". Use "Public" for templates. */
+  publicLabel?: string;
 }
 
 // Singleton cache for centers data to prevent multiple fetches
@@ -68,7 +70,8 @@ export const fetchCentersOnce = async (): Promise<Center[]> => {
 export const CenterBadges: React.FC<CenterBadgesProps> = ({ 
   centerIds, 
   showAllIfEmpty = true,
-  showWarningIfEmpty = false
+  showWarningIfEmpty = false,
+  publicLabel = 'Public Session'
 }) => {
   const [centers, setCenters] = useState<Center[]>(centersCache || []);
   const [loading, setLoading] = useState(!centersCache);
@@ -94,7 +97,7 @@ export const CenterBadges: React.FC<CenterBadgesProps> = ({
     
     return (
       <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded">
-        🌐 Public Session
+        🌐 {publicLabel}
       </span>
     );
   }

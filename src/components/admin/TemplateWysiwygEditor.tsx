@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Stage, Layer, Rect, Text, Image as KonvaImage, Transformer, Group } from 'react-konva';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
+import { Stage, Layer, Rect, Text, Image as KonvaImage, Transformer, Group, Circle, Line } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type Konva from 'konva';
 import useImage from 'use-image';
@@ -62,12 +62,22 @@ interface TemplateWysiwygEditorProps {
   onSlideIndexChange?: (index: number) => void;
   /** Callback to switch to YAML editor at the current slide */
   onSwitchToYaml?: (slideIndex: number) => void;
+  /** Callback to open template preview (e.g. from toolbar) */
+  onPreview?: () => void;
 }
 
 // Get slide dimensions based on aspect ratio
 function getSlideDimensions(aspectRatio: AspectRatio = '16:9') {
   return ASPECT_RATIO_DIMENSIONS[aspectRatio] || ASPECT_RATIO_DIMENSIONS['16:9'];
 }
+
+const SONG_CONTENT_ELEMENT_TO_STYLE: Record<string, 'songTitleStyle' | 'songLyricsStyle' | 'songTranslationStyle' | 'bottomLeftTextStyle' | 'bottomRightTextStyle'> = {
+  'song-title-element': 'songTitleStyle',
+  'song-lyrics-element': 'songLyricsStyle',
+  'song-translation-element': 'songTranslationStyle',
+  'bottom-left-text-element': 'bottomLeftTextStyle',
+  'bottom-right-text-element': 'bottomRightTextStyle',
+};
 
 // BackgroundImage component for slide background
 export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
@@ -76,6 +86,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   onEscape,
   onSlideIndexChange,
   onSwitchToYaml,
+  onPreview,
 }) => {
   // Multi-select support
   const {
@@ -105,10 +116,18 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   const [songSearchQuery, setSongSearchQuery] = useState('');
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const stageRef = useRef<Konva.Stage>(null);
+  const layerRef = useRef<Konva.Layer>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const mouseDownOnStageRef = useRef<boolean>(false);
   const propertiesPanelRef = useRef<HTMLDivElement>(null);
+
+  // Debug mode: no selection; live crosshair shows position; click for point, drag for rect
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugCursor, setDebugCursor] = useState<{ x: number; y: number } | null>(null);
+  const [debugPoint, setDebugPoint] = useState<{ x: number; y: number } | null>(null);
+  const [debugRect, setDebugRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const debugDragStartRef = useRef<{ x: number; y: number } | null>(null);
   
   // On mount, ensure first slide is selected and canvas has focus
   useEffect(() => {
@@ -563,6 +582,12 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     setCanvasHasFocus(true);
     setSlideListHasFocus(false);
 
+    // In debug mode, don't deselect; click/drag is handled by debug handlers
+    if (debugMode) {
+      mouseDownOnStageRef.current = false;
+      return;
+    }
+
     // Only deselect if BOTH mousedown and click happened on empty stage area
     const clickedOnStage = e.target === e.target.getStage();
     
@@ -574,6 +599,66 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     // Always reset the flag after handling click
     mouseDownOnStageRef.current = false;
   };
+
+  // Get pointer position in slide coordinates (for debug mode)
+  const getPointerSlideCoords = useCallback((): { x: number; y: number } | null => {
+    const stage = stageRef.current;
+    if (!stage) return null;
+    const pos = stage.getPointerPosition();
+    if (!pos) return null;
+    const scale = stage.scaleX();
+    return { x: pos.x / scale, y: pos.y / scale };
+  }, []);
+
+  // Debug mode: mousedown on overlay (clears previous, starts point or rect)
+  const handleDebugMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
+    e.cancelBubble = true;
+    setDebugPoint(null);
+    setDebugRect(null);
+    const coords = getPointerSlideCoords();
+    if (coords) debugDragStartRef.current = coords;
+  }, [getPointerSlideCoords]);
+
+  // Debug mode: mousemove always updates live cursor; while dragging also updates rect
+  const handleDebugMouseMove = useCallback((e: KonvaEventObject<MouseEvent>) => {
+    const coords = getPointerSlideCoords();
+    if (coords) setDebugCursor(coords);
+    const start = debugDragStartRef.current;
+    if (!start || !coords) return;
+    const x = Math.min(start.x, coords.x);
+    const y = Math.min(start.y, coords.y);
+    const width = Math.abs(coords.x - start.x);
+    const height = Math.abs(coords.y - start.y);
+    setDebugRect({ x, y, width, height });
+  }, [getPointerSlideCoords]);
+
+  // Debug mode: mouseup sets point (click) or keeps rect (drag)
+  const handleDebugMouseUp = useCallback((e: KonvaEventObject<MouseEvent>) => {
+    const start = debugDragStartRef.current;
+    if (!start) return;
+    const coords = getPointerSlideCoords();
+    if (coords) {
+      const dx = Math.abs(coords.x - start.x);
+      const dy = Math.abs(coords.y - start.y);
+      if (dx < 4 && dy < 4) {
+        setDebugPoint({ x: Math.round(start.x), y: Math.round(start.y) });
+        setDebugRect(null);
+      } else {
+        const x = Math.min(start.x, coords.x);
+        const y = Math.min(start.y, coords.y);
+        const width = Math.abs(coords.x - start.x);
+        const height = Math.abs(coords.y - start.y);
+        setDebugRect({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) });
+        setDebugPoint(null);
+      }
+    }
+    debugDragStartRef.current = null;
+  }, [getPointerSlideCoords]);
+
+  // Debug mode: mouse leave canvas clears live cursor
+  const handleDebugMouseLeave = useCallback(() => {
+    setDebugCursor(null);
+  }, []);
 
 
 
@@ -1182,6 +1267,57 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     SLIDE_HEIGHT,
   });
 
+  // Reorder all overlay nodes (song content + canvas elements) by logical z-index so draw order
+  // and hit-test match on the reference slide. Song title/lyrics/translation etc. can then be
+  // clicked when they are on top of images. Run in rAF so it runs after react-konva sync.
+  useLayoutEffect(() => {
+    const layer = layerRef.current;
+    if (!layer) return;
+    const isRefSlide = selectedSlideIndex === referenceSlideIndex;
+    const run = () => {
+      const l = layerRef.current;
+      if (!l) return;
+      const children = l.getChildren((node: Konva.Node) => true);
+      // Build combined overlay list: song content (ref slide only) + canvas elements, sorted by z-index
+      const overlayEntries: { id: string; zIndex: number }[] = [];
+      if (isRefSlide) {
+        overlayEntries.push({ id: 'song-title-element', zIndex: songTitleStyle?.zIndex ?? 20 });
+        overlayEntries.push({ id: 'song-lyrics-element', zIndex: songLyricsStyle?.zIndex ?? 21 });
+        overlayEntries.push({ id: 'song-translation-element', zIndex: songTranslationStyle?.zIndex ?? 22 });
+        overlayEntries.push({ id: 'bottom-left-text-element', zIndex: bottomLeftTextStyle?.zIndex ?? 23 });
+        overlayEntries.push({ id: 'bottom-right-text-element', zIndex: bottomRightTextStyle?.zIndex ?? 24 });
+      }
+      canvasElements.forEach((el) => overlayEntries.push({ id: el.id, zIndex: el.zIndex ?? 0 }));
+      overlayEntries.sort((a, b) => a.zIndex - b.zIndex);
+
+      const findNode = (id: string) =>
+        children.find((n) => n.id() === id || (n as Konva.Node & { getAttr?: (n: string) => unknown }).getAttr?.('id') === id);
+
+      overlayEntries.forEach((entry, i) => {
+        const node = findNode(entry.id);
+        if (node && typeof (node as Konva.Node).setZIndex === 'function') {
+          const targetIndex = 1 + i; // 0 = background, 1..N = overlays, N+1 = Transformer
+          const current = (node as Konva.Node).getZIndex?.();
+          if (current !== targetIndex) {
+            (node as Konva.Node).setZIndex(Math.min(targetIndex, children.length - 1));
+          }
+        }
+      });
+      l.draw(); // immediate draw so hit canvas is updated and topmost node receives clicks
+    };
+    const raf = requestAnimationFrame(run);
+    return () => cancelAnimationFrame(raf);
+  }, [
+    selectedSlideIndex,
+    referenceSlideIndex,
+    canvasElements,
+    songTitleStyle?.zIndex,
+    songLyricsStyle?.zIndex,
+    songTranslationStyle?.zIndex,
+    bottomLeftTextStyle?.zIndex,
+    bottomRightTextStyle?.zIndex,
+  ]);
+
   // Update song content style (only for reference slide)
   const handleSongContentStyleChange = useCallback((
     styleType: 'songTitleStyle' | 'songLyricsStyle' | 'songTranslationStyle' | 'bottomLeftTextStyle' | 'bottomRightTextStyle',
@@ -1200,6 +1336,32 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
 
     updateTemplateWithSlides(newSlides, referenceSlideIndex);
   }, [slides, referenceSlideIndex, getDefaultStyle, updateTemplateWithSlides]);
+
+  const bringSongContentToFront = useCallback((styleType: 'songTitleStyle' | 'songLyricsStyle' | 'songTranslationStyle' | 'bottomLeftTextStyle' | 'bottomRightTextStyle') => {
+    const allZIndices = [
+      songTitleStyle.zIndex ?? 20,
+      songLyricsStyle.zIndex ?? 21,
+      songTranslationStyle.zIndex ?? 22,
+      bottomLeftTextStyle.zIndex ?? 23,
+      bottomRightTextStyle.zIndex ?? 24,
+      ...canvasElements.map(el => el.zIndex || 0),
+    ];
+    const maxZ = Math.max(0, ...allZIndices);
+    handleSongContentStyleChange(styleType, { zIndex: maxZ + 1 });
+  }, [songTitleStyle?.zIndex, songLyricsStyle?.zIndex, songTranslationStyle?.zIndex, bottomLeftTextStyle?.zIndex, bottomRightTextStyle?.zIndex, canvasElements, handleSongContentStyleChange]);
+
+  const sendSongContentToBack = useCallback((styleType: 'songTitleStyle' | 'songLyricsStyle' | 'songTranslationStyle' | 'bottomLeftTextStyle' | 'bottomRightTextStyle') => {
+    const allZIndices = [
+      songTitleStyle.zIndex ?? 20,
+      songLyricsStyle.zIndex ?? 21,
+      songTranslationStyle.zIndex ?? 22,
+      bottomLeftTextStyle.zIndex ?? 23,
+      bottomRightTextStyle.zIndex ?? 24,
+      ...canvasElements.map(el => el.zIndex || 0),
+    ];
+    const minZ = Math.min(0, ...allZIndices);
+    handleSongContentStyleChange(styleType, { zIndex: minZ - 1 });
+  }, [songTitleStyle?.zIndex, songLyricsStyle?.zIndex, songTranslationStyle?.zIndex, bottomLeftTextStyle?.zIndex, bottomRightTextStyle?.zIndex, canvasElements, handleSongContentStyleChange]);
 
   // Now we can resolve the selected song content style
   const selectedSongContentStyle = selectedSongContentType ? 
@@ -1254,13 +1416,21 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       // Add escape key listener
       document.addEventListener('keydown', handleEscapeKey, true);
 
-      const buttons = [
-        { icon: 'fa-arrow-up', text: 'Bring to Front', action: () => { bringToFront(); setElementContextMenu(null); } },
-        { icon: 'fa-arrow-down', text: 'Send to Back', action: () => { sendToBack(); setElementContextMenu(null); } },
-      ];
+      const songContentStyleType = SONG_CONTENT_ELEMENT_TO_STYLE[elementContextMenu.elementId];
+      const isSongContentElement = songContentStyleType != null;
 
-      // Add alignment options if multiple elements selected
-      if (selectedIds.size > 1) {
+      const buttons = isSongContentElement
+        ? [
+            { icon: 'fa-arrow-up', text: 'Bring to Front', action: () => { bringSongContentToFront(songContentStyleType); setElementContextMenu(null); } },
+            { icon: 'fa-arrow-down', text: 'Send to Back', action: () => { sendSongContentToBack(songContentStyleType); setElementContextMenu(null); } },
+          ]
+        : [
+            { icon: 'fa-arrow-up', text: 'Bring to Front', action: () => { bringToFront(); setElementContextMenu(null); } },
+            { icon: 'fa-arrow-down', text: 'Send to Back', action: () => { sendToBack(); setElementContextMenu(null); } },
+          ];
+
+      // Add alignment options if multiple elements selected (canvas elements only)
+      if (!isSongContentElement && selectedIds.size > 1) {
         buttons.push(
           { divider: true },
           { icon: 'fa-align-left', text: 'Align Left', action: () => { alignLeft(); setElementContextMenu(null); } },
@@ -1347,7 +1517,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
       document.removeEventListener('keydown', handleEscapeKey, true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elementContextMenu, contextMenu, selectedIds.size, slides.length, referenceSlideIndex]);
+  }, [elementContextMenu, contextMenu, selectedIds.size, slides.length, referenceSlideIndex, bringSongContentToFront, sendSongContentToBack]);
 
   // Get background color/style
   const bgColor = (!currentSlide.background?.type || currentSlide.background?.type === 'color')
@@ -1859,6 +2029,40 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
             >
               <i className="fas fa-trash text-base"></i>
             </button>
+            {onPreview && (
+              <button
+                onClick={onPreview}
+                title="Preview how this template will look with sample content"
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium shadow-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                <i className="fas fa-eye text-base"></i>
+                Preview
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setDebugMode((on) => {
+                  if (on) {
+                    setDebugCursor(null);
+                    setDebugPoint(null);
+                    setDebugRect(null);
+                    debugDragStartRef.current = null;
+                  } else {
+                    setSelectedIds(new Set());
+                  }
+                  return !on;
+                });
+              }}
+              title="Debug: click for x,y (slide coords); drag to draw a rectangle and see width × height"
+              className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium shadow-sm ${
+                debugMode
+                  ? 'bg-amber-500 text-black ring-2 ring-amber-300'
+                  : 'bg-gray-500 text-white hover:bg-gray-600'
+              }`}
+            >
+              <i className="fas fa-bug text-base"></i>
+              Debug
+            </button>
           </div>
           {/* Slide frame */}
           <div 
@@ -1893,17 +2097,19 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               height={CANVAS_HEIGHT}
               onClick={handleStageClick}
               onTap={handleStageClick}
+              onMouseLeave={debugMode ? handleDebugMouseLeave : undefined}
               scaleX={SCALE}
               scaleY={SCALE}
-              style={{ backgroundColor: bgColor }}
+              style={{ backgroundColor: bgColor, cursor: debugMode ? 'crosshair' : undefined }}
             >
-              <Layer>
+              <Layer ref={layerRef}>
                 {/* Background - full slide size */}
                 {currentSlide.background?.type === 'image' && currentSlide.background.value ? (
                   <BackgroundImage 
                     url={currentSlide.background.value}
                     width={SLIDE_WIDTH}
                     height={SLIDE_HEIGHT}
+                    zIndex={0}
                   />
                 ) : (
                   <Rect
@@ -1913,6 +2119,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     height={SLIDE_HEIGHT}
                     fill={bgColor}
                     listening={false}
+                    zIndex={0}
                   />
                 )}
 
@@ -1922,6 +2129,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     {/* Song Title - Editable position/style, fixed text */}
                     <Text
                       id="song-title-element"
+                      zIndex={songTitleStyle.zIndex ?? 20}
                       x={Number.isFinite(songTitleStyle.x) ? songTitleStyle.x : 40}
                       y={Number.isFinite(songTitleStyle.y) ? songTitleStyle.y : Math.round(SLIDE_HEIGHT * 0.05)}
                       width={Number.isFinite(songTitleStyle.width) ? songTitleStyle.width : SLIDE_WIDTH - 80}
@@ -1937,6 +2145,18 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       draggable
                       onClick={() => selectElement('song-title-element')}
                       onTap={() => selectElement('song-title-element')}
+                      onContextMenu={(e) => {
+                        e.evt.preventDefault();
+                        selectElement('song-title-element');
+                        const stage = e.target.getStage();
+                        if (stage) {
+                          const pos = stage.getPointerPosition();
+                          if (pos) {
+                            const rect = stage.container().getBoundingClientRect();
+                            setElementContextMenu({ x: pos.x + rect.left, y: pos.y + rect.top, elementId: 'song-title-element' });
+                          }
+                        }
+                      }}
                       onDragEnd={(e) => {
                         handleSongContentStyleChange('songTitleStyle', {
                           x: Math.round(e.target.x()),
@@ -1959,6 +2179,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     {/* Song Lyrics - Editable position/style, fixed text */}
                     <Text
                       id="song-lyrics-element"
+                      zIndex={songLyricsStyle.zIndex ?? 21}
                       x={songLyricsStyle.x}
                       y={songLyricsStyle.y}
                       width={songLyricsStyle.width}
@@ -1974,6 +2195,18 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       draggable
                       onClick={() => selectElement('song-lyrics-element')}
                       onTap={() => selectElement('song-lyrics-element')}
+                      onContextMenu={(e) => {
+                        e.evt.preventDefault();
+                        selectElement('song-lyrics-element');
+                        const stage = e.target.getStage();
+                        if (stage) {
+                          const pos = stage.getPointerPosition();
+                          if (pos) {
+                            const rect = stage.container().getBoundingClientRect();
+                            setElementContextMenu({ x: pos.x + rect.left, y: pos.y + rect.top, elementId: 'song-lyrics-element' });
+                          }
+                        }
+                      }}
                       onDragEnd={(e) => {
                         handleSongContentStyleChange('songLyricsStyle', {
                           x: Math.round(e.target.x()),
@@ -1996,6 +2229,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     {/* Translation - Editable position/style, fixed text */}
                     <Text
                       id="song-translation-element"
+                      zIndex={songTranslationStyle.zIndex ?? 22}
                       x={songTranslationStyle.x}
                       y={songTranslationStyle.y}
                       width={songTranslationStyle.width}
@@ -2011,6 +2245,18 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       draggable
                       onClick={() => selectElement('song-translation-element')}
                       onTap={() => selectElement('song-translation-element')}
+                      onContextMenu={(e) => {
+                        e.evt.preventDefault();
+                        selectElement('song-translation-element');
+                        const stage = e.target.getStage();
+                        if (stage) {
+                          const pos = stage.getPointerPosition();
+                          if (pos) {
+                            const rect = stage.container().getBoundingClientRect();
+                            setElementContextMenu({ x: pos.x + rect.left, y: pos.y + rect.top, elementId: 'song-translation-element' });
+                          }
+                        }
+                      }}
                       onDragEnd={(e) => {
                         handleSongContentStyleChange('songTranslationStyle', {
                           x: Math.round(e.target.x()),
@@ -2033,6 +2279,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     {/* Bottom Left Text - Current Song Info */}
                     <Text
                       id="bottom-left-text-element"
+                      zIndex={bottomLeftTextStyle.zIndex ?? 23}
                       x={bottomLeftTextStyle.x}
                       y={bottomLeftTextStyle.y}
                       width={bottomLeftTextStyle.width}
@@ -2048,6 +2295,18 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       draggable
                       onClick={() => selectElement('bottom-left-text-element')}
                       onTap={() => selectElement('bottom-left-text-element')}
+                      onContextMenu={(e) => {
+                        e.evt.preventDefault();
+                        selectElement('bottom-left-text-element');
+                        const stage = e.target.getStage();
+                        if (stage) {
+                          const pos = stage.getPointerPosition();
+                          if (pos) {
+                            const rect = stage.container().getBoundingClientRect();
+                            setElementContextMenu({ x: pos.x + rect.left, y: pos.y + rect.top, elementId: 'bottom-left-text-element' });
+                          }
+                        }
+                      }}
                       onDragEnd={(e) => {
                         handleSongContentStyleChange('bottomLeftTextStyle', {
                           x: Math.round(e.target.x()),
@@ -2070,6 +2329,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     {/* Bottom Right Text - Next Song Info */}
                     <Text
                       id="bottom-right-text-element"
+                      zIndex={bottomRightTextStyle.zIndex ?? 24}
                       x={bottomRightTextStyle.x}
                       y={bottomRightTextStyle.y}
                       width={bottomRightTextStyle.width}
@@ -2085,6 +2345,18 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       draggable
                       onClick={() => selectElement('bottom-right-text-element')}
                       onTap={() => selectElement('bottom-right-text-element')}
+                      onContextMenu={(e) => {
+                        e.evt.preventDefault();
+                        selectElement('bottom-right-text-element');
+                        const stage = e.target.getStage();
+                        if (stage) {
+                          const pos = stage.getPointerPosition();
+                          if (pos) {
+                            const rect = stage.container().getBoundingClientRect();
+                            setElementContextMenu({ x: pos.x + rect.left, y: pos.y + rect.top, elementId: 'bottom-right-text-element' });
+                          }
+                        }
+                      }}
                       onDragEnd={(e) => {
                         handleSongContentStyleChange('bottomRightTextStyle', {
                           x: Math.round(e.target.x()),
@@ -2292,9 +2564,93 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   }}
                 />
               </Layer>
+
+              {/* Debug overlay: captures all events (no selection), live crosshair, point, rect */}
+              {debugMode && (
+                <Layer listening={true}>
+                  {/* Full-stage transparent rect captures all mouse events so nothing below is selected */}
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={SLIDE_WIDTH}
+                    height={SLIDE_HEIGHT}
+                    fill="transparent"
+                    listening={true}
+                    onMouseDown={handleDebugMouseDown}
+                    onMouseMove={handleDebugMouseMove}
+                    onMouseUp={handleDebugMouseUp}
+                  />
+                  {/* Live crosshair at current pointer position with coordinates inline */}
+                  {debugCursor && (
+                    <>
+                      <Circle x={debugCursor.x} y={debugCursor.y} radius={8} stroke="lime" strokeWidth={2} fill="transparent" listening={false} />
+                      <Line points={[debugCursor.x - 16, debugCursor.y, debugCursor.x + 16, debugCursor.y]} stroke="lime" strokeWidth={1} listening={false} />
+                      <Line points={[debugCursor.x, debugCursor.y - 16, debugCursor.x, debugCursor.y + 16]} stroke="lime" strokeWidth={1} listening={false} />
+                      <Text
+                        x={debugCursor.x + 14}
+                        y={debugCursor.y + 27}
+                        text={`${Math.round(debugCursor.x)}, ${Math.round(debugCursor.y)}`}
+                        fontSize={22}
+                        fontFamily="monospace"
+                        fill="lime"
+                        shadowColor="black"
+                        shadowBlur={4}
+                        shadowOffset={{ x: 1, y: 1 }}
+                        listening={false}
+                      />
+                    </>
+                  )}
+                  {debugPoint && (
+                    <>
+                      <Circle x={debugPoint.x} y={debugPoint.y} radius={6} stroke="orange" strokeWidth={2} fill="transparent" listening={false} />
+                      <Line points={[debugPoint.x - 12, debugPoint.y, debugPoint.x + 12, debugPoint.y]} stroke="orange" strokeWidth={1} listening={false} />
+                      <Line points={[debugPoint.x, debugPoint.y - 12, debugPoint.x, debugPoint.y + 12]} stroke="orange" strokeWidth={1} listening={false} />
+                      <Text
+                        x={debugPoint.x + 12}
+                        y={debugPoint.y + 25}
+                        text={`${debugPoint.x}, ${debugPoint.y}`}
+                        fontSize={20}
+                        fontFamily="monospace"
+                        fill="orange"
+                        shadowColor="black"
+                        shadowBlur={4}
+                        shadowOffset={{ x: 1, y: 1 }}
+                        listening={false}
+                      />
+                    </>
+                  )}
+                  {debugRect && (
+                    <>
+                      <Rect
+                        x={debugRect.x}
+                        y={debugRect.y}
+                        width={debugRect.width}
+                        height={debugRect.height}
+                        stroke="cyan"
+                        strokeWidth={2}
+                        fill="rgba(0,255,255,0.1)"
+                        dash={[4, 4]}
+                        listening={false}
+                      />
+                      <Text
+                        x={debugRect.x}
+                        y={debugRect.y + debugRect.height + 6}
+                        text={`x: ${debugRect.x}, y: ${debugRect.y}, w: ${debugRect.width}, h: ${debugRect.height}`}
+                        fontSize={22}
+                        fontFamily="monospace"
+                        fill="cyan"
+                        shadowColor="black"
+                        shadowBlur={4}
+                        shadowOffset={{ x: 1, y: 1 }}
+                        listening={false}
+                      />
+                    </>
+                  )}
+                </Layer>
+              )}
             </Stage>
           </div>
-          
+
           {/* Canvas instructions */}
           <div className="mt-3 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-xs text-gray-600 dark:text-gray-400 text-center">
             <span className="font-medium">Click</span> to select • <span className="font-medium">Ctrl+Click</span> to multi-select • <span className="font-medium">Drag</span> to move • <span className="font-medium">Corner handles</span> to resize
@@ -2372,8 +2728,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
             )}
           </div>
 
-          {/* Selected Element Properties */}
-          {selectedIds.size > 0 ? (
+          {/* Selected Element Properties - canvas elements (image, video, text); song content uses the panel below */}
+          {selectedIds.size > 0 && !(selectedSongContentType && selectedSongContentStyle) ? (
             <div className="space-y-3">
               <h4 className="font-medium text-gray-700 dark:text-gray-300 text-sm">
                 {isMultiSelect ? (
@@ -2390,6 +2746,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       ? 'Image'
                       : selectedElement?.type === 'video'
                       ? 'Video'
+                      : selectedElement?.type === 'audio'
+                      ? 'Audio'
                       : 'Text'}
                   </>
                 )}
@@ -2432,11 +2790,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   </label>
                   <input
                     type="number"
-                    value={isMultiSelect ? '' : Math.round(selectedElement.y)}
+                    value={isMultiSelect ? '' : Math.round(selectedElement?.y ?? 0)}
                     placeholder={isMultiSelect ? 'Mixed' : ''}
                     disabled={isMultiSelect}
                     onChange={(e) =>
-                      updateElement(selectedElement.id, {
+                      selectedElement && updateElement(selectedElement.id, {
                         y: Number.isNaN(parseInt(e.target.value, 10)) ? 0 : parseInt(e.target.value, 10),
                       })
                     }
@@ -2458,11 +2816,11 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 </label>
                 <input
                   type="number"
-                  value={isMultiSelect ? '' : Math.round(selectedElement.rotation ?? 0)}
+                  value={isMultiSelect ? '' : Math.round(selectedElement?.rotation ?? 0)}
                   placeholder={isMultiSelect ? 'Mixed' : ''}
                   disabled={isMultiSelect}
                   onChange={(e) =>
-                    updateElement(selectedElement.id, {
+                    selectedElement && updateElement(selectedElement.id, {
                       rotation: Number.isNaN(parseInt(e.target.value, 10)) ? 0 : parseInt(e.target.value, 10),
                     })
                   }
@@ -2484,13 +2842,13 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       </label>
                       <input
                         type="number"
-                        value={isMultiSelect ? '' : Math.round(selectedElement.width)}
+                        value={isMultiSelect ? '' : Math.round(selectedElement?.width ?? 0)}
                         placeholder={isMultiSelect ? 'Mixed' : ''}
                         disabled={isMultiSelect}
                     onChange={(e) =>
-                      updateElement(selectedElement.id, {
+                      selectedElement && updateElement(selectedElement.id, {
                         width: Number.isNaN(parseInt(e.target.value, 10))
-                          ? selectedElement.width
+                          ? (selectedElement.width ?? 0)
                           : parseInt(e.target.value, 10),
                       })
                     }
@@ -2509,13 +2867,13 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                       </label>
                       <input
                         type="number"
-                        value={isMultiSelect ? '' : Math.round(selectedElement.height)}
+                        value={isMultiSelect ? '' : Math.round(selectedElement?.height ?? 0)}
                         placeholder={isMultiSelect ? 'Mixed' : ''}
                         disabled={isMultiSelect}
                     onChange={(e) =>
-                      updateElement(selectedElement.id, {
+                      selectedElement && updateElement(selectedElement.id, {
                         height: Number.isNaN(parseInt(e.target.value, 10))
-                          ? selectedElement.height
+                          ? (selectedElement.height ?? 0)
                           : parseInt(e.target.value, 10),
                       })
                     }
@@ -2527,7 +2885,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
               {/* Opacity */}
               <div>
                 <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                  Opacity: {isMultiSelect ? 'Mixed' : `${Math.round((selectedElement.opacity ?? 1) * 100)}%`}
+                  Opacity: {isMultiSelect ? 'Mixed' : `${Math.round((selectedElement?.opacity ?? 1) * 100)}%`}
                   <span 
                     title="Transparency level - 0% is fully transparent, 100% is fully opaque"
                     className="ml-1 text-gray-400 dark:text-gray-500 cursor-help"
@@ -2539,15 +2897,15 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   type="range"
                   min="0"
                   max="100"
-                  value={isMultiSelect ? 50 : Math.round((selectedElement.opacity ?? 1) * 100)}
+                  value={isMultiSelect ? 50 : Math.round((selectedElement?.opacity ?? 1) * 100)}
                   disabled={isMultiSelect}
-                  onChange={(e) => updateElement(selectedElement.id, { opacity: parseInt(e.target.value) / 100 })}
+                  onChange={(e) => selectedElement && updateElement(selectedElement.id, { opacity: parseInt(e.target.value) / 100 })}
                   className="w-full disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
               {/* Element-specific properties - hide when multiple elements selected */}
-              {!isMultiSelect && selectedElement.type === 'image' && (
+              {!isMultiSelect && selectedElement?.type === 'image' && (
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                     <div>
@@ -2588,7 +2946,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                     />
                   </div>
                 </>
-              )}              {!isMultiSelect && selectedElement.type === 'video' && (
+              )}              {!isMultiSelect && selectedElement?.type === 'video' && (
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                     <div>
@@ -2691,7 +3049,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 </>
               )}
 
-              {!isMultiSelect && selectedElement.type === 'audio' && (
+              {!isMultiSelect && selectedElement?.type === 'audio' && (
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                   <div>
@@ -2859,7 +3217,7 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                 </>
               )}
 
-              {!isMultiSelect && selectedElement.type === 'text' && (
+              {!isMultiSelect && selectedElement?.type === 'text' && (
                 <>
                   <hr className="border-gray-200 dark:border-gray-700" />
                   <div>
@@ -3118,6 +3476,24 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
                   value={Math.round(selectedSongContentStyle.height || 200)}
                   onChange={(e) => handleSongContentStyleChange(selectedSongContentType, {
                     height: Number.isNaN(parseInt(e.target.value, 10)) ? 100 : parseInt(e.target.value, 10),
+                  })}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              {/* Z-Index (stacking order; higher = on top of images/other elements) */}
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                  Z-Index
+                  <span className="ml-1 text-gray-400 dark:text-gray-500 cursor-help" title="Stacking order: higher values appear on top of images and other elements">
+                    <i className="fas fa-info-circle text-xs"></i>
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  value={selectedSongContentStyle.zIndex ?? 20}
+                  onChange={(e) => handleSongContentStyleChange(selectedSongContentType, {
+                    zIndex: Number.isNaN(parseInt(e.target.value, 10)) ? 0 : parseInt(e.target.value, 10),
                   })}
                   className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />

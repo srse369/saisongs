@@ -185,19 +185,31 @@ class CacheService {
     centerIds?: number[]
   ): T[] {
     // Admin users have access to everything
-    if (userRole === 'admin' || !centerIds) {
+    if (userRole === 'admin') {
       return resources;
     }
 
-    return resources.filter(resource => {
+    // Normalize to set of numbers so string/number mismatch (e.g. "5" vs 5) does not hide templates
+    const normalizedUserIds = new Set<number>(
+      (centerIds || []).map((id: number | string) => Number(id)).filter((n) => !Number.isNaN(n))
+    );
+
+    // If user has no center access, only show untagged (global) resources
+    if (normalizedUserIds.size === 0) {
+      return resources.filter(
+        (resource) => !resource.centerIds || resource.centerIds.length === 0
+      );
+    }
+
+    return resources.filter((resource) => {
       // Untagged content (null or empty center_ids) is visible to everyone
       if (!resource.centerIds || resource.centerIds.length === 0) {
         return true;
       }
 
-      // Check if user has access to any of the resource's centers
-      return resource.centerIds.some(contentCenterId =>
-        centerIds.includes(contentCenterId)
+      // Check if user has access to any of the resource's centers (compare as numbers)
+      return resource.centerIds.some((contentCenterId: number | string) =>
+        normalizedUserIds.has(Number(contentCenterId))
       );
     });
   }
@@ -1201,7 +1213,9 @@ class CacheService {
     if (cached && Array.isArray(cached) && template) {
       this.set(cacheKey, [...cached, template], this.DEFAULT_TTL_MS);
     } else if (template) {
-      this.set(cacheKey, [template], this.DEFAULT_TTL_MS);
+      // Had no list or stale cache: do not store [template] or we would hide all other templates.
+      // Invalidate list cache so next getAllTemplates() refetches full list from DB.
+      this.invalidate(cacheKey);
     }
 
     return template;

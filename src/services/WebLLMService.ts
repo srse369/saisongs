@@ -1,8 +1,8 @@
-import * as webllm from "@mlc-ai/web-llm";
 import type { SongSearchFilters } from '../components/common/AdvancedSongSearch';
 import type { PitchSearchFilters } from '../components/common/AdvancedPitchSearch';
 import { ALL_PITCH_OPTIONS } from '../utils/pitchUtils';
 import type { Song } from '../types';
+import { parseNaturalQuery } from '../utils/smartSearch';
 
 export type SearchType = 'song' | 'pitch';
 
@@ -21,19 +21,12 @@ export interface AvailableValues {
   levels?: string[];
   pitches?: string[];
   singerNames?: string[];
+  songNames?: string[];
 }
 
 export class WebLLMService {
-  private engine: webllm.MLCEngine | null = null;
-  private isInitializing = false;
-  private isReady = false;
-  private initPromise: Promise<void> | null = null;
   private availableValues: AvailableValues = {};
-  
-  // Using the smallest available model for better performance and reliability
-  // Qwen2-0.5B is the smallest model (~100-150MB) perfect for simple parsing tasks
-  private readonly MODEL = "Qwen2-0.5B-Instruct-q4f16_1-MLC";
-  
+
   constructor() {}
   
   /**
@@ -65,6 +58,11 @@ export class WebLLMService {
       .filter(name => name && name.trim())
       .sort((a, b) => a.localeCompare(b));
 
+    const songNames = songs
+      .map(s => s.name)
+      .filter(name => name && name.trim())
+      .slice(0, 200); // Limit for prompt size
+
     return {
       ragas: getUniqueValues('raga'),
       deities: getUniqueValues('deity'),
@@ -74,557 +72,281 @@ export class WebLLMService {
       levels: getUniqueValues('level'),
       pitches: ALL_PITCH_OPTIONS,
       singerNames: Array.from(new Set(singerNames)),
+      songNames,
     };
   }
 
-  async initialize(onProgress?: (report: webllm.InitProgressReport) => void): Promise<void> {
-    if (this.isReady) return;
-    if (this.initPromise) return this.initPromise;
-
-    this.initPromise = (async () => {
-      try {
-        this.isInitializing = true;
-        
-        this.engine = await webllm.CreateMLCEngine(this.MODEL, {
-          initProgressCallback: onProgress,
-        });
-        
-        this.isReady = true;
-        this.isInitializing = false;
-      } catch (error) {
-        this.isInitializing = false;
-        this.isReady = false;
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.error('Failed to initialize WebLLM:', errorMessage, error);
-        
-        // Provide more helpful error messages
-        if (errorMessage.includes('WebGPU')) {
-          throw new Error('WebGPU not available. Please use Chrome/Edge 113+ with hardware acceleration enabled.');
-        } else if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
-          throw new Error('Network error loading model. Check your internet connection and try again.');
-        } else if (errorMessage.includes('memory') || errorMessage.includes('OOM')) {
-          throw new Error('Insufficient memory. Please close other tabs and try again.');
-        }
-        
-        throw new Error(`Failed to load AI model: ${errorMessage}`);
-      }
-    })();
-
-    return this.initPromise;
-  }
-
-  isModelReady(): boolean {
-    return this.isReady;
-  }
-
-  isModelInitializing(): boolean {
-    return this.isInitializing;
-  }
-
+  /**
+   * Parse natural language into structured filters (rule-based).
+   */
   async parseNaturalLanguageQuery(
-    query: string, 
+    query: string,
     searchType: SearchType
   ): Promise<LLMSearchResult> {
-    if (!this.isReady || !this.engine) {
-      throw new Error('WebLLM not initialized');
-    }
-
-    // Preprocess query to add hints for better mapping
-    const enhancedQuery = this.preprocessQuery(query, searchType);
-    
-    const systemPrompt = this.getSystemPrompt(searchType);
-    const userPrompt = this.getUserPrompt(enhancedQuery, searchType);
-
-    try {
-      console.log('🤖 WebLLM Request:', {
-        originalQuery: query,
-        enhancedQuery: enhancedQuery,
-        searchType,
-        systemPrompt: systemPrompt.substring(0, 150) + '...',
-        userPrompt
-      });
-
-      const response = await this.engine.chat.completions.create({
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.1,
-        max_tokens: 256,
-      });
-
-      const content = response.choices[0]?.message?.content || '{}';
-      console.log('🤖 WebLLM Raw Response:', content);
-      
-      const parsed = this.parseResponse(content, searchType, query);
-      console.log('🤖 WebLLM Parsed Result:', parsed);
-      
-      return parsed;
-    } catch (error) {
-      console.error('❌ WebLLM query failed:', error);
-      throw error;
-    }
-  }
-
-  private preprocessQuery(query: string, searchType: SearchType): string {
-    // Add explicit hints when certain keywords are detected
-    // Collect all hints first, then append them all at once
-    const hints: string[] = [];
-    const lowerQuery = query.toLowerCase();
-    
-    // Common ragas - if detected, add hint
-    const commonRagas = [
-      'hamsadhwani', 'mohanam', 'kalyani', 'shankarabharanam', 'kharaharapriya',
-      'bhairavi', 'sankarabharanam', 'todi', 'kambhoji', 'bilahari', 'dhanyasi',
-      'bilawal', 'kapi', 'arabhi', 'natabhairavi', 'sahana', 'begada', 'mayamalavagowla'
-    ];
-    
-    for (const raga of commonRagas) {
-      if (lowerQuery.includes(raga)) {
-        hints.push(`"${raga}" is a RAGA name`);
-      }
-    }
-    
-    // Common deities
-    const deities = ['sai', 'devi', 'krishna', 'rama', 'shiva', 'ganesh', 'hanuman', 
-                     'durga', 'lakshmi', 'saraswati', 'ganesha', 'vishnu', 'muruga', 
-                     'murugan', 'ayyappa'];
-    for (const deity of deities) {
-      if (lowerQuery.includes(deity)) {
-        hints.push(`"${deity}" is a DEITY name`);
-      }
-    }
-    
-    // Language detection
-    const languages = ['sanskrit', 'hindi', 'telugu', 'tamil', 'kannada', 'malayalam', 
-                      'bengali', 'marathi', 'gujarati', 'punjabi', 'oriya'];
-    for (const lang of languages) {
-      if (lowerQuery.includes(lang)) {
-        hints.push(`"${lang}" is a LANGUAGE`);
-      }
-    }
-    
-    // Tempo detection
-    const tempos = ['slow', 'medium', 'fast', 'medium-fast', 'medium-slow'];
-    for (const tempo of tempos) {
-      if (lowerQuery.includes(tempo)) {
-        hints.push(`"${tempo}" is a TEMPO`);
-      }
-    }
-    
-    // Level detection
-    const levels = ['simple', 'intermediate', 'advanced', 'beginner', 'difficult', 'hard', 'complex'];
-    for (const level of levels) {
-      if (lowerQuery.includes(level)) {
-        hints.push(`"${level}" is a LEVEL`);
-      }
-    }
-    
-    // Special handling for "which singers" queries - these are asking about singers, not pitches
-    if (searchType === 'pitch' && (lowerQuery.includes('which singers') || lowerQuery.includes('which singer') || 
-        lowerQuery.includes('who sings') || lowerQuery.includes('singers who'))) {
-      hints.push('[QUERY TYPE: This is asking about SINGERS, not pitches. Extract singerName or deity filters only. Do NOT extract pitch unless explicitly mentioned.]');
-    }
-    
-    // "bhajans" is a song type, not a raga
-    if (lowerQuery.includes('bhajan')) {
-      hints.push('"bhajan" or "bhajans" is a SONG TYPE, NOT a raga name. Do NOT classify it as a raga.');
-    }
-    
-    // If we found any hints, append them to the query
-    if (hints.length > 0) {
-      const hintsText = hints.map(hint => `[HINT: ${hint}]`).join(' ');
-      return `${query} ${hintsText}`;
-    }
-    
-    return query;
-  }
-
-  private formatValueList(values: string[] | undefined, maxItems: number = 50): string {
-    if (!values || values.length === 0) {
-      return 'none available';
-    }
-    if (values.length <= maxItems) {
-      return values.join(', ');
-    }
-    return `${values.slice(0, maxItems).join(', ')} ... (${values.length} total)`;
-  }
-
-  private getSystemPrompt(searchType: SearchType): string {
-    const { ragas, deities, languages, tempos, beats, levels, pitches, singerNames } = this.availableValues;
-    
-    // Format available values for the prompt
-    const availableRagas = this.formatValueList(ragas);
-    const availableDeities = this.formatValueList(deities);
-    const availableLanguages = this.formatValueList(languages);
-    const availableTempos = this.formatValueList(tempos);
-    const availableBeats = this.formatValueList(beats);
-    const availableLevels = this.formatValueList(levels);
-    const availablePitches = this.formatValueList(pitches);
-    const availableSingerNames = this.formatValueList(singerNames);
-    
+    const parsed = parseNaturalQuery(query);
+    const filters: Record<string, string> = {};
     if (searchType === 'song') {
-      return `You are a search query parser. Extract filters from natural language and output ONLY valid JSON.
-
-CRITICAL RULES FOR CLASSIFICATION:
-1. RAGA = Musical raga names (see VALID RAGAS below)
-2. DEITY = Gods/goddesses (see VALID DEITIES below)
-3. LANGUAGE = Languages (see VALID LANGUAGES below)
-4. TEMPO = Speed (see VALID TEMPOS below)
-5. LEVEL = Difficulty (see VALID LEVELS below)
-6. NAME = Actual song title/name
-
-VALID RAGAS (use exact match from this list): ${availableRagas}
-
-VALID DEITIES (use exact match from this list): ${availableDeities}
-
-VALID LANGUAGES (use exact match from this list): ${availableLanguages}
-
-VALID TEMPOS (use exact match from this list): ${availableTempos}
-
-VALID BEATS (use exact match from this list): ${availableBeats}
-
-VALID LEVELS (use exact match from this list): ${availableLevels}
-
-AVAILABLE FILTERS:
-- name: song name/title
-- deity: ONLY deity names from VALID DEITIES list (not ragas!)
-- language: ONLY language names from VALID LANGUAGES list
-- raga: ONLY raga names from VALID RAGAS list (not deities!)
-- tempo: ONLY tempo values from VALID TEMPOS list
-- beat: beat pattern from VALID BEATS list
-- level: ONLY difficulty levels from VALID LEVELS list
-- songTags: tags/categories
-
-TEXT SEARCH vs FILTERS:
-- If query asks to "find/search songs which have/contain the word X" or similar text search phrases, use name filter for text search
-- If query mentions a deity/raga/language directly (e.g., "rama songs", "hamsadhwani raga"), use the appropriate filter
-- Text search queries should extract the search term into the "name" field
-
-EXAMPLES:
-Input: "Find hamsadhwani raga songs"
-Output: {"raga":"hamsadhwani"}
-
-Input: "Show me sai bhajans in sanskrit"
-Output: {"deity":"sai","language":"sanskrit"}
-
-Input: "Mohanam raga devi songs"
-Output: {"raga":"mohanam","deity":"devi"}
-
-Input: "Fast tempo krishna bhajans"
-Output: {"tempo":"fast","deity":"krishna"}
-
-Input: "Simple level songs in kalyani raga"
-Output: {"level":"simple","raga":"kalyani"}
-
-Input: "Bhairavi raga slow songs"
-Output: {"raga":"bhairavi","tempo":"slow"}
-
-Input: "rama songs in shankarabharanam / bilawal raga"
-Output: {"deity":"rama","raga":"shankarabharanam / bilawal raga"}
-
-Input: "find songs which have the word rama"
-Output: {"name":"rama"}
-
-Input: "search for songs containing krishna"
-Output: {"name":"krishna"}
-
-Input: "songs with the word devi in the name"
-Output: {"name":"devi"}
-
-PAY ATTENTION TO HINTS: If query contains [HINT: "word" is a TYPE], use that TYPE for classification.
-
-IMPORTANT: If multiple ragas are mentioned (e.g., "raga1 / raga2"), include the full raga string including the slash separator in the raga field.
-
-Output ONLY the JSON object, nothing else.`;
+      if (parsed.general) filters.name = parsed.general;
+      if (parsed.deity) filters.deity = parsed.deity;
+      if (parsed.language) filters.language = parsed.language;
+      if (parsed.raga) filters.raga = parsed.raga;
+      if (parsed.tempo) filters.tempo = parsed.tempo;
+      if (parsed.beat) filters.beat = parsed.beat;
+      if (parsed.level) filters.level = parsed.level;
     } else {
-      return `You are a search query parser. Extract filters from natural language and output ONLY valid JSON.
-
-CRITICAL RULES FOR CLASSIFICATION:
-1. PITCH = Musical notes (see VALID PITCHES below)
-2. RAGA = Musical raga names (see VALID RAGAS below)
-3. DEITY = Gods/goddesses (see VALID DEITIES below)
-4. LANGUAGE = Languages (see VALID LANGUAGES below)
-5. SINGER = Singer names (see VALID SINGER NAMES below)
-
-VALID PITCHES (use exact match from this list): ${availablePitches}
-
-VALID RAGAS (use exact match from this list): ${availableRagas}
-
-VALID DEITIES (use exact match from this list): ${availableDeities}
-
-VALID LANGUAGES (use exact match from this list): ${availableLanguages}
-
-VALID SINGER NAMES (use exact match from this list): ${availableSingerNames}
-
-AVAILABLE FILTERS:
-- songName: name of the song
-- singerName: name of the singer from VALID SINGER NAMES list
-- pitch: ONLY musical pitches from VALID PITCHES list
-- deity: ONLY deity names from VALID DEITIES list (not ragas or languages!)
-- language: ONLY language names from VALID LANGUAGES list (NOT ragas! Languages like sanskrit, hindi, telugu are NEVER ragas)
-- raga: ONLY raga names from VALID RAGAS list (not deities or languages!)
-
-EXAMPLES:
-Input: "Show me C# pitches for sai songs"
-Output: {"pitch":"C#","deity":"sai"}
-
-Input: "Find pitches for devi songs in hamsadhwani raga"
-Output: {"deity":"devi","raga":"hamsadhwani"}
-
-Input: "Which singers sing krishna bhajans in sanskrit"
-Output: {"deity":"krishna","language":"sanskrit"}
-
-Input: "Which singers have krishna bhajans"
-Output: {"deity":"krishna"}
-
-Input: "Who sings devi songs"
-Output: {"deity":"devi"}
-
-Input: "C pitch for mohanam raga"
-Output: {"pitch":"C","raga":"mohanam"}
-
-Input: "D# pitch kalyani raga"
-Output: {"pitch":"D#","raga":"kalyani"}
-
-Input: "Show me D# devi songs in sanskrit"
-Output: {"pitch":"D#","deity":"devi","language":"sanskrit"}
-
-CRITICAL RULES:
-1. ONLY extract values that are EXPLICITLY mentioned in the query. Do NOT invent or guess values.
-2. If NO pitch is mentioned, do NOT include a pitch filter.
-3. "bhajans" or "bhajan" is a SONG TYPE, NOT a raga. Never classify it as a raga.
-4. Sanskrit, Hindi, Telugu, Tamil, Kannada, Malayalam, Bengali, Marathi, Gujarati, Punjabi, Oriya are LANGUAGES, NOT ragas. Never classify them as ragas.
-5. For "which singers" queries, extract deity or songName filters to find singers who sing those songs. Do NOT extract pitch unless explicitly mentioned.
-
-PAY ATTENTION TO HINTS: If query contains [HINT: "word" is a TYPE], use that TYPE for classification.
-
-IMPORTANT: Use exact matches from the VALID lists above. If a value is not in the list, do not include it in the output.
-
-Output ONLY the JSON object, nothing else.`;
+      if (parsed.general) filters.songName = parsed.general;
+      if (parsed.singer) filters.singerName = parsed.singer;
+      if (parsed.pitch) filters.pitch = parsed.pitch;
+      if (parsed.deity) filters.deity = parsed.deity;
+      if (parsed.language) filters.language = parsed.language;
+      if (parsed.raga) filters.raga = parsed.raga;
     }
+    return { filters: filters as SongSearchFilters | PitchSearchFilters };
   }
 
-  private getUserPrompt(query: string, searchType: SearchType): string {
-    return `Query: "${query}"
-
-Output the JSON filter object:`;
+  /**
+   * Normalize synonyms so rule regexes can match flexibly.
+   * Canonical forms: song (not bhajan), scale (not key/pitch for "my scale for" style).
+   */
+  private normalizeSynonyms(text: string): string {
+    let out = text.toLowerCase().trim();
+    // song = bhajan (whole word)
+    out = out.replace(/\bbhajans\b/g, 'songs');
+    out = out.replace(/\bbhajan\b/g, 'song');
+    // scale = key = pitch (for "my X for the song" / "X's X for song" patterns)
+    out = out.replace(/\bmy\s+key\s+for\b/g, 'my scale for');
+    out = out.replace(/\bmy\s+pitch\s+for\b/g, 'my scale for');
+    out = out.replace(/\bkey\s+for\s+(?:the\s+)?(?:song\s+)?/gi, 'scale for the song ');
+    out = out.replace(/\bpitch\s+for\s+(?:the\s+)?(?:song\s+)?/gi, 'scale for the song ');
+    // X's key for / X's pitch for -> X's scale for
+    out = out.replace(/'s?\s+key\s+for\b/g, "'s scale for");
+    out = out.replace(/'s?\s+pitch\s+for\b/g, "'s scale for");
+    return out;
   }
 
-  private parseResponse(content: string, searchType: SearchType, originalQuery?: string): LLMSearchResult {
-    try {
-      // Try multiple parsing strategies
-      let parsed: any = {};
-      
-      // Strategy 1: Direct JSON parse (if response is pure JSON)
-      try {
-        parsed = JSON.parse(content.trim());
-        console.log('✅ Parsed using direct JSON.parse');
-      } catch {
-        // Strategy 2: Extract JSON using regex (handles text before/after)
-        const jsonMatch = content.match(/\{[^{}]*\}/);
-        if (jsonMatch) {
-          try {
-            parsed = JSON.parse(jsonMatch[0]);
-            console.log('✅ Parsed using regex extraction');
-          } catch {
-            console.warn('⚠️ Regex extracted text but failed to parse:', jsonMatch[0]);
-          }
-        }
-      }
-      
-      // Validate that we got a plain object (not array or null)
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-        console.warn('⚠️ Invalid parsed result type:', typeof parsed);
-        return { filters: {} };
-      }
-      
-      // Clean up filters: remove null/undefined/empty string values
-      const cleanFilters = Object.entries(parsed).reduce((acc, [key, value]) => {
-        if (value && typeof value === 'string' && value.trim()) {
-          acc[key] = value.trim().toLowerCase();
-        }
-        return acc;
-      }, {} as Record<string, string>);
-      
-      // Post-processing: Fix obvious misclassifications
-      const correctedFilters = this.correctMisclassifications(cleanFilters);
-      
-      // Post-processing: Remove values that weren't in the original query
-      const validatedFilters = originalQuery ? this.validateFiltersAgainstQuery(correctedFilters, originalQuery) : correctedFilters;
-      
-      console.log('✅ Clean filters:', cleanFilters);
-      if (JSON.stringify(cleanFilters) !== JSON.stringify(correctedFilters)) {
-        console.log('🔧 Corrected filters:', correctedFilters);
-      }
-      if (JSON.stringify(correctedFilters) !== JSON.stringify(validatedFilters)) {
-        console.log('🔍 Validated filters (removed values not in query):', validatedFilters);
-      }
-      
-      return {
-        filters: validatedFilters,
-        confidence: 0.8,
-      };
-    } catch (error) {
-      console.error('❌ Failed to parse LLM response:', error, 'Content:', content);
-      return { filters: {} };
-    }
-  }
-  
-  private validateFiltersAgainstQuery(filters: Record<string, string>, query: string): Record<string, string> {
-    const validated: Record<string, string> = {};
-    const lowerQuery = query.toLowerCase();
-    
-    // Known valid values that should be checked
-    const { ragas, deities, languages, tempos, beats, levels, pitches, singerNames } = this.availableValues;
-    
-    for (const [key, value] of Object.entries(filters)) {
-      let isValid = false;
-      let correctedValue = value;
-      
-      // Check if the value or a close match appears in the query
-      if (lowerQuery.includes(value)) {
-        isValid = true;
-      } else {
-        // For deity, check if a similar deity name appears in query
-        if (key === 'deity') {
-          const deityMatch = deities?.find(d => {
-            const lowerDeity = d.toLowerCase();
-            return lowerQuery.includes(lowerDeity) && 
-              (lowerDeity === value || lowerDeity.includes(value) || value.includes(lowerDeity));
-          });
-          if (deityMatch) {
-            correctedValue = deityMatch.toLowerCase();
-            isValid = true;
-          }
-        }
-        // For pitch, only include if explicitly mentioned (C, C#, D, etc.)
-        else if (key === 'pitch') {
-          // Check if any pitch from available pitches appears in query
-          const pitchMatch = pitches?.find(p => {
-            const lowerPitch = p.toLowerCase();
-            // Match exact pitch or pitch with # (e.g., "c#" matches "C#")
-            return lowerQuery.includes(lowerPitch) || 
-              (lowerQuery.includes(p.replace('#', '').toLowerCase()) && lowerQuery.includes('#'));
-          });
-          if (pitchMatch && lowerQuery.includes(pitchMatch.toLowerCase())) {
-            correctedValue = pitchMatch.toLowerCase();
-            isValid = true;
-          }
-        }
-        // For language, check if language appears in query
-        else if (key === 'language') {
-          const langMatch = languages?.find(l => {
-            const lowerLang = l.toLowerCase();
-            return lowerQuery.includes(lowerLang) && 
-              (lowerLang === value || lowerLang.includes(value) || value.includes(lowerLang));
-          });
-          if (langMatch) {
-            correctedValue = langMatch.toLowerCase();
-            isValid = true;
-          }
-        }
-        // For raga, check if raga appears in query
-        else if (key === 'raga') {
-          const ragaMatch = ragas?.find(r => {
-            const lowerRaga = r.toLowerCase();
-            return lowerQuery.includes(lowerRaga) && 
-              (lowerRaga === value || lowerRaga.includes(value) || value.includes(lowerRaga));
-          });
-          if (ragaMatch) {
-            correctedValue = ragaMatch.toLowerCase();
-            isValid = true;
-          }
-        }
-        // For other fields (singerName, songName, etc.), be more lenient
-        else {
-          // Check if value or part of it appears in query
-          const words = value.split(/\s+/);
-          const queryWords = lowerQuery.split(/\s+/);
-          const hasMatch = words.some(word => queryWords.some(qw => qw.includes(word) || word.includes(qw)));
-          if (hasMatch) {
-            isValid = true;
-          }
-        }
-      }
-      
-      if (isValid) {
-        validated[key] = correctedValue;
-      } else {
-        console.warn(`⚠️ Removed filter ${key}: "${value}" - not found in query: "${query}"`);
+  /** Deity names as tagged in the DB; user may say "hanuman" but data uses "anjaneya". */
+  private static readonly DEITY_FILTER_ALIASES: Record<string, string> = {
+    hanuman: 'anjaneya',
+  };
+
+  /**
+   * Rule-based extraction of song filters from phrases like "fast shiva bhajans" or "show me slow sai songs".
+   * Maps user-facing deity names to DB values (e.g. hanuman -> anjaneya).
+   */
+  private tryRuleBasedSongFilters(userPrompt: string): Record<string, string> | null {
+    const lower = userPrompt.toLowerCase().trim();
+    const filters: Record<string, string> = {};
+    const deityWords = ['shiva', 'devi', 'krishna', 'rama', 'sai', 'ganesh', 'ganesha', 'hanuman', 'vishnu', 'muruga', 'murugan', 'lakshmi', 'saraswati', 'durga', 'ayyappa'];
+    const tempoWords = ['fast', 'slow', 'medium'];
+    for (const d of deityWords) {
+      if (new RegExp(`\\b${d}\\b`, 'i').test(lower)) {
+        filters.deity = WebLLMService.DEITY_FILTER_ALIASES[d] ?? d;
+        break;
       }
     }
-    
-    return validated;
+    for (const t of tempoWords) {
+      if (new RegExp(`\\b${t}\\b`, 'i').test(lower)) {
+        filters.tempo = t;
+        break;
+      }
+    }
+    if (Object.keys(filters).length === 0) return null;
+    return filters;
   }
 
-  private correctMisclassifications(filters: Record<string, string>): Record<string, string> {
-    const corrected = { ...filters };
-    
-    // Known ragas that might be misclassified as deity
-    const knownRagas = [
-      'hamsadhwani', 'mohanam', 'kalyani', 'shankarabharanam', 'kharaharapriya',
-      'bhairavi', 'sankarabharanam', 'todi', 'kambhoji', 'bilahari', 'dhanyasi',
-      'kapi', 'arabhi', 'natabhairavi', 'sahana', 'begada', 'mayamalavagowla'
-    ];
-    
-    // Known deities
-    const knownDeities = [
-      'sai', 'devi', 'krishna', 'rama', 'shiva', 'ganesh', 'ganesha', 'hanuman',
-      'durga', 'lakshmi', 'saraswati', 'vishnu', 'muruga', 'murugan', 'ayyappa'
-    ];
-    
-    // Known languages
-    const knownLanguages = [
-      'sanskrit', 'hindi', 'telugu', 'tamil', 'kannada', 'malayalam',
-      'bengali', 'marathi', 'gujarati', 'punjabi', 'oriya'
-    ];
-    
-    // Check if deity value is actually a raga
-    if (corrected.deity && knownRagas.includes(corrected.deity)) {
-      console.warn(`⚠️ Correcting misclassification: "${corrected.deity}" is a raga, not deity`);
-      corrected.raga = corrected.deity;
-      delete corrected.deity;
+  /** Map deity values to DB tags (e.g. hanuman -> anjaneya). */
+  private normalizeDeityInFilters(filters: Record<string, string>): Record<string, string> {
+    if (!filters.deity) return filters;
+    const mapped = WebLLMService.DEITY_FILTER_ALIASES[filters.deity.toLowerCase()];
+    if (!mapped) return filters;
+    return { ...filters, deity: mapped };
+  }
+
+  /**
+   * App-aware chat: user message is answered using rule-based parsing only.
+   * Returns a reply and optional action (navigate, show_preview, play_audio, etc.).
+   * @param options.onDebugLog - If provided, called with (message, data) for each step.
+   */
+  async chatWithAppContext(
+    userMessage: string,
+    options?: { onDebugLog?: (message: string, data?: unknown) => void }
+  ): Promise<{ reply: string; action?: { type: string; path?: string; filters?: Record<string, string>; [k: string]: unknown } }> {
+    const log = (message: string, data?: unknown) => {
+      console.log('[Ask app]', message, data ?? '');
+      options?.onDebugLog?.(message, data);
+    };
+
+    const userPrompt = userMessage.trim() || '(User said nothing)';
+    const lower = userPrompt.toLowerCase();
+    const norm = this.normalizeSynonyms(userPrompt);
+    log('User message', userPrompt);
+
+    const wantsSongs = /\b(songs?|tracks?)\b/.test(norm) || /\b(show|find|give|get|list|me)\s+.+\s+songs?\b/.test(norm);
+    const hasFilterHint = /\b(shiva|devi|krishna|rama|sai|hanuman|ganesh|fast|slow|medium|sanskrit|hindi|telugu|tamil|raga|deity|tempo|language)\b/i.test(norm);
+    const wantsMyPitches = /\bmy\b/i.test(norm) && (/\b(songs?|pitches?)\b/.test(norm) || norm.includes('pitches') || norm.includes('scale') || norm.includes('key') || norm.includes('pitch') || hasFilterHint);
+
+    // "What is my scale/key/pitch for [the] [song] X" -> Pitches, my pitches, songName: X (norm has "scale")
+    const myScaleForSongMatch = norm.match(/(?:what'?s?|what is)\s+my\s+scale\s+for\s+(?:the\s+)?(?:song\s+)?(.+?)(?:\s*[.?]?\s*)$/);
+    if (myScaleForSongMatch) {
+      const songName = myScaleForSongMatch[1].trim();
+      if (songName) {
+        log('Rule: my scale for song', { songName });
+        return {
+          reply: `Showing your scale for "${songName}".`,
+          action: { type: 'navigate', path: '/admin/pitches', filters: { songName }, showMyPitches: true },
+        };
+      }
     }
-    
-    // Check if raga value is actually a deity
-    if (corrected.raga && knownDeities.includes(corrected.raga)) {
-      console.warn(`⚠️ Correcting misclassification: "${corrected.raga}" is a deity, not raga`);
-      corrected.deity = corrected.raga;
-      delete corrected.raga;
+
+    // "What is X's scale/key/pitch for [the] [song] Y" -> Pitches, all pitches, singerName: X, songName: Y
+    // (?!is\s) prevents capturing "is ashwin" when the phrase is "What is ashwin's" - only the name goes in group 1.
+    const possessiveScaleMatch = norm.match(/(?:what'?s?|what is)\s+(?!is\s)(.+?)'s\s+scale\s+for\s+(?:the\s+)?(?:song\s+)?(.+?)(?:\s*[.?]?\s*)$/);
+    if (possessiveScaleMatch) {
+      const singerName = possessiveScaleMatch[1].trim();
+      const songName = possessiveScaleMatch[2].trim();
+      if (singerName && songName) {
+        log('Rule: singer scale for song', { singerName, songName });
+        return {
+          reply: `Showing ${singerName}'s scale for "${songName}".`,
+          action: { type: 'navigate', path: '/admin/pitches', filters: { singerName, songName }, showMyPitches: false },
+        };
+      }
     }
-    
-    // Check if deity is actually a language
-    if (corrected.deity && knownLanguages.includes(corrected.deity)) {
-      console.warn(`⚠️ Correcting misclassification: "${corrected.deity}" is a language, not deity`);
-      corrected.language = corrected.deity;
-      delete corrected.deity;
+
+    // "My X bhajans" / "my pitches for X" -> Pitches with filters
+    if (wantsMyPitches && hasFilterHint) {
+      const ruleFilters = this.tryRuleBasedSongFilters(userPrompt);
+      if (ruleFilters && Object.keys(ruleFilters).length > 0) {
+        log('Rule: my pitches', ruleFilters);
+        const parts = Object.entries(ruleFilters).map(([k, v]) => `${k}: ${v}`);
+        return {
+          reply: `Showing your pitches for ${parts.join(', ')}.`,
+          action: { type: 'navigate', path: '/admin/pitches', filters: ruleFilters, showMyPitches: true },
+        };
+      }
     }
-    
-    // Check if raga value is actually a language
-    if (corrected.raga && knownLanguages.includes(corrected.raga)) {
-      console.warn(`⚠️ Correcting misclassification: "${corrected.raga}" is a language, not raga`);
-      corrected.language = corrected.raga;
-      delete corrected.raga;
+
+    // "Show me bhajans/songs with the word X" -> Songs tab with song name filter X
+    const withTheWordMatch = norm.match(/\b(?:show|find|list)\s+(?:me\s+)?songs?\s+with\s+the\s+word\s+(.+?)(?:\s*[.?]?\s*)$/);
+    if (withTheWordMatch) {
+      const nameQuery = withTheWordMatch[1].trim();
+      if (nameQuery) {
+        log('Rule: songs with the word', { name: nameQuery });
+        return {
+          reply: `Showing songs with the word "${nameQuery}".`,
+          action: { type: 'navigate', path: '/admin/songs', filters: { name: nameQuery } },
+        };
+      }
     }
-    
-    // Check if language value is actually a raga
-    if (corrected.language && knownRagas.includes(corrected.language)) {
-      console.warn(`⚠️ Correcting misclassification: "${corrected.language}" is a raga, not language`);
-      corrected.raga = corrected.language;
-      delete corrected.language;
+
+    // "Show/find X songs/bhajans" -> Songs with filters
+    if (wantsSongs || (norm.includes('show') && norm.includes('song'))) {
+      const ruleFilters = this.tryRuleBasedSongFilters(userPrompt);
+      if (ruleFilters && Object.keys(ruleFilters).length > 0) {
+        log('Rule: songs with filters', ruleFilters);
+        const parts = Object.entries(ruleFilters).map(([k, v]) => `${k}: ${v}`);
+        return {
+          reply: `Showing songs with ${parts.join(', ')}.`,
+          action: { type: 'navigate', path: '/admin/songs', filters: ruleFilters },
+        };
+      }
+      const parsed = await this.parseNaturalLanguageQuery(userPrompt, 'song');
+      let filters = parsed.filters as Record<string, string>;
+      if (filters && Object.keys(filters).length > 0) {
+        filters = this.normalizeDeityInFilters(filters);
+        log('Rule: song query parser', filters);
+        const parts = Object.entries(filters).map(([k, v]) => `${k}: ${v}`);
+        return {
+          reply: `Showing songs with ${parts.join(', ')}.`,
+          action: { type: 'navigate', path: '/admin/songs', filters },
+        };
+      }
     }
-    
-    return corrected;
+
+    // Navigate to other tabs
+    if (/\b(singers?|artists?)\b/.test(lower) && /\b(go|open|show|take|navigate)\b/.test(lower)) {
+      log('Rule: navigate to singers');
+      return { reply: 'Opening Singers.', action: { type: 'navigate', path: '/admin/singers' } };
+    }
+    if (/\b(help)\b/.test(lower) && /\b(go|open|show|take)\b/.test(lower)) {
+      return { reply: 'Opening Help.', action: { type: 'navigate', path: '/help' } };
+    }
+    if (/\b(session)\b/.test(lower) && /\b(go|open|show|take)\b/.test(lower)) {
+      return { reply: 'Opening Session.', action: { type: 'navigate', path: '/session' } };
+    }
+    if (/\b(templates?)\b/.test(lower) && /\b(go|open|show|take)\b/.test(lower)) {
+      return { reply: 'Opening Templates.', action: { type: 'navigate', path: '/admin/templates' } };
+    }
+    if (/\b(centers?)\b/.test(lower) && /\b(go|open|show|take)\b/.test(lower)) {
+      return { reply: 'Opening Centers.', action: { type: 'navigate', path: '/admin/centers' } };
+    }
+    if (/\b(feedback)\b/.test(lower) && /\b(go|open|show|take)\b/.test(lower)) {
+      return { reply: 'Opening Feedback.', action: { type: 'navigate', path: '/admin/feedback' } };
+    }
+    if (/\bsongs?\b/.test(norm) && /\b(go|open|show|take)\b/.test(norm) && !hasFilterHint) {
+      return { reply: 'Opening Songs.', action: { type: 'navigate', path: '/admin/songs' } };
+    }
+    if (/\b(pitches?|scale|key)\b/.test(norm) && /\b(go|open|show|take)\b/.test(norm)) {
+      return { reply: 'Opening Pitches.', action: { type: 'navigate', path: '/admin/pitches' } };
+    }
+
+    // "Show me preview of bhajan/song X" -> preview of song X (norm has "song" for bhajan)
+    const previewOfBhajanMatch = norm.match(/\b(?:show\s+me\s+)?preview\s+of\s+song\s+(.+?)(?:\s*[.?]?\s*)$/);
+    if (previewOfBhajanMatch) {
+      const songName = previewOfBhajanMatch[1].trim();
+      if (songName) {
+        log('Rule: show_preview of bhajan/song', { songName });
+        return { reply: `Opening preview for "${songName}".`, action: { type: 'show_preview', songName } };
+      }
+    }
+
+    // Song-specific actions: preview, play, ref gents/ladies (extract song name from message)
+    const previewMatch = lower.match(/\b(?:preview|show)\s+(?:me\s+)?(?:the\s+)?(.+?)(?:\s+please)?$/);
+    const playMatch = lower.match(/\b(?:play)\s+(?:me\s+)?(?:the\s+)?(.+?)(?:\s+please)?$/);
+    const refGentsMatch = lower.match(/\b(?:ref\s*gents?|gents?\s*scale|men'?s?\s*scale)\s+(?:for\s+)?(.+?)(?:\s+please)?$/);
+    const refLadiesMatch = lower.match(/\b(?:ref\s*ladies|ladies'?\s*scale|women'?s?\s*scale)\s+(?:for\s+)?(.+?)(?:\s+please)?$/);
+    const songNameFrom = (m: RegExpMatchArray | null) => (m ? m[1].trim().replace(/\s+please\s*$/i, '') : null);
+    const songName = songNameFrom(previewMatch) || songNameFrom(playMatch) || songNameFrom(refGentsMatch) || songNameFrom(refLadiesMatch);
+    if (previewMatch && songName) {
+      log('Rule: show_preview', { songName });
+      return { reply: `Opening preview for "${songName}".`, action: { type: 'show_preview', songName } };
+    }
+    if (playMatch && songName) {
+      log('Rule: play_audio', { songName });
+      return { reply: `Playing "${songName}".`, action: { type: 'play_audio', songName } };
+    }
+    if (refGentsMatch && songName) {
+      log('Rule: show_ref_gents', { songName });
+      return { reply: `Showing gents scale for "${songName}".`, action: { type: 'show_ref_gents', songName } };
+    }
+    if (refLadiesMatch && songName) {
+      log('Rule: show_ref_ladies', { songName });
+      return { reply: `Showing ladies scale for "${songName}".`, action: { type: 'show_ref_ladies', songName } };
+    }
+
+    // Session actions
+    if (/\bclear\s+(?:the\s+)?session\b/.test(lower)) {
+      return { reply: 'Clearing the session.', action: { type: 'clear_session' } };
+    }
+    const addSessionMatch = lower.match(/\b(?:add)\s+(.+?)\s+to\s+(?:the\s+)?session\b/);
+    if (addSessionMatch) {
+      const name = addSessionMatch[1].trim();
+      return { reply: `Adding "${name}" to the session.`, action: { type: 'add_song_to_session', songName: name } };
+    }
+    const removeSessionMatch = lower.match(/\b(?:remove)\s+(.+?)\s+from\s+(?:the\s+)?session\b/);
+    if (removeSessionMatch) {
+      const name = removeSessionMatch[1].trim();
+      return { reply: `Removing "${name}" from the session.`, action: { type: 'remove_song_from_session', songName: name } };
+    }
+
+    log('No rule matched');
+    return {
+      reply: "I didn't catch that. Try: 'Show Shiva songs', 'Fast devi bhajans', 'Go to Songs', or 'Preview Om Ram'.",
+    };
   }
 
   async unload(): Promise<void> {
-    if (this.engine) {
-      // Clean up resources
-      this.engine = null;
-      this.isReady = false;
-      this.initPromise = null;
-    }
+    // No-op: rule-based only, no model to unload
   }
 }
 
@@ -641,5 +363,8 @@ export function getWebLLMService(): WebLLMService {
 export function checkWebGPUSupport(): boolean {
   return 'gpu' in navigator;
 }
+
+/** No-op: app uses rule-based parsing only, no model to preload. */
+export function preloadWebLLM(): void {}
 
 

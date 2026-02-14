@@ -9,6 +9,7 @@ import { LoadingSpinner } from '../common/LoadingSpinner';
 import { generateSessionPresentationSlides } from '../../utils/slideUtils';
 import ApiClient from '../../services/ApiClient';
 import templateService from '../../services/TemplateService';
+import { loadTemplateWithRetry } from '../../utils/templateRetry';
 import { getSelectedTemplateId, setSelectedTemplateId, clearSelectedTemplateId } from '../../utils/cacheUtils';
 import type { Slide, Song, PresentationTemplate } from '../../types';
 
@@ -40,6 +41,12 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const [songsData, setSongsData] = useState<Song[]>([]);
   const [contentScale, setContentScale] = useState(1.0);
 
+  // Set tab title to "Sai Songs - Live", restore to "Sai Songs" on exit
+  useEffect(() => {
+    document.title = 'Sai Songs - Live';
+    return () => { document.title = 'Sai Songs'; };
+  }, []);
+
   // Load template and songs data on mount (in parallel to avoid flicker)
   useEffect(() => {
     if (entries.length === 0) {
@@ -57,59 +64,47 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         const persistedTemplateId = getSelectedTemplateId();
         const templateId = persistedTemplateId;
         
-        // Load template and songs in parallel
-        const [template, fullSongs] = await Promise.all([
-          (async () => {
-            try {
-              if (templateId) {
-                const t = await templateService.getTemplate(templateId);
+        // Load template and songs in parallel (template has retry for transient 500s)
+        const loadTemplate = async () => {
+          try {
+            if (templateId) {
+              const t = await templateService.getTemplate(templateId);
+              if (t) {
                 setSelectedTemplateId(templateId);
                 return t;
-              } else {
-                // Always load default template if no template in localStorage
-                const t = await templateService.getDefaultTemplate();
-                if (t && t.id) {
-                  setSelectedTemplateId(t.id);
-                  setSelectedTemplateId(t.id); // Persist default template
-                }
+              }
+            } else {
+              const t = await templateService.getDefaultTemplate();
+              if (t?.id) {
+                setSelectedTemplateId(t.id);
                 return t;
               }
-            } catch (error) {
-              console.error('Error loading template:', error);
-              
-              // Only clear template ID if we're certain it's a 404 (not found) error
-              // For all other errors (network, 500, timeout, etc.), keep the template ID
-              // as the error may be temporary and the template may be valid
-              const isNotFoundError = error instanceof Error && (
-                error.message.includes('404') ||
-                error.message.includes('Not Found') ||
-                (error.message.includes('not found') && !error.message.includes('Failed to fetch'))
-              );
-              
-              // Only clear on confirmed 404 errors
-              if (isNotFoundError && templateId && templateId === persistedTemplateId) {
-                console.warn(`Template ${templateId} not found (404), clearing from localStorage and using default`);
-                clearSelectedTemplateId();
-              } else if (templateId && templateId === persistedTemplateId) {
-                // For all other errors, don't clear - just log and fall back temporarily
-                // The template ID is preserved so it can be retried later
-                console.warn(`Error loading template ${templateId}, falling back to default (error may be temporary, template ID preserved)`);
-              }
-              
-              // Fall back to default template
-              try {
-                const defaultTemplate = await templateService.getDefaultTemplate();
-                if (defaultTemplate && defaultTemplate.id) {
-                  setSelectedTemplateId(defaultTemplate.id);
-                  setSelectedTemplateId(defaultTemplate.id); // Persist default template
-                  return defaultTemplate;
-                }
-              } catch (e) {
-                console.error('Error loading default template:', e);
-              }
-              return null;
             }
-          })(),
+          } catch (error) {
+            console.error('Error loading template:', error);
+            const isNotFoundError = error instanceof Error && (
+              error.message.includes('404') ||
+              error.message.includes('Not Found') ||
+              (error.message.includes('not found') && !error.message.includes('Failed to fetch'))
+            );
+            if (isNotFoundError && templateId && templateId === persistedTemplateId) {
+              clearSelectedTemplateId();
+            }
+            try {
+              const defaultTemplate = await templateService.getDefaultTemplate();
+              if (defaultTemplate?.id) {
+                setSelectedTemplateId(defaultTemplate.id);
+                return defaultTemplate;
+              }
+            } catch (e) {
+              console.error('Error loading default template:', e);
+            }
+          }
+          return null;
+        };
+
+        const [template, fullSongs] = await Promise.all([
+          loadTemplateWithRetry(loadTemplate),
           (async () => {
             // Get songs from context cache first, but verify they have full details
             const songPromises = entries.map(async (entry) => {
@@ -135,13 +130,13 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
             setSelectedTemplateId(template.id);
           }
         } else {
-          // If no template loaded, try one more time to get default
+          // Template failed after retries - try once more with reset (server may have recovered)
           try {
+            ApiClient.resetBackoff();
             const defaultTemplate = await templateService.getDefaultTemplate();
-            if (defaultTemplate && defaultTemplate.id) {
+            if (defaultTemplate?.id) {
               setActiveTemplate(defaultTemplate);
               setSelectedTemplateId(defaultTemplate.id);
-              setSelectedTemplateId(defaultTemplate.id); // Persist default template
             }
           } catch (e) {
             console.error('Failed to load default template as fallback:', e);

@@ -294,8 +294,9 @@ describe('templateUtils', () => {
       };
 
       const styles = getElementStyles(element);
-      expect(styles.width).toBe('100px');
-      expect(styles.height).toBe('50px');
+      // Width/height are converted to % of slide (1920x1080 default) so preview scales correctly
+      expect(styles.width).toBe('5.208333333333334%'); // 100/1920*100
+      expect(styles.height).toBe('4.62962962962963%');  // 50/1080*100
       expect(styles.opacity).toBe(0.8);
       expect(styles.zIndex).toBe(5);
     });
@@ -336,6 +337,25 @@ describe('templateUtils', () => {
       const element = { y: '25%', width: '50px', height: '50px' };
       const styles = getElementStyles(element);
       expect(styles.top).toBe('25%');
+    });
+
+    it('should handle negative x position (number and px string) for scaling', () => {
+      const element = { x: -100, width: '50px', height: '50px' };
+      const styles = getElementStyles(element, 1920, 1080);
+      expect(styles.left).toBe('-5.208333333333334%'); // -100/1920 * 100
+    });
+
+    it('should handle negative y position for scaling', () => {
+      const element = { y: -50, width: '50px', height: '50px' };
+      const styles = getElementStyles(element, 1920, 1080);
+      expect(styles.top).toBe('-4.62962962962963%'); // -50/1080 * 100
+    });
+
+    it('should use percentage for zero x/y (not fall back to 0px)', () => {
+      const element = { x: 0, y: 0, width: '50px', height: '50px' };
+      const styles = getElementStyles(element, 1920, 1080);
+      expect(styles.left).toBe('0%');
+      expect(styles.top).toBe('0%');
     });
 
     it('should apply rotation for elements without predefined position', () => {

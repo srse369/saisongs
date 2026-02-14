@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseNaturalQuery,
+  stripStructuredKeywordsFromName,
   createSongFuzzySearch,
   createSingerFuzzySearch,
   smartSearchSongs,
@@ -148,7 +149,25 @@ describe('smartSearch', () => {
         const result = parseNaturalQuery('ram naam song');
         expect(result.general).toBe('ram naam');
       });
+
+      it('should not put tempo keywords like "slow" in general when used as filter', () => {
+        const result = parseNaturalQuery('show slow shiva bhajans');
+        expect(result.tempo).toBe('slow');
+        expect(result.deity).toBe('shiva');
+        expect(result.general).toBeUndefined();
+        if (result.general) expect(result.general).not.toContain('slow');
+      });
     });
+
+  describe('stripStructuredKeywordsFromName', () => {
+    it('should remove tempo words from name', () => {
+      expect(stripStructuredKeywordsFromName('slow shiva')).toBe('');
+      expect(stripStructuredKeywordsFromName('slow om namah')).toBe('om namah');
+    });
+    it('should remove deity and tempo so name is not duplicated', () => {
+      expect(stripStructuredKeywordsFromName('slow shiva bhajans')).toBe('');
+    });
+  });
 
     describe('combined queries', () => {
       it('should parse complex query with multiple filters', () => {

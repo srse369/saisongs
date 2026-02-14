@@ -6,6 +6,9 @@ import { generatePresentationSlides } from '../../utils/slideUtils';
 import type { Slide, Song, PresentationTemplate } from '../../types';
 import apiClient from '../../services/ApiClient';
 import templateService from '../../services/TemplateService';
+import songService from '../../services/SongService';
+import { normalizePitch } from '../../utils/pitchNormalization';
+import { loadTemplateWithRetry } from '../../utils/templateRetry';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSongs } from '../../contexts/SongContext';
 import { getSelectedTemplateId, setSelectedTemplateId, clearSelectedTemplateId } from '../../utils/cacheUtils';
@@ -94,55 +97,42 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
           return;
         }
         
-        // Load template and song in parallel
-        const [template, song] = await Promise.all([
-          (async () => {
-            try {
-              if (effectiveTemplateId) {
-                return await templateService.getTemplate(effectiveTemplateId);
-              } else {
-                return await templateService.getDefaultTemplate();
-              }
-            } catch (error) {
-              console.error('Error loading template:', error);
-              
-              // Only clear template ID if we're certain it's a 404 (not found) error
-              // For all other errors (network, 500, timeout, etc.), keep the template ID
-              // as the error may be temporary and the template may be valid
-              const isNotFoundError = error instanceof Error && (
-                error.message.includes('404') ||
-                error.message.includes('Not Found') ||
-                (error.message.includes('not found') && !error.message.includes('Failed to fetch'))
-              );
-              
-              // Only clear on confirmed 404 errors
-              if (isNotFoundError && effectiveTemplateId && effectiveTemplateId === currentPersistedTemplateId) {
-                console.warn(`Template ${effectiveTemplateId} not found (404), clearing from localStorage and using default`);
-                clearSelectedTemplateId();
-              } else if (effectiveTemplateId && effectiveTemplateId === currentPersistedTemplateId) {
-                // For all other errors, don't clear - just log and fall back temporarily
-                // The template ID is preserved so it can be retried later
-                console.warn(`Error loading template ${effectiveTemplateId}, falling back to default (error may be temporary, template ID preserved)`);
-              }
-              
-              // Fall back to default template
-              try {
-                return await templateService.getDefaultTemplate();
-              } catch (e) {
-                console.error('Error loading default template:', e);
-                return null;
-              }
+        // Load template and song in parallel (template has retry for transient 500s)
+        const loadTemplate = async (): Promise<PresentationTemplate | null> => {
+          try {
+            if (effectiveTemplateId) {
+              return await templateService.getTemplate(effectiveTemplateId);
             }
-          })(),
+            return await templateService.getDefaultTemplate();
+          } catch (error) {
+            console.error('Error loading template:', error);
+            const isNotFoundError = error instanceof Error && (
+              error.message.includes('404') ||
+              error.message.includes('Not Found') ||
+              (error.message.includes('not found') && !error.message.includes('Failed to fetch'))
+            );
+            if (isNotFoundError && effectiveTemplateId && effectiveTemplateId === currentPersistedTemplateId) {
+              clearSelectedTemplateId();
+            }
+            try {
+              return await templateService.getDefaultTemplate();
+            } catch (e) {
+              console.error('Error loading default template:', e);
+              return null;
+            }
+          }
+        };
+
+        const [template, song] = await Promise.all([
+          loadTemplateWithRetry(loadTemplate),
           (async () => {
-            // Try to get from context cache, but verify it has full details
+            // Try in-memory context first (same tab)
             const cachedSong = songs.find(s => s.id === songId);
-            // Check if cached song has full details (lyrics are loaded)
-            if (cachedSong && cachedSong.lyrics !== null && cachedSong.lyrics !== undefined) {
+            if (cachedSong && cachedSong.lyrics != null && cachedSong.lyrics !== undefined) {
               return cachedSong;
             }
-            // Fetch from API to get full details
-            return apiClient.getSong(songId) as Promise<Song | null>;
+            // Use SongService (checks localStorage cache, then API)
+            return songService.getSongById(songId);
           })()
         ]);
 
@@ -159,15 +149,14 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
             setSelectedTemplateIdState(template.id);
           }
         } else {
-          // If template failed to load, try to get default as fallback
+          // Template failed after retries - try once more with reset (server may have recovered)
           try {
+            apiClient.resetBackoff();
             const defaultTemplate = await templateService.getDefaultTemplate();
-            if (defaultTemplate && defaultTemplate.id) {
+            if (defaultTemplate?.id) {
               setActiveTemplate(defaultTemplate);
               setSelectedTemplateIdState(defaultTemplate.id);
-              // Persist default template if not already persisted
-              const currentPersisted = getSelectedTemplateId();
-              if (!currentPersisted) {
+              if (!getSelectedTemplateId()) {
                 setSelectedTemplateId(defaultTemplate.id);
               }
             }
@@ -185,6 +174,15 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     loadData();
   }, [songId, selectedTemplateId]);
 
+  // Set window title to include song name when loaded
+  useEffect(() => {
+    if (songData?.name) {
+      const prev = document.title;
+      document.title = `Sai Songs - ${songData.name}`;
+      return () => { document.title = prev; };
+    }
+  }, [songData?.name]);
+
   // Generate slides when song or template changes (after initial load)
   useEffect(() => {
     if (!songData || !activeTemplate) {
@@ -198,17 +196,19 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     let displaySingerName = singerName;
     
     // If no singer pitch is provided, use reference pitches from the song
+    // Normalize first (e.g. "2 Pancham / D" → "D") so SlideView's formatPitch works
     if (!pitch) {
-      // If both reference pitches exist, show both
-      if (songData.refGents && songData.refLadies) {
+      const gents = songData.refGents ? (normalizePitch(songData.refGents) || songData.refGents) : null;
+      const ladies = songData.refLadies ? (normalizePitch(songData.refLadies) || songData.refLadies) : null;
+      if (gents && ladies) {
         displaySingerName = 'Gents/Ladies';
-        displayPitch = `${songData.refGents} / ${songData.refLadies}`;
-      } else if (songData.refGents) {
+        displayPitch = `${gents} / ${ladies}`;
+      } else if (gents) {
         displaySingerName = 'Gents';
-        displayPitch = songData.refGents;
-      } else if (songData.refLadies) {
+        displayPitch = gents;
+      } else if (ladies) {
         displaySingerName = 'Ladies';
-        displayPitch = songData.refLadies;
+        displayPitch = ladies;
       }
     }
 

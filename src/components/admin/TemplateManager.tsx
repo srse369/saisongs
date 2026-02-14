@@ -351,6 +351,14 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Set tab title when template preview is open, restore to "Sai Songs" on close
+  useEffect(() => {
+    if (previewTemplate) {
+      document.title = 'Sai Songs - Template Preview';
+      return () => { document.title = 'Sai Songs'; };
+    }
+  }, [previewTemplate]);
+
   // Get slides array from preview template (for multi-slide preview)
   const previewSlides = useMemo(() => {
     if (!previewTemplate) return [];
@@ -501,7 +509,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
     };
     setEditingTemplate(newTemplate);
     setOriginalTemplate(null); // New template has no original
-    setCenterIds([]); // Reset center IDs
+    setCenterIds(isAdmin ? [] : (editorFor || [])); // Editors default to their centers (min 1)
     setYamlContent('');
     setValidationError('');
     setShowForm(true);
@@ -550,7 +558,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
       // Set it as the editing template
       setEditingTemplate(importedTemplate);
       setOriginalTemplate(null); // Imported template has no original
-      setCenterIds([]);
+      setCenterIds(isAdmin ? [] : (editorFor || [])); // Editors default to their centers (min 1)
       setYamlContent('');
       setValidationError('');
       setShowForm(true);
@@ -620,7 +628,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
 
     setEditingTemplate(templateWithDefaults);
     setOriginalTemplate(clonedTemplate);
-    setCenterIds(template.centerIds || []); // Load existing center IDs
+    setCenterIds(template.centerIds || []);
     setYamlContent(template.yaml || '');
     setValidationError('');
     setShowForm(true);
@@ -706,6 +714,12 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
     try {
       setValidationError('');
 
+      // Editors must assign at least one center (cannot create or save as public)
+      if (!isAdmin && (!centerIds || centerIds.length === 0)) {
+        setValidationError('Please assign this template to at least one center. Public templates are only for admins.');
+        return;
+      }
+
       // Ensure reference slide has song content styles with defaults
       const aspectRatio: AspectRatio = editingTemplate.aspectRatio || '16:9';
       const referenceIndex = editingTemplate.referenceSlideIndex ?? 0;
@@ -771,7 +785,8 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
       }
     } catch (error) {
       console.error('Error saving template:', error);
-      setValidationError('Failed to save template');
+      const message = error instanceof Error ? error.message : 'Failed to save template';
+      setValidationError(message);
     }
   };
 
@@ -1004,7 +1019,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                             📑 {template.slides?.length || 1} slide{(template.slides?.length || 1) !== 1 ? 's' : ''} (ref: {(template.referenceSlideIndex ?? 0) + 1})
                           </span>
                           {/* Center badges - show actual centers for all users */}
-                          <CenterBadges centerIds={template.centerIds || []} />
+                          <CenterBadges centerIds={template.centerIds || []} publicLabel="Public" />
                         </div>
                       </div>
 
@@ -1144,6 +1159,10 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                 template={editingTemplate}
                 onTemplateChange={setEditingTemplate}
                 onSlideIndexChange={setEditorSelectedSlideIndex}
+                onPreview={() => {
+                  setPreviewSlideIndex(editorSelectedSlideIndex);
+                  setPreviewTemplate(editingTemplate);
+                }}
                 onSwitchToYaml={(slideIndex) => {
                   // Sync visual changes to YAML before switching
                   // Apply default song content styles to the reference slide if needed
@@ -1327,41 +1346,27 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
               selectedCenterIds={centerIds}
               onChange={setCenterIds}
               editableOnly={!isAdmin}
-              label={isAdmin ? "Optional - leave empty for all centers" : "Select from your editor centers"}
+              readOnlyCenterIds={!isAdmin && centerIds.length === 1 ? centerIds : []}
+              label={isAdmin ? "Optional - leave empty for all centers" : "Select at least one center (from your editor centers)"}
             />
           </div>
 
-          <div className="flex gap-2 justify-between pt-2">
+          <div className="flex gap-2 justify-end pt-2">
             <button
-              onClick={() => {
-                if (editingTemplate) {
-                  setPreviewSlideIndex(editorSelectedSlideIndex);
-                  setPreviewTemplate(editingTemplate);
-                }
-              }}
-              title="Preview how this template will look with sample content"
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+              onClick={handleFormCancel}
+              title="Discard changes and close the editor"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             >
-              <i className="fas fa-eye text-base"></i>
-              Preview
+              Cancel
             </button>
-            <div className="flex gap-2">
-              <button
-                onClick={handleFormCancel}
-                title="Discard changes and close the editor"
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleFormSubmit}
-                disabled={loading}
-                title={editingTemplate?.id ? "Save changes to this template" : "Create a new template with these settings"}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {editingTemplate?.id ? 'Update Template' : 'Create Template'}
-              </button>
-            </div>
+            <button
+              onClick={handleFormSubmit}
+              disabled={loading}
+              title={editingTemplate?.id ? "Save changes to this template" : "Create a new template with these settings"}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {editingTemplate?.id ? 'Update Template' : 'Create Template'}
+            </button>
           </div>
         </div>
       </Modal>
@@ -1434,7 +1439,8 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
               selectedCenterIds={centerIds}
               onChange={setCenterIds}
               editableOnly={!isAdmin}
-              label={isAdmin ? "Centers (leave empty for global template)" : "Centers (pre-selected with your editor centers)"}
+              readOnlyCenterIds={!isAdmin && centerIds.length === 1 ? centerIds : []}
+              label={isAdmin ? "Centers (leave empty for global template)" : "Select at least one center (from your editor centers)"}
             />
           </div>
           <div className="flex justify-end space-x-3">

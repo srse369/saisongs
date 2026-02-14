@@ -122,7 +122,7 @@ class TemplateBackendService {
   /**
    * Map template JSON to PresentationTemplate
    */
-  mapTemplateJson(id: string, name: string, description: string, isDefault: boolean, centerIds: [], templateJson: any, createdAt: Date, createdBy: string, updatedAt: Date, updatedBy: string): PresentationTemplate {
+  mapTemplateJson(id: string, name: string, description: string, isDefault: boolean, centerIds: number[], templateJson: any, createdAt: Date, createdBy: string, updatedAt: Date, updatedBy: string): PresentationTemplate {
     const template: PresentationTemplate = {
       id: id,
       name: name,
@@ -166,10 +166,21 @@ class TemplateBackendService {
 
   /**
    * Map template row to PresentationTemplate
+   * Handles both uppercase and lowercase column names (Oracle may return either).
    */
   mapTemplateRow(row: any): PresentationTemplate {
-    // Center Ids
-    const centerIds: [] = typeof row.CENTER_IDS === 'string' ? JSON.parse(row.CENTER_IDS) : row.CENTER_IDS || [];
+    const rawCenterIds = row.CENTER_IDS ?? row.center_ids;
+    let centerIds: number[] = [];
+    if (rawCenterIds != null && rawCenterIds !== '') {
+      try {
+        const parsed = typeof rawCenterIds === 'string' ? JSON.parse(rawCenterIds) : rawCenterIds;
+        centerIds = Array.isArray(parsed)
+          ? parsed.map((id: number | string) => Number(id)).filter((n: number) => !Number.isNaN(n))
+          : [];
+      } catch (e) {
+        console.error('Error parsing template center_ids:', e);
+      }
+    }
 
     // Template JSON
     let templateJson: any = {};
@@ -259,14 +270,16 @@ class TemplateBackendService {
    */
   async createTemplate(template: PresentationTemplate): Promise<PresentationTemplate> {
     try {
-      const id = template.id || randomUUID();
+      // Always generate a new id on the server to avoid unique constraint violations
+      // (e.g. client sending same id on retry or duplicate submit)
+      const id = randomUUID();
 
       // If this is set as default, unset other defaults
       if (template.isDefault) {
         await databaseWriteService.unsetAllDefaultTemplates(template.createdBy || '');
       }
 
-      const row = await databaseWriteService.createTemplate(
+      await databaseWriteService.createTemplate(
         id,
         template.name,
         template.description || null,
@@ -276,8 +289,18 @@ class TemplateBackendService {
         template.createdBy || ''
       );
 
-      return this.mapTemplateRow(row);
+      const created = await this.getTemplate(id);
+      if (!created) throw new Error('Template not found after create');
+      return created;
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('ORA-00001') || message.includes('unique constraint')) {
+        // Template was likely created by a prior request (e.g. double submit). Return existing.
+        const all = await this.getAllTemplates();
+        const existing = all.find(t => t.name === template.name);
+        if (existing) return existing;
+        throw new Error('A template with this name already exists. Please use a different name.');
+      }
       console.error('Error creating template:', error);
       throw error;
     }

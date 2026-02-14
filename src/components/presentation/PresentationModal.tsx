@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, f
 import { SlideView } from './SlideView';
 import { getSlideBackgroundStyles, SlideBackground, SlideImages, SlideVideos, SlideAudios, SlideText } from '../../utils/templateUtils';
 import type { Slide, TemplateSlide, PresentationTemplate } from '../../types';
+import { getSlideDimensionsForPreview } from '../../types';
 
 interface PresentationModalProps {
   isOpen: boolean;
@@ -145,8 +146,7 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
   }, [currentSlideIndex, resetNavButtonTimeout]);
 
   const aspectRatio = template?.aspectRatio || '16:9';
-  const slideWidth = aspectRatio === '4:3' ? 1600 : 1920;
-  const slideHeight = aspectRatio === '4:3' ? 1200 : 1080;
+  const { width: slideWidth, height: slideHeight } = getSlideDimensionsForPreview(template);
 
   // Calculate scale
   useEffect(() => {

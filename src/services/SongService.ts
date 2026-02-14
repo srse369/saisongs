@@ -1,4 +1,6 @@
 import apiClient from './ApiClient';
+import { CACHE_KEYS, getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
+import { normalizePitch } from '../utils/pitchNormalization';
 import type {
   Song,
   CreateSongInput,
@@ -9,6 +11,16 @@ import {
   DatabaseError,
   ErrorCode,
 } from '../types';
+
+const SONG_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+/** Normalize reference pitch (e.g. "2 Pancham / D" → "D"); keep raw if unrecognized */
+function normalizeRefPitch(value: string | null | undefined): string | null {
+  if (!value || !value.trim()) return null;
+  const trimmed = value.trim();
+  const normalized = normalizePitch(trimmed);
+  return normalized ?? trimmed;
+}
 
 /**
  * SongService handles all CRUD operations for songs via API
@@ -65,11 +77,46 @@ class SongService {
   }
 
   /**
-   * Retrieves a single song by ID
+   * Retrieves a single song by ID (uses localStorage cache first to avoid backend fetch in new tabs)
    */
   async getSongById(id: string, nocache: boolean = false): Promise<Song | null> {
+    if (!nocache && typeof window !== 'undefined') {
+      // 1. Try individual song cache
+      const songKey = `${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`;
+      const cachedRaw = getLocalStorageItem(songKey);
+      if (cachedRaw) {
+        try {
+          const { timestamp, song } = JSON.parse(cachedRaw) as { timestamp: number; song: Song };
+          if (song && Date.now() - timestamp < SONG_CACHE_TTL_MS) {
+            return song;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+      // 2. Try songs list cache (populated when user visited Songs tab)
+      const listRaw = getLocalStorageItem(CACHE_KEYS.SAI_SONGS_SONGS);
+      if (listRaw) {
+        try {
+          const { timestamp, songs } = JSON.parse(listRaw) as { timestamp: number; songs: Song[] };
+          if (Array.isArray(songs) && Date.now() - timestamp < SONG_CACHE_TTL_MS) {
+            const found = songs.find((s) => s.id === id);
+            if (found && found.lyrics != null && found.lyrics !== undefined) {
+              return found;
+            }
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
     try {
-      return await apiClient.getSong(id, nocache);
+      const song = await apiClient.getSong(id, nocache);
+      if (song && typeof window !== 'undefined') {
+        const songKey = `${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`;
+        setLocalStorageItem(songKey, JSON.stringify({ timestamp: Date.now(), song }));
+      }
+      return song;
     } catch (error) {
       console.error('Error fetching song by ID:', error);
       if (error instanceof Error && error.message.includes('404')) {
@@ -105,8 +152,8 @@ class SongService {
         audioLink: input.audioLink || null,
         videoLink: input.videoLink || null,
         goldenVoice: input.goldenVoice,
-        refGents: input.refGents || null,
-        refLadies: input.refLadies || null,
+        refGents: normalizeRefPitch(input.refGents) || null,
+        refLadies: normalizeRefPitch(input.refLadies) || null,
       });
     } catch (error) {
       console.error('Error creating song:', error);
@@ -140,8 +187,8 @@ class SongService {
         audioLink: input.audioLink,
         videoLink: input.videoLink,
         goldenVoice: input.goldenVoice,
-        refGents: input.refGents,
-        refLadies: input.refLadies,
+        refGents: input.refGents != null ? normalizeRefPitch(input.refGents) : undefined,
+        refLadies: input.refLadies != null ? normalizeRefPitch(input.refLadies) : undefined,
       };
       await apiClient.updateSong(id, updateData);
       // Use nocache=true to ensure we get fresh data after the update
@@ -162,6 +209,9 @@ class SongService {
   async deleteSong(id: string): Promise<boolean> {
     try {
       await apiClient.deleteSong(id);
+      if (typeof window !== 'undefined') {
+        removeLocalStorageItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`);
+      }
       return true;
     } catch (error) {
       console.error('Error deleting song:', error);

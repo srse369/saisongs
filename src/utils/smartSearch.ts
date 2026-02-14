@@ -15,13 +15,20 @@ export interface ParsedQuery {
 }
 
 // Common keywords and their mappings
-const DEITY_KEYWORDS = ['sai', 'devi', 'krishna', 'rama', 'shiva', 'ganesh', 'hanuman', 'durga', 'lakshmi', 'saraswati'];
-const LANGUAGE_KEYWORDS = ['sanskrit', 'hindi', 'telugu', 'tamil', 'kannada', 'malayalam', 'bengali', 'marathi'];
-const TEMPO_KEYWORDS = ['slow', 'medium', 'fast', 'quick', 'slow-medium', 'medium-fast'];
-const LEVEL_KEYWORDS = ['simple', 'easy', 'basic', 'intermediate', 'advanced', 'difficult', 'hard'];
-const PITCH_KEYWORDS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const DEITY_KEYWORDS = ['allah', 'anjaneya', 'ayyappa', 'buddha', 'devi', 'durga', 'ganesha', 'guru', 'hanuman', 'krishna', 'lakshmi', 'narayana', 'narasimha', 'rama', 'sai', 'sarva dharma', 'saraswati', 'shiva', 'surya', 'vittala'];
+const LANGUAGE_KEYWORDS = ['arabic', 'bengali', 'chinese', 'dutch', 'french', 'german', 'greek', 'hebrew', 'hindi', 'italian', 'japanese', 'kannada', 'korean', 'latin', 'malayalam', 'marathi', 'multi-lingual', 'portuguese', 'punjabi', 'russian', 'sanskrit', 'spanish', 'tamil', 'telugu', 'turkish', 'urdu', 'zulu'];
+const TEMPO_KEYWORDS = ['fast', 'fast medium', 'medium', 'medium fast', 'medium slow', 'slow', 'slow medium'];
+const LEVEL_KEYWORDS = ['advanced', 'basic', 'difficult', 'easy', 'hard', 'intermediate', 'simple'];
+const PITCH_KEYWORDS = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A minor', 'A# minor', 'B minor', 'C minor', 'C# minor', 'D minor', 'D# minor', 'E minor', 'F minor', 'F# minor', 'G minor', 'G# minor', 'A major', 'A# major', 'B major', 'C major', 'C# major', 'D major', 'D# major', 'E major', 'F major', 'F# major', 'G major', 'G# major'];
 
 // Synonyms for better matching
+const DEITY_SYNONYMS: Record<string, string[]> = {
+  'devi': ['devi', 'durga', 'lakshmi', 'saraswati'],
+  'hanuman': ['anjaneya', 'hanuman', 'maruti'],
+  'sarva dharma': ['multi faith', 'sarva dharma', 'sarva dharm'],
+  'ganesha': ['ganesh', 'ganesha', 'lambodara', 'vighneshwara', 'vinayaka'],
+};
+
 const TEMPO_SYNONYMS: Record<string, string[]> = {
   'slow': ['slow', 'slower', 'slowly'],
   'medium': ['medium', 'moderate', 'normal'],
@@ -33,6 +40,70 @@ const LEVEL_SYNONYMS: Record<string, string[]> = {
   'intermediate': ['intermediate', 'medium'],
   'advanced': ['advanced', 'difficult', 'hard', 'complex'],
 };
+
+const PITCH_SYNONYMS: Record<string, string[]> = {
+  'C': ['1'],
+  'C major': ['1M', 'CM', 'C major'],
+  'C minor': ['1m', 'Cm', 'C minor'],
+  'C#': ['1.5'],
+  'C# major': ['1.5M', 'C#M', 'C# major'],
+  'C# minor': ['1.5m', 'C#m', 'C# minor'],
+  'D': ['2'],
+  'D major': ['2M', 'DM', 'D major'],
+  'D minor': ['2m', 'Dm', 'D minor'],
+  'D#': ['2.5'],
+  'D# major': ['2.5M', 'D#M', 'D# major'],
+  'D# minor': ['2.5m', 'D#m', 'D# minor'],
+  'E': ['3'],
+  'E major': ['3M', 'EM', 'E major'],
+  'E minor': ['3m', 'Em', 'E minor'],
+  'F': ['4'],
+  'F major': ['4M', 'FM', 'F major'],
+  'F minor': ['4m', 'Fm', 'F minor'],
+  'F#': ['4.5'],
+  'F# major': ['4.5M', 'F#M', 'F# major'],
+  'F# minor': ['4.5m', 'F#m', 'F# minor'],
+  'G': ['5'],
+  'G major': ['5M', 'GM', 'G major'],
+  'G minor': ['5m', 'Gm', 'G minor'],
+  'G#': ['5.5'],
+  'G# major': ['5.5M', 'G#M', 'G# major'],
+  'G# minor': ['5.5m', 'G#m', 'G# minor'],
+  'A': ['6'],
+  'A major': ['6M', 'AM', 'A major'],
+  'A minor': ['6m', 'Am', 'A minor'],
+  'A#': ['6.5'],
+  'A# major': ['6.5M', 'A#M', 'A# major'],
+  'A# minor': ['6.5m', 'A#m', 'A# minor'],
+  'B': ['7'],
+  'B major': ['7M', 'BM', 'B major'],
+  'B minor': ['7m', 'Bm', 'B minor']
+};
+
+/** Set of words that are structured filter keywords (tempo, level, deity, language) or noise — never use in name/general search. */
+const STRUCTURED_KEYWORD_WORDS = new Set([
+  ...DEITY_KEYWORDS.flatMap(w => w.split(/\s+/)),
+  ...Object.values(DEITY_SYNONYMS).flat().flatMap(w => w.split(/\s+/)),
+  ...LANGUAGE_KEYWORDS.flatMap(w => w.split(/\s+/)),
+  ...TEMPO_KEYWORDS.flatMap(t => t.split(/\s+/)),
+  ...Object.values(TEMPO_SYNONYMS).flat(),
+  ...LEVEL_KEYWORDS,
+  ...Object.values(LEVEL_SYNONYMS).flat(),
+  'bhajan', 'bhajans', 'songs', 'song', 'show', 'display', 'list',
+].map(w => w.toLowerCase()));
+
+/**
+ * Remove tempo, deity, language, level keywords from a name string (e.g. LLM-returned "name" filter).
+ * Use when the same word is mapped to both name and a structured filter (e.g. "slow shiva" -> name should not contain "slow").
+ */
+export function stripStructuredKeywordsFromName(name: string): string {
+  if (!name || typeof name !== 'string') return '';
+  const words = name.trim().split(/\s+/).filter(w => {
+    const lower = w.toLowerCase();
+    return !STRUCTURED_KEYWORD_WORDS.has(lower);
+  });
+  return words.join(' ').trim();
+}
 
 /**
  * Parse a natural language query into structured filters
@@ -46,11 +117,21 @@ export function parseNaturalQuery(query: string): ParsedQuery {
   const lowerQuery = query.toLowerCase();
   const words = lowerQuery.split(/\s+/);
 
-  // Check for deity
-  for (const deity of DEITY_KEYWORDS) {
-    if (lowerQuery.includes(deity)) {
+  // Check for deity (with synonyms)
+  for (const [deity, synonyms] of Object.entries(DEITY_SYNONYMS)) {
+    if (synonyms.some(syn => lowerQuery.includes(syn))) {
       parsed.deity = deity;
       break;
+    }
+  }
+
+  // Check for deity
+  if (!parsed.deity) {
+    for (const deity of DEITY_KEYWORDS) {
+      if (lowerQuery.includes(deity)) {
+        parsed.deity = deity;
+        break;
+      }
     }
   }
 
@@ -79,15 +160,23 @@ export function parseNaturalQuery(query: string): ParsedQuery {
   }
 
   // Check for pitch (case-sensitive match)
-  for (const pitch of PITCH_KEYWORDS) {
-    const pitchRegex = new RegExp(`\\b${pitch.replace('#', '\\#')}\\b`, 'i');
-    if (pitchRegex.test(query)) {
+  for (const [pitch, synonyms] of Object.entries(PITCH_SYNONYMS)) {
+    if (synonyms.some(syn => lowerQuery.includes(syn))) {
       parsed.pitch = pitch;
       break;
     }
   }
 
-  // Extract any remaining words as general search
+  // Words that must never appear in general (song name) search - only in structured filters
+  const stoplist = new Set([
+    'in', 'the', 'a', 'an', 'of', 'for', 'with', 'by', 'songs', 'song', 'bhajan', 'bhajans',
+    'pitch', 'tempo', 'level', 'language', 'deity', 'raga', 'singer', 'show', 'display', 'list',
+    ...TEMPO_KEYWORDS.flatMap(t => t.split(/\s+/)),
+    ...Object.values(TEMPO_SYNONYMS).flat(),
+    ...LEVEL_KEYWORDS,
+    ...Object.values(LEVEL_SYNONYMS).flat(),
+  ].map(w => w.toLowerCase()));
+
   const extractedKeywords = [
     parsed.deity,
     parsed.language,
@@ -97,9 +186,11 @@ export function parseNaturalQuery(query: string): ParsedQuery {
   ].filter(Boolean);
 
   const remainingWords = words.filter(word => {
-    return !extractedKeywords.some(keyword => 
-      keyword && word.includes(keyword.toLowerCase())
-    ) && !['in', 'the', 'a', 'an', 'of', 'for', 'with', 'by', 'songs', 'song', 'pitch'].includes(word);
+    const lower = word.toLowerCase();
+    if (stoplist.has(lower)) return false;
+    // Exclude if word equals or is contained in an extracted keyword (e.g. "slow" when tempo is "slow")
+    if (extractedKeywords.some(keyword => keyword && (lower === keyword.toLowerCase() || lower.includes(keyword.toLowerCase())))) return false;
+    return true;
   });
 
   if (remainingWords.length > 0) {
@@ -125,7 +216,7 @@ export function createSongFuzzySearch(songs: Song[]) {
     ],
     threshold: 0.4, // 0 = exact match, 1 = match anything
     includeScore: true,
-    minMatchCharLength: 2,
+    minMatchCharLength: 3,
     ignoreLocation: true,
   });
 }
@@ -160,17 +251,17 @@ export function smartSearchSongs(
 
   // Apply structured filters first
   if (parsed.deity) {
-    results = results.filter(s => 
+    results = results.filter(s =>
       s.deity?.toLowerCase().includes(parsed.deity!)
     );
   }
   if (parsed.language) {
-    results = results.filter(s => 
+    results = results.filter(s =>
       s.language?.toLowerCase().includes(parsed.language!)
     );
   }
   if (parsed.raga) {
-    results = results.filter(s => 
+    results = results.filter(s =>
       s.raga?.toLowerCase().includes(parsed.raga!)
     );
   }
@@ -183,7 +274,7 @@ export function smartSearchSongs(
     });
   }
   if (parsed.level) {
-    results = results.filter(s => 
+    results = results.filter(s =>
       s.level?.toLowerCase().includes(parsed.level!)
     );
   }
@@ -193,7 +284,7 @@ export function smartSearchSongs(
     const fuzzyResults = fuzzySearch.search(parsed.general);
     const fuzzyIds = new Set(fuzzyResults.map(r => r.item.id));
     results = results.filter(s => fuzzyIds.has(s.id));
-    
+
     // Sort results: prioritize songs that start with the search term
     const lowerQuery = parsed.general.toLowerCase();
     results = results.sort((a, b) => {
@@ -201,11 +292,11 @@ export function smartSearchSongs(
       const bName = b.name.toLowerCase();
       const aStartsWith = aName.startsWith(lowerQuery);
       const bStartsWith = bName.startsWith(lowerQuery);
-      
+
       // Prefix matches come first
       if (aStartsWith && !bStartsWith) return -1;
       if (!aStartsWith && bStartsWith) return 1;
-      
+
       // If both start with query or neither does, sort alphabetically
       return aName.localeCompare(bName);
     });
@@ -278,15 +369,15 @@ export function generateSearchSuggestions(
  */
 export function highlightMatches(text: string, query: string): string {
   if (!query.trim()) return text;
-  
+
   const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
   let highlighted = text;
-  
+
   words.forEach(word => {
     const regex = new RegExp(`(${word})`, 'gi');
     highlighted = highlighted.replace(regex, '<mark>$1</mark>');
   });
-  
+
   return highlighted;
 }
 

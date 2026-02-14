@@ -196,27 +196,37 @@ export const CenterMultiSelect: React.FC<CenterMultiSelectProps> = ({
                 No centers available
               </div>
             ) : (
-              centers.map(center => (
-                <button
-                  key={center.id}
-                  type="button"
-                  onClick={() => toggleCenter(center.id)}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedCenterIds.includes(center.id)}
-                    onChange={() => {}}
-                    className="rounded text-blue-600 focus:ring-blue-500"
-                  />
-                  <span
-                    className="text-sm font-medium"
-                    style={{ color: center.badgeTextColor }}
+              centers.map(center => {
+                const isReadOnly = readOnlyCenterIds.includes(center.id) && selectedCenterIds.includes(center.id);
+                return (
+                  <button
+                    key={center.id}
+                    type="button"
+                    onClick={() => toggleCenter(center.id)}
+                    disabled={isReadOnly}
+                    className={`w-full px-4 py-2 text-left flex items-center gap-2 ${
+                      isReadOnly ? 'opacity-70 cursor-default' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                    title={isReadOnly ? 'Cannot remove – required for your role' : ''}
                   >
-                    {center.name}
-                  </span>
-                </button>
-              ))
+                    <input
+                      type="checkbox"
+                      checked={selectedCenterIds.includes(center.id)}
+                      readOnly
+                      className="rounded text-blue-600 focus:ring-blue-500"
+                    />
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: center.badgeTextColor }}
+                    >
+                      {center.name}
+                    </span>
+                    {isReadOnly && (
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">(required)</span>
+                    )}
+                  </button>
+                );
+              })
             )}
           </div>
         </>
