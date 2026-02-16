@@ -136,12 +136,12 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                 <SongMetadataCard
                   song={song}
                   onNameClick={isMobile ? undefined : () => handlePresent(song)}
-                  nameClickTitle={isMobile ? undefined : "Click to preview"}
                   showBackground={!isMobile}
                   pitchCount={song.pitchCount}
                   isSelected={isSelected}
                   onPreviewClick={() => handlePresent(song)}
                   isAuthenticated={isAuthenticated}
+                  lyricsHover={{ songId: song.id, songName: song.name, song }}
                 />
 
                 {/* Audio Player - Hidden on mobile until row is selected */}

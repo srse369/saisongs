@@ -377,6 +377,7 @@ export interface Slide {
   translation?: string;
   songName: string;
   singerName?: string;
+  singerGender?: string;
   pitch?: string;
   /** 1-based position of this slide within its song, when the song spans multiple slides */
   songSlideNumber?: number;

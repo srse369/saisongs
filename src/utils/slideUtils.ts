@@ -269,17 +269,18 @@ export function generatePresentationSlides(
  * @returns Array of slides for the complete session presentation
  */
 export function generateSessionPresentationSlides(
-  songs: Array<{ song: Song; singerName?: string; pitch?: string }>,
+  songs: Array<{ song: Song; singerName?: string; singerGender?: string; pitch?: string }>,
   template: PresentationTemplate | null
 ): Slide[] {
   const result: Slide[] = [];
 
   // If no multi-slide template, just concatenate song slides
   if (!template || !isMultiSlideTemplate(template)) {
-    songs.forEach(({ song, singerName, pitch }, songIndex) => {
+    songs.forEach(({ song, singerName, singerGender, pitch }, songIndex) => {
       const songSlides = generateSlides(song).map((slide) => ({
         ...slide,
         singerName,
+        singerGender,
         pitch,
         slideType: 'song' as const,
       }));
@@ -301,7 +302,7 @@ export function generateSessionPresentationSlides(
   const templateSlides = template.slides!;
   const refIndex = template.referenceSlideIndex ?? 0;
 
-  songs.forEach(({ song, singerName, pitch }, songIndex) => {
+  songs.forEach(({ song, singerName, singerGender, pitch }, songIndex) => {
     const isFirstSong = songIndex === 0;
     const isLastSong = songIndex === songs.length - 1;
 
@@ -325,6 +326,7 @@ export function generateSessionPresentationSlides(
     const songSlides = generateSlides(song).map((slide) => ({
       ...slide,
       singerName,
+      singerGender,
       pitch,
       slideType: 'song' as const,
       templateSlide: templateSlides[refIndex], // Set reference slide for proper rendering

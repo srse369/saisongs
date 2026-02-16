@@ -1,6 +1,8 @@
 import React from 'react';
 import { formatNormalizedPitch } from '../../utils/pitchNormalization';
 import { toTitleCase } from '../../utils/textUtils';
+import { LyricsHoverPopup } from './LyricsHoverPopup';
+import type { Song } from '../../types';
 
 export interface SongMetadata {
   name: string;
@@ -24,6 +26,8 @@ interface SongMetadataCardProps {
   alwaysShowDeityLanguage?: boolean;
   onPreviewClick?: () => void;
   isAuthenticated?: boolean; // Hide pitch count on mobile when not authenticated
+  /** When provided, song name shows lyrics popup on 3s hover */
+  lyricsHover?: { songId: string; songName: string; song?: Song | null };
 }
 
 /**
@@ -33,13 +37,14 @@ interface SongMetadataCardProps {
 export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
   song,
   onNameClick,
-  nameClickTitle = 'Click to preview',
+  nameClickTitle,
   showBackground = true,
   pitchCount,
   isSelected = false,
   alwaysShowDeityLanguage = false,
   onPreviewClick,
   isAuthenticated = true, // Default to true for backward compatibility
+  lyricsHover,
 }) => {
   const hasReferencePitches = song.refGents || song.refLadies;
 
@@ -50,12 +55,34 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
     <div className={`${shouldShowBackground ? 'bg-slate-100/80 dark:bg-gray-900/60 px-[5px] pb-[5px]' : ''} md:px-2 md:pt-1 md:pb-1 md:mb-1.5 ${shouldShowBackground ? 'rounded-lg' : ''}`}>
       {/* Song Name with External Link and Info Button */}
       <div className="flex items-center gap-2">
-        {onNameClick ? (
+        {lyricsHover ? (
+          <LyricsHoverPopup
+            songId={lyricsHover.songId}
+            songName={lyricsHover.songName}
+            song={lyricsHover.song}
+            className="flex-1 min-w-0"
+          >
+            {onNameClick ? (
+              <button
+                type="button"
+                onClick={onNameClick}
+                className="text-left text-base sm:text-lg font-semibold text-gray-900 dark:text-white hover:underline w-full truncate whitespace-nowrap"
+                {...(nameClickTitle ? { title: nameClickTitle } : {})}
+              >
+                {song.name}
+              </button>
+            ) : (
+              <span className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white block truncate whitespace-nowrap">
+                {song.name}
+              </span>
+            )}
+          </LyricsHoverPopup>
+        ) : onNameClick ? (
           <button
             type="button"
             onClick={onNameClick}
             className="text-left text-base sm:text-lg font-semibold text-gray-900 dark:text-white hover:underline flex-1 min-w-0 truncate whitespace-nowrap"
-            title={nameClickTitle}
+            {...(nameClickTitle ? { title: nameClickTitle } : {})}
           >
             {song.name}
           </button>

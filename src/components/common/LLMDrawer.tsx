@@ -133,6 +133,8 @@ export const LLMDrawer: React.FC<LLMDrawerProps> = ({ isOpen, onClose }) => {
                 'Show me fast shiva songs',
                 "What is ashwin's scale for song arunachala shiva",
                 'Show me bhajans of deity hanuman',
+                'Add the following song to live "arunachala shiva"',
+                'Add the following bhajan for singer "John" to live "arunachala shiva"',
               ].map((suggestion) => (
                 <li key={suggestion}>
                   <button

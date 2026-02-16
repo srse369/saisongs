@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 // Use sessionStorage (tab-specific) instead of localStorage (shared across tabs)
 // This ensures each browser tab has its own independent live session
 const SESSION_STORAGE_KEY = 'saiSongs:sessionSongs';
+// Temporary storage for projector window - written before opening, read once on load
+export const PROJECTOR_SESSION_KEY = 'saiSongs:projectorSession';
 
 interface SessionEntry {
   songId: string;
@@ -33,10 +35,14 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
   const [entries, setEntries] = useState<SessionEntry[]>([]);
 
   // Load session from sessionStorage on mount (tab-specific storage)
+  // When opened as projector window (?projector=1), load from localStorage instead
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+      const isProjector = new URLSearchParams(window.location.search).get('projector') === '1';
+      const raw = isProjector
+        ? window.localStorage.getItem(PROJECTOR_SESSION_KEY)
+        : window.sessionStorage.getItem(SESSION_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
@@ -57,6 +63,10 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
               });
             setEntries(validEntries);
           }
+        }
+        // Clear projector session after one-time read (don't persist)
+        if (isProjector) {
+          window.localStorage.removeItem(PROJECTOR_SESSION_KEY);
         }
       }
     } catch {

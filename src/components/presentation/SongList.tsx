@@ -45,24 +45,27 @@ export const SongList: React.FC<SongListProps> = ({ onSongSelect }) => {
       return base;
     }
 
-    const filtered = base.filter(song => {
-      const fields = [
-        song.name,
-        song.language,
-        song.deity,
-        song.tempo,
-        song.beat,
-        song.raga,
-        song.level,
-        song.externalSourceUrl,
-      ];
+    // Priority 1: Prefix match on song name
+    const prefixMatches = base.filter(song => song.name?.toLowerCase().startsWith(query));
+    const filtered = prefixMatches.length > 0
+      ? prefixMatches
+      : base.filter(song => {
+          const fields = [
+            song.name,
+            song.language,
+            song.deity,
+            song.tempo,
+            song.beat,
+            song.raga,
+            song.level,
+            song.externalSourceUrl,
+          ];
+          return fields.some(field =>
+            field ? field.toString().toLowerCase().includes(query) : false
+          );
+        });
 
-      return fields.some(field =>
-        field ? field.toString().toLowerCase().includes(query) : false
-      );
-    });
-
-    // Sort results: prioritize songs that start with the search term
+    // Sort results: prefix matches first, then alphabetically
     return filtered.sort((a, b) => {
       const aName = a.name.toLowerCase();
       const bName = b.name.toLowerCase();

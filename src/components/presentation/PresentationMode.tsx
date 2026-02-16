@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PresentationModal } from './PresentationModal';
 import TemplateSelector from './TemplateSelector';
 import { LoadingSpinner } from '../common/LoadingSpinner';
@@ -10,6 +10,7 @@ import songService from '../../services/SongService';
 import { normalizePitch } from '../../utils/pitchNormalization';
 import { loadTemplateWithRetry } from '../../utils/templateRetry';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { openProjectorWindow } from '../../utils/projectorWindow';
 import { useSongs } from '../../contexts/SongContext';
 import { getSelectedTemplateId, setSelectedTemplateId, clearSelectedTemplateId } from '../../utils/cacheUtils';
 
@@ -39,6 +40,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
   const [searchParams] = useSearchParams();
   const singerName = searchParams.get('singerName') || undefined;
   const pitch = searchParams.get('pitch') || undefined;
+  const projectorWindowRef = useRef<Window | null>(null);
   
   // Always get templateId from localStorage, or use default if not set
   const persistedTemplateId = getSelectedTemplateId();
@@ -173,6 +175,15 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
 
     loadData();
   }, [songId, selectedTemplateId]);
+
+  // Close projector window on unmount (e.g. browser back, navigate away)
+  useEffect(() => {
+    return () => {
+      if (projectorWindowRef.current && !projectorWindowRef.current.closed) {
+        projectorWindowRef.current.close();
+      }
+    };
+  }, []);
 
   // Set window title to include song name when loaded
   useEffect(() => {
@@ -383,6 +394,17 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
   }, []);
 
   const handleExitPresentation = useCallback(async () => {
+    // If we're the projector window, close the entire window
+    const isProjector = new URLSearchParams(window.location.search).get('projector') === '1';
+    if (isProjector) {
+      window.close();
+      return;
+    }
+    // Close projector window if open
+    if (projectorWindowRef.current && !projectorWindowRef.current.closed) {
+      projectorWindowRef.current.close();
+      projectorWindowRef.current = null;
+    }
     // Exit fullscreen if active
     if (document.fullscreenElement) {
       await document.exitFullscreen();
@@ -396,6 +418,21 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
   const handleZoomIn = useCallback(() => setContentScale(prev => Math.min(MAX_CONTENT_SCALE, prev + CONTENT_SCALE_STEP)), []);
   const handleZoomOut = useCallback(() => setContentScale(prev => Math.max(MIN_CONTENT_SCALE, prev - CONTENT_SCALE_STEP)), []);
   const handleZoomReset = useCallback(() => setContentScale(1.0), []);
+
+  const handleProjectToSecondDisplay = useCallback(() => {
+    const params = new URLSearchParams();
+    params.set('projector', '1');
+    if (singerName) params.set('singerName', singerName);
+    if (pitch) params.set('pitch', pitch);
+    const query = params.toString();
+    const path = `/presentation/${songId}?${query}`;
+    openProjectorWindow({ path }).then((win) => {
+      projectorWindowRef.current = win ?? null;
+      if (!win && typeof window !== 'undefined') {
+        window.alert('Please allow popups for this site to open the projector window.');
+      }
+    });
+  }, [songId, singerName, pitch]);
 
   const handleNavigate = (index: number) => {
     setCurrentSlideIndex(index);
@@ -445,6 +482,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
       template={activeTemplate}
       onFullscreenToggle={toggleFullScreen}
       isFullscreen={isFullScreen}
+      onProjectToSecondDisplay={handleProjectToSecondDisplay}
       disableKeyboardNavigation={true}
       contentScale={contentScale}
       onZoomIn={handleZoomIn}

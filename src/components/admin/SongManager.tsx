@@ -252,25 +252,30 @@ export const SongManager: React.FC<SongManagerProps> = ({ isActive = true }) => 
       return results;
     }
 
-    // Direct substring search using the full query - this is the primary search
-    // Search across multiple fields to cast a wide net
     const lowerQuery = query.toLowerCase();
-    const directMatches = results.filter(s =>
-      s.name.toLowerCase().includes(lowerQuery) ||
-      s.deity?.toLowerCase().includes(lowerQuery) ||
-      s.language?.toLowerCase().includes(lowerQuery) ||
-      s.raga?.toLowerCase().includes(lowerQuery) ||
-      s.songTags?.toLowerCase().includes(lowerQuery)
-    );
 
-    // Use direct matches if found, otherwise fall back to fuzzy search
-    if (directMatches.length > 0) {
-      results = directMatches;
+    // Priority 1: Match leftmost part of song name (prefix match)
+    const prefixMatches = results.filter(s =>
+      (s.name?.toLowerCase() ?? '').startsWith(lowerQuery)
+    );
+    if (prefixMatches.length > 0) {
+      results = prefixMatches;
     } else {
-      // Fuzzy search as last resort for typo tolerance
-      const fuzzyResults = fuzzySearch.search(query);
-      const fuzzyIds = new Set(fuzzyResults.map(r => r.item.id));
-      results = results.filter(s => fuzzyIds.has(s.id));
+      // Priority 2: Substring in name or other fields, then fuzzy
+      const otherMatches = results.filter(s =>
+        s.name.toLowerCase().includes(lowerQuery) ||
+        s.deity?.toLowerCase().includes(lowerQuery) ||
+        s.language?.toLowerCase().includes(lowerQuery) ||
+        s.raga?.toLowerCase().includes(lowerQuery) ||
+        s.songTags?.toLowerCase().includes(lowerQuery)
+      );
+      if (otherMatches.length > 0) {
+        results = otherMatches;
+      } else {
+        const fuzzyResults = fuzzySearch.search(query);
+        const fuzzyIds = new Set(fuzzyResults.map(r => r.item.id));
+        results = results.filter(s => fuzzyIds.has(s.id));
+      }
     }
 
     // Apply sorting

@@ -105,8 +105,11 @@ export const useAdminTabs = () => {
   const changeTab = useCallback((tab: AdminTab) => {
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('tab', tab);
-    // Preserve other query params like songId
-    // Update the URL path and query params together
+    // When switching to Songs via menu, clear songId - it should only be set when
+    // explicitly clicking the song button on a pitch row
+    if (tab === 'songs') {
+      newSearchParams.delete('songId');
+    }
     const newUrl = `/admin/${tab}${newSearchParams.toString() ? `?${newSearchParams.toString()}` : ''}`;
     navigate(newUrl, { replace: true });
   }, [searchParams, navigate]);

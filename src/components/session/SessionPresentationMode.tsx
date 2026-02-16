@@ -11,6 +11,8 @@ import ApiClient from '../../services/ApiClient';
 import templateService from '../../services/TemplateService';
 import { loadTemplateWithRetry } from '../../utils/templateRetry';
 import { getSelectedTemplateId, setSelectedTemplateId, clearSelectedTemplateId } from '../../utils/cacheUtils';
+import { openProjectorWindow } from '../../utils/projectorWindow';
+import { PROJECTOR_SESSION_KEY } from '../../contexts/SessionContext';
 import type { Slide, Song, PresentationTemplate } from '../../types';
 
 interface SessionPresentationModeProps {
@@ -28,6 +30,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const { songs } = useSongs();
   const { singers } = useSingers();
   const presentationModalRef = useRef<PresentationModalHandle>(null);
+  const projectorWindowRef = useRef<Window | null>(null);
 
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -40,6 +43,15 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>();
   const [songsData, setSongsData] = useState<Song[]>([]);
   const [contentScale, setContentScale] = useState(1.0);
+
+  // Close projector window on unmount (e.g. browser back, navigate away)
+  useEffect(() => {
+    return () => {
+      if (projectorWindowRef.current && !projectorWindowRef.current.closed) {
+        projectorWindowRef.current.close();
+      }
+    };
+  }, []);
 
   // Set tab title to "Sai Songs - Live", restore to "Sai Songs" on exit
   useEffect(() => {
@@ -164,6 +176,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
       return {
         song: song!,
         singerName: singer?.name,
+        singerGender: singer?.gender,
         pitch: entry.pitch,
       };
     }).filter(item => item.song); // Filter out any null songs
@@ -332,6 +345,17 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   }, []);
 
   const handleExitPresentation = useCallback(async () => {
+    // If we're the projector window, close the entire window
+    const isProjector = new URLSearchParams(window.location.search).get('projector') === '1';
+    if (isProjector) {
+      window.close();
+      return;
+    }
+    // Close projector window if open
+    if (projectorWindowRef.current && !projectorWindowRef.current.closed) {
+      projectorWindowRef.current.close();
+      projectorWindowRef.current = null;
+    }
     // Exit fullscreen if active
     if (document.fullscreenElement) {
       await document.exitFullscreen();
@@ -344,6 +368,21 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const handleZoomIn = useCallback(() => setContentScale(prev => Math.min(MAX_CONTENT_SCALE, prev + CONTENT_SCALE_STEP)), []);
   const handleZoomOut = useCallback(() => setContentScale(prev => Math.max(MIN_CONTENT_SCALE, prev - CONTENT_SCALE_STEP)), []);
   const handleZoomReset = useCallback(() => setContentScale(1.0), []);
+
+  const handleProjectToSecondDisplay = useCallback(() => {
+    try {
+      window.localStorage.setItem(PROJECTOR_SESSION_KEY, JSON.stringify(entries));
+      openProjectorWindow({ path: '/session/present?projector=1' }).then((win) => {
+        projectorWindowRef.current = win ?? null;
+        if (!win && typeof window !== 'undefined') {
+          window.alert('Please allow popups for this site to open the projector window.');
+        }
+      });
+    } catch (err) {
+      console.error('Failed to open projector window:', err);
+      window.alert('Failed to open projector window. Please try again.');
+    }
+  }, [entries]);
 
   const handleNavigate = (index: number) => {
     setCurrentSlideIndex(index);
@@ -393,6 +432,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
       template={activeTemplate}
       onFullscreenToggle={toggleFullScreen}
       isFullscreen={isFullScreen}
+      onProjectToSecondDisplay={handleProjectToSecondDisplay}
       disableKeyboardNavigation={true}
       contentScale={contentScale}
       onZoomIn={handleZoomIn}

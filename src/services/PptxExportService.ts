@@ -3,6 +3,7 @@ import type { PresentationTemplate, TemplateSlide, TextElement, ImageElement, Vi
 import { ASPECT_RATIO_DIMENSIONS } from '../types';
 import { API_BASE_URL } from './ApiClient';
 import { formatPitch } from '../utils/pitchUtils';
+import { getSongTitleColor } from '../utils/singerColors';
 
 // Text run with formatting for pptxgenjs
 interface TextRun {
@@ -383,6 +384,7 @@ class PptxExportService {
 
     // Song Title - only the song name, no singer/pitch (that goes in bottom left)
     const titleStyle = referenceSlide?.songTitleStyle || defaultTitleStyle;
+    const titleColor = getSongTitleColor(titleStyle.color, sessionSlide.singerGender);
     if (sessionSlide.songName) {
       const x = this.round((titleStyle.x / templateDimensions.width) * slideWidthInches);
       const y = this.round((titleStyle.y / templateDimensions.height) * slideHeightInches);
@@ -399,7 +401,7 @@ class PptxExportService {
         w: this.sanitizeDimension(w, 2, 0.1),
         h: this.sanitizeDimension(h, 0.5, 0.1),
         fontSize: Math.max(8, Math.min(fontSizePt, 72)),
-        color: this.sanitizeColor(titleStyle.color, 'FFFFFF'),
+        color: this.sanitizeColor(titleColor, 'FFFFFF'),
         fontFace: titleStyle.fontFamily || 'Arial',
         bold: titleStyle.fontWeight === 'bold',
         italic: titleStyle.fontStyle === 'italic',

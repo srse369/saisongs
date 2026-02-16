@@ -26,6 +26,8 @@ interface PresentationModalProps {
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onZoomReset?: () => void;
+  /** When provided, shows a "Project to second display" button */
+  onProjectToSecondDisplay?: () => void;
 }
 
 export interface PresentationModalHandle {
@@ -53,6 +55,7 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
   onZoomIn,
   onZoomOut,
   onZoomReset,
+  onProjectToSecondDisplay,
 }, ref) => {
   const [scale, setScale] = useState(1);
   const [cssFullscreenMode, setCssFullscreenMode] = useState(false); // Fallback for iOS
@@ -370,6 +373,17 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
                 <i className="fas fa-crop text-base md:text-lg"></i>
               </button>
               
+              {/* Project to second display button */}
+              {onProjectToSecondDisplay && (
+                <button
+                  onClick={onProjectToSecondDisplay}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors flex-shrink-0"
+                  aria-label="Project to second display"
+                  title="Open presentation in a new window for projecting to a second display"
+                >
+                  <i className="fas fa-tv text-base md:text-lg"></i>
+                </button>
+              )}
               {/* Fullscreen toggle button */}
               <button
                 onClick={handleFullscreenToggle}

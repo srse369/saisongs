@@ -2,6 +2,7 @@ import React from 'react';
 import type { Slide, PresentationTemplate, TemplateSlide, SongContentStyle } from '../../types';
 import { DEFAULT_SONG_TITLE_STYLE, DEFAULT_SONG_LYRICS_STYLE, DEFAULT_SONG_TRANSLATION_STYLE, getSlideDimensionsForPreview } from '../../types';
 import { formatPitch } from '../../utils/pitchUtils';
+import { getSongTitleColor } from '../../utils/singerColors';
 import { getBackgroundStyles, getSlideBackgroundStyles, getReferenceSlide, TemplateBackground, TemplateImages, TemplateVideos, TemplateAudios, TemplateText, SlideBackground, SlideOverlaysInZOrder, renderStyledText } from '../../utils/templateUtils';
 import { getFontFamily } from '../../utils/fonts';
 
@@ -33,11 +34,16 @@ export const SlideView: React.FC<SlideViewProps> = ({ slide, showTranslation = t
   
   // Get song content styles from reference slide (merge with defaults to ensure all properties exist)
   // Only override defaults with defined template values
-  const titleStyle: SongContentStyle = { 
+  const baseTitleStyle: SongContentStyle = { 
     ...DEFAULT_SONG_TITLE_STYLE, 
     ...(effectiveSlide?.songTitleStyle && Object.fromEntries(
       Object.entries(effectiveSlide.songTitleStyle).filter(([_, v]) => v !== undefined)
     ))
+  };
+  // Override title color with singer color when template uses white
+  const titleStyle: SongContentStyle = {
+    ...baseTitleStyle,
+    color: getSongTitleColor(baseTitleStyle.color, slide.singerGender),
   };
   const lyricsStyle: SongContentStyle = { 
     ...DEFAULT_SONG_LYRICS_STYLE, 

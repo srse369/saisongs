@@ -159,6 +159,7 @@ export const PitchList: React.FC<PitchListProps> = ({
       <div className="space-y-0 md:space-y-3">
         {enrichedPitches.map((pitch, index) => {
           const isSelected = selectedPitchId === pitch.id;
+          const songWithLyrics = songs.find(s => s.id === pitch.songId);
           return (
           <div
             key={pitch.id}
@@ -197,10 +198,10 @@ export const PitchList: React.FC<PitchListProps> = ({
                     refLadies: pitch.refLadies,
                   }}
                   onNameClick={isMobile ? undefined : () => handlePresent(pitch)}
-                  nameClickTitle={isMobile ? undefined : pitch.songName}
                   showBackground={!isMobile}
                   isSelected={isSelected}
                   onPreviewClick={() => handlePresent(pitch)}
+                  lyricsHover={{ songId: pitch.songId, songName: pitch.songName || 'Unknown', song: songWithLyrics }}
                 />
                 
                 {/* Singer and Pitch */}

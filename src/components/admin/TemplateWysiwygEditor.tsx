@@ -1203,34 +1203,38 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
         };
       });
       
-      // Insert new slides after the selected slide
+      // Insert new slides at the selected slide (replace/insert at that position)
       const newSlides = [
-        ...slides.slice(0, selectedSlideIndex + 1),
+        ...slides.slice(0, selectedSlideIndex),
         ...newTemplateSlides,
-        ...slides.slice(selectedSlideIndex + 1),
+        ...slides.slice(selectedSlideIndex),
       ];
       
       updateTemplateWithSlides(newSlides, referenceSlideIndex);
 
-      // Select the first imported slide
-      setSelectedSlideIndex(selectedSlideIndex + 1);
+      // Select the first imported slide (now at selectedSlideIndex)
+      setSelectedSlideIndex(selectedSlideIndex);
       setSelectedIds(new Set());
       
       // Close the picker
       setShowSongPicker(false);
       setSongSearchQuery('');
       
-      console.log(`✅ Imported song "${song.name}" as ${newTemplateSlides.length} slide(s) after selected slide`);
+      console.log(`✅ Imported song "${song.name}" as ${newTemplateSlides.length} slide(s) at selected slide`);
     } finally {
       setImportingSong(false);
     }
   };
   
-  // Filter songs based on search query
+  // Filter songs: prefix match on name first, then substring in name/lyrics
   const filteredSongs = useMemo(() => {
     if (!songSearchQuery.trim()) return songs.slice(0, 20); // Show first 20 by default
-    const query = songSearchQuery.toLowerCase();
-    return songs.filter(song => 
+    const query = songSearchQuery.toLowerCase().trim();
+    const prefixMatches = songs.filter(song => song.name.toLowerCase().startsWith(query));
+    if (prefixMatches.length > 0) {
+      return prefixMatches.slice(0, 20);
+    }
+    return songs.filter(song =>
       song.name.toLowerCase().includes(query) ||
       song.lyrics?.toLowerCase().includes(query)
     ).slice(0, 20);

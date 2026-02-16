@@ -19,6 +19,7 @@ import templateService from '../../services/TemplateService';
 import { pptxExportService } from '../../services/PptxExportService';
 import ApiClient from '../../services/ApiClient';
 import { getSelectedTemplateId, setSelectedTemplateId } from '../../utils/cacheUtils';
+import { buildSessionCsv, parseSessionCsv, downloadCsv } from '../../utils/sessionCsvUtils';
 
 const SESSION_SCROLL_POSITION_KEY = 'saiSongs:sessionScrollPosition';
 
@@ -46,7 +47,9 @@ export const SessionManager: React.FC = () => {
   const [selectedSessionItemKey, setSelectedSessionItemKey] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const [importingCsv, setImportingCsv] = useState(false);
   const listContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const csvFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -315,6 +318,7 @@ export const SessionManager: React.FC = () => {
         return {
           song,
           singerName: singer?.name,
+          singerGender: singer?.gender,
           pitch: entry.pitch,
         };
       });
@@ -333,6 +337,84 @@ export const SessionManager: React.FC = () => {
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleExportCsv = () => {
+    if (sessionItems.length === 0) return;
+    const items = sessionItems.map(({ entry, song, singer }) => ({
+      songId: entry.songId,
+      songName: song.name,
+      singerId: singer?.id ?? '',
+      singerName: singer?.name ?? '',
+      pitch: entry.pitch ?? '',
+    }));
+    const csv = buildSessionCsv(items);
+    const filename = `session-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadCsv(filename, csv);
+  };
+
+  const handleImportCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ''; // Reset so same file can be selected again
+
+    setImportingCsv(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const text = reader.result as string;
+        const rows = parseSessionCsv(text);
+        if (rows.length === 0) {
+          alert('No valid rows found in CSV. Expected columns: songId, songName, singerId, singerName, pitch');
+          setImportingCsv(false);
+          return;
+        }
+
+        if (sessionItems.length > 0 && !window.confirm('Import will replace your current session. Continue?')) {
+          setImportingCsv(false);
+          return;
+        }
+
+        clearSession();
+        let added = 0;
+        let skipped = 0;
+        const songByName = new Map(songs.map((s) => [s.name.toLowerCase().trim(), s]));
+        const singerByName = new Map(singers.map((s) => [s.name.toLowerCase().trim(), s]));
+
+        for (const row of rows) {
+          let songId = row.songId?.trim();
+          if (!songId && row.songName?.trim()) {
+            const song = songByName.get(row.songName.toLowerCase().trim());
+            songId = song?.id ?? '';
+          }
+          if (!songId) {
+            skipped++;
+            continue;
+          }
+
+          let singerId: string | undefined;
+          if (row.singerId?.trim()) {
+            singerId = singers.some((s) => s.id === row.singerId) ? row.singerId : undefined;
+          }
+          if (!singerId && row.singerName?.trim()) {
+            singerId = singerByName.get(row.singerName.toLowerCase().trim())?.id;
+          }
+
+          addSong(songId, singerId, row.pitch?.trim() || undefined);
+          added++;
+        }
+
+        setImportingCsv(false);
+        if (skipped > 0) {
+          alert(`Imported ${added} songs. ${skipped} rows skipped (song not found).`);
+        }
+      } catch (err) {
+        console.error('Failed to import CSV:', err);
+        alert('Failed to import CSV. Please check the file format.');
+        setImportingCsv(false);
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
   };
 
   const handleTemplateSelect = (template: PresentationTemplate) => {
@@ -376,6 +458,20 @@ export const SessionManager: React.FC = () => {
     const order = sessionItems.map(({ entry }) => entry.songId);
     const [moved] = order.splice(fromIndex, 1);
     order.splice(toIndex, 0, moved);
+    reorderSession(order);
+  };
+
+  const handleMoveUp = (index: number) => {
+    if (index <= 0) return;
+    const order = sessionItems.map(({ entry }) => entry.songId);
+    [order[index - 1], order[index]] = [order[index], order[index - 1]];
+    reorderSession(order);
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index >= sessionItems.length - 1) return;
+    const order = sessionItems.map(({ entry }) => entry.songId);
+    [order[index], order[index + 1]] = [order[index + 1], order[index]];
     reorderSession(order);
   };
 
@@ -526,10 +622,33 @@ export const SessionManager: React.FC = () => {
       variant: 'secondary',
       disabled: exporting || sessionItems.length === 0,
     },
+    {
+      label: 'Export CSV',
+      icon: 'fas fa-file-csv',
+      onClick: handleExportCsv,
+      variant: 'secondary',
+      disabled: sessionItems.length === 0,
+    },
+    {
+      label: 'Import CSV',
+      icon: 'fas fa-file-csv',
+      onClick: () => csvFileInputRef.current?.click(),
+      variant: 'secondary',
+      disabled: importingCsv,
+    },
   ];
 
   return (
     <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-4">
+      {/* Hidden file input for CSV import */}
+      <input
+        ref={csvFileInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        onChange={handleImportCsv}
+        className="hidden"
+        aria-hidden="true"
+      />
       {/* Fixed Header on Mobile - Pinned below Layout header */}
       <div 
         className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-6'}`}
@@ -573,6 +692,16 @@ export const SessionManager: React.FC = () => {
                   Load
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => csvFileInputRef.current?.click()}
+                disabled={importingCsv}
+                title="Import session from a CSV file"
+                className="hidden md:flex min-h-[16px] sm:min-h-0 px-4 py-3 sm:py-2 text-sm font-medium text-gray-900 bg-gray-200 dark:bg-gray-600 rounded-lg sm:rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors text-center flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                <i className={`fas ${importingCsv ? 'fa-spinner fa-spin' : 'fa-file-csv'} mr-2`}></i>
+                Import CSV
+              </button>
             </>
           ) : (
             <>
@@ -588,6 +717,18 @@ export const SessionManager: React.FC = () => {
                   <span>Load</span>
                 </button>
               )}
+
+              {/* Import CSV */}
+              <button
+                type="button"
+                onClick={() => csvFileInputRef.current?.click()}
+                disabled={importingCsv}
+                title="Import session from a CSV file"
+                className="hidden md:flex min-h-[16px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-600 rounded-lg sm:rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors text-center flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                <i className={`fas ${importingCsv ? 'fa-spinner fa-spin' : 'fa-file-csv'} mr-1`}></i>
+                <span>Import CSV</span>
+              </button>
 
               {/* Save Session (only for authenticated users) */}
               {isAuthenticated && (
@@ -642,6 +783,19 @@ export const SessionManager: React.FC = () => {
                 >
                   <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-download'}`}></i>
                   <span>{exporting ? 'Exporting...' : 'Export'}</span>
+                </button>
+              </div>
+
+              {/* Export CSV */}
+              <div>
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  title="Export session to CSV file for backup or sharing"
+                  className="w-full hidden md:flex min-h-[16px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-600 rounded-lg sm:rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <i className="fas fa-file-csv mr-1"></i>
+                  <span>Export CSV</span>
                 </button>
               </div>
             </>
@@ -712,21 +866,43 @@ export const SessionManager: React.FC = () => {
                 onDrop={(e) => !isMobile && handleDrop(e, index)}
               >
                 <div className="flex flex-col gap-1.5 md:gap-3">
-                  {/* Header with song number */}
+                  {/* Header with song number and move buttons */}
                   <div className="flex items-start gap-1.5 md:gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full font-bold text-sm">
-                      {index + 1}
+                    <div className="flex flex-col gap-0.5 flex-shrink-0">
+                      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full font-bold text-sm">
+                        {index + 1}
+                      </div>
+                      <div className="flex justify-center gap-0.5">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleMoveUp(index); }}
+                          disabled={index === 0}
+                          title="Move up"
+                          aria-label="Move up"
+                          className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                        >
+                          <i className="fas fa-chevron-up text-xs"></i>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleMoveDown(index); }}
+                          disabled={index === sessionItems.length - 1}
+                          title="Move down"
+                          aria-label="Move down"
+                          className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                        >
+                          <i className="fas fa-chevron-down text-xs"></i>
+                        </button>
+                      </div>
                     </div>
                     <div className="flex-1 min-w-0">
                       {/* Song Metadata Section - Reusable component */}
                       <SongMetadataCard
                         song={song}
                         onNameClick={isMobile ? undefined : () => handlePreviewSong(song.id)}
-                        nameClickTitle={isMobile ? undefined : song.name}
                         showBackground={!isMobile}
                         isSelected={isSelected}
                         alwaysShowDeityLanguage={true}
                         onPreviewClick={() => handlePreviewSong(song.id)}
+                        lyricsHover={{ songId: song.id, songName: song.name, song }}
                       />
 
                       {/* Singer and Pitch */}

@@ -181,6 +181,25 @@ export class WebLLMService {
     const norm = this.normalizeSynonyms(userPrompt);
     log('User message', userPrompt);
 
+    // "Add to live" rules FIRST - must run before song search (which would wrongly treat "add...to live X" as a filter)
+    const addForSingerToLiveMatch = lower.match(/\badd\s+(?:the\s+following\s+)?(?:song|bhajan)\s+for\s+singer\s+["']?([^"']+)["']?\s+to\s+live\s+["']?([^"']+)["']?/);
+    if (addForSingerToLiveMatch) {
+      const singerName = addForSingerToLiveMatch[1].trim();
+      const songName = addForSingerToLiveMatch[2].trim();
+      if (singerName && songName) {
+        log('Rule: add song for singer to live', { singerName, songName });
+        return { reply: `Adding "${songName}" for ${singerName} to the session.`, action: { type: 'add_song_to_session', songName, singerName } };
+      }
+    }
+    const addToLiveMatch = lower.match(/\badd\s+(?:the\s+following\s+)?(?:song|bhajan)\s+to\s+live\s+["']?([^"']+)["']?/);
+    if (addToLiveMatch) {
+      const songName = addToLiveMatch[1].trim();
+      if (songName) {
+        log('Rule: add song to live', { songName });
+        return { reply: `Adding "${songName}" to the session.`, action: { type: 'add_song_to_session', songName } };
+      }
+    }
+
     const wantsSongs = /\b(songs?|tracks?)\b/.test(norm) || /\b(show|find|give|get|list|me)\s+.+\s+songs?\b/.test(norm);
     const hasFilterHint = /\b(shiva|devi|krishna|rama|sai|hanuman|ganesh|fast|slow|medium|sanskrit|hindi|telugu|tamil|raga|deity|tempo|language)\b/i.test(norm);
     const wantsMyPitches = /\bmy\b/i.test(norm) && (/\b(songs?|pitches?)\b/.test(norm) || norm.includes('pitches') || norm.includes('scale') || norm.includes('key') || norm.includes('pitch') || hasFilterHint);
@@ -328,7 +347,7 @@ export class WebLLMService {
     if (/\bclear\s+(?:the\s+)?session\b/.test(lower)) {
       return { reply: 'Clearing the session.', action: { type: 'clear_session' } };
     }
-    const addSessionMatch = lower.match(/\b(?:add)\s+(.+?)\s+to\s+(?:the\s+)?session\b/);
+    const addSessionMatch = lower.match(/\b(?:add)\s+(.+?)\s+to\s+(?:the\s+)?(?:session|live)\b/);
     if (addSessionMatch) {
       const name = addSessionMatch[1].trim();
       return { reply: `Adding "${name}" to the session.`, action: { type: 'add_song_to_session', songName: name } };

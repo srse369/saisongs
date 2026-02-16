@@ -217,34 +217,44 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
     }
 
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const lowerQuery = query.toLowerCase();
 
-    // Multi-word query: require every word to appear in at least one field (fast, no Fuse)
-    if (words.length > 1) {
-      results = results.filter(song => {
-        const name = song.name?.toLowerCase() ?? '';
-        const deity = song.deity?.toLowerCase() ?? '';
-        const language = song.language?.toLowerCase() ?? '';
-        const raga = song.raga?.toLowerCase() ?? '';
-        const songTags = song.songTags?.toLowerCase() ?? '';
-        const combined = `${name} ${deity} ${language} ${raga} ${songTags}`;
-        return words.every(word => combined.includes(word));
-      });
+    // Priority 1: Match leftmost part of song name (prefix match) - fast, best for typing
+    const prefixMatches = results.filter(s =>
+      (s.name?.toLowerCase() ?? '').startsWith(lowerQuery)
+    );
+    if (prefixMatches.length > 0) {
+      results = prefixMatches;
     } else {
-      // Single word: try direct substring first, then Fuse only if no matches (Fuse is slow for long phrases)
-      const lowerQuery = query.toLowerCase();
-      const directMatches = results.filter(s =>
-        s.name.toLowerCase().includes(lowerQuery) ||
-        s.deity?.toLowerCase().includes(lowerQuery) ||
-        s.language?.toLowerCase().includes(lowerQuery) ||
-        s.raga?.toLowerCase().includes(lowerQuery) ||
-        s.songTags?.toLowerCase().includes(lowerQuery)
-      );
-      if (directMatches.length > 0) {
-        results = directMatches;
+      // Priority 2: Other search styles (substring in name/fields, then fuzzy)
+      if (words.length > 1) {
+        // Multi-word: require every word to appear in at least one field
+        results = results.filter(song => {
+          const name = song.name?.toLowerCase() ?? '';
+          const deity = song.deity?.toLowerCase() ?? '';
+          const language = song.language?.toLowerCase() ?? '';
+          const raga = song.raga?.toLowerCase() ?? '';
+          const songTags = song.songTags?.toLowerCase() ?? '';
+          const combined = `${name} ${deity} ${language} ${raga} ${songTags}`;
+          return words.every(word => combined.includes(word));
+        });
       } else {
-        const fuzzyResults = fuzzySearch.search(query);
-        const fuzzyIds = new Set(fuzzyResults.map(r => r.item.id));
-        results = results.filter(s => fuzzyIds.has(s.id));
+        // Single word: substring in name or other fields
+        const otherMatches = results.filter(s =>
+          s.name.toLowerCase().includes(lowerQuery) ||
+          s.deity?.toLowerCase().includes(lowerQuery) ||
+          s.language?.toLowerCase().includes(lowerQuery) ||
+          s.raga?.toLowerCase().includes(lowerQuery) ||
+          s.songTags?.toLowerCase().includes(lowerQuery)
+        );
+        if (otherMatches.length > 0) {
+          results = otherMatches;
+        } else {
+          // Priority 3: Fuzzy search (typo tolerance) - only when no prefix or substring matches
+          const fuzzyResults = fuzzySearch.search(query);
+          const fuzzyIds = new Set(fuzzyResults.map(r => r.item.id));
+          results = results.filter(s => fuzzyIds.has(s.id));
+        }
       }
     }
 
