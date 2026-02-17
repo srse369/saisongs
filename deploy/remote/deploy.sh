@@ -92,6 +92,8 @@ usage() {
     echo "  nginx               Upload and update nginx configuration"
     echo "  setup               Upload setup.sh script to remote server"
     echo "  ssl-setup           Complete HTTPS setup (certificate + nginx)"
+    echo "  cert-check          Check SSL certificate status on remote server"
+    echo "  cert-renew          Renew Let's Encrypt certificate on remote server"
     echo "  check               Run health check on remote server"
     echo "  restart             Restart backend on remote server"
     echo "  logs [n]            View remote logs (default: 50 lines)"
@@ -113,6 +115,8 @@ usage() {
     echo "  $0 nginx"
     echo "  $0 setup"
     echo "  $0 ssl-setup"
+    echo "  $0 cert-check"
+    echo "  $0 cert-renew"
     echo "  $0 check"
     echo "  $0 restart"
     echo "  $0 logs 100"
@@ -802,6 +806,75 @@ cmd_setup() {
 }
 
 # =============================================================================
+# =============================================================================
+# CERT-CHECK Command - Check SSL certificate status
+# =============================================================================
+
+cmd_cert_check() {
+    check_config
+
+    echo "🔐 SSL Certificate Status"
+    echo "=========================="
+    echo ""
+    ssh_exec << 'ENDSSH'
+echo "Let's Encrypt certificates:"
+sudo certbot certificates 2>/dev/null || echo "Certbot not installed or no certificates found"
+echo ""
+echo "Certificate file check for saisongs.org:"
+if [ -f /etc/letsencrypt/live/saisongs.org/fullchain.pem ]; then
+    echo "  fullchain.pem: exists"
+    sudo openssl x509 -in /etc/letsencrypt/live/saisongs.org/fullchain.pem -noout -dates -subject -issuer 2>/dev/null || echo "  (could not read)"
+else
+    echo "  fullchain.pem: NOT FOUND"
+fi
+if [ -f /etc/letsencrypt/live/saisongs.org/privkey.pem ]; then
+    echo "  privkey.pem: exists"
+else
+    echo "  privkey.pem: NOT FOUND"
+fi
+echo ""
+echo "Certbot renewal timer:"
+systemctl is-active certbot.timer 2>/dev/null || echo "  certbot.timer not found"
+ENDSSH
+}
+
+# =============================================================================
+# CERT-RENEW Command - Renew Let's Encrypt certificate
+# =============================================================================
+
+cmd_cert_renew() {
+    check_config
+
+    echo "🔄 Renewing SSL Certificate"
+    echo "==========================="
+    echo ""
+    echo "This will renew the Let's Encrypt certificate for saisongs.org on the remote server."
+    echo ""
+    read -p "Continue? (y/N) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Cancelled."
+        exit 0
+    fi
+
+    echo ""
+    ssh_exec << 'ENDSSH'
+echo "Running certbot renew..."
+sudo certbot renew --nginx --non-interactive
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "Reloading nginx..."
+    sudo systemctl reload nginx
+    echo "✅ Certificate renewed and nginx reloaded"
+    sudo certbot certificates
+else
+    echo "❌ Certificate renewal failed"
+    exit 1
+fi
+ENDSSH
+}
+
+# =============================================================================
 # SSL-SETUP Command - Complete HTTPS setup (certificate + nginx)
 # =============================================================================
 
@@ -886,6 +959,12 @@ case "$cmd" in
         ;;
     ssl-setup)
         cmd_ssl_setup
+        ;;
+    cert-check)
+        cmd_cert_check
+        ;;
+    cert-renew)
+        cmd_cert_renew
         ;;
     check)
         cmd_check

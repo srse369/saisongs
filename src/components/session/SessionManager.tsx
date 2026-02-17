@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSession } from '../../contexts/SessionContext';
 import { useSongs } from '../../contexts/SongContext';
@@ -48,8 +48,73 @@ export const SessionManager: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [importingCsv, setImportingCsv] = useState(false);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const listContainerRef = React.useRef<HTMLDivElement | null>(null);
   const csvFileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const scrollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastDragYRef = useRef<number>(0);
+
+  const SCROLL_ZONE = 80;
+  const SCROLL_SPEED = 12;
+
+  // Auto-scroll when dragging near top/bottom of viewport
+  useEffect(() => {
+    if (draggingIndex === null) {
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const scroll = () => {
+      const y = lastDragYRef.current;
+      const zone = SCROLL_ZONE;
+      const viewportHeight = window.innerHeight;
+      const isMobileView = window.innerWidth < 768;
+
+      let delta = 0;
+      if (y < zone) {
+        delta = -SCROLL_SPEED * (1 - y / zone);
+      } else if (y > viewportHeight - zone) {
+        delta = SCROLL_SPEED * (1 - (viewportHeight - y) / zone);
+      }
+
+      if (delta === 0) return;
+
+      if (isMobileView && listContainerRef.current) {
+        const el = listContainerRef.current;
+        el.scrollTop = Math.max(0, Math.min(el.scrollHeight - el.clientHeight, el.scrollTop + delta));
+      } else {
+        window.scrollTo({ top: Math.max(0, window.scrollY + delta), behavior: 'auto' });
+      }
+    };
+
+    const handleDocumentDragOver = (e: DragEvent) => {
+      lastDragYRef.current = e.clientY;
+      const y = e.clientY;
+      const zone = SCROLL_ZONE;
+      const viewportHeight = window.innerHeight;
+      const inZone = y < zone || y > viewportHeight - zone;
+
+      if (inZone && !scrollIntervalRef.current) {
+        scrollIntervalRef.current = setInterval(scroll, 16);
+      } else if (!inZone && scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    };
+
+    document.addEventListener('dragover', handleDocumentDragOver);
+    return () => {
+      document.removeEventListener('dragover', handleDocumentDragOver);
+      if (scrollIntervalRef.current) {
+        clearInterval(scrollIntervalRef.current);
+        scrollIntervalRef.current = null;
+      }
+    };
+  }, [draggingIndex]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -445,6 +510,22 @@ export const SessionManager: React.FC = () => {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, fromIndex: number) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', String(fromIndex));
+    setDraggingIndex(fromIndex);
+    setDragOverIndex(fromIndex);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, toIndex: number) => {
+    e.preventDefault();
+    if (draggingIndex === null) return;
+    // Don't update when over the dragged item itself - prevents flicker as list reorders
+    if (toIndex === draggingIndex) return;
+    // Don't update when over the same drop target - avoids rapid back-and-forth
+    setDragOverIndex((prev) => (prev === toIndex ? prev : toIndex));
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, toIndex: number) => {
@@ -452,6 +533,8 @@ export const SessionManager: React.FC = () => {
     const fromIndexRaw = e.dataTransfer.getData('text/plain');
     const fromIndex = parseInt(fromIndexRaw, 10);
     if (Number.isNaN(fromIndex) || fromIndex === toIndex) {
+      setDraggingIndex(null);
+      setDragOverIndex(null);
       return;
     }
 
@@ -459,7 +542,20 @@ export const SessionManager: React.FC = () => {
     const [moved] = order.splice(fromIndex, 1);
     order.splice(toIndex, 0, moved);
     reorderSession(order);
+    setDraggingIndex(null);
+    setDragOverIndex(null);
   };
+
+  // Preview order when dragging: show what the list will look like if dropped at dragOverIndex
+  const displayItems = useMemo(() => {
+    if (draggingIndex === null || dragOverIndex === null || draggingIndex === dragOverIndex) {
+      return sessionItems;
+    }
+    const indices = sessionItems.map((_, i) => i);
+    const [moved] = indices.splice(draggingIndex, 1);
+    indices.splice(dragOverIndex, 0, moved);
+    return indices.map((i) => sessionItems[i]);
+  }, [sessionItems, draggingIndex, dragOverIndex]);
 
   const handleMoveUp = (index: number) => {
     if (index <= 0) return;
@@ -837,9 +933,11 @@ export const SessionManager: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-0 md:space-y-3">
-          {sessionItems.map(({ entry, song, singer }, index) => {
+          {displayItems.map(({ entry, song, singer }, index) => {
             const itemKey = `${entry.songId}-${entry.singerId ?? 'none'}`;
             const isSelected = selectedSessionItemKey === itemKey;
+            const originalIndex = sessionItems.findIndex((s) => s.entry.songId === entry.songId && s.entry.singerId === entry.singerId);
+            const isDragging = !isMobile && draggingIndex !== null && originalIndex === draggingIndex;
             return (
               <div
                 key={itemKey}
@@ -859,11 +957,12 @@ export const SessionManager: React.FC = () => {
                           ? 'border-blue-500 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
                           : 'border-gray-200 dark:border-gray-700'
                       }`
-                }`}
+                } ${isDragging ? 'opacity-50' : ''}`}
                 draggable={!isMobile}
-                onDragStart={(e) => !isMobile && handleDragStart(e, index)}
-                onDragOver={(e) => !isMobile && e.preventDefault()}
-                onDrop={(e) => !isMobile && handleDrop(e, index)}
+                onDragStart={(e) => !isMobile && handleDragStart(e, originalIndex)}
+                onDragOver={(e) => !isMobile && handleDragOver(e, originalIndex)}
+                onDrop={(e) => !isMobile && handleDrop(e, originalIndex)}
+                onDragEnd={!isMobile ? handleDragEnd : undefined}
               >
                 <div className="flex flex-col gap-1.5 md:gap-3">
                   {/* Header with song number and move buttons */}
