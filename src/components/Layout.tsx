@@ -8,8 +8,14 @@ import { MusicIcon, SongIcon, RoleBadge, UserDropdown, DatabaseStatusDropdown, C
 import { FeedbackDrawer } from './common/FeedbackDrawer';
 import { LLMDrawer } from './common/LLMDrawer';
 import { clearAllCaches, checkCacheClearCooldown, CACHE_KEYS } from '../utils/cacheUtils';
+import { takeOfflineIfNeeded, getLastOfflineDownloadTime } from '../utils/offlineDownload';
 import apiClient from '../services/ApiClient';
 import { globalEventBus } from '../utils/globalEventBus';
+import { useSongs } from '../contexts/SongContext';
+import { useSingers } from '../contexts/SingerContext';
+import { usePitches } from '../contexts/PitchContext';
+import { useTemplates } from '../contexts/TemplateContext';
+import { useToast } from '../contexts/ToastContext';
 
 // Cache health stats for 60 seconds
 let healthStatsCache: { stats: any; timestamp: number } | null = null;
@@ -69,7 +75,27 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [reloadMessage, setReloadMessage] = useState<string | null>(null);
   const [centers, setCenters] = useState<Center[]>([]);
   const [showDesktopScrollToTop, setShowDesktopScrollToTop] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [takingOffline, setTakingOffline] = useState(false);
+  const [offlineProgress, setOfflineProgress] = useState<string | null>(null);
   const { isConnected, connectionError, resetConnection } = useDatabase();
+  const { fetchSongs } = useSongs();
+  const { fetchSingers } = useSingers();
+  const { fetchAllPitches } = usePitches();
+  const { fetchTemplates } = useTemplates();
+  const toast = useToast();
+
+  // Track online/offline for Take Offline button state
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
   const { isAuthenticated, userRole, userName, userEmail, logout, centerIds, editorFor, isAdmin } = useAuth();
 
   // Track window scroll for desktop scroll-to-top button (desktop uses window scroll)
@@ -165,6 +191,45 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       setReloadingBackendCache(false);
     }
   };
+
+  const handleTakeOffline = async () => {
+    setTakingOffline(true);
+    setOfflineProgress('Checking...');
+    setIsMobileMenuOpen(false);
+    try {
+      const { skipped, result } = await takeOfflineIfNeeded((progress) => {
+        setOfflineProgress(progress.message);
+      });
+      if (result.success) {
+        if (skipped) {
+          toast.success('Already have all data offline. No download needed.');
+        } else {
+          toast.success(
+            `Downloaded ${result.songsCount} songs, ${result.singersCount} singers, ${result.pitchesCount} pitches, ${result.templatesCount} templates, ${result.sessionsCount} sessions, ${result.centersCount} centers for offline use.`
+          );
+        }
+        fetchSongs(false);
+        if (isAuthenticated) {
+          fetchSingers(false);
+          fetchAllPitches(false);
+          fetchTemplates(false);
+        }
+      } else {
+        toast.error(result.error || 'Failed to download for offline');
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to download for offline';
+      toast.error(msg);
+    } finally {
+      setTakingOffline(false);
+      setOfflineProgress(null);
+    }
+  };
+
+  const [lastOfflineTime, setLastOfflineTime] = useState<number | null>(null);
+  useEffect(() => {
+    getLastOfflineDownloadTime().then(setLastOfflineTime);
+  }, [takingOffline]); // Re-fetch when take offline completes
 
   // Check if current path matches the link
   const isActive = (path: string) => {
@@ -409,8 +474,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-      {/* Header with Navigation */}
-      <header className="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700">
+      {/* Sticky header area - offline banner is now at app root (OfflineBannerWrapper) for persistence across routes */}
+      <div className="sticky top-0 z-50 flex flex-col">
+        {/* Header with Navigation */}
+        <header className="bg-white dark:bg-gray-800 shadow-md border-b border-gray-200 dark:border-gray-700 shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-12 md:h-16">
             {/* Logo/Brand */}
@@ -483,6 +550,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   resetConnection={resetConnection}
                   isAdmin={isAdmin}
                   isAuthenticated={isAuthenticated}
+                  canTakeOffline={userRole === 'admin' || userRole === 'editor'}
                 />
 
                 {/* Login/Logout buttons */}
@@ -596,6 +664,35 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </>
                   )}
                 </div>
+
+                {/* Take Offline Button (Editors and Admins only) */}
+                {(userRole === 'admin' || userRole === 'editor') && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={handleTakeOffline}
+                    disabled={takingOffline || !isOnline}
+                    title={!isOnline ? 'Connect to the internet to download for offline' : 'Download all song details for offline use'}
+                    className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+                  >
+                    {takingOffline ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin text-base mr-2"></i>
+                        {offlineProgress || 'Downloading...'}
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-download text-base mr-2"></i>
+                        Take Offline
+                      </>
+                    )}
+                  </button>
+                  {lastOfflineTime && !takingOffline && (
+                    <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                      Last downloaded: {new Date(lastOfflineTime).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                )}
 
                 {/* Clear Local Storage Button (All Users) */}
                 <div className={'mt-4 pt-4 border-t border-gray-200 dark:border-gray-700'}>
@@ -834,6 +931,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
       </header>
+      </div>
 
       {/* Main Content */}
       <main className="flex-1 w-full max-w-7xl mx-auto py-2 sm:py-4 md:py-4 lg:py-4 px-2 sm:px-6 lg:px-8 pb-24 md:pb-2 grid">

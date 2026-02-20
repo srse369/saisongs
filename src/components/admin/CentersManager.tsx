@@ -3,9 +3,10 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserMultiSelect } from '../common/UserMultiSelect';
 import { clearCentersCache } from '../common/CenterBadges';
-import { removeLocalStorageItem, setLocalStorageItem } from '../../utils/cacheUtils';
+import { getCacheItem, removeCacheItem, setCacheItem } from '../../utils/cacheUtils';
 import { RefreshIcon, Modal, type MobileAction } from '../common';
 import { globalEventBus } from '../../utils/globalEventBus';
+import { isOffline } from '../../utils/offlineQueue';
 import type { Center } from '../../types';
 import { BaseManager } from './BaseManager';
 import { useBaseManager } from '../../hooks/useBaseManager';
@@ -75,6 +76,24 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
   const fetchCenters = useCallback(async () => {
     try {
       setLoading(true);
+      // Browser cache first
+      if (typeof window !== 'undefined') {
+        const raw = await getCacheItem(CENTERS_CACHE_KEY);
+        if (raw) {
+          try {
+            const { timestamp, centers } = JSON.parse(raw) as { timestamp: number; centers: Center[] };
+            if (Array.isArray(centers) && Date.now() - timestamp < CENTERS_CACHE_TTL_MS) {
+              setCenters(centers);
+              setError('');
+              setLoading(false);
+              return;
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+
       const response = await fetch(`${API_BASE_URL}/centers`, {
         credentials: 'include',
       });
@@ -84,9 +103,16 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
       }
 
       const data = await response.json();
-      // Ensure data is an array
-      setCenters(Array.isArray(data) ? data : []);
+      const centersData = Array.isArray(data) ? data : [];
+      setCenters(centersData);
       setError('');
+      // Persist to localStorage for offline use and browser cache stats
+      if (typeof window !== 'undefined' && centersData.length > 0) {
+        setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({
+          timestamp: Date.now(),
+          centers: centersData,
+        })).catch(() => {});
+      }
     } catch (err) {
       console.error('Error fetching centers:', err);
       setError('Failed to load centers');
@@ -121,19 +147,19 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
           if (prev.some(c => c.id === center.id)) {
             const updated = prev.map(c => c.id === center.id ? center : c);
             if (typeof window !== 'undefined') {
-              setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+              setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({
                 timestamp: Date.now(),
                 centers: updated,
-              }));
+              })).catch(() => {});
             }
             return updated;
           }
           const updated = [...prev, center];
           if (typeof window !== 'undefined') {
-            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+            setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({
               timestamp: Date.now(),
               centers: updated,
-            }));
+            })).catch(() => {});
           }
           return updated;
         });
@@ -146,10 +172,10 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
         setCenters(prev => {
           const updated = prev.map(c => c.id === center.id ? center : c);
           if (typeof window !== 'undefined') {
-            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+            setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({
               timestamp: Date.now(),
               centers: updated,
-            }));
+            })).catch(() => {});
           }
           return updated;
         });
@@ -162,10 +188,10 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
         setCenters(prev => {
           const updated = prev.filter(c => c.id !== center.id);
           if (typeof window !== 'undefined') {
-            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+            setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({
               timestamp: Date.now(),
               centers: updated,
-            }));
+            })).catch(() => {});
           }
           return updated;
         });
@@ -183,10 +209,10 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
             return c;
           });
           if (typeof window !== 'undefined') {
-            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+            setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({
               timestamp: Date.now(),
               centers: updated,
-            }));
+            })).catch(() => {});
           }
           return updated;
         });
@@ -207,10 +233,10 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
             return c;
           });
           if (typeof window !== 'undefined') {
-            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+            setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({
               timestamp: Date.now(),
               centers: updated,
-            }));
+            })).catch(() => {});
           }
           return updated;
         });
@@ -228,10 +254,10 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
             return c;
           });
           if (typeof window !== 'undefined') {
-            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+            setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({
               timestamp: Date.now(),
               centers: updated,
-            }));
+            })).catch(() => {});
           }
           return updated;
         });
@@ -246,10 +272,10 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
             return { ...c, singerCount: (c.singerCount ?? 0) + (centerIdsSingerCountDown.get(String(c.id)) ?? 0) };
           });
           if (typeof window !== 'undefined') {
-            setLocalStorageItem(CENTERS_CACHE_KEY, JSON.stringify({
+            setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({
               timestamp: Date.now(),
               centers: updated,
-            }));
+            })).catch(() => {});
           }
           return updated;
         });
@@ -266,6 +292,8 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
   // Escape key is handled by useBaseManager's onEscapeKey callback
 
   const handleOpenForm = (center?: Center) => {
+    if (isOffline()) return;
+
     const initialData = center
       ? {
         name: center.name ?? '',
@@ -341,13 +369,29 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isOffline()) {
+      setError('Centers cannot be added or edited when offline.');
+      return;
+    }
+
     if (!formData.name.trim()) {
       setError('Center name is required');
       return;
     }
 
     setIsSubmitting(true);
+    const isCreate = !editingCenter;
+    const optimisticCenter: Center = isCreate
+      ? { id: -1, name: formData.name.trim(), badgeTextColor: formData.badgeTextColor, editorIds: formData.editorIds }
+      : { ...editingCenter!, name: formData.name.trim(), badgeTextColor: formData.badgeTextColor, editorIds: formData.editorIds };
     try {
+      if (typeof window !== 'undefined') {
+        setCenters(prev => {
+          const updated = isCreate ? [...prev, optimisticCenter] : prev.map(c => c.id === editingCenter!.id ? optimisticCenter : c);
+          setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), centers: updated })).catch(() => {});
+          return updated;
+        });
+      }
       const url = editingCenter
         ? `${API_BASE_URL}/centers/${editingCenter.id}`
         : `${API_BASE_URL}/centers`;
@@ -369,20 +413,40 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to save center');
       }
-
+      const savedCenter = await response.json();
+      if (typeof window !== 'undefined') {
+        setCenters(prev => {
+          const updated = isCreate
+            ? prev.map(c => c.id === -1 ? savedCenter : c)
+            : prev.map(c => c.id === editingCenter!.id ? savedCenter : c);
+          setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), centers: updated })).catch(() => {});
+          return updated;
+        });
+      }
       await fetchCenters();
 
       // Clear caches since centers data has changed
       clearCentersCache(); // Clear the CenterBadges module-level cache
-      removeLocalStorageItem('saiSongs:singersCache'); // Singers may have changed permissions
-      removeLocalStorageItem(CENTERS_CACHE_KEY); // Clear any localStorage centers cache
+      removeCacheItem('saiSongs:singersCache').catch(() => {}); // Singers may have changed permissions
+      removeCacheItem(CENTERS_CACHE_KEY).catch(() => {}); // Clear centers cache
 
       // Dispatch global event to notify other components
       globalEventBus.dispatch('centerUpdated', { type: 'centerUpdated', center: editingCenter ?? null });
+      // Trigger singers refetch to repopulate cache (needed for offline; singers have center associations)
+      globalEventBus.requestRefresh('singers');
 
       setError('');
       handleCloseForm(true); // Force close without unsaved changes check
     } catch (err: any) {
+      if (typeof window !== 'undefined') {
+        setCenters(prev => {
+          const reverted = isCreate
+            ? prev.filter(c => c.id !== -1)
+            : prev.map(c => c.id === editingCenter!.id ? editingCenter! : c);
+          setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), centers: reverted })).catch(() => {});
+          return reverted;
+        });
+      }
       console.error('Error saving center:', err);
       setError(err.message || 'Failed to save center');
     } finally {
@@ -391,11 +455,23 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
   };
 
   const handleDelete = async (center: Center) => {
+    if (isOffline()) {
+      setError('Centers cannot be deleted when offline.');
+      return;
+    }
+
     if (!confirm(`Are you sure you want to delete "${center.name}"? This action cannot be undone.`)) {
       return;
     }
 
     try {
+      if (typeof window !== 'undefined') {
+        setCenters(prev => {
+          const updated = prev.filter(c => c.id !== center.id);
+          setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), centers: updated })).catch(() => {});
+          return updated;
+        });
+      }
       const response = await fetch(`${API_BASE_URL}/centers/${center.id}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -426,16 +502,23 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
 
       await fetchCenters();
 
-      // Clear caches since centers data has changed
       clearCentersCache();
-      removeLocalStorageItem('saiSongs:singersCache');
-      removeLocalStorageItem('saiSongs:centersCache');
+      removeCacheItem('saiSongs:singersCache').catch(() => {});
+      removeCacheItem(CENTERS_CACHE_KEY).catch(() => {});
 
-      // Dispatch global event to notify other components
       globalEventBus.dispatch('centerDeleted', { type: 'centerDeleted', center: center });
+      // Trigger singers refetch to repopulate cache (needed for offline; singers have center associations)
+      globalEventBus.requestRefresh('singers');
 
       setError('');
     } catch (err: any) {
+      if (typeof window !== 'undefined') {
+        setCenters(prev => {
+          const reverted = [...prev, center];
+          setCacheItem(CENTERS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), centers: reverted })).catch(() => {});
+          return reverted;
+        });
+      }
       console.error('Error deleting center:', err);
       setError(err.message || 'Failed to delete center');
     }
@@ -449,6 +532,8 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
       </div>
     );
   }
+
+  const offline = isOffline();
 
   // Mobile actions for bottom bar
   const mobileActions: MobileAction[] = [
@@ -464,6 +549,7 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
       icon: 'fas fa-plus',
       onClick: () => handleOpenForm(),
       variant: 'primary',
+      disabled: offline,
     },
   ];
 
@@ -509,7 +595,9 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
         </button>
         <button
           onClick={() => handleOpenForm()}
-          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+          disabled={offline}
+          title={offline ? 'Centers cannot be added or edited when offline' : undefined}
+          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
         >
           <i className="fas fa-plus text-lg"></i>
           Add Center
@@ -527,7 +615,7 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
       listContainerRef={baseManager.listContainerRef}
       headerRef={baseManager.headerRef}
       title="Centers"
-      subtitle="Manage centers and editors"
+      subtitle={offline ? 'Centers cannot be added, edited, or deleted when offline.' : 'Manage centers and editors'}
       helpHref="/help#centers"
       headerActions={headerActions}
       headerBelow={!loading && (centers.length > 0 || filteredCenters.length > 0) ? (
@@ -639,15 +727,19 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
-                    onClick={() => handleOpenForm(center)}
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
+                    onClick={() => !offline && handleOpenForm(center)}
+                    disabled={offline}
+                    title={offline ? 'Centers cannot be edited when offline' : undefined}
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
                     <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
                   </button>
                   <button
-                    onClick={() => handleDelete(center)}
-                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors"
+                    onClick={() => !offline && handleDelete(center)}
+                    disabled={offline}
+                    title={offline ? 'Centers cannot be deleted when offline' : undefined}
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
                     <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>

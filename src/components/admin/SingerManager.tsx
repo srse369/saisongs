@@ -4,7 +4,7 @@ import { useSingers } from '../../contexts/SingerContext';
 import { usePitches } from '../../contexts/PitchContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
-import { removeLocalStorageItem } from '../../utils/cacheUtils';
+import { removeCacheItem } from '../../utils/cacheUtils';
 import { RefreshIcon, type MobileAction } from '../common';
 import { SingerForm } from './SingerForm';
 import { SingerList } from './SingerList';
@@ -129,7 +129,7 @@ export const SingerManager: React.FC<SingerManagerProps> = ({ isActive = true })
           });
 
           // Clear centers cache since editor assignments affect center data
-          removeLocalStorageItem('saiSongs:centersCache');
+          removeCacheItem('saiSongs:centersCache').catch(() => {});
 
           // Refresh singers to get updated data
           await fetchSingers(true);

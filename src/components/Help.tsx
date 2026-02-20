@@ -790,12 +790,15 @@ export const Help: React.FC = () => {
     return text.toLowerCase().includes(query.toLowerCase());
   };
 
-  // Highlight matching text
+  // Escape HTML to prevent XSS when user search query is rendered
+  const escapeHtml = (s: string): string =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
+  // Highlight matching text (escapes matched content to prevent XSS)
   const highlightText = (text: string, query: string): string => {
     if (!query.trim()) return text;
-    
     const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return text.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-600 px-1 rounded">$1</mark>');
+    return text.replace(regex, (_, match) => `<mark class="bg-yellow-200 dark:bg-yellow-600 px-1 rounded">${escapeHtml(match)}</mark>`);
   };
 
   // Filter sections and subsections based on search query

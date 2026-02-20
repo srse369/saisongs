@@ -117,7 +117,7 @@ Shows a complex manager with:
 - Multiple modals
 - Custom header actions
 
-### FeedbackManagerRefactored.tsx
+### FeedbackManager.tsx
 Shows a simpler manager with:
 - Basic filtering
 - Single modal
@@ -146,10 +146,8 @@ Shows a simpler manager with:
 src/components/admin/
 ├── BaseManager.tsx              # Reusable UI component
 ├── README.md                    # This documentation
-├── SongManager.tsx              # Original implementation
-├── SongManagerRefactored.tsx    # Using base pattern
-├── FeedbackManager.tsx          # Original implementation  
-├── FeedbackManagerRefactored.tsx # Using base pattern
+├── SongManagerRefactored.tsx    # Song management (uses base pattern)
+├── FeedbackManager.tsx          # Feedback management (uses base pattern)
 └── ...other managers...
 
 src/hooks/

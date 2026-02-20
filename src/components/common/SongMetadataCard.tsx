@@ -53,31 +53,9 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
   
   return (
     <div className={`${shouldShowBackground ? 'bg-slate-100/80 dark:bg-gray-900/60 px-[5px] pb-[5px]' : ''} md:px-2 md:pt-1 md:pb-1 md:mb-1.5 ${shouldShowBackground ? 'rounded-lg' : ''}`}>
-      {/* Song Name with External Link and Info Button */}
+      {/* Song Name with External Link and Lyrics Button */}
       <div className="flex items-center gap-2">
-        {lyricsHover ? (
-          <LyricsHoverPopup
-            songId={lyricsHover.songId}
-            songName={lyricsHover.songName}
-            song={lyricsHover.song}
-            className="flex-1 min-w-0"
-          >
-            {onNameClick ? (
-              <button
-                type="button"
-                onClick={onNameClick}
-                className="text-left text-base sm:text-lg font-semibold text-gray-900 dark:text-white hover:underline w-full truncate whitespace-nowrap"
-                {...(nameClickTitle ? { title: nameClickTitle } : {})}
-              >
-                {song.name}
-              </button>
-            ) : (
-              <span className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white block truncate whitespace-nowrap">
-                {song.name}
-              </span>
-            )}
-          </LyricsHoverPopup>
-        ) : onNameClick ? (
+        {onNameClick ? (
           <button
             type="button"
             onClick={onNameClick}
@@ -98,6 +76,22 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
               {pitchCount}
             </div>
           </div>
+        )}
+        {/* Lyrics button - small circle with "l" that shows lyrics on hover */}
+        {lyricsHover && (
+          <LyricsHoverPopup
+            songId={lyricsHover.songId}
+            songName={lyricsHover.songName}
+            song={lyricsHover.song}
+            className="flex-shrink-0"
+          >
+            <div
+              title="View lyrics"
+              className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 text-xs font-semibold cursor-default"
+            >
+              ℓ
+            </div>
+          </LyricsHoverPopup>
         )}
         {onPreviewClick && (
           <button

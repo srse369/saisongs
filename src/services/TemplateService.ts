@@ -3,7 +3,7 @@
  */
 
 import apiClient from './ApiClient';
-import { CACHE_KEYS, getLocalStorageItem, setLocalStorageItem } from '../utils/cacheUtils';
+import { CACHE_KEYS, getCacheItem, setCacheItem } from '../utils/cacheUtils';
 import type { PresentationTemplate, TemplateReference } from '../types';
 
 const DEFAULT_TEMPLATE_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -44,10 +44,10 @@ class TemplateService {
       // Also cache the default template for use in new tabs (presentation preview)
       const defaultT = templates.find((t) => t.isDefault);
       if (defaultT && typeof window !== 'undefined') {
-        setLocalStorageItem(
+        setCacheItem(
           CACHE_KEYS.SAI_SONGS_DEFAULT_TEMPLATE,
           JSON.stringify({ timestamp: Date.now(), template: defaultT })
-        );
+        ).catch(() => {});
       }
       return templates;
     } catch (error) {
@@ -60,10 +60,37 @@ class TemplateService {
    * Get template by ID (with caching and promise deduplication)
    */
   async getTemplate(id: string): Promise<PresentationTemplate> {
-    // Check cache first
+    // Check in-memory cache first
     const cached = templateCache.get(id);
     if (cached && Date.now() - cached.timestamp < TEMPLATE_CACHE_TTL_MS) {
       return cached.template;
+    }
+
+    // When offline, use IndexedDB cache only - avoid hanging fetch
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    if (isOffline && typeof window !== 'undefined') {
+      const templatesRaw = await getCacheItem(CACHE_KEYS.SAI_SONGS_TEMPLATES);
+      if (templatesRaw) {
+        try {
+          const { templates } = JSON.parse(templatesRaw) as { timestamp: number; templates: PresentationTemplate[] };
+          if (Array.isArray(templates)) {
+            const found = templates.find((t) => t.id === id);
+            if (found) return found;
+          }
+        } catch {
+          // Fall through
+        }
+      }
+      const defaultRaw = await getCacheItem(CACHE_KEYS.SAI_SONGS_DEFAULT_TEMPLATE);
+      if (defaultRaw) {
+        try {
+          const { template } = JSON.parse(defaultRaw) as { timestamp: number; template: PresentationTemplate };
+          if (template && template.id === id) return template;
+        } catch {
+          // Fall through
+        }
+      }
+      throw new Error('Template not found in offline cache');
     }
 
     // Check if fetch is already in progress
@@ -100,13 +127,15 @@ class TemplateService {
    * Get default template (uses localStorage cache first to avoid backend fetch in new tabs)
    */
   async getDefaultTemplate(): Promise<PresentationTemplate | null> {
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
     // 1. Try dedicated default template cache (survives new tab / page reload)
     if (typeof window !== 'undefined') {
-      const cachedRaw = getLocalStorageItem(CACHE_KEYS.SAI_SONGS_DEFAULT_TEMPLATE);
+      const cachedRaw = await getCacheItem(CACHE_KEYS.SAI_SONGS_DEFAULT_TEMPLATE);
       if (cachedRaw) {
         try {
           const { timestamp, template } = JSON.parse(cachedRaw) as { timestamp: number; template: PresentationTemplate };
-          if (template && Date.now() - timestamp < DEFAULT_TEMPLATE_CACHE_TTL_MS) {
+          if (template && (isOffline || Date.now() - timestamp < DEFAULT_TEMPLATE_CACHE_TTL_MS)) {
             return template;
           }
         } catch {
@@ -114,11 +143,11 @@ class TemplateService {
         }
       }
       // 2. Try templates list cache - find default (populated when user visited Templates tab)
-      const templatesRaw = getLocalStorageItem(CACHE_KEYS.SAI_SONGS_TEMPLATES);
+      const templatesRaw = await getCacheItem(CACHE_KEYS.SAI_SONGS_TEMPLATES);
       if (templatesRaw) {
         try {
           const { timestamp, templates } = JSON.parse(templatesRaw) as { timestamp: number; templates: PresentationTemplate[] };
-          if (Array.isArray(templates) && Date.now() - timestamp < DEFAULT_TEMPLATE_CACHE_TTL_MS) {
+          if (Array.isArray(templates) && (isOffline || Date.now() - timestamp < DEFAULT_TEMPLATE_CACHE_TTL_MS)) {
             const defaultT = templates.find((t) => t.isDefault);
             if (defaultT) return defaultT;
           }
@@ -126,15 +155,17 @@ class TemplateService {
           // Ignore parse errors
         }
       }
+      // When offline, never call API - return cache or null
+      if (isOffline) return null;
     }
     // 3. Fetch from backend and cache on success
     try {
       const template = await apiClient.get<PresentationTemplate>('/templates/default');
       if (template && typeof window !== 'undefined') {
-        setLocalStorageItem(
+        setCacheItem(
           CACHE_KEYS.SAI_SONGS_DEFAULT_TEMPLATE,
           JSON.stringify({ timestamp: Date.now(), template })
-        );
+        ).catch(() => {});
       }
       return template;
     } catch (error) {

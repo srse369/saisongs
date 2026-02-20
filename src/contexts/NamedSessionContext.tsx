@@ -9,6 +9,10 @@ import type {
 } from '../types';
 import NamedSessionService from '../services/NamedSessionService';
 import { useToast } from './ToastContext';
+import { isOfflineError, addToOfflineQueue, generateTempId } from '../utils/offlineQueue';
+import { getCacheItem, setCacheItem } from '../utils/cacheUtils';
+import { CACHE_KEYS } from '../utils/cacheUtils';
+import { globalEventBus } from '../utils/globalEventBus';
 
 interface NamedSessionContextType {
   sessions: NamedSession[];
@@ -57,6 +61,13 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       const data = await NamedSessionService.getAllSessions();
       setSessions(data);
+      // Persist to cache for offline use and browser cache stats
+      if (typeof window !== 'undefined' && data.length > 0) {
+        setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({
+          timestamp: Date.now(),
+          sessions: data,
+        })).catch(() => {});
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load sessions';
       setError(message);
@@ -77,6 +88,7 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const message = err instanceof Error ? err.message : 'Failed to load session';
       setError(message);
       showToast('error', message);
+      throw err; // Re-throw so caller can clean up (e.g. close modal, clear loading state)
     } finally {
       setLoading(false);
     }
@@ -86,12 +98,58 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const createSession = useCallback(async (input: CreateNamedSessionInput): Promise<NamedSession | null> => {
     setLoading(true);
     setError(null);
+    const tempId = generateTempId('session');
+    const optimisticSession: NamedSession = { id: tempId, name: input.name, description: input.description, centerIds: input.centerIds, items: [] };
     try {
+      if (typeof window !== 'undefined') {
+        setSessions(prev => {
+          const updated = [...prev, optimisticSession];
+          setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: updated })).catch(() => {});
+          return updated;
+        });
+      }
       const newSession = await NamedSessionService.createSession(input);
-      setSessions(prev => [...prev, newSession]);
+      if (typeof window !== 'undefined') {
+        setSessions(prev => {
+          const updated = prev.filter(s => s.id !== tempId);
+          const merged = [...updated, newSession];
+          setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: merged })).catch(() => {});
+          return merged;
+        });
+      }
       showToast('success', 'Session created successfully');
       return newSession;
     } catch (err) {
+      if (typeof window !== 'undefined') {
+        setSessions(prev => {
+          const reverted = prev.filter(s => s.id !== tempId);
+          setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: reverted })).catch(() => {});
+          return reverted;
+        });
+      }
+      if (isOfflineError(err)) {
+        addToOfflineQueue({
+          type: 'create',
+          entity: 'session',
+          payload: { ...input, items: [] } as unknown as Record<string, unknown>,
+          tempId,
+          displayLabel: `Session: ${input.name}`,
+        });
+        setSessions(prev => [...prev, optimisticSession]);
+        const raw = await getCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS);
+        if (raw) {
+          try {
+            const { sessions } = JSON.parse(raw);
+            const updated = [...(sessions || []), optimisticSession];
+            setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: updated })).catch(() => {});
+          } catch {
+            // ignore
+          }
+        }
+        showToast('success', 'Session saved offline. Will sync when online.');
+        setLoading(false);
+        return optimisticSession;
+      }
       const message = err instanceof Error ? err.message : 'Failed to create session';
       setError(message);
       showToast('error', message);
@@ -105,15 +163,57 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const updateSession = useCallback(async (id: string, input: UpdateNamedSessionInput): Promise<NamedSession | null> => {
     setLoading(true);
     setError(null);
+    const existing = sessions.find(s => s.id === id);
+    const optimisticSession = existing ? { ...existing, ...input } : null;
     try {
+      if (optimisticSession && typeof window !== 'undefined') {
+        setSessions(prev => {
+          const updated = prev.map(s => s.id === id ? optimisticSession : s);
+          setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: updated })).catch(() => {});
+          return updated;
+        });
+        if (currentSession && currentSession.id === id) {
+          setCurrentSession({ ...currentSession, ...input });
+        }
+      }
       const updatedSession = await NamedSessionService.updateSession(id, input);
-      setSessions(prev => prev.map(s => s.id === id ? updatedSession : s));
-      if (currentSession && currentSession.id === id) {
+      setSessions(prev => {
+        const merged = prev.map(s => s.id === id ? updatedSession : s);
+        setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: merged })).catch(() => {});
+        return merged;
+      });
+      if (currentSession?.id === id) {
         setCurrentSession({ ...currentSession, ...updatedSession });
       }
       showToast('success', 'Session updated successfully');
       return updatedSession;
     } catch (err) {
+      if (existing && typeof window !== 'undefined') {
+        setSessions(prev => {
+          const reverted = prev.map(s => s.id === id ? existing : s);
+          setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: reverted })).catch(() => {});
+          return reverted;
+        });
+        if (currentSession && currentSession.id === id) {
+          setCurrentSession({ ...currentSession, ...existing });
+        }
+      }
+      if (isOfflineError(err)) {
+        addToOfflineQueue({
+          type: 'update',
+          entity: 'session',
+          payload: { id, ...input } as unknown as Record<string, unknown>,
+          displayLabel: `Session: ${input.name ?? sessions.find(s => s.id === id)?.name ?? id}`,
+        });
+        setSessions(prev => prev.map(s => s.id === id ? { ...s, ...input } : s));
+        if (currentSession && currentSession.id === id) {
+          setCurrentSession({ ...currentSession, ...input });
+        }
+        showToast('success', 'Session saved offline. Will sync when online.');
+        setLoading(false);
+        const existing = sessions.find(s => s.id === id);
+        return existing ? ({ ...existing, ...input } as NamedSession) : null;
+      }
       const message = err instanceof Error ? err.message : 'Failed to update session';
       setError(message);
       showToast('error', message);
@@ -121,21 +221,50 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } finally {
       setLoading(false);
     }
-  }, [currentSession, showToast]);
+  }, [currentSession, sessions, showToast]);
 
   // Delete a session
   const deleteSession = useCallback(async (id: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
+    const sessionToDelete = sessions.find(s => s.id === id);
     try {
-      await NamedSessionService.deleteSession(id);
-      setSessions(prev => prev.filter(s => s.id !== id));
-      if (currentSession && currentSession.id === id) {
-        setCurrentSession(null);
+      if (sessionToDelete && typeof window !== 'undefined') {
+        setSessions(prev => {
+          const updated = prev.filter(s => s.id !== id);
+          setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: updated })).catch(() => {});
+          return updated;
+        });
+        if (currentSession && currentSession.id === id) {
+          setCurrentSession(null);
+        }
       }
+      await NamedSessionService.deleteSession(id);
       showToast('success', 'Session deleted successfully');
       return true;
     } catch (err) {
+      if (sessionToDelete && typeof window !== 'undefined') {
+        setSessions(prev => {
+          const reverted = [...prev, sessionToDelete];
+          setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: reverted })).catch(() => {});
+          return reverted;
+        });
+      }
+      if (isOfflineError(err)) {
+        addToOfflineQueue({
+          type: 'delete',
+          entity: 'session',
+          payload: { id },
+          displayLabel: `Session: ${sessions.find(s => s.id === id)?.name ?? id}`,
+        });
+        setSessions(prev => prev.filter(s => s.id !== id));
+        if (currentSession && currentSession.id === id) {
+          setCurrentSession(null);
+        }
+        showToast('success', 'Session removed offline. Will sync when online.');
+        setLoading(false);
+        return true;
+      }
       const message = err instanceof Error ? err.message : 'Failed to delete session';
       setError(message);
       showToast('error', message);
@@ -151,7 +280,13 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setError(null);
     try {
       const newSession = await NamedSessionService.duplicateSession(id, newName);
-      setSessions(prev => [...prev, newSession]);
+      setSessions(prev => {
+        const updated = [...prev, newSession];
+        if (typeof window !== 'undefined') {
+          setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: updated })).catch(() => {});
+        }
+        return updated;
+      });
       showToast('success', 'Session duplicated successfully');
       return newSession;
     } catch (err) {
@@ -176,9 +311,39 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (currentSession && currentSession.id === sessionId) {
         setCurrentSession({ ...currentSession, items: updatedItems });
       }
+      // Update sessions cache so all sessions always have items
+      setSessions(prev => {
+        const updated = prev.map(s => s.id === sessionId ? { ...s, items: updatedItems } : s);
+        if (typeof window !== 'undefined') {
+          setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: updated })).catch(() => {});
+        }
+        return updated;
+      });
       // Don't show toast here - it's an internal operation, parent will show appropriate message
       return updatedItems;
     } catch (err) {
+      if (isOfflineError(err)) {
+        addToOfflineQueue({
+          type: 'update',
+          entity: 'session',
+          payload: { id: sessionId, items } as unknown as Record<string, unknown>,
+          displayLabel: `Session items: ${currentSession?.name ?? sessionId}`,
+        });
+        if (currentSession && currentSession.id === sessionId) {
+          const optimisticItems = items.map((item, i) => ({
+            id: `temp-item-${i}`,
+            sessionId,
+            songId: item.songId,
+            singerId: item.singerId,
+            pitch: item.pitch,
+            songName: '',
+            singerName: '',
+          }));
+          setCurrentSession({ ...currentSession, items: optimisticItems as SessionItemWithDetails[] });
+        }
+        setLoading(false);
+        return (currentSession?.items || []) as SessionItemWithDetails[];
+      }
       const message = err instanceof Error ? err.message : 'Failed to update session items';
       setError(message);
       showToast('error', message);
@@ -237,6 +402,16 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       hasLoadedRef.current = true;
       loadSessions();
     }
+  }, [loadSessions, isPresentationOnly]);
+
+  // Reload sessions when offline sync completes
+  useEffect(() => {
+    const unsub = globalEventBus.on('dataRefreshNeeded', (detail) => {
+      if (detail.resource === 'all' && !isPresentationOnly) {
+        loadSessions();
+      }
+    });
+    return unsub;
   }, [loadSessions, isPresentationOnly]);
 
   const value: NamedSessionContextType = {

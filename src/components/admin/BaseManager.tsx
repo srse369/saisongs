@@ -82,7 +82,7 @@ export const BaseManager: React.FC<BaseManagerProps> = ({
         ref={headerRef}
         className="fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700"
         style={{
-          top: isMobile ? '48px' : '64px', // h-12 = 48px on mobile, md:h-16 = 64px on desktop
+          top: isMobile ? 'calc(48px + var(--offline-banner-height, 0px))' : 'calc(64px + var(--offline-banner-height, 0px))',
           paddingTop: 'env(safe-area-inset-top, 0px)',
         }}
       >

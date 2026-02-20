@@ -41,7 +41,11 @@ if (!process.env.BREVO_API_KEY) {
 }
 
 if (!process.env.SESSION_SECRET) {
-  console.warn('⚠️  WARNING: SESSION_SECRET not set! Using default (INSECURE)');
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ FATAL: SESSION_SECRET must be set in production');
+    process.exit(1);
+  }
+  console.warn('⚠️  WARNING: SESSION_SECRET not set! Using default (INSECURE - dev only)');
   process.env.SESSION_SECRET = 'dev-session-secret-change-in-production';
 }
 

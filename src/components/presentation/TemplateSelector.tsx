@@ -5,10 +5,12 @@ import type { PresentationTemplate } from '../../types';
 interface TemplateSelectorProps {
   onTemplateSelect?: (template: PresentationTemplate) => void;
   currentTemplateId?: string;
+  /** Fallback name when template is in use but not yet in context list (e.g. new tab) */
+  currentTemplateName?: string;
   onExpandedChange?: (expanded: boolean) => void;
 }
 
-export default function TemplateSelector({ onTemplateSelect, currentTemplateId, onExpandedChange }: TemplateSelectorProps) {
+export default function TemplateSelector({ onTemplateSelect, currentTemplateId, currentTemplateName, onExpandedChange }: TemplateSelectorProps) {
   const { templates: contextTemplates, loading: contextLoading, fetchTemplates } = useTemplates();
   const [expanded, setExpanded] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -84,9 +86,9 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
   };
 
   const selectedTemplate = contextTemplates.find(t => t.id === currentTemplateId);
-  // Consider template selected if we have a currentTemplateId, even if templates haven't loaded yet
-  // This prevents showing "Select one" while the default template is being loaded
-  const isTemplateSelected = !!selectedTemplate || (!!currentTemplateId && contextLoading);
+  // Consider template selected if we have it in context, or currentTemplateId + loading, or currentTemplateId + fallback name (template in use but not in context yet)
+  const isTemplateSelected = !!selectedTemplate || (!!currentTemplateId && contextLoading) || (!!currentTemplateId && !!currentTemplateName);
+  const displayName = selectedTemplate?.name ?? (currentTemplateName && currentTemplateId ? currentTemplateName : null);
 
   return (
     <>
@@ -97,7 +99,7 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
           className={`w-full sm:w-auto sm:min-w-[200px] sm:max-w-[200px] min-h-[35px] sm:max-h-[35px] max-h-[35px] flex items-center justify-center sm:justify-start gap-2 sm:gap-3 px-3 sm:px-5 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 shadow-lg hover:shadow-xl transition-all duration-200 font-medium bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 focus:ring-amber-500 ${
             !isTemplateSelected ? 'animate-pulse-gentle' : ''
           }`}
-          title={isTemplateSelected ? `Template: ${selectedTemplate?.name}` : 'Pick a template for presentation'}
+          title={isTemplateSelected ? `Template: ${displayName || 'Default'}` : 'Pick a template for presentation'}
         >
           <i className="fas fa-layer-group text-lg flex-shrink-0"></i>
           {/* Mobile: simplified, Desktop: full layout */}
@@ -105,7 +107,7 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
             <span className="text-xs font-bold opacity-90 tracking-wider">TEMPLATE</span>
             <span className="text-[10px] truncate w-full">
               {isTemplateSelected 
-                ? (selectedTemplate?.name || (currentTemplateId && contextLoading ? 'Loading...' : 'Default'))
+                ? (displayName || (currentTemplateId && contextLoading ? 'Loading...' : 'Default'))
                 : 'Select one'}
             </span>
           </div>

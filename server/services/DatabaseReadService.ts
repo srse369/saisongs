@@ -589,6 +589,17 @@ class DatabaseReadService {
   }
 
   /**
+   * Get all presentation templates (for caching)
+   */
+  async getAllTemplatesForCache(): Promise<any[]> {
+    return await this.query<any>(`
+      SELECT id, name, description, template_json, center_ids, is_default, created_at, updated_at
+      FROM presentation_templates
+      ORDER BY is_default DESC, name ASC
+    `);
+  }
+
+  /**
    * Get template by ID
    */
   async getTemplateById(id: string): Promise<any | null> {
@@ -761,6 +772,36 @@ class DatabaseReadService {
     return result[0]?.CNT || result[0]?.cnt || 0;
   }
 
+  /**
+   * Get entity counts for health/stats - lightweight COUNT queries instead of loading all rows.
+   */
+  async getEntityCounts(): Promise<{
+    centers: number;
+    songs: number;
+    users: number;
+    pitches: number;
+    templates: number;
+    sessions: number;
+  }> {
+    const [centers, songs, users, pitches, templates, sessions] = await Promise.all([
+      this.query<any>('SELECT COUNT(*) as cnt FROM centers'),
+      this.query<any>('SELECT COUNT(*) as cnt FROM songs'),
+      this.query<any>('SELECT COUNT(*) as cnt FROM users'),
+      this.query<any>('SELECT COUNT(*) as cnt FROM song_singer_pitches'),
+      this.query<any>('SELECT COUNT(*) as cnt FROM presentation_templates'),
+      this.query<any>('SELECT COUNT(*) as cnt FROM song_sessions'),
+    ]);
+    const getCnt = (r: any[]): number => r[0]?.CNT ?? r[0]?.cnt ?? 0;
+    return {
+      centers: getCnt(centers),
+      songs: getCnt(songs),
+      users: getCnt(users),
+      pitches: getCnt(pitches),
+      templates: getCnt(templates),
+      sessions: getCnt(sessions),
+    };
+  }
+
   // =====================================================
   // UTILITY METHODS
   // =====================================================
@@ -835,6 +876,35 @@ class DatabaseReadService {
       FROM songs s
       WHERE RAWTOHEX(s.id) = :1
     `, [id]);
+  }
+
+  /**
+   * Get all songs with CLOB fields (for offline download - single batched query)
+   */
+  async getAllSongsWithClobsForCache(): Promise<any[]> {
+    return await this.query(`
+      SELECT 
+        RAWTOHEX(s.id) as id,
+        s.name,
+        s.external_source_url,
+        DBMS_LOB.SUBSTR(s.lyrics, 4000, 1) AS lyrics,
+        DBMS_LOB.SUBSTR(s.meaning, 4000, 1) AS meaning,
+        s."LANGUAGE" as language,
+        s.deity,
+        s.tempo,
+        s.beat,
+        s.raga,
+        s."LEVEL" as song_level,
+        DBMS_LOB.SUBSTR(s.song_tags, 4000, 1) AS song_tags,
+        s.audio_link,
+        s.video_link,
+        s.golden_voice,
+        s.reference_gents_pitch,
+        s.reference_ladies_pitch,
+        (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.song_id = s.id) as pitch_count
+      FROM songs s
+      ORDER BY LTRIM(REGEXP_REPLACE(LOWER(s.name), '[^a-zA-Z0-9 ]', ''), '0123456789 ')
+    `);
   }
 
   /**
@@ -1415,6 +1485,41 @@ class DatabaseReadService {
        WHERE RAWTOHEX(id) = :1`,
       [normalizedId]
     );
+  }
+
+  /**
+   * Get deleted entity IDs since a given timestamp (for offline cache cleanup).
+   * Returns IDs grouped by entity type. Requires deleted_entities table (run migration_deleted_entities.sql).
+   */
+  async getDeletedEntitiesSince(since: Date): Promise<{ songs: string[]; singers: string[]; pitches: string[]; templates: string[]; sessions: string[]; centers: string[] }> {
+    try {
+      const rows = await this.query<{ ENTITY_TYPE: string; ENTITY_ID: string }>(
+        `SELECT entity_type, entity_id FROM deleted_entities WHERE deleted_at > :1`,
+        [since]
+      );
+      const result = {
+        songs: [] as string[],
+        singers: [] as string[],
+        pitches: [] as string[],
+        templates: [] as string[],
+        sessions: [] as string[],
+        centers: [] as string[],
+      };
+      for (const row of rows) {
+        const type = row.ENTITY_TYPE?.toLowerCase();
+        const id = String(row.ENTITY_ID || '');
+        if (type && id && type in result) {
+          (result as Record<string, string[]>)[type].push(id);
+        }
+      }
+      return result;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('ORA-00942') || msg.includes('does not exist')) {
+        return { songs: [], singers: [], pitches: [], templates: [], sessions: [], centers: [] };
+      }
+      throw err;
+    }
   }
 }
 

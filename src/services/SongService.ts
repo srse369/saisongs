@@ -1,5 +1,5 @@
 import apiClient from './ApiClient';
-import { CACHE_KEYS, getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
+import { CACHE_KEYS, getCacheItem, setCacheItem, removeCacheItem } from '../utils/cacheUtils';
 import { normalizePitch } from '../utils/pitchNormalization';
 import type {
   Song,
@@ -80,14 +80,16 @@ class SongService {
    * Retrieves a single song by ID (uses localStorage cache first to avoid backend fetch in new tabs)
    */
   async getSongById(id: string, nocache: boolean = false): Promise<Song | null> {
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
     if (!nocache && typeof window !== 'undefined') {
       // 1. Try individual song cache
       const songKey = `${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`;
-      const cachedRaw = getLocalStorageItem(songKey);
+      const cachedRaw = await getCacheItem(songKey);
       if (cachedRaw) {
         try {
           const { timestamp, song } = JSON.parse(cachedRaw) as { timestamp: number; song: Song };
-          if (song && Date.now() - timestamp < SONG_CACHE_TTL_MS) {
+          if (song && (isOffline || Date.now() - timestamp < SONG_CACHE_TTL_MS)) {
             return song;
           }
         } catch {
@@ -95,13 +97,13 @@ class SongService {
         }
       }
       // 2. Try songs list cache (populated when user visited Songs tab)
-      const listRaw = getLocalStorageItem(CACHE_KEYS.SAI_SONGS_SONGS);
+      const listRaw = await getCacheItem(CACHE_KEYS.SAI_SONGS_SONGS);
       if (listRaw) {
         try {
           const { timestamp, songs } = JSON.parse(listRaw) as { timestamp: number; songs: Song[] };
-          if (Array.isArray(songs) && Date.now() - timestamp < SONG_CACHE_TTL_MS) {
+          if (Array.isArray(songs) && (isOffline || Date.now() - timestamp < SONG_CACHE_TTL_MS)) {
             const found = songs.find((s) => s.id === id);
-            if (found && found.lyrics != null && found.lyrics !== undefined) {
+            if (found && (found.lyrics != null && found.lyrics !== undefined || isOffline)) {
               return found;
             }
           }
@@ -109,16 +111,66 @@ class SongService {
           // Ignore parse errors
         }
       }
+      // When offline, never call API - fetch would hang. Return cache or null.
+      if (isOffline) {
+        const songKey = `${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`;
+        const offlineCached = await getCacheItem(songKey);
+        if (offlineCached) {
+          try {
+            const { song } = JSON.parse(offlineCached) as { timestamp: number; song: Song };
+            if (song) return song;
+          } catch {
+            // Fall through
+          }
+        }
+        const offlineList = await getCacheItem(CACHE_KEYS.SAI_SONGS_SONGS);
+        if (offlineList) {
+          try {
+            const { songs } = JSON.parse(offlineList) as { timestamp: number; songs: Song[] };
+            if (Array.isArray(songs)) {
+              const found = songs.find((s) => s.id === id);
+              if (found) return found;
+            }
+          } catch {
+            // Fall through
+          }
+        }
+        return null;
+      }
     }
     try {
       const song = await apiClient.getSong(id, nocache);
       if (song && typeof window !== 'undefined') {
         const songKey = `${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`;
-        setLocalStorageItem(songKey, JSON.stringify({ timestamp: Date.now(), song }));
+        await setCacheItem(songKey, JSON.stringify({ timestamp: Date.now(), song }));
       }
       return song;
     } catch (error) {
-      console.error('Error fetching song by ID:', error);
+      // Offline fallback: return from cache even if expired so app works without network
+      if (!nocache && typeof window !== 'undefined') {
+        const songKey = `${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`;
+        const cachedRaw = await getCacheItem(songKey);
+        if (cachedRaw) {
+          try {
+            const { song } = JSON.parse(cachedRaw) as { timestamp: number; song: Song };
+            if (song) return song;
+          } catch {
+            // Fall through
+          }
+        }
+        const listRaw = await getCacheItem(CACHE_KEYS.SAI_SONGS_SONGS);
+        if (listRaw) {
+          try {
+            const { songs } = JSON.parse(listRaw) as { timestamp: number; songs: Song[] };
+            if (Array.isArray(songs)) {
+              const found = songs.find((s) => s.id === id);
+              if (found) return found;
+            }
+          } catch {
+            // Fall through
+          }
+        }
+      }
       if (error instanceof Error && error.message.includes('404')) {
         return null;
       }
@@ -210,7 +262,7 @@ class SongService {
     try {
       await apiClient.deleteSong(id);
       if (typeof window !== 'undefined') {
-        removeLocalStorageItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`);
+        await removeCacheItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`);
       }
       return true;
     } catch (error) {

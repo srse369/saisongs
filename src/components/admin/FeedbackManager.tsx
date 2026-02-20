@@ -8,6 +8,7 @@ import { RefreshIcon, type MobileAction } from '../common';
 import { BaseManager } from './BaseManager';
 import { useBaseManager } from '../../hooks/useBaseManager';
 import { globalEventBus } from '../../utils/globalEventBus';
+import { isOffline } from '../../utils/offlineQueue';
 
 const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
   bug: { label: 'Bug Report', icon: '🐛' },
@@ -92,6 +93,8 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
     };
   }, [loadFeedback]);
 
+  const offline = isOffline();
+
   const filteredFeedback = useMemo(() => {
     if (!searchTerm.trim()) return feedback;
     const q = searchTerm.toLowerCase().trim();
@@ -103,6 +106,8 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
   }, [feedback, searchTerm]);
 
   const handleViewDetails = (item: Feedback) => {
+    if (isOffline()) return;
+
     setSelectedFeedback(item);
     setAdminNotes(`\n-----------------------------------------\nUpdated by: ${item.updatedBy}\nUpdated at: ${item.updatedAt}\nAdmin Notes:\n${item.adminNotes || ''}`);
     setNewStatus(item.status);
@@ -120,6 +125,10 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
 
   const handleUpdateStatus = async () => {
     if (!selectedFeedback) return;
+    if (isOffline()) {
+      toast.error('Feedback cannot be updated when offline.');
+      return;
+    }
 
     try {
       await feedbackService.updateFeedback(selectedFeedback.id, {
@@ -141,6 +150,10 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
     if (!id) {
       console.error('Cannot delete feedback: ID is missing', { id });
       toast.error('Cannot delete feedback: ID is missing');
+      return;
+    }
+    if (isOffline()) {
+      toast.error('Feedback cannot be deleted when offline.');
       return;
     }
 
@@ -299,7 +312,7 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
       listContainerRef={baseManager.listContainerRef}
       headerRef={baseManager.headerRef}
       title="Feedback"
-      subtitle="User feedback and suggestions"
+      subtitle={offline ? 'Feedback cannot be updated or deleted when offline.' : 'User feedback and suggestions'}
       helpHref="/help#overview"
       headerActions={headerActions}
       headerBelow={(
@@ -388,16 +401,19 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
-                        onClick={() => handleViewDetails(item)}
-                        title="Edit feedback status and admin notes"
-                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                        onClick={() => !offline && handleViewDetails(item)}
+                        disabled={offline}
+                        title={offline ? 'Feedback cannot be edited when offline' : 'Edit feedback status and admin notes'}
+                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
                         <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
                       </button>
                       <button
-                        onClick={() => handleDelete(item.id)}
-                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+                        onClick={() => !offline && handleDelete(item.id)}
+                        disabled={offline}
+                        title={offline ? 'Feedback cannot be deleted when offline' : undefined}
+                        className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
                         <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
@@ -590,7 +606,8 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
               {!isPreviewMode && (
                 <button
                   onClick={handleUpdateStatus}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                  disabled={offline}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Save Changes
                 </button>

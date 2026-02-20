@@ -160,6 +160,29 @@ export class ApiClient {
     return this.request<T>(endpoint, { method: 'GET' });
   }
 
+  /**
+   * GET with timeout - aborts the request if it takes longer than timeoutMs.
+   * Use for large downloads that might hang indefinitely.
+   */
+  async getWithTimeout<T = any>(endpoint: string, timeoutMs: number): Promise<T> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const result = await this.request<T>(endpoint, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+      return result;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${timeoutMs / 1000} seconds`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
   async post<T = any>(endpoint: string, data?: any): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',

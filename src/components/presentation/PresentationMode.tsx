@@ -42,9 +42,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
   const pitch = searchParams.get('pitch') || undefined;
   const projectorWindowRef = useRef<Window | null>(null);
   
-  // Always get templateId from localStorage, or use default if not set
-  const persistedTemplateId = getSelectedTemplateId();
-  const [selectedTemplateId, setSelectedTemplateIdState] = useState<string | undefined>(persistedTemplateId || undefined);
+  const [selectedTemplateId, setSelectedTemplateIdState] = useState<string | undefined>(undefined);
   
   // Wrapper to update both state and localStorage
   const updateSelectedTemplateId = (id: string | undefined) => {
@@ -56,47 +54,50 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
 
   // Re-read persisted template when songId changes (in case it was updated in another preview)
   useEffect(() => {
-    const currentPersisted = getSelectedTemplateId();
-    if (currentPersisted && currentPersisted !== selectedTemplateId) {
-      setSelectedTemplateIdState(currentPersisted);
-    } else if (!currentPersisted && !selectedTemplateId && !activeTemplate) {
-      // If no template in localStorage, load default template
-      templateService.getDefaultTemplate().then(template => {
-        if (template && template.id) {
-          setSelectedTemplateIdState(template.id);
-          setActiveTemplate(template);
-          setSelectedTemplateId(template.id); // Persist default template
+    const syncTemplate = async () => {
+      const currentPersisted = await getSelectedTemplateId();
+      if (currentPersisted && currentPersisted !== selectedTemplateId) {
+        setSelectedTemplateIdState(currentPersisted);
+      } else if (!currentPersisted && !selectedTemplateId && !activeTemplate) {
+        try {
+          const template = await templateService.getDefaultTemplate();
+          if (template && template.id) {
+            setSelectedTemplateIdState(template.id);
+            setActiveTemplate(template);
+            setSelectedTemplateId(template.id);
+          }
+        } catch (err) {
+          console.error('Error loading default template:', err);
         }
-      }).catch(err => {
-        console.error('Error loading default template:', err);
-      });
-    }
+      }
+    };
+    syncTemplate();
   }, [songId, selectedTemplateId, activeTemplate]);
 
   // Load template and song data on mount
   useEffect(() => {
     const loadData = async () => {
+      // Always get templateId from IndexedDB or state, fallback to default
+      const currentPersistedTemplateId = await getSelectedTemplateId();
+      const effectiveTemplateId = currentPersistedTemplateId || selectedTemplateId;
+
+      // Only skip reloading if we have BOTH template AND song with full data, and they match
+      // Check BEFORE setLoading(true) to avoid flicker when effect re-runs after template state sync
+      const hasFullSongData = songData?.id === songId && songData?.lyrics !== null && songData?.lyrics !== undefined;
+      const hasMatchingTemplate = activeTemplate && activeTemplate.id === effectiveTemplateId;
+
+      if (hasFullSongData && hasMatchingTemplate) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
-      
+
       try {
-        // Always get templateId from localStorage or state, fallback to default
-        const currentPersistedTemplateId = getSelectedTemplateId();
-        const effectiveTemplateId = currentPersistedTemplateId || selectedTemplateId;
-        
         // Update state if we found a persisted template that's different
         if (currentPersistedTemplateId && currentPersistedTemplateId !== selectedTemplateId) {
           setSelectedTemplateIdState(currentPersistedTemplateId);
-        }
-        
-        // Only skip reloading if we have BOTH template AND song with full data, and they match
-        // Don't skip if we only have template but not song, or vice versa
-        const hasFullSongData = songData?.id === songId && songData?.lyrics !== null && songData?.lyrics !== undefined;
-        const hasMatchingTemplate = activeTemplate && activeTemplate.id === effectiveTemplateId;
-        
-        if (hasFullSongData && hasMatchingTemplate) {
-          setLoading(false);
-          return;
         }
         
         // Load template and song in parallel (template has retry for transient 500s)
@@ -158,7 +159,8 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
             if (defaultTemplate?.id) {
               setActiveTemplate(defaultTemplate);
               setSelectedTemplateIdState(defaultTemplate.id);
-              if (!getSelectedTemplateId()) {
+              const persisted = await getSelectedTemplateId();
+              if (!persisted) {
                 setSelectedTemplateId(defaultTemplate.id);
               }
             }
@@ -174,7 +176,8 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
     };
 
     loadData();
-  }, [songId, selectedTemplateId]);
+    // Only run on songId change - template switches use setActiveTemplate directly, no need to reload
+  }, [songId]);
 
   // Close projector window on unmount (e.g. browser back, navigate away)
   useEffect(() => {
@@ -491,6 +494,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
       topRightControls={
         <TemplateSelector 
           currentTemplateId={selectedTemplateId}
+          currentTemplateName={activeTemplate?.name}
           onTemplateSelect={(template) => {
             updateSelectedTemplateId(template.id);
             setActiveTemplate(template);

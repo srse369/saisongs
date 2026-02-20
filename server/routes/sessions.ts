@@ -8,8 +8,9 @@ const router = express.Router();
 
 // ============ Named Sessions ============
 
-// Get all sessions - Public endpoint for presentation purposes
+// Get all sessions with items - Public endpoint for presentation purposes
 // Uses optionalAuth to populate req.user if logged in (for center-based filtering)
+// All sessions are returned with items for offline caching and load session
 router.get('/', optionalAuth, async (req, res) => {
   try {
     // Get all sessions from database (fresh data, filtering is user-specific)
@@ -46,7 +47,15 @@ router.get('/', optionalAuth, async (req, res) => {
       });
     }
     
-    res.json(filteredSessions);
+    // Fetch full session with items for each filtered session
+    const sessionsWithItems = await Promise.all(
+      filteredSessions.map(async (s: { id: string }) => {
+        const full = await cacheService.getSession(s.id);
+        return full || s;
+      })
+    );
+    
+    res.json(sessionsWithItems);
   } catch (error) {
     console.error('Error fetching sessions:', error);
     // Return empty array if database not configured or connection failed (for development)

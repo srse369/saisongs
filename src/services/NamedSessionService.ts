@@ -9,16 +9,105 @@ import type {
   SessionItemWithDetails,
 } from '../types';
 import apiClient from './ApiClient';
+import { getCacheItem } from '../utils/cacheUtils';
+import { CACHE_KEYS } from '../utils/cacheUtils';
+
+const SESSIONS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function isOffline(): boolean {
+  return typeof navigator !== 'undefined' && !navigator.onLine;
+}
 
 class NamedSessionService {
   // ============ Named Sessions ============
 
   async getAllSessions(): Promise<NamedSession[]> {
-    return apiClient.get('/sessions');
+    if (typeof window !== 'undefined') {
+      const raw = await getCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS);
+      if (raw) {
+        try {
+          const { timestamp, sessions } = JSON.parse(raw) as { timestamp: number; sessions: any[] };
+          if (Array.isArray(sessions)) {
+            const useCache = isOffline() || Date.now() - timestamp < SESSIONS_CACHE_TTL_MS;
+            if (useCache) {
+              return sessions as NamedSession[];
+            }
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+      if (isOffline()) throw new Error('Offline: No cached sessions');
+    }
+    try {
+      const data = await apiClient.get('/sessions');
+      return data as NamedSession[];
+    } catch {
+      if (typeof window !== 'undefined') {
+        const raw = await getCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS);
+        if (raw) {
+          try {
+            const { sessions } = JSON.parse(raw) as { timestamp: number; sessions: any[] };
+            if (Array.isArray(sessions)) {
+              return sessions as NamedSession[];
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+      throw new Error('Failed to load sessions');
+    }
   }
 
   async getSession(id: string): Promise<NamedSessionWithItems | null> {
-    return apiClient.get(`/sessions/${id}`);
+    if (typeof window !== 'undefined') {
+      const raw = await getCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS);
+      if (raw) {
+        try {
+          const { timestamp, sessions } = JSON.parse(raw) as { timestamp: number; sessions: any[] };
+          if (Array.isArray(sessions)) {
+            const useCache = isOffline() || Date.now() - timestamp < SESSIONS_CACHE_TTL_MS;
+            if (useCache) {
+              const found = sessions.find((s: any) => s.id === id);
+              if (found) {
+                if (isOffline() && !Array.isArray(found.items)) {
+                  throw new Error('Session not available offline. Use Take Offline to cache sessions with songs.');
+                }
+                return found;
+              }
+            }
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.includes('Take Offline')) throw e;
+          // Ignore parse errors
+        }
+      }
+      if (isOffline()) throw new Error('Offline: Session not found in cache');
+    }
+    try {
+      return await apiClient.get(`/sessions/${id}`);
+    } catch {
+      if (typeof window !== 'undefined') {
+        const raw = await getCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS);
+        if (raw) {
+          try {
+            const { sessions } = JSON.parse(raw) as { timestamp: number; sessions: any[] };
+            const found = Array.isArray(sessions) ? sessions.find((s: any) => s.id === id) : null;
+            if (found) {
+              if (isOffline() && !Array.isArray(found.items)) {
+                throw new Error('Session not available offline. Use Take Offline to cache sessions with songs.');
+              }
+              return found;
+            }
+          } catch (e) {
+            if (e instanceof Error && e.message.includes('Take Offline')) throw e;
+            // Ignore parse errors
+          }
+        }
+      }
+      throw new Error('Failed to load session');
+    }
   }
 
   async createSession(input: CreateNamedSessionInput): Promise<NamedSession> {

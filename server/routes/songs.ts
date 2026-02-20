@@ -203,6 +203,7 @@ router.post('/:id/sync', async (req, res) => {
     if (updates) {
       // Invalidate cache for song and all songs
       cacheService.invalidate('songs:all');
+      cacheService.invalidate('songs:all:withClobs');
       cacheService.invalidate(`song:${id}`);
 
       res.json({ message: 'Song synced successfully', updates });

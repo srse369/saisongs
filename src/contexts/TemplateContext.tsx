@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 import type { PresentationTemplate, ServiceError } from '../types';
 import templateService from '../services/TemplateService';
 import { useToast } from './ToastContext';
-import { getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from '../utils/cacheUtils';
+import { getCacheItem, setCacheItem, removeCacheItem } from '../utils/cacheUtils';
 
 const TEMPLATES_CACHE_KEY = 'saiSongs:templatesCache';
-const TEMPLATES_CACHE_TTL_MS = 10 * 60 * 1000; // 5 minutes
+const TEMPLATES_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 interface TemplateContextState {
   templates: PresentationTemplate[];
@@ -68,7 +68,7 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
       // Try to hydrate from browser cache first to speed up page load,
       // unless the caller explicitly requested a forced refresh.
       if (!forceRefresh && typeof window !== 'undefined') {
-        const cachedRaw = getLocalStorageItem(TEMPLATES_CACHE_KEY);
+        const cachedRaw = await getCacheItem(TEMPLATES_CACHE_KEY);
         if (cachedRaw) {
           try {
             // getLocalStorageItem already decompresses automatically
@@ -94,18 +94,34 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
       setTemplates(freshTemplates);
       setHasFetched(true);
 
-      // Persist to cache for subsequent loads (compression is handled automatically by setLocalStorageItem)
+      // Persist to cache for subsequent loads
       if (typeof window !== 'undefined') {
         const cacheData = JSON.stringify({
           timestamp: Date.now(),
           templates: freshTemplates,
         });
-        
-        if (!setLocalStorageItem(TEMPLATES_CACHE_KEY, cacheData)) {
-          console.warn('Failed to cache templates due to localStorage quota. Templates will be fetched from server on next load.');
+        const ok = await setCacheItem(TEMPLATES_CACHE_KEY, cacheData);
+        if (!ok) {
+          console.warn('Failed to cache templates. Templates will be fetched from server on next load.');
         }
       }
     } catch (err) {
+      // Offline fallback: use cached data even if expired so app works without network
+      if (typeof window !== 'undefined') {
+        const cachedRaw = await getCacheItem(TEMPLATES_CACHE_KEY);
+        if (cachedRaw) {
+          try {
+            const cached = JSON.parse(cachedRaw) as { timestamp: number; templates: PresentationTemplate[] };
+            if (cached.templates && Array.isArray(cached.templates)) {
+              setTemplates(cached.templates);
+              setHasFetched(true);
+              return;
+            }
+          } catch {
+            // Fall through to error
+          }
+        }
+      }
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch templates';
       setError({
         code: 'UNKNOWN_ERROR',
@@ -155,20 +171,37 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
   const createTemplate = useCallback(async (template: PresentationTemplate): Promise<PresentationTemplate | null> => {
     setLoading(true);
     setError(null);
+    const tempId = `temp-template-${Date.now()}`;
+    const optimisticTemplate: PresentationTemplate = { ...template, id: tempId };
     try {
+      if (typeof window !== 'undefined') {
+        setTemplates(prev => {
+          const updated = [...prev, optimisticTemplate];
+          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: updated })).catch(() => {});
+          return updated;
+        });
+      }
       const created = await templateService.createTemplate(template);
-      // Add to local state immediately for instant UI update
-      setTemplates(prev => [...prev, created]);
-      // Clear localStorage cache so fresh data is fetched next time
-      removeLocalStorageItem(TEMPLATES_CACHE_KEY);
+      if (typeof window !== 'undefined') {
+        setTemplates(prev => {
+          const updated = prev.filter(t => t.id !== tempId);
+          const merged = [...updated, created];
+          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: merged })).catch(() => {});
+          return merged;
+        });
+      }
       toast.success('Template created successfully');
       return created;
     } catch (err) {
+      if (typeof window !== 'undefined') {
+        setTemplates(prev => {
+          const reverted = prev.filter(t => t.id !== tempId);
+          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: reverted })).catch(() => {});
+          return reverted;
+        });
+      }
       const errorMessage = err instanceof Error ? err.message : 'Failed to create template';
-      setError({
-        code: 'UNKNOWN_ERROR',
-        message: errorMessage,
-      });
+      setError({ code: 'UNKNOWN_ERROR', message: errorMessage });
       toast.error(errorMessage);
       return null;
     } finally {
@@ -179,39 +212,72 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
   const updateTemplate = useCallback(async (id: string, updates: Partial<PresentationTemplate>): Promise<PresentationTemplate | null> => {
     setLoading(true);
     setError(null);
+    const existing = templates.find(t => t.id === id);
+    const optimisticTemplate = existing ? { ...existing, ...updates } : null;
     try {
+      if (optimisticTemplate && typeof window !== 'undefined') {
+        setTemplates(prev => {
+          const updated = prev.map(t => t.id === id ? optimisticTemplate : t);
+          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: updated })).catch(() => {});
+          return updated;
+        });
+      }
       const updated = await templateService.updateTemplate(id, updates);
       if (updated) {
-        setTemplates(prev => prev.map(t => t.id === id ? updated : t));
-        // Clear localStorage cache so fresh data is fetched next time
-        removeLocalStorageItem(TEMPLATES_CACHE_KEY);
+        setTemplates(prev => {
+          const merged = prev.map(t => t.id === id ? updated : t);
+          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: merged })).catch(() => {});
+          return merged;
+        });
         toast.success('Template updated successfully');
+      } else if (existing && typeof window !== 'undefined') {
+        setTemplates(prev => {
+          const reverted = prev.map(t => t.id === id ? existing : t);
+          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: reverted })).catch(() => {});
+          return reverted;
+        });
       }
       return updated;
     } catch (err) {
+      if (existing && typeof window !== 'undefined') {
+        setTemplates(prev => {
+          const reverted = prev.map(t => t.id === id ? existing : t);
+          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: reverted })).catch(() => {});
+          return reverted;
+        });
+      }
       const errorMessage = err instanceof Error ? err.message : 'Failed to update template';
-      setError({
-        code: 'UNKNOWN_ERROR',
-        message: errorMessage,
-      });
+      setError({ code: 'UNKNOWN_ERROR', message: errorMessage });
       toast.error(errorMessage);
       return null;
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, templates]);
 
   const deleteTemplate = useCallback(async (id: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
+    const templateToDelete = templates.find(t => t.id === id);
     try {
+      if (templateToDelete && typeof window !== 'undefined') {
+        setTemplates(prev => {
+          const updated = prev.filter(t => t.id !== id);
+          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: updated })).catch(() => {});
+          return updated;
+        });
+      }
       await templateService.deleteTemplate(id);
-      setTemplates(prev => prev.filter(template => template.id !== id));
-      // Clear localStorage cache so fresh data is fetched next time
-      removeLocalStorageItem(TEMPLATES_CACHE_KEY);
       toast.success('Template deleted successfully');
       return true;
     } catch (err) {
+      if (templateToDelete && typeof window !== 'undefined') {
+        setTemplates(prev => {
+          const reverted = [...prev, templateToDelete];
+          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: reverted })).catch(() => {});
+          return reverted;
+        });
+      }
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete template';
       setError({
         code: 'UNKNOWN_ERROR',
@@ -236,7 +302,7 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
           isDefault: t.id === id
         })));
         // Clear localStorage cache so fresh data is fetched next time
-        removeLocalStorageItem(TEMPLATES_CACHE_KEY);
+        removeCacheItem(TEMPLATES_CACHE_KEY).catch(() => {});
         toast.success(`${updated.name} is now the default template`);
       }
       return updated;
@@ -262,7 +328,7 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
         // Add to local state immediately for instant UI update
         setTemplates(prev => [...prev, duplicated]);
         // Clear localStorage cache so fresh data is fetched next time
-        removeLocalStorageItem(TEMPLATES_CACHE_KEY);
+        removeCacheItem(TEMPLATES_CACHE_KEY).catch(() => {});
         toast.success(`Template duplicated as "${name}"`);
       }
       return duplicated;

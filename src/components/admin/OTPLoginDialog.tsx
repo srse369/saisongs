@@ -77,7 +77,7 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
 
       if (response.ok) {
         setStep('otp');
-        setOtpExpiry(Date.now() + 10 * 60 * 1000); // 10 minutes
+        setOtpExpiry(Date.now() + 60 * 1000); // 1 minute (matches server OTP_EXPIRATION_MS)
         setError('');
       } else {
         // Show specific message for non-existent email
@@ -117,7 +117,7 @@ export const OTPLoginDialog: React.FC<OTPLoginDialogProps> = ({
 
       if (response.ok) {
         const role = data.role as UserRole;
-        const userId = data.user?.id || '';
+        const userId = data.user?.id != null ? String(data.user.id) : '';
         const userEmail = data.user?.email || email.trim().toLowerCase();
         const userName = data.user?.name;
         const centerIds = data.user?.centerIds || [];

@@ -31,6 +31,7 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
     pitches,
     loading: pitchLoading,
     error: pitchError,
+    hasFetched: pitchesHasFetched,
     fetchAllPitches,
     createPitch,
     updatePitch,
@@ -149,13 +150,11 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
     }
   }, [singerFilterId, songFilterId]);
 
-  // Only fetch data when tab is active (only if not already loaded)
+  // Only fetch data when tab is active and not already loaded (avoids refetch when switching tabs)
   useEffect(() => {
     if (!isActive) return;
     
-    // Only fetch if data isn't already loaded to avoid unnecessary network requests
-    // The fetch functions will use cache if available, so this is just to prevent
-    // unnecessary calls when data is already present
+    // Use hasFetched to avoid refetching when switching back to tab - data persists in context
     const promises: Promise<void>[] = [];
     
     if (songs.length === 0) {
@@ -166,18 +165,17 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
       promises.push(fetchSingers());
     }
     
-    if (pitches.length === 0) {
+    // Only fetch pitches if we haven't already - prevents reload when switching Live <-> Pitches
+    if (!pitchesHasFetched) {
       promises.push(fetchAllPitches());
     }
     
-    // Fetch all needed data in parallel for faster loading
-    // The fetch functions handle their own loading state and caching
     if (promises.length > 0) {
       Promise.all(promises).catch(error => {
         console.error('Error fetching data in parallel:', error);
       });
     }
-  }, [fetchSongs, fetchSingers, fetchAllPitches, isActive, songs.length, singers.length, pitches.length]);
+  }, [fetchSongs, fetchSingers, fetchAllPitches, isActive, songs.length, singers.length, pitchesHasFetched]);
 
   // Listen for data refresh requests from global event bus
   useEffect(() => {

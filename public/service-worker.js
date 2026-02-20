@@ -69,8 +69,8 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // If network fails, try cache as fallback
-          return caches.match(event.request);
+          // If network fails (e.g. offline), serve from cache
+          return caches.match(event.request).then((cached) => cached || new Response('Offline', { status: 503, statusText: 'Service Unavailable' }));
         })
     );
     return;
@@ -105,10 +105,11 @@ self.addEventListener('fetch', (event) => {
             return response;
           })
           .catch(() => {
-            // If network fails and it's a navigation request, return offline page
+            // If network fails, try cache - for navigation, fallback to index.html
             if (event.request.mode === 'navigate') {
-              return caches.match('/index.html');
+              return caches.match('/index.html').then((cached) => cached || caches.match('/'));
             }
+            return caches.match(event.request);
           });
       })
   );

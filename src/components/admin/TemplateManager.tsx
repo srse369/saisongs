@@ -11,6 +11,11 @@ import { isMultiSlideTemplate } from '../../utils/templateUtils';
 import { pptxImportService } from '../../services/PptxImportService';
 import { pptxExportService } from '../../services/PptxExportService';
 import type { CloudStorageConfig } from '../../services/CloudStorageService';
+import {
+  downloadTemplateMediaForOffline,
+  collectTemplateMediaUrls,
+  isTemplateMediaCached,
+} from '../../utils/templateMediaOffline';
 import { BaseManager } from './BaseManager';
 import { useBaseManager } from '../../hooks/useBaseManager';
 
@@ -311,6 +316,20 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
   const [importingPptx, setImportingPptx] = useState(false);
   const [importProgress, setImportProgress] = useState('');
   const [exportingPptx, setExportingPptx] = useState<string | null>(null);
+  const [takingOfflineTemplateId, setTakingOfflineTemplateId] = useState<string | null>(null);
+  const [templateMediaCachedIds, setTemplateMediaCachedIds] = useState<Set<string>>(new Set());
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
   const [showMediaExportModal, setShowMediaExportModal] = useState(false);
   const [pendingPptxFile, setPendingPptxFile] = useState<File | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -382,6 +401,20 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
       fetchTemplates();
     }
   }, [fetchTemplates, isActive, templates.length]);
+
+  // Check which templates have media cached for offline (for badge display)
+  useEffect(() => {
+    if (templates.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const ids = templates.map((t) => t.id).filter((id): id is string => !!id);
+      const results = await Promise.all(ids.map((id) => isTemplateMediaCached(id)));
+      if (cancelled) return;
+      const cached = ids.filter((_, i) => results[i]);
+      setTemplateMediaCachedIds(new Set(cached));
+    })();
+    return () => { cancelled = true; };
+  }, [templates]);
 
   // Handle escape key to close preview modal, and arrow keys to navigate slides
   useEffect(() => {
@@ -584,6 +617,49 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
       if (pptxInputRef.current) {
         pptxInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleTakeTemplateOffline = async (template: PresentationTemplate) => {
+    const tid = template.id;
+    if (!tid || takingOfflineTemplateId) return;
+    if (!isOnline) {
+      setValidationError('Connect to the internet to download template media for offline use.');
+      return;
+    }
+
+    const urls = collectTemplateMediaUrls(template);
+    if (urls.length === 0) {
+      setSuccessMessage(`"${template.name}" has no downloadable media (images, video, or audio).`);
+      setTimeout(() => setSuccessMessage(''), 5000);
+      return;
+    }
+
+    setTakingOfflineTemplateId(tid);
+    setValidationError('');
+
+    try {
+      const result = await downloadTemplateMediaForOffline(tid, template, (p) => {
+        setImportProgress(p.message);
+      });
+      setImportProgress('');
+      if (result.success) {
+        setTemplateMediaCachedIds((prev) => new Set([...prev, tid]));
+        const parts = [];
+        if (result.imagesCached > 0) parts.push(`${result.imagesCached} image(s)`);
+        if (result.videosCached > 0) parts.push(`${result.videosCached} video(s)`);
+        if (result.audiosCached > 0) parts.push(`${result.audiosCached} audio(s)`);
+        const summary = parts.length > 0 ? parts.join(', ') : 'media';
+        setSuccessMessage(`"${template.name}" is ready for offline use (${summary} cached).${result.failed > 0 ? ` ${result.failed} failed (e.g. CORS).` : ''}`);
+      } else {
+        setValidationError(`Failed to download some media. ${result.failed} of ${urls.length} failed. External URLs may be blocked by CORS.`);
+      }
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (err) {
+      setImportProgress('');
+      setValidationError(`Failed to download template media: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setTakingOfflineTemplateId(null);
     }
   };
 
@@ -1063,6 +1139,18 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                           <i className={`fas ${exportingPptx === template.id ? 'fa-spinner fa-spin' : 'fa-download'} text-lg text-purple-600 dark:text-purple-400`}></i>
                           <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">
                             {exportingPptx === template.id ? 'Exporting...' : 'Export'}
+                          </span>
+                        </button>
+                        {/* Take Offline - download template media for offline use */}
+                        <button
+                          onClick={() => handleTakeTemplateOffline(template)}
+                          disabled={takingOfflineTemplateId === template.id || !isOnline}
+                          title={!isOnline ? 'Connect to the internet to download for offline' : (template.id && templateMediaCachedIds.has(template.id)) ? 'Template media already cached for offline' : 'Download images, video, and audio for offline use'}
+                          className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <i className={`fas ${takingOfflineTemplateId === template.id ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-down'} text-lg ${(template.id && templateMediaCachedIds.has(template.id)) ? 'text-[rgb(227,74,16)]' : 'text-cyan-600 dark:text-cyan-400'}`}></i>
+                          <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">
+                            {takingOfflineTemplateId === template.id ? 'Downloading...' : (template.id && templateMediaCachedIds.has(template.id)) ? 'Offline ✓' : 'Take Offline'}
                           </span>
                         </button>
                         {/* Set Default - only for admins */}

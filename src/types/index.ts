@@ -335,6 +335,7 @@ export interface NamedSession {
   name: string;
   description?: string;
   centerIds?: number[];              // Centers that have access to this session (empty = all centers)
+  items?: SessionItemWithDetails[];  // Always present when fetched; empty array for new sessions
   createdAt?: Date;
   createdBy?: string;                // Email of user who created the session
   updatedAt?: Date;

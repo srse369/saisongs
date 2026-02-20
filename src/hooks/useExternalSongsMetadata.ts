@@ -55,6 +55,3 @@ export function useExternalSongsData(externalsongsUrl?: string) {
 
   return { data, isLoading, error };
 }
-
-// Keep the old name for backwards compatibility
-export const useExternalSongsMetadata = useExternalSongsData;

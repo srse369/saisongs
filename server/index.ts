@@ -2,6 +2,8 @@
 import './config/env.js';
 
 import express from 'express';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 import session from 'express-session';
 import cors from 'cors';
 import path from 'path';
@@ -17,8 +19,10 @@ import analyticsRouter from './routes/analytics.js';
 import feedbackRouter from './routes/feedback.js';
 import templatesRouter from './routes/templates.js';
 import mediaRouter from './routes/media.js';
+import offlineRouter from './routes/offline.js';
 import { requireAuth, requireEditor, requireAdmin } from './middleware/simpleAuth.js';
 import { warmupCache, cacheService } from './services/CacheService.js';
+import { databaseReadService } from './services/DatabaseReadService.js';
 import { OracleSessionStore } from './middleware/OracleSessionStore.js';
 import { emailService } from './services/EmailService.js';
 import { PPTX_MEDIA_DIR } from './config/env.js';
@@ -57,11 +61,62 @@ const getFrontendOrigin = () => {
   return 'http://localhost:5111';
 };
 
-// Middleware
+// Middleware - compress all API responses when client accepts gzip (efficient transfer)
+// threshold: 0 ensures every entity download is gzipped, including small responses
+app.use(compression({ level: 6, threshold: 0 }));
+
+// Rate limit for auth - 30 requests per 15 min per IP (covers session checks + OTP flows)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { error: 'Too many requests', message: 'Please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limit for feedback - 5 submissions per hour per IP
+const feedbackLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many feedback submissions', message: 'Please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use(cors({
   origin: getFrontendOrigin(),
   credentials: true, // Allow cookies/session
 }));
+
+// Health check - mount BEFORE session so it never triggers Oracle session load (root cause of health check hanging)
+app.get('/api/health', async (req, res) => {
+  try {
+    const response: any = {
+      status: 'ok',
+      version: APP_VERSION,
+      timestamp: new Date().toISOString(),
+    };
+    if (req.query.stats === 'true') {
+      try {
+        const statsPromise = databaseReadService.getEntityCounts();
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Stats query timed out')), 3000)
+        );
+        response.stats = await Promise.race([statsPromise, timeoutPromise]);
+      } catch (error) {
+        console.error('Error fetching database stats:', error);
+        response.stats = null;
+        response.statsError = error instanceof Error ? error.message : 'Unknown error';
+      }
+    }
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Health check failed',
+    });
+  }
+});
 
 // Session middleware with Oracle persistent store
 app.use(session({
@@ -93,53 +148,6 @@ app.use('/pptx-media', cors(), express.static(PPTX_MEDIA_DIR, {
     res.set('Cache-Control', 'public, max-age=31536000');
   }
 }));
-
-// Health check endpoint with optional database stats
-app.get('/api/health', async (req, res) => {
-  try {
-    const response: any = { 
-      status: 'ok', 
-      version: APP_VERSION,
-      timestamp: new Date().toISOString() 
-    };
-
-    // If query param requests stats, fetch them
-    if (req.query.stats === 'true') {
-      try {
-        // Fetch counts for each entity
-        const [centers, songs, users, pitches, templates, sessions] = await Promise.all([
-          cacheService.getAllCenters(),
-          cacheService.getAllSongs(),
-          cacheService.getAllSingers(), // Users
-          cacheService.getAllPitches(),
-          cacheService.getAllTemplates(),
-          cacheService.getAllSessions(),
-        ]);
-
-        response.stats = {
-          centers: centers.length,
-          songs: songs.length,
-          users: users.length,
-          pitches: pitches.length,
-          templates: templates.length,
-          sessions: sessions.length,
-        };
-      } catch (error) {
-        console.error('Error fetching database stats:', error);
-        // Include error details in response for debugging
-        response.stats = null;
-        response.statsError = error instanceof Error ? error.message : 'Unknown error';
-      }
-    }
-
-    res.json(response);
-  } catch (error) {
-    res.status(500).json({ 
-      status: 'error', 
-      message: error instanceof Error ? error.message : 'Health check failed' 
-    });
-  }
-});
 
 // Cache reload endpoint (admin only)
 app.post('/api/cache/reload', requireAdmin, async (req, res) => {
@@ -176,11 +184,11 @@ app.get('/api/health/brevo', async (req, res) => {
 
 // API Routes
 // Public routes
-app.use('/api/auth', authRouter);
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/songs', songsRouter);  // Songs remain public
 app.use('/api/sessions', sessionsRouter);  // Sessions public for presentation mode
 app.use('/api/analytics', analyticsRouter);  // Analytics (routes handle their own auth)
-app.use('/api/feedback', feedbackRouter);  // Feedback is public
+app.use('/api/feedback', feedbackLimiter, feedbackRouter);  // Feedback is public
 app.use('/api/templates', templatesRouter);  // Templates public for presentation mode
 app.use('/api/centers', centersRouter);  // Centers GET is public for UI, but POST/PUT/DELETE require admin (enforced in routes)
 app.use('/api', mediaRouter);  // Media upload routes (handles own auth)
@@ -189,6 +197,7 @@ app.use('/api', mediaRouter);  // Media upload routes (handles own auth)
 app.use('/api/singers', singersRouter);  // Singer routes require editor/admin (enforced in route handlers)
 app.use('/api/pitches', requireAuth, pitchesRouter);  // Pitch data is private
 app.use('/api/import-mappings', requireAdmin, importMappingsRouter);  // Admin only
+app.use('/api/offline', offlineRouter);  // Editor/admin - batched offline download
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -202,7 +211,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   
   res.status(500).json({
     error: 'Internal server error',
-    message: err.message
+    ...(process.env.NODE_ENV !== 'production' && { message: err?.message }),
   });
 });
 

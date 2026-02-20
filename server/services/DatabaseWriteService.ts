@@ -137,6 +137,21 @@ class DatabaseWriteService {
   // =====================================================
 
   /**
+   * Record a deleted entity in the tombstone table for offline cache sync.
+   * Best-effort: failures are logged but do not affect the delete operation.
+   */
+  private async recordDeletedEntity(entityType: string, entityId: string): Promise<void> {
+    try {
+      await this.db.query<any>(
+        `INSERT INTO deleted_entities (entity_type, entity_id) VALUES (:1, :2)`,
+        [entityType, String(entityId)]
+      );
+    } catch (err) {
+      console.warn(`Tombstone: failed to record deleted ${entityType} ${entityId}:`, err);
+    }
+  }
+
+  /**
    * Delete a pitch by ID
    */
   async deletePitchById(pitchId: string): Promise<void> {
@@ -144,6 +159,7 @@ class DatabaseWriteService {
       'DELETE FROM song_singer_pitches WHERE id = HEXTORAW(:1)',
       [pitchId]
     );
+    await this.recordDeletedEntity('pitch', pitchId);
   }
 
   /**
@@ -207,6 +223,7 @@ class DatabaseWriteService {
    */
   async deleteTemplate(id: string): Promise<void> {
     await this.db.query('DELETE FROM presentation_templates WHERE id = :1', [id]);
+    await this.recordDeletedEntity('template', id);
   }
 
   // =====================================================
@@ -403,6 +420,7 @@ class DatabaseWriteService {
    */
   async deleteSongForCache(id: string): Promise<void> {
     await this.db.query(`DELETE FROM songs WHERE RAWTOHEX(id) = :1`, [id]);
+    await this.recordDeletedEntity('song', id);
   }
 
   /**
@@ -435,6 +453,7 @@ class DatabaseWriteService {
    */
   async deleteSingerForCache(id: string): Promise<void> {
     await this.db.query(`DELETE FROM users WHERE RAWTOHEX(id) = :1`, [id]);
+    await this.recordDeletedEntity('singer', id);
   }
 
   /**
@@ -505,6 +524,7 @@ class DatabaseWriteService {
    */
   async deletePitchForCache(id: string): Promise<void> {
     await this.db.query(`DELETE FROM song_singer_pitches WHERE RAWTOHEX(id) = :1`, [id]);
+    await this.recordDeletedEntity('pitch', id);
   }
 
   /**
@@ -539,6 +559,7 @@ class DatabaseWriteService {
       `DELETE FROM centers WHERE id = :1`,
       [id]
     );
+    await this.recordDeletedEntity('center', String(id));
   }
 
   /**
@@ -567,6 +588,7 @@ class DatabaseWriteService {
    */
   async deleteSessionForCache(id: string): Promise<void> {
     await this.db.query(`DELETE FROM song_sessions WHERE RAWTOHEX(id) = :1`, [id]);
+    await this.recordDeletedEntity('session', id);
   }
 
   /**

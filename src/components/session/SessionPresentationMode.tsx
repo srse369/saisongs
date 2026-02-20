@@ -7,7 +7,7 @@ import { PresentationModal, type PresentationModalHandle } from '../presentation
 import TemplateSelector from '../presentation/TemplateSelector';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { generateSessionPresentationSlides } from '../../utils/slideUtils';
-import ApiClient from '../../services/ApiClient';
+import apiClient from '../../services/ApiClient';
 import templateService from '../../services/TemplateService';
 import { loadTemplateWithRetry } from '../../utils/templateRetry';
 import { getSelectedTemplateId, setSelectedTemplateId, clearSelectedTemplateId } from '../../utils/cacheUtils';
@@ -27,7 +27,7 @@ const CONTENT_SCALE_STEP = 0.1;
 export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = ({ onExit }) => {
   const navigate = useNavigate();
   const { entries } = useSession();
-  const { songs } = useSongs();
+  const { songs, getSongById } = useSongs();
   const { singers } = useSingers();
   const presentationModalRef = useRef<PresentationModalHandle>(null);
   const projectorWindowRef = useRef<Window | null>(null);
@@ -72,8 +72,8 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
       setError(null);
       
       try {
-        // Always get templateId from localStorage, or use default if not set
-        const persistedTemplateId = getSelectedTemplateId();
+        // Always get templateId from IndexedDB, or use default if not set
+        const persistedTemplateId = await getSelectedTemplateId();
         const templateId = persistedTemplateId;
         
         // Load template and songs in parallel (template has retry for transient 500s)
@@ -118,15 +118,13 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         const [template, fullSongs] = await Promise.all([
           loadTemplateWithRetry(loadTemplate),
           (async () => {
-            // Get songs from context cache first, but verify they have full details
+            // Use getSongById (cache-first, offline-aware) - avoids hanging API calls when offline
             const songPromises = entries.map(async (entry) => {
               const cachedSong = songs.find(s => s.id === entry.songId);
-              // Check if cached song has full details (lyrics are loaded)
               if (cachedSong && cachedSong.lyrics !== null && cachedSong.lyrics !== undefined) {
                 return cachedSong;
               }
-              // Fetch from API to get full details (includes CLOB fields)
-              return ApiClient.get<Song>(`/songs/${entry.songId}`);
+              return getSongById(entry.songId);
             });
             const songsData = await Promise.all(songPromises);
             return songsData;
@@ -144,7 +142,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
         } else {
           // Template failed after retries - try once more with reset (server may have recovered)
           try {
-            ApiClient.resetBackoff();
+            apiClient.resetBackoff();
             const defaultTemplate = await templateService.getDefaultTemplate();
             if (defaultTemplate?.id) {
               setActiveTemplate(defaultTemplate);

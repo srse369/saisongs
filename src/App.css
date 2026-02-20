@@ -72,6 +72,16 @@
   animation: slide-up 0.3s ease-out;
 }
 
+/* Pulsing animation for offline status icon */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.08); }
+}
+
+.animate-status-pulse {
+  animation: status-pulse 0.8s ease-in-out infinite;
+}
+
 /* Safe area padding for notched devices (iPhone X+) */
 .pb-safe {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));

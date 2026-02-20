@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { getCacheItem, setCacheItem } from '../../utils/cacheUtils';
+import { CACHE_KEYS } from '../../utils/cacheUtils';
 
 interface Center {
   id: number;
@@ -16,6 +18,7 @@ interface CenterBadgesProps {
 
 // Singleton cache for centers data to prevent multiple fetches
 let centersCache: Center[] | null = null;
+const CENTERS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 let centersFetchPromise: Promise<Center[]> | null = null;
 
 /**
@@ -45,14 +48,49 @@ export const fetchCentersOnce = async (): Promise<Center[]> => {
   // Start new fetch
   centersFetchPromise = (async () => {
     try {
+      // Browser cache first
+      const raw = await getCacheItem(CACHE_KEYS.SAI_SONGS_CENTERS);
+      if (raw) {
+        try {
+          const { timestamp, centers } = JSON.parse(raw) as { timestamp: number; centers: Center[] };
+          if (Array.isArray(centers) && Date.now() - timestamp < CENTERS_CACHE_TTL_MS) {
+            centersCache = centers;
+            return centers;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+
       const response = await fetch('/api/centers');
       if (response.ok) {
         const data = await response.json();
-        centersCache = data;
-        return data;
+        const centers = Array.isArray(data) ? data : [];
+        centersCache = centers;
+        // Persist to localStorage for offline use and browser cache stats
+        if (centers.length > 0) {
+          setCacheItem(CACHE_KEYS.SAI_SONGS_CENTERS, JSON.stringify({
+            timestamp: Date.now(),
+            centers,
+          })).catch(() => {});
+        }
+        return centers;
       }
-      return [];
+      throw new Error('Failed to fetch centers');
     } catch (error) {
+      // Offline fallback: return from cache
+      const raw = await getCacheItem(CACHE_KEYS.SAI_SONGS_CENTERS);
+      if (raw) {
+        try {
+          const { centers } = JSON.parse(raw) as { timestamp: number; centers: Center[] };
+          if (Array.isArray(centers)) {
+            centersCache = centers;
+            return centers;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
       console.error('Failed to fetch centers:', error);
       return [];
     } finally {

@@ -195,10 +195,10 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
   };
   
   const [clipboard, setClipboard] = useState<ClipboardItem[] | null>(() => {
-    // Initialize from localStorage
+    // Initialize from sync storage (clipboard stays in localStorage for cross-window storage events)
     try {
-      const { getLocalStorageItem } = require('../../utils/cacheUtils');
-      const stored = getLocalStorageItem(CLIPBOARD_KEY);
+      const { getSyncItem } = require('../../utils/cacheUtils');
+      const stored = getSyncItem(CLIPBOARD_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -293,9 +293,9 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     });
     
     if (clipboardItems.length > 0) {
-      // Save to localStorage for cross-window access
-      const { setLocalStorageItem } = require('../../utils/cacheUtils');
-      setLocalStorageItem(CLIPBOARD_KEY, JSON.stringify(clipboardItems));
+      // Save to sync storage for cross-window access (storage event)
+      const { setSyncItem } = require('../../utils/cacheUtils');
+      setSyncItem(CLIPBOARD_KEY, JSON.stringify(clipboardItems));
       setClipboard(clipboardItems);
     }
   }, [selectedIds, slides, selectedSlideIndex]);
@@ -306,8 +306,8 @@ export const TemplateWysiwygEditor: React.FC<TemplateWysiwygEditorProps> = ({
     // Read fresh from localStorage to ensure we have the latest
     let pasteItems: ClipboardItem[] | null = clipboard;
     try {
-      const { getLocalStorageItem } = require('../../utils/cacheUtils');
-      const stored = getLocalStorageItem(CLIPBOARD_KEY);
+      const { getSyncItem } = require('../../utils/cacheUtils');
+      const stored = getSyncItem(CLIPBOARD_KEY);
       if (stored) {
         pasteItems = JSON.parse(stored);
       }

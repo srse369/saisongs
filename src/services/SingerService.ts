@@ -1,9 +1,13 @@
 import apiClient from './ApiClient';
+import { getCacheItem } from '../utils/cacheUtils';
+import { CACHE_KEYS } from '../utils/cacheUtils';
 import type {
   Singer,
   CreateSingerInput,
   UpdateSingerInput,
 } from '../types';
+
+const SINGERS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 import {
   ValidationError,
   DatabaseError,
@@ -90,16 +94,44 @@ class SingerService {
   }
 
   /**
-   * Retrieves a single singer by ID
+   * Retrieves a single singer by ID (browser cache first, then backend)
    * @param id - Singer UUID
    * @returns Singer object or null if not found
    */
   async getSingerById(id: string, nocache: boolean = false): Promise<Singer | null> {
+    if (!nocache && typeof window !== 'undefined') {
+      const listRaw = await getCacheItem(CACHE_KEYS.SAI_SONGS_SINGERS);
+      if (listRaw) {
+        try {
+          const { timestamp, singers } = JSON.parse(listRaw) as { timestamp: number; singers: any[] };
+          if (Array.isArray(singers) && Date.now() - timestamp < SINGERS_CACHE_TTL_MS) {
+            const found = singers.find((s: any) => s?.id === id);
+            if (found) return this.mapApiSinger(found);
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
     try {
       const raw = await apiClient.getSinger(id, nocache);
       if (!raw) return null;
       return this.mapApiSinger(raw as any);
     } catch (error) {
+      if (!nocache && typeof window !== 'undefined') {
+        const listRaw = await getCacheItem(CACHE_KEYS.SAI_SONGS_SINGERS);
+        if (listRaw) {
+          try {
+            const { singers } = JSON.parse(listRaw) as { timestamp: number; singers: any[] };
+            if (Array.isArray(singers)) {
+              const found = singers.find((s: any) => s?.id === id);
+              if (found) return this.mapApiSinger(found);
+            }
+          } catch {
+            // Fall through
+          }
+        }
+      }
       console.error('Error fetching singer by ID:', error);
       if (error instanceof Error && error.message.includes('404')) {
         return null;

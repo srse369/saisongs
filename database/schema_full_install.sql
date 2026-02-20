@@ -57,6 +57,8 @@ BEGIN EXECUTE IMMEDIATE 'DROP TABLE otp_codes CASCADE CONSTRAINTS'; EXCEPTION WH
 /
 BEGIN EXECUTE IMMEDIATE 'DROP TABLE users CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
 /
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE deleted_entities CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
 
 -- Drop sequences if they exist
 BEGIN EXECUTE IMMEDIATE 'DROP SEQUENCE centers_seq'; EXCEPTION WHEN OTHERS THEN NULL; END;
@@ -457,6 +459,21 @@ COMMENT ON TABLE csv_song_mappings IS 'Maps CSV song names to database songs';
 COMMENT ON TABLE csv_pitch_mappings IS 'Maps CSV pitch formats to normalized pitches';
 
 PROMPT ✓ Created CSV mapping tables
+PROMPT
+
+-- ============================================================================
+-- DELETED ENTITIES (tombstone for offline cache sync)
+-- ============================================================================
+CREATE TABLE deleted_entities (
+    entity_type VARCHAR2(32) NOT NULL,
+    entity_id   VARCHAR2(64) NOT NULL,
+    deleted_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (entity_type, entity_id)
+);
+CREATE INDEX idx_deleted_entities_deleted_at ON deleted_entities(deleted_at);
+COMMENT ON TABLE deleted_entities IS 'Tombstone log for offline sync - records deleted entity IDs so clients can clean their cache';
+
+PROMPT ✓ Created deleted_entities table
 PROMPT
 
 -- ============================================================================

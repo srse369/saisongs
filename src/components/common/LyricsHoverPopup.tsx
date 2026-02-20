@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import songService from '../../services/SongService';
 import type { Song } from '../../types';
 
-const HOVER_DELAY_MS = 2000;
+const HOVER_DELAY_MS = 0;
 const AUTO_DISMISS_MS = 10000;
 const LEAVE_DELAY_MS = 150; // Brief delay so user can move cursor to popup to read
 
@@ -97,6 +97,10 @@ export const LyricsHoverPopup: React.FC<LyricsHoverPopupProps> = ({
         } catch {
           setLyrics(null);
           setLoading(false);
+          setShowPopup(true);
+          setPosition({ top: cursorPosRef.current.y, left: cursorPosRef.current.x });
+          clearDismissTimer();
+          dismissTimerRef.current = setTimeout(closePopup, AUTO_DISMISS_MS);
         }
       }, HOVER_DELAY_MS);
     }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { OTPLoginDialog } from '../admin/OTPLoginDialog';
 
@@ -10,11 +10,10 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireAdmin = false, requireEditor = false }) => {
-  const { isAuthenticated, isAdmin, isEditor, isLoading } = useAuth();
+  const { isAuthenticated, isAdmin, isEditor, isLoading, setAuthenticatedUser } = useAuth();
   const navigate = useNavigate();
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
-  const location = useLocation();
 
   useEffect(() => {
     // Only show login dialog after loading completes and user is not authenticated
@@ -97,6 +96,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
           window.history.back();
         }}
         onSuccess={(role, userId, userEmail, userName, centerIds, editorFor) => {
+          setAuthenticatedUser(role, userId, userEmail, userName, centerIds, editorFor);
           setShowLoginDialog(false);
           setLoginSuccess(true);
         }}

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../services/ApiClient';
-import { clearAllCaches, CACHE_KEYS, getLocalStorageItem, setLocalStorageItem } from '../utils/cacheUtils';
+import { clearAllCaches, CACHE_KEYS, getSyncItem, setSyncItem } from '../utils/cacheUtils';
 
 const VERSION_CHECK_INTERVAL = 10 * 60 * 1000; // Check every 5 minutes
 
@@ -22,7 +22,7 @@ export const useVersionCheck = () => {
       // Update stored version before clearing
       const serverVersion = await fetchServerVersion();
       if (serverVersion) {
-        setLocalStorageItem(CACHE_KEYS.APP_VERSION, serverVersion);
+        setSyncItem(CACHE_KEYS.APP_VERSION, serverVersion);
       }
 
       // Clear all caches and reload
@@ -69,7 +69,7 @@ export const useVersionCheck = () => {
     isCheckingRef.current = true;
 
     try {
-      const storedVersion = getLocalStorageItem(CACHE_KEYS.APP_VERSION);
+      const storedVersion = getSyncItem(CACHE_KEYS.APP_VERSION);
       const serverVersion = await fetchServerVersion();
 
       if (!serverVersion) {
@@ -80,7 +80,7 @@ export const useVersionCheck = () => {
 
       // If this is the first time, just store the version
       if (!storedVersion) {
-        setLocalStorageItem(CACHE_KEYS.APP_VERSION, serverVersion);
+        setSyncItem(CACHE_KEYS.APP_VERSION, serverVersion);
         isCheckingRef.current = false;
         return;
       }

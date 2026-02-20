@@ -4,7 +4,7 @@ import { OTPLoginDialog } from './components/admin';
 import { SongList, PresentationMode } from './components/presentation';
 import { SessionManager } from './components/session/SessionManager';
 import { SessionPresentationMode } from './components/session/SessionPresentationMode';
-import { ErrorBoundary, ToastContainer, ProtectedRoute } from './components/common';
+import { ErrorBoundary, ToastContainer, ProtectedRoute, OfflineSyncModal, OfflineBannerWrapper } from './components/common';
 import { Layout } from './components/Layout';
 import { SongProvider, useSongs } from './contexts/SongContext';
 import { SingerProvider, useSingers } from './contexts/SingerContext';
@@ -12,6 +12,7 @@ import { PitchProvider, usePitches } from './contexts/PitchContext';
 import { TemplateProvider, useTemplates } from './contexts/TemplateContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { OfflineSyncProvider, useOfflineSyncContext } from './contexts/OfflineSyncContext';
 import { SessionProvider, useSession } from './contexts/SessionContext';
 import { NamedSessionProvider, useNamedSessions } from './contexts/NamedSessionContext';
 import { useAdminShortcut } from './hooks';
@@ -61,7 +62,9 @@ function AppContent() {
   
   // Check for version updates and auto-clear cache if needed
   useVersionCheck();
-  
+
+  const { showSyncModal, setShowSyncModal, onSyncComplete } = useOfflineSyncContext();
+
   // Track page views for analytics
   usePageTracking();
 
@@ -116,8 +119,13 @@ function AppContent() {
   }
 
   return (
-    <>
+    <OfflineBannerWrapper>
       <ToastContainer />
+      <OfflineSyncModal
+        isOpen={showSyncModal}
+        onClose={() => setShowSyncModal(false)}
+        onSyncComplete={onSyncComplete}
+      />
       
       {/* OTP Login Dialog - triggered by keyboard shortcut */}
       <OTPLoginDialog
@@ -217,7 +225,7 @@ function AppContent() {
         {/* Redirect unknown routes to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+    </OfflineBannerWrapper>
   );
 }
 
@@ -263,6 +271,7 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <ToastProvider>
+            <OfflineSyncProvider>
             <SongProvider>
               <SingerProvider>
                 <PitchProvider>
@@ -276,6 +285,7 @@ function App() {
                 </PitchProvider>
               </SingerProvider>
             </SongProvider>
+            </OfflineSyncProvider>
           </ToastProvider>
         </AuthProvider>
       </BrowserRouter>

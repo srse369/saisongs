@@ -1,8 +1,9 @@
-import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, forwardRef, useMemo } from 'react';
 import { SlideView } from './SlideView';
 import { getSlideBackgroundStyles, SlideBackground, SlideImages, SlideVideos, SlideAudios, SlideText } from '../../utils/templateUtils';
 import type { Slide, TemplateSlide, PresentationTemplate } from '../../types';
 import { getSlideDimensionsForPreview } from '../../types';
+import { resolveTemplateMediaUrls } from '../../utils/templateMediaOffline';
 
 interface PresentationModalProps {
   isOpen: boolean;
@@ -66,15 +67,47 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
   const [showNavButtons, setShowNavButtons] = useState(true);
   const navButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const [resolvedTemplate, setResolvedTemplate] = useState<PresentationTemplate | null>(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
+
+  // When offline, resolve template media URLs from cache for presentation
+  useEffect(() => {
+    if (!isOpen || !template?.id || isOnline) {
+      setResolvedTemplate(null);
+      return;
+    }
+    let cancelled = false;
+    resolveTemplateMediaUrls(template, template.id).then((resolved) => {
+      if (!cancelled) setResolvedTemplate(resolved);
+    });
+    return () => { cancelled = true; };
+  }, [isOpen, template?.id, isOnline]);
+
+  // Effective template: use resolved (with cached media) when offline, else original
+  const effectiveTemplate = useMemo(() => {
+    if (isOnline) return template;
+    return resolvedTemplate ?? template;
+  }, [template, resolvedTemplate, isOnline]);
 
   // Control audio playback based on current slide
   useEffect(() => {
-    if (!template?.slides) return;
+    if (!effectiveTemplate?.slides) return;
     
     // Collect all audio elements with their original slide index
     // Use compound key (slideIndex_audioId) to handle duplicate IDs across slides
     const allAudios: Array<{ audio: any; originalSlideIndex: number; uniqueKey: string }> = [];
-    template.slides.forEach((slide, slideIndex) => {
+    effectiveTemplate.slides.forEach((slide, slideIndex) => {
       (slide.audios || []).forEach((audio) => {
         const uniqueKey = `${slideIndex}_${audio.id}`;
         allAudios.push({ audio, originalSlideIndex: slideIndex, uniqueKey });
@@ -112,7 +145,7 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
         audioElement.currentTime = 0;
       }
     });
-  }, [currentSlideIndex, template?.slides, slides.length]);
+  }, [currentSlideIndex, effectiveTemplate?.slides, slides.length]);
 
   // Expose the hide UI state to parent component
   useImperativeHandle(ref, () => ({
@@ -148,8 +181,8 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
     resetNavButtonTimeout();
   }, [currentSlideIndex, resetNavButtonTimeout]);
 
-  const aspectRatio = template?.aspectRatio || '16:9';
-  const { width: slideWidth, height: slideHeight } = getSlideDimensionsForPreview(template);
+  const aspectRatio = effectiveTemplate?.aspectRatio || '16:9';
+  const { width: slideWidth, height: slideHeight } = getSlideDimensionsForPreview(effectiveTemplate);
 
   // Calculate scale
   useEffect(() => {
@@ -317,14 +350,14 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
       }}
     >
       {/* Background audio that plays across all slides */}
-      {template?.backgroundAudio && (
+      {effectiveTemplate?.backgroundAudio && (
         <audio
-          key={template.backgroundAudio.id}
-          src={template.backgroundAudio.url}
-          autoPlay={template.backgroundAudio.autoPlay ?? true}
-          loop={template.backgroundAudio.loop ?? true}
+          key={effectiveTemplate.backgroundAudio.id}
+          src={effectiveTemplate.backgroundAudio.url}
+          autoPlay={effectiveTemplate.backgroundAudio.autoPlay ?? true}
+          loop={effectiveTemplate.backgroundAudio.loop ?? true}
           style={{ display: 'none' }}
-          ref={(el) => { if (el && template.backgroundAudio) el.volume = template.backgroundAudio.volume ?? 0.5; }}
+          ref={(el) => { if (el && effectiveTemplate.backgroundAudio) el.volume = effectiveTemplate.backgroundAudio.volume ?? 0.5; }}
         />
       )}
       
@@ -450,29 +483,35 @@ export const PresentationModal = forwardRef<PresentationModalHandle, Presentatio
                 <SlideView 
                   slide={currentSlide as Slide}
                   showTranslation={true}
-                  template={template}
+                  template={effectiveTemplate}
                   contentScale={contentScale}
                   skipAudio={true}
                 />
               ) : isTemplateSlide(currentSlide) ? (
-                <div 
-                  className="presentation-slide relative overflow-hidden"
-                  style={{
-                    ...getSlideBackgroundStyles(currentSlide as TemplateSlide),
-                    width: '100%',
-                    height: '100%',
-                  }}
-                >
-                  <SlideBackground templateSlide={currentSlide as TemplateSlide} />
-                  <SlideImages templateSlide={currentSlide as TemplateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
-                  <SlideVideos templateSlide={currentSlide as TemplateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
-                  {/* Audio is handled by persistent audio refs at modal level, not here */}
-                  <SlideText templateSlide={currentSlide as TemplateSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
-                </div>
+                (() => {
+                  const templateSlide = currentSlide as TemplateSlide;
+                  const slideIndex = template?.slides?.indexOf(templateSlide) ?? -1;
+                  const resolvedSlide = (slideIndex >= 0 && effectiveTemplate?.slides?.[slideIndex]) ? effectiveTemplate.slides[slideIndex] : templateSlide;
+                  return (
+                    <div 
+                      className="presentation-slide relative overflow-hidden"
+                      style={{
+                        ...getSlideBackgroundStyles(resolvedSlide),
+                        width: '100%',
+                        height: '100%',
+                      }}
+                    >
+                      <SlideBackground templateSlide={resolvedSlide} />
+                      <SlideImages templateSlide={resolvedSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
+                      <SlideVideos templateSlide={resolvedSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
+                      <SlideText templateSlide={resolvedSlide} slideWidth={slideWidth} slideHeight={slideHeight} />
+                    </div>
+                  );
+                })()
               ) : null}
               
               {/* Multi-slide audio elements - overlaid on slide */}
-              {template?.slides && template.slides.flatMap((slide, slideIndex) => 
+              {effectiveTemplate?.slides && effectiveTemplate.slides.flatMap((slide, slideIndex) => 
                 (slide.audios || []).map((audio) => {
                   // Use compound key to handle duplicate IDs across slides
                   const uniqueKey = `${slideIndex}_${audio.id}`;

@@ -20,6 +20,9 @@ interface Feedback extends FeedbackSubmission {
   updatedAt: Date;
 }
 
+const MAX_FEEDBACK_LENGTH = 5000;
+const MAX_EMAIL_LENGTH = 255;
+
 // Submit feedback
 router.post('/', async (req, res) => {
   try {
@@ -27,6 +30,10 @@ router.post('/', async (req, res) => {
 
     if (!feedback || feedback.trim().length === 0) {
       return res.status(400).json({ error: 'Feedback cannot be empty' });
+    }
+
+    if (feedback.length > MAX_FEEDBACK_LENGTH) {
+      return res.status(400).json({ error: `Feedback must be ${MAX_FEEDBACK_LENGTH} characters or less` });
     }
 
     if (!category || !['bug', 'feature', 'improvement', 'question', 'other'].includes(category)) {
@@ -37,9 +44,14 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
+    const trimmedEmail = email.trim();
+    if (trimmedEmail.length > MAX_EMAIL_LENGTH) {
+      return res.status(400).json({ error: 'Email is too long' });
+    }
+
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
+    if (!emailRegex.test(trimmedEmail)) {
       return res.status(400).json({ error: 'Invalid email address' });
     }
 
@@ -48,9 +60,9 @@ router.post('/', async (req, res) => {
 
     // Insert into database via cache service
     await cacheService.createFeedback({
-      feedback: feedback.trim(),
+      feedback: feedback.trim().slice(0, MAX_FEEDBACK_LENGTH),
       category,
-      email: email.trim(),
+      email: trimmedEmail.slice(0, MAX_EMAIL_LENGTH),
       ipAddress: ipAddress?.toString(),
       userAgent: userAgent || req.get('user-agent') || undefined,
       url: url || undefined

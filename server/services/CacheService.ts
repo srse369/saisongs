@@ -18,6 +18,7 @@ import {
 import databaseReadService from './DatabaseReadService.js';
 import databaseWriteService from './DatabaseWriteService.js';
 import templateBackendService from './TemplateBackendService.js';
+import zipCacheService from './ZipCacheService.js';
 
 export type {
   BackgroundElement,
@@ -43,7 +44,7 @@ interface CacheEntry<T> {
 
 class CacheService {
   private cache: Map<string, CacheEntry<any>> = new Map();
-  private readonly DEFAULT_TTL_MS = 10 * 60 * 1000; // 10 minutes
+  private readonly DEFAULT_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
   /**
    * Get data from cache if not expired
@@ -225,6 +226,19 @@ class CacheService {
     const cached = this.get<any[]>(cacheKey);
     if (cached && Array.isArray(cached)) return cached;
 
+    // Derive light list from bulk cache if available (avoids extra DB query)
+    const fullSongs = this.get<any[]>('songs:all:withClobs');
+    if (fullSongs && Array.isArray(fullSongs)) {
+      const lightSongs = fullSongs.map((s: any) => ({
+        ...s,
+        lyrics: null,
+        meaning: null,
+        songTags: null,
+      }));
+      this.set(cacheKey, lightSongs, this.DEFAULT_TTL_MS);
+      return lightSongs;
+    }
+
     const songs = await this.databaseReadService.getAllSongsForCache();
 
     const mappedSongs = songs.map((song: any) => ({
@@ -254,16 +268,22 @@ class CacheService {
 
   /**
    * Get individual song WITH CLOB fields (lyrics, meaning, song_tags)
-   * Used when viewing song details - fetches and caches full data
+   * Serves from bulk cache (songs:all:withClobs) - no DB call when cache is warm
    */
   async getSong(id: string): Promise<any> {
-    // Check individual song cache first
-    const cacheKey = `song:${id}`;
-    const cached = this.get<any>(cacheKey);
+    // Check bulk cache first - all songs loaded during warmup
+    const fullSongs = this.get<any[]>('songs:all:withClobs');
+    if (fullSongs && Array.isArray(fullSongs)) {
+      const song = fullSongs.find((s: any) => s?.id === id);
+      if (song) return song;
+    }
+
+    // Fallback: individual song cache (e.g. after create/update)
+    const cached = this.get<any>(`song:${id}`);
     if (cached) return cached;
 
+    // Cache miss - fetch from DB (e.g. new song not yet in bulk cache)
     const songs = await this.databaseReadService.getSongWithClobsForCache(id);
-
     if (songs.length === 0) return null;
 
     const song = songs[0];
@@ -288,9 +308,43 @@ class CacheService {
       pitchCount: parseInt(song.PITCH_COUNT || song.pitch_count || '0', 10),
     };
 
-    // Cache individual song with CLOBs
-    this.set(cacheKey, mappedSong, this.DEFAULT_TTL_MS);
+    this.set(`song:${id}`, mappedSong, this.DEFAULT_TTL_MS);
     return mappedSong;
+  }
+
+  /**
+   * Get all songs WITH CLOB fields - for offline download (single batched query)
+   * Cached in memory; populated during warmup so getSong(id) never hits DB
+   */
+  async getAllSongsWithClobs(): Promise<any[]> {
+    const cacheKey = 'songs:all:withClobs';
+    const cached = this.get<any[]>(cacheKey);
+    if (cached && Array.isArray(cached)) return cached;
+
+    const songs = await this.databaseReadService.getAllSongsWithClobsForCache();
+    const mapped = songs.map((song: any) => ({
+      id: extractValue(song.ID),
+      name: extractValue(song.NAME),
+      externalSourceUrl: extractValue(song.EXTERNAL_SOURCE_URL),
+      lyrics: extractValue(song.LYRICS),
+      meaning: extractValue(song.MEANING),
+      language: extractValue(song.LANGUAGE),
+      deity: extractValue(song.DEITY),
+      tempo: extractValue(song.TEMPO),
+      beat: extractValue(song.BEAT),
+      raga: extractValue(song.RAGA),
+      level: extractValue(song.SONG_LEVEL),
+      songTags: extractValue(song.SONG_TAGS),
+      audioLink: extractValue(song.AUDIO_LINK),
+      videoLink: extractValue(song.VIDEO_LINK),
+      goldenVoice: !!extractValue(song.GOLDEN_VOICE),
+      refGents: extractValue(song.REFERENCE_GENTS_PITCH),
+      refLadies: extractValue(song.REFERENCE_LADIES_PITCH),
+      pitchCount: parseInt(song.PITCH_COUNT || song.pitch_count || '0', 10),
+    }));
+
+    this.set(cacheKey, mapped, this.DEFAULT_TTL_MS);
+    return mapped;
   }
 
   async createSong(songData: any): Promise<any> {
@@ -347,18 +401,37 @@ class CacheService {
       // Update cache directly - add to existing cache or invalidate to force fresh fetch
       const cached = this.get('songs:all');
       if (cached && Array.isArray(cached)) {
-        const updated = [...cached, mappedSong].sort((a, b) =>
+        const updated = [...cached, { ...mappedSong, lyrics: null, meaning: null, songTags: null }].sort((a, b) =>
           (a.name || '').localeCompare(b.name || '')
         );
         this.set('songs:all', updated, this.DEFAULT_TTL_MS);
       } else {
-        // No cache exists - invalidate to force fresh fetch on next request
-        // This ensures all songs (including the new one) will be included
         this.invalidate('songs:all');
       }
 
-      // Also cache the individual song
+      // Update bulk cache (songs:all:withClobs) so getSong(id) stays consistent
+      const fullCached = this.get<any[]>('songs:all:withClobs');
+      if (fullCached && Array.isArray(fullCached)) {
+        const updatedFull = [...fullCached, mappedSong].sort((a, b) =>
+          (a.name || '').localeCompare(b.name || '')
+        );
+        this.set('songs:all:withClobs', updatedFull, this.DEFAULT_TTL_MS);
+      } else {
+        this.invalidate('songs:all:withClobs');
+      }
+
       this.set(`song:${mappedSong.id}`, mappedSong, this.DEFAULT_TTL_MS);
+
+      // Update zip cache for offline
+      const light = { ...mappedSong };
+      delete light.lyrics;
+      delete light.meaning;
+      delete light.songTags;
+      zipCacheService.setSong(mappedSong.id, light, {
+        lyrics: mappedSong.lyrics ?? null,
+        meaning: mappedSong.meaning ?? null,
+        songTags: mappedSong.songTags ?? null,
+      });
 
       return mappedSong;
     }
@@ -438,13 +511,33 @@ class CacheService {
         }
         this.set('songs:all', updated, this.DEFAULT_TTL_MS);
       } else {
-        // Cache doesn't exist - invalidate to force fresh fetch on next request
-        // This ensures the new song will be included
         this.invalidate('songs:all');
       }
 
-      // Update the individual song cache directly
+      // Update bulk cache (songs:all:withClobs) so getSong(id) stays consistent
+      const fullCached = this.get<any[]>('songs:all:withClobs');
+      if (fullCached && Array.isArray(fullCached)) {
+        const songExists = fullCached.some((s: any) => s.id === id);
+        const updatedFull = songExists
+          ? fullCached.map((s: any) => (s.id === id ? mappedSong : s)).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+          : [...fullCached, mappedSong].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        this.set('songs:all:withClobs', updatedFull, this.DEFAULT_TTL_MS);
+      } else {
+        this.invalidate('songs:all:withClobs');
+      }
+
       this.set(`song:${id}`, mappedSong, this.DEFAULT_TTL_MS);
+
+      // Update zip cache for offline
+      const light = { ...mappedSong };
+      delete light.lyrics;
+      delete light.meaning;
+      delete light.songTags;
+      zipCacheService.setSong(id, light, {
+        lyrics: mappedSong.lyrics ?? null,
+        meaning: mappedSong.meaning ?? null,
+        songTags: mappedSong.songTags ?? null,
+      });
 
       return mappedSong;
     }
@@ -457,6 +550,15 @@ class CacheService {
 
     // Remove from individual song cache
     this.invalidate(`song:${id}`);
+
+    // Remove from bulk cache (songs:all:withClobs)
+    const fullCached = this.get<any[]>('songs:all:withClobs');
+    if (fullCached && Array.isArray(fullCached)) {
+      const updated = fullCached.filter((s: any) => s.id !== id);
+      this.set('songs:all:withClobs', updated, this.DEFAULT_TTL_MS);
+    } else {
+      this.invalidate('songs:all:withClobs');
+    }
 
     // Update songs cache directly - remove from list
     let cached = this.get('songs:all');
@@ -472,7 +574,7 @@ class CacheService {
       this.set('pitches:all', updated, this.DEFAULT_TTL_MS);
     }
 
-    // Note: Cannot invalidate individual pitch caches without querying which pitches were affected
+    zipCacheService.deleteSong(id);
   }
 
   // ==================== SINGERS ====================
@@ -656,6 +758,8 @@ class CacheService {
         // Invalidate centers cache since singer count changed
         this.invalidate('centers:all');
 
+        zipCacheService.setSinger(normalizedSinger.id, normalizedSinger);
+
         // Return the normalized singer object
         return normalizedSinger;
       }
@@ -782,6 +886,7 @@ class CacheService {
           .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         this.set('singers:all', updated, this.DEFAULT_TTL_MS);
       }
+      zipCacheService.setSinger(id, normalizedSinger);
     }
 
     // If center associations changed, invalidate center caches
@@ -811,6 +916,8 @@ class CacheService {
 
     // Invalidate centers cache since singer count changed
     this.invalidate('centers:all');
+
+    zipCacheService.deleteSinger(id);
   }
 
   async updateSingerAdminStatus(id: string, isAdmin: number): Promise<void> {
@@ -1045,6 +1152,8 @@ class CacheService {
         });
       }
 
+      zipCacheService.setPitch(normalizedPitch.id, normalizedPitch);
+
       return normalizedPitch;
     }
 
@@ -1064,23 +1173,22 @@ class CacheService {
     const updatedPitches = await this.databaseReadService.getUpdatedPitchForCache(id);
 
     if (updatedPitches.length > 0) {
+      const rawPitch = updatedPitches[0];
+      const normalizedPitch = {
+        id: rawPitch.id || rawPitch.ID,
+        songId: rawPitch.song_id || rawPitch.SONG_ID,
+        singerId: rawPitch.singer_id || rawPitch.SINGER_ID,
+        pitch: rawPitch.pitch || rawPitch.PITCH,
+        songName: rawPitch.song_name || rawPitch.SONG_NAME,
+        singerName: rawPitch.singer_name || rawPitch.SINGER_NAME,
+      };
+
       const cached = this.get('pitches:all');
       if (cached && Array.isArray(cached)) {
-        // Normalize the updated pitch data
-        const rawPitch = updatedPitches[0];
-        const normalizedPitch = {
-          id: rawPitch.id || rawPitch.ID,
-          songId: rawPitch.song_id || rawPitch.SONG_ID,
-          singerId: rawPitch.singer_id || rawPitch.SINGER_ID,
-          pitch: rawPitch.pitch || rawPitch.PITCH,
-          songName: rawPitch.song_name || rawPitch.SONG_NAME,
-          singerName: rawPitch.singer_name || rawPitch.SINGER_NAME,
-        };
-
-        // Replace the pitch in cache (use lowercase 'id' to match normalized cache)
         const updated = cached.map((p: any) => p.id === id ? normalizedPitch : p);
         this.set('pitches:all', updated, this.DEFAULT_TTL_MS);
       }
+      zipCacheService.setPitch(id, normalizedPitch);
     }
   }
 
@@ -1157,6 +1265,8 @@ class CacheService {
     }
 
     await this.databaseWriteService.deletePitchForCache(id);
+
+    zipCacheService.deletePitch(id);
 
     // Write-through cache: Remove from cached list
     const cached = this.get('pitches:all');
@@ -1235,6 +1345,8 @@ class CacheService {
       this.set(cacheKey, cached, this.DEFAULT_TTL_MS);
     }
 
+    zipCacheService.setTemplate(String(created.id), created);
+
     return created;
   }
 
@@ -1255,6 +1367,8 @@ class CacheService {
       }
     }
 
+    zipCacheService.setTemplate(id, updated);
+
     return updated;
   }
 
@@ -1271,6 +1385,8 @@ class CacheService {
       const filtered = cached.filter((t: any) => t.id !== id);
       this.set(cacheKey, filtered, this.DEFAULT_TTL_MS);
     }
+
+    zipCacheService.deleteTemplate(id);
   }
 
   /**
@@ -1289,6 +1405,8 @@ class CacheService {
       }));
       this.set(cacheKey, updatedCache, this.DEFAULT_TTL_MS);
     }
+
+    zipCacheService.setTemplate(id, updated);
 
     return updated;
   }
@@ -1468,7 +1586,10 @@ class CacheService {
       this.set('sessions:all', updated, this.DEFAULT_TTL_MS);
     }
 
-    return mappedSession;
+    zipCacheService.setSession(mappedSession.id, mappedSession);
+
+    // Return full session with items for client caching
+    return await this.getSession(mappedSession.id);
   }
 
   async updateSession(id: string, updates: any): Promise<any> {
@@ -1549,7 +1670,10 @@ class CacheService {
       this.set('sessions:all', updated, this.DEFAULT_TTL_MS);
     }
 
-    return mappedSession;
+    zipCacheService.setSession(id, mappedSession);
+
+    // Return full session with items for client caching
+    return await this.getSession(id);
   }
 
   async deleteSession(id: string): Promise<void> {
@@ -1561,6 +1685,8 @@ class CacheService {
       const updated = cached.filter((session: any) => session.id !== id);
       this.set('sessions:all', updated, this.DEFAULT_TTL_MS);
     }
+
+    zipCacheService.deleteSession(id);
   }
 
   async duplicateSession(id: string, newName: string): Promise<any> {
@@ -1606,7 +1732,8 @@ class CacheService {
       this.set('sessions:all', updated, this.DEFAULT_TTL_MS);
     }
 
-    return mappedSession;
+    // Return full session with items for client caching
+    return await this.getSession(mappedSession.id);
   }
 
   async getSessionItems(sessionId: string): Promise<any[]> {
@@ -1948,14 +2075,15 @@ class CacheService {
 
     if (result.length > 0) {
       const center = result[0];
-
-      return {
+      const createdCenter = {
         id: center.ID || center.id,
         name: center.NAME || center.name,
         badgeTextColor: center.BADGE_TEXT_COLOR || center.badge_text_color || '#1e40af',
         createdAt: center.CREATED_AT || center.created_at,
         createdBy: center.CREATED_BY || center.created_by,
       };
+      zipCacheService.setCenter(String(createdCenter.id), createdCenter);
+      return createdCenter;
     }
 
     return null;
@@ -2003,12 +2131,18 @@ class CacheService {
     // Invalidate center-related caches
     this.invalidateCenterRelatedCaches();
 
-    // Return updated center
-    return this.getCenterById(centerId);
+    // Return updated center and update zip cache
+    const updatedCenter = await this.getCenterById(centerId);
+    if (updatedCenter) {
+      zipCacheService.setCenter(String(updatedCenter.id), updatedCenter);
+    }
+    return updatedCenter;
   }
 
   async deleteCenter(id: string | number): Promise<void> {
     await this.databaseWriteService.deleteCenterForCache(id);
+
+    zipCacheService.deleteCenter(String(id));
 
     // Invalidate center-related caches
     this.invalidateCenterRelatedCaches();
@@ -2218,14 +2352,15 @@ function extractValue(value: any): any {
  * This reduces latency for initial requests
  */
 /**
- * Selective warmup - fetches all data WITHOUT expensive CLOB fields
- * CLOBs (lyrics, meaning, song_tags) are fetched on-demand when viewing song details
- * This reduces recursive SQL from 40k to ~2-3k
+ * Warmup - fetches all data including CLOBs (lyrics, meaning, song_tags) for songs.
+ * Songs with CLOBs are cached so getSong(id) never hits the DB when cache is warm.
  */
 export async function warmupCache(): Promise<void> {
   const { cacheService } = await import('./CacheService.js');
+  const { zipCacheService } = await import('./ZipCacheService.js');
 
   cacheService.clear();
+  zipCacheService.clear();
 
   // Track overall success
   let successCount = 0;
@@ -2233,7 +2368,8 @@ export async function warmupCache(): Promise<void> {
   const stats: { table: string; count: number }[] = [];
 
   try {
-    const songs = await cacheService.getAllSongs();
+    // Load all songs WITH lyrics (CLOBs) - populates songs:all:withClobs so getSong(id) never hits DB
+    const songs = await cacheService.getAllSongsWithClobs();
     stats.push({ table: 'songs', count: songs.length });
     successCount++;
   } catch (error) {
@@ -2305,6 +2441,22 @@ export async function warmupCache(): Promise<void> {
   } catch (error) {
     console.error('  ✗ Failed to cache feedback:', error instanceof Error ? error.message : error);
     failureCount++;
+  }
+
+  // Populate zip cache for offline downloads (songs, singers, pitches, templates, sessions, centers)
+  try {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await Promise.all([
+      zipCacheService.loadSongsFromDb(),
+      zipCacheService.loadSingersFromDb(),
+      zipCacheService.loadPitchesFromDb(),
+      zipCacheService.loadTemplatesFromDb(),
+      zipCacheService.loadSessionsFromDb(),
+      zipCacheService.loadCentersFromDb(),
+    ]);
+    console.log('   zip-cache       : loaded (songs, singers, pitches, templates, sessions, centers)');
+  } catch (error) {
+    console.error('  ✗ Failed to load zip cache:', error instanceof Error ? error.message : error);
   }
 
   // Summary

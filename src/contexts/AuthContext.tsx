@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { flushSync } from 'react-dom';
 import type { ReactNode } from 'react';
-import { clearLocalStorageCache, DATA_CACHE_KEYS } from '../utils/cacheUtils';
+import { clearLocalStorageCache } from '../utils/cacheUtils';
 
 export type UserRole = 'public' | 'viewer' | 'editor' | 'admin';
 
@@ -43,6 +43,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Check authentication status on mount
   useEffect(() => {
     const checkAuth = async () => {
+      // When offline, skip auth check - render app immediately so presentation/cache can load
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        setUserRole('public');
+        setUserId(null);
+        setUserName(null);
+        setUserEmail(null);
+        setCenterIds([]);
+        setEditorFor([]);
+        setIsLoading(false);
+        return;
+      }
       try {
         const response = await fetch(`${API_BASE_URL}/auth/session`, {
           method: 'GET',
@@ -88,18 +99,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
-  const setAuthenticatedUser = useCallback((role: UserRole, id: number, email: string, name?: string, centersIds?: number[], editorsFor?: number[]) => {
+  const setAuthenticatedUser = useCallback((role: UserRole, userId: string, email: string, name?: string, centerIds?: number[], editorFor?: number[]) => {
     // Clear all app-specific localStorage caches on login to ensure fresh data
     clearLocalStorageCache();
-    
+
     // Use flushSync to ensure state is updated synchronously
     flushSync(() => {
       setUserRole(role);
-      setUserId(id);
+      setUserId(userId ? String(userId) : null);
       setUserName(name || null);
       setUserEmail(email);
-      setCenterIds(centersIds || []);
-      setEditorFor(editorsFor || []);
+      setCenterIds(centerIds || []);
+      setEditorFor(editorFor || []);
     });
   }, []);
 

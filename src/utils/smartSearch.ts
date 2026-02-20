@@ -364,6 +364,11 @@ export function generateSearchSuggestions(
   return suggestions.slice(0, 5);
 }
 
+/** Escape special regex characters to prevent invalid regex or ReDoS */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Highlight matching terms in text
  */
@@ -374,7 +379,7 @@ export function highlightMatches(text: string, query: string): string {
   let highlighted = text;
 
   words.forEach(word => {
-    const regex = new RegExp(`(${word})`, 'gi');
+    const regex = new RegExp(`(${escapeRegex(word)})`, 'gi');
     highlighted = highlighted.replace(regex, '<mark>$1</mark>');
   });
 

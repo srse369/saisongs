@@ -17,7 +17,6 @@ import { generateSessionPresentationSlides } from '../../utils/slideUtils';
 import TemplateSelector from '../presentation/TemplateSelector';
 import templateService from '../../services/TemplateService';
 import { pptxExportService } from '../../services/PptxExportService';
-import ApiClient from '../../services/ApiClient';
 import { getSelectedTemplateId, setSelectedTemplateId } from '../../utils/cacheUtils';
 import { buildSessionCsv, parseSessionCsv, downloadCsv } from '../../utils/sessionCsvUtils';
 
@@ -26,7 +25,7 @@ const SESSION_SCROLL_POSITION_KEY = 'saiSongs:sessionScrollPosition';
 export const SessionManager: React.FC = () => {
   const location = useLocation();
   const { entries, removeSong, clearSession, reorderSession, addSong } = useSession();
-  const { songs, fetchSongs } = useSongs();
+  const { songs, fetchSongs, getSongById } = useSongs();
   const { singers, fetchSingers } = useSingers();
   const { sessions, createSession, setSessionItems, loadSession, currentSession, loadSessions, loading, deleteSession } = useNamedSessions();
   const { isEditor, isAuthenticated, userEmail, userRole } = useAuth();
@@ -54,6 +53,7 @@ export const SessionManager: React.FC = () => {
   const csvFileInputRef = React.useRef<HTMLInputElement | null>(null);
   const scrollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastDragYRef = useRef<number>(0);
+  const [dragPreviewPos, setDragPreviewPos] = useState<{ x: number; y: number } | null>(null);
 
   const SCROLL_ZONE = 80;
   const SCROLL_SPEED = 12;
@@ -93,6 +93,7 @@ export const SessionManager: React.FC = () => {
 
     const handleDocumentDragOver = (e: DragEvent) => {
       lastDragYRef.current = e.clientY;
+      setDragPreviewPos({ x: e.clientX, y: e.clientY });
       const y = e.clientY;
       const zone = SCROLL_ZONE;
       const viewportHeight = window.innerHeight;
@@ -258,7 +259,7 @@ export const SessionManager: React.FC = () => {
         return;
       }
 
-      const savedTemplateId = getSelectedTemplateId();
+      const savedTemplateId = await getSelectedTemplateId();
       if (savedTemplateId) {
         try {
           const template = await templateService.getTemplate(savedTemplateId);
@@ -310,7 +311,7 @@ export const SessionManager: React.FC = () => {
   // Re-sync template when returning to the Live tab (handles same-tab navigation)
   useEffect(() => {
     const syncTemplateFromStorage = async () => {
-      const savedTemplateId = getSelectedTemplateId();
+      const savedTemplateId = await getSelectedTemplateId();
       if (savedTemplateId && savedTemplateId !== selectedTemplate?.id) {
         try {
           const template = await templateService.getTemplate(savedTemplateId);
@@ -366,14 +367,12 @@ export const SessionManager: React.FC = () => {
     setExporting(true);
 
     try {
-      // Fetch full song data with lyrics - same logic as SessionPresentationMode
+      // Use getSongById (cache-first, offline-aware) - same as SessionPresentationMode
       const songPromises = sessionItems.map(async ({ entry, song: cachedSong }) => {
-        // Check if cached song has full details (lyrics are loaded)
         if (cachedSong && cachedSong.lyrics !== null && cachedSong.lyrics !== undefined) {
           return cachedSong;
         }
-        // Fetch from API to get full details (includes CLOB fields like lyrics)
-        return ApiClient.get<Song>(`/songs/${entry.songId}`);
+        return getSongById(entry.songId);
       });
       const songsWithLyrics = await Promise.all(songPromises);
 
@@ -512,11 +511,17 @@ export const SessionManager: React.FC = () => {
     e.dataTransfer.setData('text/plain', String(fromIndex));
     setDraggingIndex(fromIndex);
     setDragOverIndex(fromIndex);
+    setDragPreviewPos({ x: e.clientX, y: e.clientY });
+    // Hide default drag image so we can show a custom one with dynamic number
+    const img = new Image();
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    e.dataTransfer.setDragImage(img, 0, 0);
   };
 
   const handleDragEnd = () => {
     setDraggingIndex(null);
     setDragOverIndex(null);
+    setDragPreviewPos(null);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, toIndex: number) => {
@@ -662,12 +667,13 @@ export const SessionManager: React.FC = () => {
 
   // Effect to handle loading session items into live session
   useEffect(() => {
-    if (sessionToLoad && currentSession && currentSession.id === sessionToLoad && currentSession.items) {
+    if (sessionToLoad && currentSession && currentSession.id === sessionToLoad) {
       // Clear existing session first
       clearSession();
 
-      // Load songs into the active session context
-      currentSession.items.forEach(item => {
+      // Load songs into the active session context (items may be undefined from list cache)
+      const items = Array.isArray(currentSession.items) ? currentSession.items : [];
+      items.forEach(item => {
         // All authenticated users (editors and viewers) can see singer and pitch info
         // from sessions that belong to their centers
         addSong(item.songId, item.singerId, item.pitch);
@@ -749,7 +755,7 @@ export const SessionManager: React.FC = () => {
       <div 
         className={`${isMobile ? 'fixed left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700' : 'mb-6'}`}
         style={isMobile ? {
-          top: '48px', // Position below Layout header (h-12 = 48px on mobile)
+          top: 'calc(48px + var(--offline-banner-height, 0px))', // Below Layout header; + offline banner when visible
           paddingTop: 'env(safe-area-inset-top, 0px)',
         } : {}}
       >
@@ -917,9 +923,9 @@ export const SessionManager: React.FC = () => {
         ref={listContainerRef}
         className={isMobile ? 'overflow-y-auto' : ''}
         style={isMobile ? {
-          // Calculate height: viewport height minus Layout header (48px) + SessionManager header (~200px) + bottom action bar space (~102px)
-          marginTop: '128px', // Space for Layout header (48px) + SessionManager header (~200px)
-          height: 'calc(100vh - 128px - 166px)', // Viewport minus Layout header, SessionManager header, and bottom bar
+          // Space for Layout header (48px) + SessionManager header (~200px) + offline banner when visible
+          marginTop: 'calc(128px + var(--offline-banner-height, 0px))',
+          height: 'calc(100vh - 128px - 166px - var(--offline-banner-height, 0px))', // Viewport minus header, SessionManager header, bottom bar, offline banner
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'contain', // Prevent scroll chaining
         } : {}}
@@ -973,8 +979,8 @@ export const SessionManager: React.FC = () => {
                       </div>
                       <div className="flex justify-center gap-0.5">
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleMoveUp(index); }}
-                          disabled={index === 0}
+                          onClick={(e) => { e.stopPropagation(); handleMoveUp(originalIndex); }}
+                          disabled={originalIndex === 0}
                           title="Move up"
                           aria-label="Move up"
                           className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
@@ -982,8 +988,8 @@ export const SessionManager: React.FC = () => {
                           <i className="fas fa-chevron-up text-xs"></i>
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleMoveDown(index); }}
-                          disabled={index === sessionItems.length - 1}
+                          onClick={(e) => { e.stopPropagation(); handleMoveDown(originalIndex); }}
+                          disabled={originalIndex === sessionItems.length - 1}
                           title="Move down"
                           aria-label="Move down"
                           className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
@@ -1284,6 +1290,23 @@ export const SessionManager: React.FC = () => {
       <MobileBottomActionBar
         actions={mobileActions}
       />
+
+      {/* Custom drag preview with dynamic number - follows cursor when dragging */}
+      {!isMobile && draggingIndex !== null && dragPreviewPos && sessionItems[draggingIndex] && (
+        <div
+          className="fixed pointer-events-none z-[9999] -translate-x-1/2 -translate-y-1/2"
+          style={{ left: dragPreviewPos.x, top: dragPreviewPos.y }}
+        >
+          <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border-2 border-blue-500 dark:border-blue-400 rounded-lg shadow-xl">
+            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full font-bold text-sm">
+              {(dragOverIndex ?? draggingIndex) + 1}
+            </div>
+            <span className="font-medium text-gray-900 dark:text-gray-100 truncate max-w-[200px]">
+              {sessionItems[draggingIndex].song.name}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
