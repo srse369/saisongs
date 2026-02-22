@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   findBestSongMatch,
+  findBestSingerMatch,
   findTopSongMatches,
   normalizeSongName,
   normalizeSongNameForMapping,
   type SongMatch,
 } from './songMatcher';
-import type { Song } from '../types';
+import type { Song, Singer } from '../types';
 
 describe('songMatcher', () => {
   // Mock songs for testing
@@ -153,6 +154,16 @@ describe('songMatcher', () => {
       expect(result?.similarity).toBe(100);
     });
 
+    it('should match "Guru Vara" vs "Guruvara" (space vs no space)', () => {
+      const songs: Song[] = [
+        { id: '1', name: 'Guruvara Naam Pavana Naam', lyrics: 'Guruvara...' },
+      ] as Song[];
+      const result = findBestSongMatch('Guru Vara Naam Pavana Naam', songs, 50);
+      expect(result).toBeDefined();
+      expect(result?.song.name).toBe('Guruvara Naam Pavana Naam');
+      expect(result?.similarity).toBeGreaterThanOrEqual(50);
+    });
+
     it('should handle songs with similar prefixes', () => {
       const result = findBestSongMatch('Om', mockSongs, 50);
 
@@ -220,6 +231,39 @@ describe('songMatcher', () => {
 
       // Should return null because best match is below threshold
       expect(result).toBeNull();
+    });
+  });
+
+  describe('findBestSingerMatch', () => {
+    const mockSingers: Singer[] = [
+      { id: '1', name: 'Shambhavi' },
+      { id: '2', name: 'Simleen (SSE)' },
+      { id: '3', name: 'Ameya' },
+      { id: '4', name: 'Rosi M' },
+    ] as Singer[];
+
+    it('should return exact match', () => {
+      const result = findBestSingerMatch('Shambhavi', mockSingers);
+      expect(result).toBeDefined();
+      expect(result?.singer.name).toBe('Shambhavi');
+      expect(result?.similarity).toBe(100);
+    });
+
+    it('should fuzzy match slightly adjusted names', () => {
+      const result = findBestSingerMatch('Simleen', mockSingers);
+      expect(result).toBeDefined();
+      expect(result?.singer.name).toBe('Simleen (SSE)');
+      expect(result?.similarity).toBeGreaterThanOrEqual(85);
+    });
+
+    it('should return null when no match above threshold', () => {
+      const result = findBestSingerMatch('Unknown Singer XYZ', mockSingers, 90);
+      expect(result).toBeNull();
+    });
+
+    it('should return null for empty search or empty singers', () => {
+      expect(findBestSingerMatch('', mockSingers)).toBeNull();
+      expect(findBestSingerMatch('Shambhavi', [])).toBeNull();
     });
   });
 

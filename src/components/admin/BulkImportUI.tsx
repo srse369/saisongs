@@ -159,9 +159,6 @@ export const BulkImportUI: React.FC<BulkImportUIProps> = ({ isOpen, onClose, inl
         throw new Error('Invalid song format. Each song must have "name" and "url" fields.');
       }
       
-      // Hide manual import UI and start importing
-      setShowManualImport(false);
-      
       // Reset state and start import
       setImportState({
         status: 'importing',

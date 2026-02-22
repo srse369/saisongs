@@ -29,6 +29,8 @@ export const CACHE_KEYS = {
   SELECTED_SESSION_TEMPLATE_ID: 'saiSongs:selectedSessionTemplateId',
   TEMPLATE_CLIPBOARD: 'saiSongs:templateClipboard',
   TEMPLATE_MEDIA_PREFIX: 'saiSongs:templateMedia:',
+  USER_PREF_SHOW_SONG_DETAILS: 'saiSongs:userPref:showSongDetails',
+  USER_PREF_DEFAULT_PITCHES: 'saiSongs:userPref:defaultPitches',
   
   // Version tracking
   APP_VERSION: 'saiSongs:appVersion',
@@ -236,6 +238,24 @@ export async function getSongIdsFromCache(): Promise<string[]> {
     return songs.map((s: { id?: string }) => s?.id).filter((id: string | undefined): id is string => !!id);
   } catch {
     return [];
+  }
+}
+
+/**
+ * Get full songs array from the songs list cache (for validation, etc.).
+ * Returns null if cache is empty or parse fails.
+ */
+export async function getSongsFromCache(): Promise<Array<{ id: string; name: string; lyrics?: string | null }> | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const songsRaw = await idbGet(CACHE_KEYS.SAI_SONGS_SONGS);
+    if (!songsRaw) return null;
+    const parsed = JSON.parse(songsRaw);
+    const songs = parsed?.songs;
+    if (!Array.isArray(songs)) return null;
+    return songs;
+  } catch {
+    return null;
   }
 }
 

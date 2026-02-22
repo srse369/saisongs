@@ -276,6 +276,37 @@ class SongService {
   }
 
   /**
+   * Merge duplicate song into target. Transfers all pitches, session items, and mappings to target, then deletes duplicate.
+   */
+  /**
+   * Fetch multiple songs with lyrics (CLOBs) in one request.
+   * Uses /offline/songs-batch - requires editor or admin.
+   */
+  async getSongsWithLyrics(ids: string[]): Promise<Song[]> {
+    if (ids.length === 0) return [];
+    const response = await apiClient.post<{ songs: Song[] }>('/offline/songs-batch', { ids });
+    return Array.isArray(response?.songs) ? response.songs : [];
+  }
+
+  async mergeSongs(targetSongId: string, duplicateSongId: string): Promise<{ message: string }> {
+    try {
+      const result = await apiClient.mergeSongs(targetSongId, duplicateSongId);
+      if (typeof window !== 'undefined') {
+        await removeCacheItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${targetSongId}`);
+        await removeCacheItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${duplicateSongId}`);
+      }
+      return result as { message: string };
+    } catch (error) {
+      console.error('Error merging songs:', error);
+      throw new DatabaseError(
+        ErrorCode.QUERY_ERROR,
+        error instanceof Error ? error.message : 'Failed to merge songs',
+        error
+      );
+    }
+  }
+
+  /**
    * Syncs a song from its external source URL
    * Fetches metadata (pitches, etc.) and updates the song
    */

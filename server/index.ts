@@ -97,6 +97,8 @@ app.get('/api/health', async (req, res) => {
       timestamp: new Date().toISOString(),
     };
     if (req.query.stats === 'true') {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.set('Pragma', 'no-cache');
       try {
         const statsPromise = databaseReadService.getEntityCounts();
         const timeoutPromise = new Promise<never>((_, reject) =>

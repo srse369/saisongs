@@ -1,7 +1,7 @@
 {
   "name": "saisongs",
   "private": true,
-  "version": "6.1.19",
+  "version": "6.1.20",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -53,6 +53,7 @@
     "react-konva": "^19.2.1",
     "react-router-dom": "^7.9.5",
     "sequelize": "^6.37.7",
+    "string-similarity": "^4.0.4",
     "use-image": "^1.1.4"
   },
   "devDependencies": {

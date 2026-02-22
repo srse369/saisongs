@@ -38,6 +38,12 @@ class PitchService {
       if (updateInput.pitch !== undefined && updateInput.pitch.trim().length === 0) {
         throw new ValidationError('Pitch value cannot be empty', 'pitch');
       }
+      if (updateInput.songId !== undefined && updateInput.songId.trim().length === 0) {
+        throw new ValidationError('Song ID cannot be empty', 'songId');
+      }
+      if (updateInput.singerId !== undefined && updateInput.singerId.trim().length === 0) {
+        throw new ValidationError('Singer ID cannot be empty', 'singerId');
+      }
     }
 
     // Validate pitch length
@@ -186,16 +192,19 @@ class PitchService {
   async updatePitch(id: string, input: UpdatePitchInput): Promise<SongSingerPitch | null> {
     this.validatePitchInput(input, true);
 
-    if (input.pitch === undefined) {
+    const hasUpdates = input.pitch !== undefined || input.songId !== undefined || input.singerId !== undefined;
+    if (!hasUpdates) {
       // No fields to update, fetch and return existing pitch (no cache-busting needed)
       const raw = await apiClient.getPitch(id, false);
       return raw ? this.mapRowToPitch(raw as any) : null;
     }
 
     try {
-      await apiClient.updatePitch(id, {
-        pitch: input.pitch.trim(),
-      });
+      const body: Record<string, string> = {};
+      if (input.pitch !== undefined) body.pitch = input.pitch.trim();
+      if (input.songId !== undefined) body.songId = input.songId;
+      if (input.singerId !== undefined) body.singerId = input.singerId;
+      await apiClient.updatePitch(id, body);
       // Use nocache=true to ensure we get fresh data after the update
       const raw = await apiClient.getPitch(id, true);
       return raw ? this.mapRowToPitch(raw as any) : null;

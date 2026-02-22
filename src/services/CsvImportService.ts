@@ -3,10 +3,17 @@
  */
 
 import apiClient from './ApiClient';
-import type { Singer, Song, Pitch } from '../types';
+import type { Singer, Song } from '../types';
 import type { CsvPitchData } from './CsvParserService';
 import { normalizePitch, isRecognizedPitch } from '../utils/pitchNormalization';
-import { findBestSongMatch, normalizeSongNameForMapping } from '../utils/songMatcher';
+
+/** Compare DB pitch with normalized CSV pitch (handles Db vs C#, 2M vs D major, etc.) */
+function pitchesMatch(dbPitch: string, normalizedPitch: string): boolean {
+  if (!dbPitch) return false;
+  const dbNorm = normalizePitch(dbPitch) ?? dbPitch.trim();
+  return dbNorm === normalizedPitch;
+}
+import { findBestSongMatch, findBestSingerMatch, normalizeSongNameForMapping } from '../utils/songMatcher';
 
 export interface ImportPreviewItem {
   csvData: CsvPitchData;
@@ -34,19 +41,49 @@ export interface ImportResult {
   errors: string[];
 }
 
+export type ImportProgressPhase = 'singers' | 'pitches';
+
+/** User chooses to map CSV singer to existing singer */
+export interface ResolveSingerMap {
+  singerId: string;
+}
+
+/** User chooses to create a new singer */
+export interface ResolveSingerCreate {
+  create: true;
+}
+
+export type ResolveSingerResult = ResolveSingerMap | ResolveSingerCreate;
+
+/** Callback to resolve a singer not in db/cache: map to existing or create new */
+export type ResolveSingerCallback = (singerName: string) => Promise<ResolveSingerResult>;
+
+export interface CreateImportPreviewResult {
+  items: ImportPreviewItem[];
+  alreadyExistsCount: number;
+}
+
 export class CsvImportService {
   /**
-   * Create a preview of what will be imported
+   * Create a preview of what will be imported.
+   * Items that already exist in the database (same song, singer, pitch) are excluded from the preview.
    */
   static async createImportPreview(
     csvData: CsvPitchData[],
     existingSingers: Singer[],
     existingSongs: Song[],
-    songMappings?: Map<string, { dbSongId: string; dbSongName: string }>
-  ): Promise<ImportPreviewItem[]> {
+    songMappings?: Map<string, { dbSongId: string; dbSongName: string }>,
+    onProgress?: (current: number, total: number) => void,
+    existingPitches?: Array<{ songId: string; singerId: string; pitch: string }>
+  ): Promise<CreateImportPreviewResult> {
     const preview: ImportPreviewItem[] = [];
+    let alreadyExistsCount = 0;
+    const total = csvData.length;
     
-    for (const data of csvData) {
+    for (let i = 0; i < csvData.length; i++) {
+      const data = csvData[i];
+      onProgress?.(i + 1, total);
+      if (i % 10 === 0) await new Promise((r) => setTimeout(r, 0));
       // Clean singer name to prevent whitespace duplicates
       const cleanSingerName = data.singerName.trim();
       
@@ -87,10 +124,14 @@ export class CsvImportService {
         status: 'pending',
       };
       
-      // Check if singer exists (case-insensitive, trimmed)
-      const singer = existingSingers.find(
+      // Check if singer exists: exact match first, then fuzzy match for slightly adjusted names
+      let singer = existingSingers.find(
         s => s.name.toLowerCase().trim() === cleanSingerName.toLowerCase()
       );
+      if (!singer) {
+        const singerMatch = findBestSingerMatch(cleanSingerName, existingSingers, 85);
+        if (singerMatch) singer = singerMatch.singer;
+      }
       if (singer) {
         item.singerId = singer.id;
         item.singerExists = true;
@@ -117,6 +158,19 @@ export class CsvImportService {
               item.status = 'ready';
             } else {
               item.status = 'needs_pitch';
+            }
+            
+            // Skip items that already exist in DB (same song, singer, pitch)
+            if (existingPitches && item.status === 'ready' && item.singerId && item.normalizedPitch) {
+              const alreadyExists = existingPitches.some((p) =>
+                p.songId === item.songId &&
+                p.singerId === item.singerId &&
+                pitchesMatch(p.pitch, item.normalizedPitch!)
+              );
+              if (alreadyExists) {
+                alreadyExistsCount++;
+                continue;
+              }
             }
             
             preview.push(item);
@@ -158,6 +212,19 @@ export class CsvImportService {
       } else {
         item.status = 'ready';
       }
+
+      // Skip items that already exist in DB (same song, singer, pitch)
+      if (existingPitches && item.status === 'ready' && item.singerId && item.normalizedPitch) {
+        const alreadyExists = existingPitches.some((p) =>
+          p.songId === item.songId &&
+          p.singerId === item.singerId &&
+          pitchesMatch(p.pitch, item.normalizedPitch!)
+        );
+        if (alreadyExists) {
+          alreadyExistsCount++;
+          continue; // Don't add to preview
+        }
+      }
       
       preview.push(item);
     }
@@ -179,53 +246,73 @@ export class CsvImportService {
       return aPriority - bPriority;
     });
     
-    return preview;
+    return { items: preview, alreadyExistsCount };
   }
   
   /**
-   * Import singers from preview items
-   * Returns a Map with lowercase singer names as keys and the count of newly created singers
+   * Import singers from preview items.
+   * For singers not in db/cache, calls resolveSinger to let user map to existing or create new.
+   * Returns a Map with lowercase singer names as keys and the count of newly created singers.
    */
-  static async importSingers(previewItems: ImportPreviewItem[]): Promise<{ singerMap: Map<string, string>; newSingersCount: number }> {
+  static async importSingers(
+    previewItems: ImportPreviewItem[],
+    onProgress?: (current: number, total: number) => void,
+    resolveSinger?: ResolveSingerCallback
+  ): Promise<{ singerMap: Map<string, string>; newSingersCount: number }> {
     const singerMap = new Map<string, string>(); // lowercase singerName -> singerId
     let newSingersCount = 0;
     
     // Get unique singers - check ALL items that will be imported, not just 'ready' status
-    const singersToCreate = new Set<string>();
+    const singersToResolve = new Set<string>();
     previewItems.forEach(item => {
       // If singer already exists, add to map (lowercase key for consistency)
       if (item.singerId) {
         singerMap.set(item.singerName.toLowerCase().trim(), item.singerId);
       }
-      // If singer doesn't exist and this item will be processed, mark for creation
+      // If singer doesn't exist and this item will be processed, needs resolution
       if (!item.singerExists && (item.status === 'ready' || item.status === 'needs_song' || item.status === 'needs_pitch')) {
-        singersToCreate.add(item.singerName);
+        singersToResolve.add(item.singerName);
       }
     });
     
-    // Create singers
-    for (const singerName of singersToCreate) {
+    const singersArray = Array.from(singersToResolve);
+    const total = singersArray.length;
+    
+    for (let i = 0; i < singersArray.length; i++) {
+      const singerName = singersArray[i];
+      onProgress?.(i + 1, total);
+      const key = singerName.toLowerCase().trim();
+      
       try {
-        const result = await apiClient.createSinger({ name: singerName });
+        let singerId: string | undefined;
         
-        // Backend may return existing singer if duplicate found (status 200)
-        // or newly created singer (status 201)
-        // Oracle might return uppercase field names (ID, NAME) or lowercase (id, name)
-        const singerId = result?.id || result?.ID;
+        if (resolveSinger) {
+          const resolution = await resolveSinger(singerName);
+          if ('singerId' in resolution) {
+            singerId = resolution.singerId;
+          } else {
+            // User chose to create new singer
+            const result = await apiClient.createSinger({ name: singerName });
+            singerId = result?.id || result?.ID;
+            if (singerId && !result?.message) newSingersCount++;
+          }
+        } else {
+          // No callback: create singer as before (backward compatible)
+          const result = await apiClient.createSinger({ name: singerName });
+          singerId = result?.id || result?.ID;
+          if (singerId && !result?.message) newSingersCount++;
+        }
         
         if (singerId) {
-          // Store with lowercase key for case-insensitive matching
-          const key = singerName.toLowerCase().trim();
           singerMap.set(key, singerId);
-          
-          if (!result.message) {
-            newSingersCount++;
-          }
         } else {
           console.error(`Failed to create singer "${singerName}": No ID in response`);
         }
       } catch (error) {
-        console.error(`Failed to create singer "${singerName}":`, error);
+        console.error(`Failed to resolve singer "${singerName}":`, error);
+        // When using resolveSinger callback, re-throw so caller can handle (e.g. user cancelled)
+        if (resolveSinger) throw error;
+        // Without callback: log and continue (backward compatible)
       }
     }
     
@@ -238,7 +325,8 @@ export class CsvImportService {
   static async importPitches(
     previewItems: ImportPreviewItem[],
     singerMap: Map<string, string>,
-    singersCreatedCount: number
+    singersCreatedCount: number,
+    onProgress?: (current: number, total: number) => void
   ): Promise<ImportResult> {
     const result: ImportResult = {
       success: true,
@@ -250,8 +338,11 @@ export class CsvImportService {
     };
     
     const readyItems = previewItems.filter(item => item.status === 'ready');
+    const total = readyItems.length;
     
-    for (const item of readyItems) {
+    for (let i = 0; i < readyItems.length; i++) {
+      const item = readyItems[i];
+      onProgress?.(i + 1, total);
       try {
         // Get singer ID (case-insensitive lookup)
         let singerId = item.singerId;
@@ -317,7 +408,9 @@ export class CsvImportService {
    */
   static async executeImport(
     previewItems: ImportPreviewItem[],
-    existingSingers: Singer[]
+    existingSingers: Singer[],
+    onProgress?: (phase: ImportProgressPhase, current: number, total: number) => void,
+    resolveSinger?: ResolveSingerCallback
   ): Promise<ImportResult> {
     try {
       // Build singer map from existing singers (case-insensitive matching)
@@ -328,8 +421,12 @@ export class CsvImportService {
         }
       });
       
-      // Import new singers
-      const { singerMap: newSingerMap, newSingersCount } = await this.importSingers(previewItems);
+      // Import new singers (resolveSinger prompts user for unknown singers)
+      const { singerMap: newSingerMap, newSingersCount } = await this.importSingers(
+        previewItems,
+        (current, total) => onProgress?.('singers', current, total),
+        resolveSinger
+      );
       
       // Merge new singers into main map
       newSingerMap.forEach((id, name) => {
@@ -351,7 +448,12 @@ export class CsvImportService {
       }));
       
       // Import pitches
-      const result = await this.importPitches(updatedItems, singerMap, newSingersCount);
+      const result = await this.importPitches(
+        updatedItems,
+        singerMap,
+        newSingersCount,
+        (current, total) => onProgress?.('pitches', current, total)
+      );
       
       return result;
     } catch (error) {

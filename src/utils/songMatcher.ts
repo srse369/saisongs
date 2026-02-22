@@ -2,7 +2,16 @@
  * Utility for fuzzy matching song names
  */
 
-import type { Song } from '../types';
+import * as stringSimilarity from 'string-similarity';
+import type { Song, Singer } from '../types';
+
+export interface SingerMatch {
+  singer: Singer;
+  similarity: number;
+  matched: boolean;
+}
+
+const BODY_COMPARE_LEN = 500;
 
 /**
  * Normalize common name variations to canonical forms
@@ -18,7 +27,6 @@ function normalizeVariations(str: string): string {
     [/\bsaai\b/gi, 'sai'],
     [/\bshree\b/gi, 'sri'],
     [/\bshri\b/gi, 'sri'],
-    [/\bshree\b/gi, 'sri'],
     
     // Jai/Jaya variations
     [/\bjaya\b/gi, 'jai'],
@@ -31,6 +39,37 @@ function normalizeVariations(str: string): string {
     // Om variations
     [/\baum\b/gi, 'om'],
     [/\bohm\b/gi, 'om'],
+    
+    // Body/lyrics spelling variations
+    [/\bmruthyunjaya\b/gi, 'mrityunjaya'],
+    [/\bbhooshana\b/gi, 'bhushana'],
+    [/\bneeraja\b/gi, 'niraja'],
+    [/\bgowri\b/gi, 'gauri'],
+    [/\bneelakanta\b/gi, 'neela kanta'],
+    [/\bjatadhara\b/gi, 'jata dhara'],
+    [/\bmano\b/gi, 'mana'],
+    [/\bmanohara\b/gi, 'manohar'],
+    [/\bjhulena\b/gi, 'jhulana'],
+    [/\bjhuley\b/gi, 'jhule'],
+    [/\braasa\b/gi, 'rasa'],
+    [/\bdheerey\b/gi, 'dheere'],
+    [/\bhauley\b/gi, 'holey'],
+    [/\baavo\b/gi, 'aao'],
+    [/\bdarshana\b/gi, 'darshan'],
+    [/\bthum\b/gi, 'tum'],
+    [/\bthumhi\b/gi, 'tum hi'],
+    [/\bjagada\b/gi, 'jagat'],
+    [/\bvidhatha\b/gi, 'vidhata'],
+    [/\bviswa\b/gi, 'vishwa'],
+    [/\bsainatha\b/gi, 'sai natha'],
+    [/\bjaganatha\b/gi, 'jagannatha'],
+    [/\bkey\b/gi, 'ke'],
+    [/\btharas\b/gi, 'taras'],
+    [/\bhein\b/gi, 'hain'],
+    [/\bshankar\b/gi, 'shankara'],
+    [/\bparameshwar\b/gi, 'parameshwara'],
+    [/\bantharyami\b/gi, 'antaryami'],
+    [/\bshanti\b/gi, 'shanthi'],
   ];
   
   for (const [pattern, replacement] of variations) {
@@ -71,7 +110,7 @@ function calculatePrefixMatch(str1: string, str2: string): number {
  * with heavy emphasis on left-to-right prefix matches
  * Returns a percentage (0-100)
  */
-function calculateSimilarity(str1: string, str2: string): number {
+export function calculateSimilarity(str1: string, str2: string): number {
   // Normalize: lowercase, trim, remove trailing punctuation, and normalize variations
   let s1 = str1.toLowerCase().trim().replace(/[,.\s]+$/, '');
   let s2 = str2.toLowerCase().trim().replace(/[,.\s]+$/, '');
@@ -79,6 +118,19 @@ function calculateSimilarity(str1: string, str2: string): number {
   // Apply variation normalization
   s1 = normalizeVariations(s1);
   s2 = normalizeVariations(s2);
+
+  // Collapse spaces so "Guru Vara" and "Guruvara" compare equivalently
+  s1 = s1.replace(/\s+/g, ' ');
+  s2 = s2.replace(/\s+/g, ' ');
+  const s1NoSpaces = s1.replace(/\s/g, '');
+  const s2NoSpaces = s2.replace(/\s/g, '');
+  // Use the higher of: normal comparison vs space-collapsed comparison
+  const withSpaces = compareNormalized(s1, s2);
+  const withoutSpaces = s1NoSpaces === s2NoSpaces ? 100 : compareNormalized(s1NoSpaces, s2NoSpaces);
+  return Math.max(withSpaces, withoutSpaces);
+}
+
+function compareNormalized(s1: string, s2: string): number {
   
   if (s1 === s2) return 100;
   if (s1.length === 0 || s2.length === 0) return 0;
@@ -179,6 +231,81 @@ export function findBestSongMatch(
 }
 
 /**
+ * Find the best matching singer from database (for CSV import).
+ * Handles slightly adjusted names like "Simleen" vs "Simleen (SSE)".
+ * @param searchName - The singer name from CSV
+ * @param singers - Array of singers from database
+ * @param threshold - Minimum similarity percentage (default: 85)
+ */
+export function findBestSingerMatch(
+  searchName: string,
+  singers: Singer[],
+  threshold: number = 85
+): SingerMatch | null {
+  if (!searchName || singers.length === 0) return null;
+
+  let bestMatch: SingerMatch | null = null;
+  let highestSimilarity = 0;
+
+  for (const singer of singers) {
+    const similarity = calculateSimilarity(searchName, singer.name ?? '');
+
+    if (similarity > highestSimilarity) {
+      highestSimilarity = similarity;
+      bestMatch = {
+        singer,
+        similarity,
+        matched: similarity >= threshold,
+      };
+    }
+
+    if (similarity === 100) break;
+  }
+
+  return bestMatch && bestMatch.matched ? bestMatch : null;
+}
+
+/**
+ * Find pairs of similar songs in the database (for deduplication).
+ * Compares each song to every other song and returns pairs above the similarity threshold.
+ * Yields to the event loop periodically when onProgress is provided so the UI can update.
+ * @param songs - Array of songs from database
+ * @param threshold - Minimum similarity percentage to consider a pair (default: 85)
+ * @param onProgress - Optional callback (current, total) for progress updates
+ * @returns Array of pairs with similarity scores, sorted by similarity descending
+ */
+export async function findSimilarSongPairs(
+  songs: Song[],
+  threshold: number = 85,
+  onProgress?: (current: number, total: number) => void
+): Promise<Array<{ song1: Song; song2: Song; similarity: number }>> {
+  if (songs.length < 2) return [];
+
+  const pairs: Array<{ song1: Song; song2: Song; similarity: number }> = [];
+  const total = (songs.length * (songs.length - 1)) / 2;
+  let comparisons = 0;
+  const progressInterval = Math.max(1, Math.floor(total / 100)); // Report ~100 times
+
+  for (let i = 0; i < songs.length; i++) {
+    for (let j = i + 1; j < songs.length; j++) {
+      const sim = calculateSimilarity(songs[i].name, songs[j].name);
+      if (sim >= threshold) {
+        pairs.push({ song1: songs[i], song2: songs[j], similarity: sim });
+      }
+      comparisons++;
+      if (onProgress && comparisons % progressInterval === 0) {
+        onProgress(comparisons, total);
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    }
+  }
+
+  if (onProgress) onProgress(total, total);
+  pairs.sort((a, b) => b.similarity - a.similarity);
+  return pairs;
+}
+
+/**
  * Find top N matching songs from database
  * @param searchName - The song name to search for
  * @param songs - Array of songs from database
@@ -253,3 +380,50 @@ export function normalizeSongNameForMapping(songName: string): string {
   return normalized;
 }
 
+/**
+ * Extract normalized word set from text (phonic-style: spelling variations normalized).
+ * Used for fast body comparison without expensive Levenshtein.
+ */
+export function extractBodyWordSet(text: string): Set<string> {
+  const raw = (text || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!raw) return new Set();
+  const norm = normalizeVariations(raw);
+  const normWord = (w: string) => normalizeVariations(w.replace(/[^a-z0-9]/g, ''));
+  return new Set(norm.split(/\s+/).filter((w) => w.length > 1).map(normWord));
+}
+
+/**
+ * Fast body similarity using word-set overlap (Jaccard-style).
+ * Uses intersection/union to avoid inflating scores when one text has very few unique words
+ * (e.g. "Hare Krishna Hare Rama" mantra vs a longer song that happens to mention Krishna/Rama).
+ */
+export function calculateWordSetSimilarity(set1: Set<string>, set2: Set<string>): number {
+  if (set1.size === 0 && set2.size === 0) return 100;
+  if (set1.size === 0 || set2.size === 0) return 0;
+  let overlap = 0;
+  const smaller = set1.size <= set2.size ? set1 : set2;
+  const larger = set1.size <= set2.size ? set2 : set1;
+  for (const w of smaller) {
+    if (larger.has(w)) overlap++;
+  }
+  const unionSize = set1.size + set2.size - overlap;
+  return Math.round((overlap / unionSize) * 100);
+}
+
+/**
+ * Calculate approximate similarity between two long strings (e.g. lyrics/body).
+ * Combines word-set overlap with string-similarity (Dice coefficient) for better matching.
+ */
+export function calculateBodySimilarity(str1: string, str2: string): number {
+  const set1 = extractBodyWordSet(str1);
+  const set2 = extractBodyWordSet(str2);
+  const wordSim = calculateWordSetSimilarity(set1, set2);
+
+  const raw1 = (str1 || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const raw2 = (str2 || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const norm1 = normalizeVariations(raw1).slice(0, BODY_COMPARE_LEN);
+  const norm2 = normalizeVariations(raw2).slice(0, BODY_COMPARE_LEN);
+  const diceSim = norm1 && norm2 ? Math.round(stringSimilarity.compareTwoStrings(norm1, norm2) * 100) : 0;
+
+  return Math.max(wordSim, diceSim);
+}

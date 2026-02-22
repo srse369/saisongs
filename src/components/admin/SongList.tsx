@@ -4,6 +4,7 @@ import { Modal } from '../common/Modal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
+import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 import { MusicIcon } from '../common';
 import { SongMetadataCard } from '../common/SongMetadataCard';
 
@@ -20,6 +21,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
   const navigate = useNavigate();
   const { isEditor, isAdmin, isAuthenticated, userEmail, userId } = useAuth();
   const { addSong, songIds } = useSession();
+  const { showSongDetailsInDesktop } = useUserPreferences();
   const [syncingSongId, setSyncingSongId] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [songToDelete, setSongToDelete] = useState<Song | null>(null);
@@ -142,6 +144,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                   onPreviewClick={() => handlePresent(song)}
                   isAuthenticated={isAuthenticated}
                   lyricsHover={{ songId: song.id, songName: song.name, song }}
+                  compactInDesktop={!showSongDetailsInDesktop}
                 />
 
                 {/* Audio Player - Hidden on mobile until row is selected */}

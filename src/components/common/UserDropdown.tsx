@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 import { RoleBadge } from './RoleBadge';
 import { fetchCentersOnce } from './CenterBadges';
 import { Modal } from './Modal';
@@ -20,6 +21,12 @@ interface AdminUser {
 
 export const UserDropdown: React.FC = () => {
   const { userName, userEmail, userRole, centerIds, editorFor, logout } = useAuth();
+  const {
+    showSongDetailsInDesktop,
+    setShowSongDetailsInDesktop,
+    defaultPitchesView,
+    setDefaultPitchesView,
+  } = useUserPreferences();
   const [isOpen, setIsOpen] = useState(false);
   const [centers, setCenters] = useState<Center[]>([]);
   const [showAdminsModal, setShowAdminsModal] = useState(false);
@@ -118,10 +125,10 @@ export const UserDropdown: React.FC = () => {
       {/* Dropdown Menu */}
       {isOpen && (
         <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
-          {/* User Info Section */}
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-start space-x-3">
-              <div className="p-2 rounded-full text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20">
+          {/* User Info Section - border only before Admin section; no separator above Import (editor) or Settings (viewer) */}
+          <div className={`px-4 py-2 ${userRole === 'admin' ? 'border-b border-gray-200 dark:border-gray-700' : ''}`}>
+            <div className="flex items-start space-x-2">
+              <div className="p-1.5 rounded-full text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20">
                 {getProfileIcon()}
               </div>
               <div className="flex-1 min-w-0">
@@ -135,7 +142,7 @@ export const UserDropdown: React.FC = () => {
             </div>
             
             {/* Role and Center Access Info */}
-            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600 space-y-3">
+            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 space-y-2">
               {/* Admin Status */}
               <div>
                 <p className="text-xs text-gray-700 dark:text-gray-300">
@@ -150,7 +157,7 @@ export const UserDropdown: React.FC = () => {
               
               {/* Editor For */}
               <div>
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                   Editor For:
                 </p>
                 {userRole === 'admin' ? (
@@ -181,7 +188,7 @@ export const UserDropdown: React.FC = () => {
               
               {/* Associated Centers */}
               <div>
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                   Associated Centers:
                 </p>
                 {userRole === 'admin' ? (
@@ -214,51 +221,66 @@ export const UserDropdown: React.FC = () => {
 
           {/* Admin Menu Items Section */}
           {userRole === 'admin' && (
-            <div className="py-2 border-b border-gray-200 dark:border-gray-700">
+            <div className="py-1">
               <button
                 onClick={handleShowAdmins}
-                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="w-full flex items-center px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <i className="fas fa-user-shield w-4 h-4 mr-3"></i>
                 Admins
               </button>
               <button
                 onClick={() => handleNavigate('/admin/centers')}
-                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="w-full flex items-center px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <i className="fas fa-building w-4 h-4 mr-3"></i>
                 Centers
               </button>
               <button
                 onClick={() => handleNavigate('/admin/analytics')}
-                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="w-full flex items-center px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <i className="fas fa-chart-bar w-4 h-4 mr-3"></i>
                 Analytics
               </button>
               <button
                 onClick={() => handleNavigate('/admin/feedback')}
-                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="w-full flex items-center px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <i className="fas fa-comment w-4 h-4 mr-3"></i>
                 Feedback
               </button>
-              <button
-                onClick={() => handleNavigate('/admin/import')}
-                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                <i className="fas fa-download w-4 h-4 mr-3"></i>
-                Import Songs
-              </button>
             </div>
           )}
-          
-          {/* Import Section - Available to editors and admins */}
+
+          {/* Import Section - Import Songs (admin only), Import Singers & Pitches (admin/editor) */}
           {(userRole === 'admin' || userRole === 'editor') && (
-            <div className="py-2 border-b border-gray-200 dark:border-gray-700">
+            <div className="py-1">
+              <div className="flex items-center gap-2 px-4 py-0.5">
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">Import</span>
+                <div className="flex-1 border-t border-gray-200 dark:border-gray-700"></div>
+              </div>
+              {userRole === 'admin' && (
+                <>
+                  <button
+                    onClick={() => handleNavigate('/admin/import')}
+                    className="w-full flex items-center px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <i className="fas fa-download w-4 h-4 mr-3"></i>
+                    Import Songs
+                  </button>
+                  <button
+                    onClick={() => handleNavigate('/admin/dedupe-songs')}
+                    className="w-full flex items-center px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <i className="fas fa-compress-alt w-4 h-4 mr-3"></i>
+                    Dedupe Songs
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => handleNavigate('/admin/import-csv')}
-                className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="w-full flex items-center px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
                 <i className="fas fa-file-import w-4 h-4 mr-3"></i>
                 Import Singers & Pitches
@@ -266,11 +288,45 @@ export const UserDropdown: React.FC = () => {
             </div>
           )}
 
+          {/* Settings Section */}
+          <div className="py-1 space-y-2 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 px-4 py-0.5">
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider shrink-0">Settings</span>
+              <div className="flex-1 border-t border-gray-200 dark:border-gray-700"></div>
+            </div>
+            <div className="px-4">
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+                Desktop: show song details (deity, language, tempo, etc.)
+              </label>
+              <select
+                value={showSongDetailsInDesktop ? 'show' : 'hide'}
+                onChange={(e) => setShowSongDetailsInDesktop(e.target.value === 'show')}
+                className="w-full px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="show">Show</option>
+                <option value="hide">Hide (hover to expand)</option>
+              </select>
+            </div>
+            <div className="px-4 pb-1">
+              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-0.5">
+                Pitches tab: default view
+              </label>
+              <select
+                value={defaultPitchesView}
+                onChange={(e) => setDefaultPitchesView(e.target.value as 'my' | 'all')}
+                className="w-full px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="my">My Pitches</option>
+                <option value="all">All Pitches</option>
+              </select>
+            </div>
+          </div>
+
           {/* Actions Section */}
-          <div className="py-2">
+          <div className="py-1">
             <button
               onClick={handleLogout}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="w-full flex items-center px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
               <i className="fas fa-sign-out-alt w-4 h-4 mr-3"></i>
               Sign Out

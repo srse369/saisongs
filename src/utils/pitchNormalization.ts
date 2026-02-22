@@ -18,6 +18,12 @@ const PITCH_MAPPINGS: Record<string, string> = {
   '5': 'G',
   '6': 'A',
   '7': 'B',
+  // Flat equivalents (Db=C#, Eb=D#, etc.) for matching DB-stored values
+  'Db': 'C#',
+  'Eb': 'D#',
+  'Gb': 'F#',
+  'Ab': 'G#',
+  'Bb': 'A#',
   '1.5': 'C#',
   '2.5': 'D#',
   '3.5': 'F',

@@ -3,7 +3,7 @@ import { cacheService } from '../services/CacheService.js';
 import { databaseReadService } from '../services/DatabaseReadService.js';
 import { databaseWriteService } from '../services/DatabaseWriteService.js';
 import { extractFromHtml } from '../services/SongExtractor.js';
-import { requireAuth } from '../middleware/simpleAuth.js';
+import { requireAuth, requireEditor } from '../middleware/simpleAuth.js';
 
 const router = express.Router();
 
@@ -170,6 +170,62 @@ router.delete('/:id', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error deleting song:', error);
     res.status(500).json({ error: 'Failed to delete song' });
+  }
+});
+
+// Merge duplicate song into target (editor+)
+router.post('/merge', requireEditor, async (req, res) => {
+  try {
+    const { targetSongId, duplicateSongId } = req.body;
+
+    if (!targetSongId || !duplicateSongId) {
+      return res.status(400).json({
+        error: 'targetSongId and duplicateSongId are required',
+      });
+    }
+
+    if (targetSongId === duplicateSongId) {
+      return res.status(400).json({
+        error: 'Target and duplicate must be different songs',
+      });
+    }
+
+    const targetSong = await cacheService.getSong(targetSongId);
+    const duplicateSong = await cacheService.getSong(duplicateSongId);
+
+    if (!targetSong) {
+      return res.status(404).json({ error: 'Target song not found' });
+    }
+    if (!duplicateSong) {
+      return res.status(404).json({ error: 'Duplicate song not found' });
+    }
+
+    await databaseWriteService.mergeSongsForCache(
+      targetSongId,
+      targetSong.name || targetSong.NAME || '',
+      duplicateSongId
+    );
+
+    // Invalidate caches
+    cacheService.invalidate('songs:all');
+    cacheService.invalidate('songs:all:withClobs');
+    cacheService.invalidate(`song:${targetSongId}`);
+    cacheService.invalidate(`song:${duplicateSongId}`);
+    cacheService.invalidate('pitches:all');
+    cacheService.invalidatePattern('sessions:');
+
+    console.log(`✅ Merged song ${duplicateSongId} into ${targetSongId}`);
+    res.json({
+      message: 'Songs merged successfully',
+      targetSongId,
+      duplicateSongId,
+    });
+  } catch (error) {
+    console.error('Error merging songs:', error);
+    res.status(500).json({
+      error: 'Failed to merge songs',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 });
 

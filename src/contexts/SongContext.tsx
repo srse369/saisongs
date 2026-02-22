@@ -23,6 +23,7 @@ interface SongContextState {
   createSong: (input: CreateSongInput) => Promise<Song | null>;
   updateSong: (id: string, input: UpdateSongInput) => Promise<Song | null>;
   deleteSong: (id: string) => Promise<boolean>;
+  mergeSongs: (targetSongId: string, duplicateSongId: string) => Promise<boolean>;
   searchSongs: (query: string) => Promise<void>;
   searchSongsWithFilter: (query: string, singerId?: string) => Promise<void>;
   getSongsBySinger: (singerId: string) => Promise<void>;
@@ -348,7 +349,8 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
         if (typeof window !== 'undefined') {
           globalEventBus.dispatch('songCreated', { type: 'songCreated', song, tempId });
         }
-        toast.success(`Song ${song.name} created successfully`);
+        const displayName = song.name ?? (song as { song_name?: string }).song_name ?? input.name;
+        toast.success(`Song "${displayName}" created successfully`);
         return song;
       }
       if (typeof window !== 'undefined') {
@@ -551,6 +553,36 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
     }
   }, [toast, songs]);
 
+  const mergeSongs = useCallback(async (targetSongId: string, duplicateSongId: string): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+    try {
+      await songService.mergeSongs(targetSongId, duplicateSongId);
+      const targetSong = songs.find(s => s.id === targetSongId);
+      const duplicateSong = songs.find(s => s.id === duplicateSongId);
+      if (typeof window !== 'undefined') {
+        setSongs(prev => {
+          const updated = prev.filter(s => s.id !== duplicateSongId);
+          setCacheItem(SONGS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), songs: updated })).catch(() => {});
+          removeCacheItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${duplicateSongId}`).catch(() => {});
+          return updated.sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
+        });
+        if (duplicateSong) {
+          globalEventBus.dispatch('songDeleted', { type: 'songDeleted', song: duplicateSong });
+        }
+      }
+      toast.success(`Merged "${duplicateSong?.name ?? 'song'}" into "${targetSong?.name ?? 'song'}"`);
+      return true;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to merge songs';
+      setError({ code: 'UNKNOWN_ERROR', message: errorMessage });
+      toast.error(errorMessage);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [toast, songs]);
+
   const searchSongs = useCallback(async (query: string) => {
     setLoading(true);
     setError(null);
@@ -614,6 +646,7 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
     createSong,
     updateSong,
     deleteSong,
+    mergeSongs,
     searchSongs,
     searchSongsWithFilter,
     getSongsBySinger,

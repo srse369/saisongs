@@ -5,6 +5,7 @@ import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
 import { useNamedSessions } from '../../contexts/NamedSessionContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 import type { Song, PresentationTemplate } from '../../types';
 import { Modal } from '../common/Modal';
 import { CenterBadges } from '../common/CenterBadges';
@@ -29,6 +30,7 @@ export const SessionManager: React.FC = () => {
   const { singers, fetchSingers } = useSingers();
   const { sessions, createSession, setSessionItems, loadSession, currentSession, loadSessions, loading, deleteSession } = useNamedSessions();
   const { isEditor, isAuthenticated, userEmail, userRole } = useAuth();
+  const { showSongDetailsInDesktop } = useUserPreferences();
   const navigate = useNavigate();
 
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
@@ -711,14 +713,7 @@ export const SessionManager: React.FC = () => {
       disabled: sessionItems.length === 0,
     },
     {
-      label: 'Present',
-      icon: 'fas fa-play',
-      onClick: handlePresentSession,
-      variant: 'primary' as const,
-      disabled: sessionItems.length === 0,
-    },
-    {
-      label: 'Export',
+      label: 'Export PPT',
       icon: 'fas fa-download',
       onClick: handleExportToPowerPoint,
       variant: 'secondary',
@@ -737,6 +732,13 @@ export const SessionManager: React.FC = () => {
       onClick: () => csvFileInputRef.current?.click(),
       variant: 'secondary',
       disabled: importingCsv,
+    },
+    {
+      label: 'Present',
+      icon: 'fas fa-play',
+      onClick: handlePresentSession,
+      variant: 'primary' as const,
+      disabled: sessionItems.length === 0,
     },
   ];
 
@@ -820,18 +822,6 @@ export const SessionManager: React.FC = () => {
                 </button>
               )}
 
-              {/* Import CSV */}
-              <button
-                type="button"
-                onClick={() => csvFileInputRef.current?.click()}
-                disabled={importingCsv}
-                title="Import session from a CSV file"
-                className="hidden md:flex min-h-[16px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-600 rounded-lg sm:rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors text-center flex items-center justify-center gap-1.5 disabled:opacity-50"
-              >
-                <i className={`fas ${importingCsv ? 'fa-spinner fa-spin' : 'fa-file-csv'} mr-1`}></i>
-                <span>Import CSV</span>
-              </button>
-
               {/* Save Session (only for authenticated users) */}
               {isAuthenticated && (
                 <button
@@ -856,6 +846,20 @@ export const SessionManager: React.FC = () => {
                 <span>Clear</span>
               </button>
 
+              {/* Export to PowerPoint */}
+              <div>
+                <button
+                  type="button"
+                  onClick={handleExportToPowerPoint}
+                  disabled={exporting}
+                  title="Export session to PowerPoint file with all song slides"
+                  className="w-full hidden md:flex min-h-[16px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg sm:rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-download'}`}></i>
+                  <span>{exporting ? 'Exporting...' : 'Export PPT'}</span>
+                </button>
+              </div>
+
               {/* Template */}
               <div className="hidden md:flex min-h-[16px] sm:min-h-0">
                 <TemplateSelector onTemplateSelect={handleTemplateSelect} currentTemplateId={selectedTemplate?.id} />
@@ -874,20 +878,6 @@ export const SessionManager: React.FC = () => {
                 </button>
               </div>
 
-              {/* Export to PowerPoint */}
-              <div>
-                <button
-                  type="button"
-                  onClick={handleExportToPowerPoint}
-                  disabled={exporting}
-                  title="Export session to PowerPoint file with all song slides"
-                  className="w-full hidden md:flex min-h-[16px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-white bg-blue-600 rounded-lg sm:rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <i className={`fas ${exporting ? 'fa-spinner fa-spin' : 'fa-download'}`}></i>
-                  <span>{exporting ? 'Exporting...' : 'Export'}</span>
-                </button>
-              </div>
-
               {/* Export CSV */}
               <div>
                 <button
@@ -900,6 +890,18 @@ export const SessionManager: React.FC = () => {
                   <span>Export CSV</span>
                 </button>
               </div>
+
+              {/* Import CSV */}
+              <button
+                type="button"
+                onClick={() => csvFileInputRef.current?.click()}
+                disabled={importingCsv}
+                title="Import session from a CSV file"
+                className="hidden md:flex min-h-[16px] sm:min-h-0 px-3 sm:px-4 py-3 sm:py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-600 rounded-lg sm:rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors text-center flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                <i className={`fas ${importingCsv ? 'fa-spinner fa-spin' : 'fa-file-csv'} mr-1`}></i>
+                <span>Import CSV</span>
+              </button>
             </>
           )}
         </div>
@@ -1008,6 +1010,7 @@ export const SessionManager: React.FC = () => {
                         alwaysShowDeityLanguage={true}
                         onPreviewClick={() => handlePreviewSong(song.id)}
                         lyricsHover={{ songId: song.id, songName: song.name, song }}
+                        compactInDesktop={!showSongDetailsInDesktop}
                       />
 
                       {/* Singer and Pitch */}

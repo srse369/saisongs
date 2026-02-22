@@ -9,6 +9,7 @@ import { useTemplates } from '../../contexts/TemplateContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useOfflineSyncContext } from '../../contexts/OfflineSyncContext';
 import { getPendingCount } from '../../utils/offlineQueue';
+import { globalEventBus } from '../../utils/globalEventBus';
 
 // Cache health stats for 60 seconds
 let healthStatsCache: { stats: any; timestamp: number } | null = null;
@@ -17,6 +18,8 @@ const HEALTH_STATS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
 // Cache Brevo status for 60 seconds (changes less frequently)
 let brevoStatusCache: { status: any; timestamp: number } | null = null;
 const BREVO_STATUS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+
+const CACHE_CLEAR_COOLDOWN_SECONDS = 120; // 2 minutes - must match cacheUtils checkCacheClearCooldown
 
 interface DatabaseStatusDropdownProps {
   isConnected: boolean;
@@ -35,6 +38,8 @@ interface DatabaseStats {
   pitches: number;
   templates: number;
   sessions: number;
+  songsWithLyrics?: number;
+  templatesWithSlides?: number;
 }
 
 interface BrevoStatus {
@@ -67,6 +72,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
   const [lastOfflineTime, setLastOfflineTime] = useState<number | null>(null);
   const [cacheCounts, setCacheCounts] = useState<Awaited<ReturnType<typeof getBrowserCacheEntityCounts>> | null>(null);
   const [lyricsLoadedTrigger, setLyricsLoadedTrigger] = useState(0);
+  const [cooldownRemainingSeconds, setCooldownRemainingSeconds] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { fetchSongs } = useSongs();
   const { fetchSingers } = useSingers();
@@ -90,6 +96,18 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
       getBrowserCacheEntityCounts().then(setCacheCounts);
     }
   }, [isOpen, lyricsLoadedTrigger]);
+
+  // Poll cache clear cooldown when dropdown is open (for progress bar)
+  useEffect(() => {
+    if (!isOpen) return;
+    const update = () => {
+      const { isOnCooldown, remainingSeconds } = checkCacheClearCooldown();
+      setCooldownRemainingSeconds(isOnCooldown ? remainingSeconds : 0);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [isOpen]);
 
   // Close dropdown when clicking outside or pressing Escape
   useEffect(() => {
@@ -205,19 +223,21 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
       setReloadMessage('Cache reloaded successfully!');
       // Invalidate health stats cache
       healthStatsCache = null;
-      // Refresh stats after reload
+      // Refresh stats and client data after reload
       setStats(null);
       setStatsError(null);
-      // Fetch fresh stats
-      const healthResponse = await apiClient.get<any>('/health?stats=true');
+      // Fetch fresh stats (cache-bust to avoid stale browser/proxy cache)
+      const healthResponse = await apiClient.get<any>(`/health?stats=true&_=${Date.now()}`);
       if (healthResponse && healthResponse.stats) {
-        // Cache the fresh stats
         healthStatsCache = {
           stats: healthResponse.stats,
           timestamp: Date.now()
         };
         setStats(healthResponse.stats);
       }
+      // Refresh songs from server so song count updates everywhere
+      await fetchSongs(true);
+      if (isOpen) getBrowserCacheEntityCounts().then(setCacheCounts);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to reload cache';
       setReloadMessage(`Error: ${errorMsg}`);
@@ -320,6 +340,24 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
     window.addEventListener('songsLyricsLoaded', handler);
     return () => window.removeEventListener('songsLyricsLoaded', handler);
   }, []);
+
+  // Invalidate stats and refresh when a song is created/updated/deleted (so song count updates)
+  useEffect(() => {
+    const handler = () => {
+      healthStatsCache = null;
+      setStats(null);
+      setStatsError(null);
+      if (isOpen) getBrowserCacheEntityCounts().then(setCacheCounts);
+    };
+    const unsub = globalEventBus.on('songCreated', handler);
+    const unsub2 = globalEventBus.on('songUpdated', handler);
+    const unsub3 = globalEventBus.on('songDeleted', handler);
+    return () => {
+      unsub();
+      unsub2();
+      unsub3();
+    };
+  }, [isOpen]);
   const counts = cacheCounts ?? { songs: 0, singers: 0, pitches: 0, templates: 0, sessions: 0, centers: 0 };
   const songsWithLyrics = cacheCounts?.songsWithLyrics ?? 0;
   const templatesWithSlides = cacheCounts?.templatesWithSlides ?? 0;
@@ -348,114 +386,105 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
       {isOpen && (
         <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
           {/* Content */}
-          <div className="px-4 py-3">
+          <div className="px-4 py-2">
             {/* 1. Browser cache section - shown for both connected and disconnected */}
-            <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-1.5">
-                <i className="fas fa-database text-gray-500"></i>
+            <div className="mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1.5">
+                <i className="fas fa-globe text-gray-500"></i>
                 Browser cache (offline data):
               </p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">Centers:</span>
-                    <span className={`font-medium ${counts.centers > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>{counts.centers}</span>
-                  </div>
-                  <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">Songs:</span>
-                    <span className={`font-medium ${counts.songs > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>
-                      {counts.songs}
-                      {counts.songs > 0 && (
-                        <span className="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">
-                          ({songsWithLyrics} w/ lyrics)
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">Singers:</span>
-                    <span className={`font-medium ${counts.singers > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>{counts.singers}</span>
-                  </div>
-                  <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">Pitches:</span>
-                    <span className={`font-medium ${counts.pitches > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>{counts.pitches}</span>
-                  </div>
-                  <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">Templates:</span>
-                    <span className={`font-medium ${counts.templates > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>
-                      {counts.templates}
-                      {counts.templates > 0 && (
-                        <span className="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">
-                          ({templatesWithSlides} w/ slides)
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
-                    <span className="text-gray-600 dark:text-gray-400">Sessions:</span>
-                    <span className={`font-medium ${counts.sessions > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>{counts.sessions}</span>
-                  </div>
+              <div className="space-y-0.5 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 dark:text-gray-400">Centers:</span>
+                  <span className={`font-medium ${counts.centers > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>{counts.centers}</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 dark:text-gray-400">Songs:</span>
+                  <span className={`font-medium ${counts.songs > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>
+                    {counts.songs}
+                    {counts.songs > 0 && <span className="ml-1 text-gray-500 dark:text-gray-400">({songsWithLyrics} lyrics)</span>}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 dark:text-gray-400">Singers:</span>
+                  <span className={`font-medium ${counts.singers > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>{counts.singers}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 dark:text-gray-400">Pitches:</span>
+                  <span className={`font-medium ${counts.pitches > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>{counts.pitches}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 dark:text-gray-400">Templates:</span>
+                  <span className={`font-medium ${counts.templates > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>
+                    {counts.templates}
+                    {counts.templates > 0 && <span className="ml-1 text-gray-500 dark:text-gray-400">({templatesWithSlides} slides)</span>}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 dark:text-gray-400">Sessions:</span>
+                  <span className={`font-medium ${counts.sessions > 0 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`}>{counts.sessions}</span>
+                </div>
+              </div>
               {!hasAnyCache && (
-                <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
                   No offline data. Use &quot;Take Offline&quot; when connected to download.
                 </p>
               )}
             </div>
 
-            {/* 2. Database connection status */}
-            <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center space-x-2">
-                {isConnected ? (
-                  <i className="fas fa-database text-lg text-green-600 dark:text-green-400"></i>
-                ) : (
-                  <i className="fas fa-database text-lg text-red-600 dark:text-red-400"></i>
-                )}
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  {isConnected ? 'Database Connected' : 'Database Disconnected'}
-                </h3>
-              </div>
-            </div>
-
-            {/* 3. Others */}
+            {/* 2. Database status and content */}
             {isConnected ? (
               <>
                 {isAuthenticated && loading ? (
-                  <div className="flex items-center justify-center py-4">
+                  <div className="flex items-center justify-center py-2">
                     <i className="fas fa-spinner fa-spin text-xl text-blue-600 dark:text-blue-400"></i>
                   </div>
                 ) : isAuthenticated && stats ? (
-                  <div className="space-y-2">
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">Database Statistics:</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1.5">
+                      <i className="fas fa-database text-gray-500"></i>
+                      Database Statistics:
+                    </p>
+                    <div className="space-y-0.5 text-xs">
+                      <div className="flex justify-between items-center">
                         <span className="text-gray-600 dark:text-gray-400">Centers:</span>
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">{stats.centers}</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{stats.centers}</span>
                       </div>
-                      <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
+                      <div className="flex justify-between items-center">
                         <span className="text-gray-600 dark:text-gray-400">Songs:</span>
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">{stats.songs}</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
+                          {stats.songs}
+                          {stats.songsWithLyrics != null && stats.songs > 0 && (
+                            <span className="ml-1 text-gray-500 dark:text-gray-400">({stats.songsWithLyrics} lyrics)</span>
+                          )}
+                        </span>
                       </div>
-                      <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
+                      <div className="flex justify-between items-center">
                         <span className="text-gray-600 dark:text-gray-400">Users:</span>
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">{stats.users}</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{stats.users}</span>
                       </div>
-                      <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
+                      <div className="flex justify-between items-center">
                         <span className="text-gray-600 dark:text-gray-400">Pitches:</span>
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">{stats.pitches}</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{stats.pitches}</span>
                       </div>
-                      <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
+                      <div className="flex justify-between items-center">
                         <span className="text-gray-600 dark:text-gray-400">Templates:</span>
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">{stats.templates}</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">
+                          {stats.templates}
+                          {stats.templatesWithSlides != null && stats.templates > 0 && (
+                            <span className="ml-1 text-gray-500 dark:text-gray-400">({stats.templatesWithSlides} slides)</span>
+                          )}
+                        </span>
                       </div>
-                      <div className="flex justify-between items-center px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
+                      <div className="flex justify-between items-center">
                         <span className="text-gray-600 dark:text-gray-400">Sessions:</span>
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">{stats.sessions}</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{stats.sessions}</span>
                       </div>
                     </div>
                   </div>
                 ) : isAuthenticated ? (
                   <div className="text-sm text-gray-600 dark:text-gray-400">
-                    <p className="mb-2">Unable to load statistics</p>
+                    <p className="mb-1">Unable to load statistics</p>
                     {statsError && (
                       <p className="text-xs text-red-600 dark:text-red-400 break-words">
                         {statsError}
@@ -464,28 +493,35 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                   </div>
                 ) : null}
 
+                {/* Database Connected - shown after stats when connected */}
+                <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center space-x-1.5">
+                    <i className="fas fa-database text-base text-green-600 dark:text-green-400"></i>
+                    <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100">Database Connected</h3>
+                  </div>
+                </div>
+
                 {/* Brevo API Status */}
                 {isAuthenticated && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Email Service (Brevo):</p>
+                  <div className="mt-2">
                     {brevoLoading ? (
-                      <div className="flex items-center justify-center py-2">
+                      <div className="flex items-center justify-center py-1">
                         <i className="fas fa-spinner fa-spin text-base text-blue-600 dark:text-blue-400"></i>
                       </div>
                     ) : brevoStatus ? (
-                      <div className="flex items-center space-x-2 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded">
+                      <div className="flex items-center space-x-1.5">
                         {brevoStatus.status === 'ok' ? (
                           <>
-                            <i className="fas fa-check-circle text-base text-green-600 dark:text-green-400"></i>
-                            <span className="text-sm text-green-700 dark:text-green-300 font-medium">Connected</span>
+                            <i className="fas fa-envelope text-base text-green-600 dark:text-green-400"></i>
+                            <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100">Email Service (Brevo) Connected</h3>
                           </>
                         ) : (
                           <>
-                            <i className="fas fa-times-circle text-base text-red-600 dark:text-red-400"></i>
+                            <i className="fas fa-envelope text-base text-red-600 dark:text-red-400"></i>
                             <div className="flex-1">
-                              <span className="text-sm text-red-700 dark:text-red-300 font-medium">
-                                {brevoStatus.configured ? 'Error' : 'Not Configured'}
-                              </span>
+                              <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                                Email Service (Brevo): {brevoStatus.configured ? 'Error' : 'Not Configured'}
+                              </h3>
                               {brevoStatus.message && (
                                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 break-words">
                                   {brevoStatus.message}
@@ -501,11 +537,11 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
 
                 {/* Sync Offline Changes (when pending) */}
                 {pendingCount > 0 && (
-                <div className={`${isAuthenticated && 'mt-4 pt-4 border-t'} border-gray-200 dark:border-gray-700`}>
+                <div className={`${isAuthenticated && 'mt-2 pt-2 border-t'} border-gray-200 dark:border-gray-700`}>
                   <button
                     onClick={() => { setShowSyncModal(true); setIsOpen(false); }}
                     title="Review and sync offline changes"
-                    className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors mb-3"
+                    className="w-full flex items-center justify-center px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors mb-2"
                   >
                     <i className="fas fa-cloud-upload-alt text-base mr-2"></i>
                     Sync {pendingCount} offline change{pendingCount !== 1 ? 's' : ''}
@@ -515,12 +551,12 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
 
                 {/* Take Offline Button (Editors and Admins only) */}
                 {canTakeOffline && (
-                <div className={`${isAuthenticated && 'mt-4 pt-4 border-t'} border-gray-200 dark:border-gray-700`}>
+                <div className={`${isAuthenticated && 'mt-2 pt-2 border-t'} border-gray-200 dark:border-gray-700`}>
                   <button
                     onClick={handleTakeOffline}
                     disabled={takingOffline || !isOnline}
                     title={!isOnline ? 'Connect to the internet to download for offline' : 'Download all song details for offline use'}
-                    className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+                    className="w-full flex items-center justify-center px-4 py-1.5 text-sm font-medium text-white bg-[rgb(227,74,16)] hover:bg-[rgb(200,65,14)] dark:bg-[rgb(227,74,16)] dark:hover:bg-[rgb(200,65,14)] rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-2"
                   >
                     {takingOffline ? (
                       <>
@@ -535,7 +571,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                     )}
                   </button>
                   {lastOfflineTime && !takingOffline && (
-                    <p className="text-xs text-center text-gray-500 dark:text-gray-400 mb-3">
+                    <p className="text-xs text-center text-gray-500 dark:text-gray-400 mb-2">
                       Last downloaded: {new Date(lastOfflineTime).toLocaleString()}
                     </p>
                   )}
@@ -544,43 +580,65 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
 
                 {/* Clear Local Storage Button (All Users) */}
                 <div className="border-gray-200 dark:border-gray-700">
+                  {(() => {
+                    const onCooldown = (cooldownRemainingSeconds ?? 0) > 0;
+                    const progress = onCooldown
+                      ? 1 - cooldownRemainingSeconds! / CACHE_CLEAR_COOLDOWN_SECONDS
+                      : 1;
+                    // Only 2 shades: light green (base) and dark green (fill / ready)
+                    const lightGreen = 'rgb(134, 239, 172)';
+                    const darkGreen = 'rgb(22, 163, 74)';
+                    const bgColor = onCooldown ? lightGreen : darkGreen;
+                    return (
                   <button
                     onClick={handleClearLocalStorage}
-                    disabled={clearingLocalStorage}
-                    className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 dark:bg-orange-700 dark:hover:bg-orange-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={clearingLocalStorage || onCooldown}
+                    className="relative w-full flex items-center justify-center px-4 py-1.5 text-sm font-medium text-white rounded-md overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: bgColor }}
                   >
-                    {clearingLocalStorage ? (
-                      <>
-                        <i className="fas fa-spinner fa-spin text-base mr-2"></i>
-                        Clearing...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-trash-alt text-base mr-2"></i>
-                        Clear Local Cache
-                      </>
+                    {onCooldown && (
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-l-md transition-[width] duration-1000 ease-linear"
+                        style={{ width: `${progress * 100}%`, backgroundColor: darkGreen }}
+                        aria-hidden
+                      />
                     )}
+                    <span className="relative z-10 flex items-center justify-center">
+                      {clearingLocalStorage ? (
+                        <>
+                          <i className="fas fa-spinner fa-spin text-base mr-2"></i>
+                          Clearing...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-trash-alt text-base mr-2"></i>
+                          Clear Local Cache
+                        </>
+                      )}
+                    </span>
                   </button>
+                    );
+                  })()}
                   {localStorageMessage && (
-                    <p className={`mt-2 text-xs text-center ${localStorageMessage.startsWith('Error') || localStorageMessage.startsWith('Please wait')
+                    <p className={`mt-1 text-xs text-center ${localStorageMessage.startsWith('Error') || localStorageMessage.startsWith('Please wait')
                         ? 'text-red-600 dark:text-red-400'
                         : 'text-green-600 dark:text-green-400'
                       }`}>
                       {localStorageMessage}
                     </p>
                   )}
-                  <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-center text-gray-500 dark:text-gray-400">
                     Clears web page (HTML), JavaScript, CSS cache, and localStorage data. Preserves images. 2-minute cooldown.
                   </p>
                 </div>
 
                 {/* Reload Cache Button (Admin Only) */}
                 {isAdmin && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="mt-2">
                     <button
                       onClick={handleReloadBackendCache}
                       disabled={reloadingBackendCache}
-                      className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full flex items-center justify-center px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {reloadingBackendCache ? (
                         <>
@@ -595,7 +653,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                       )}
                     </button>
                     {reloadMessage && (
-                      <p className={`mt-2 text-xs text-center ${reloadMessage.startsWith('Error')
+                      <p className={`mt-1 text-xs text-center ${reloadMessage.startsWith('Error')
                           ? 'text-red-600 dark:text-red-400'
                           : 'text-green-600 dark:text-green-400'
                         }`}>
@@ -607,8 +665,15 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
               </>
             ) : (
               <>
-                <div className="mb-3">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Error Details:</p>
+                {/* Database Disconnected */}
+                <div className="mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center space-x-1.5">
+                    <i className="fas fa-database text-base text-red-600 dark:text-red-400"></i>
+                    <h3 className="text-xs font-semibold text-gray-900 dark:text-gray-100">Database Disconnected</h3>
+                  </div>
+                </div>
+                <div className="mb-2">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-0.5">Error Details:</p>
                   <p className="text-sm text-red-600 dark:text-red-400 break-words">
                     {connectionError || 'Unable to connect to database'}
                   </p>
@@ -618,7 +683,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                     resetConnection();
                     setIsOpen(false);
                   }}
-                  className="w-full flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 rounded-md transition-colors"
+                  className="w-full flex items-center justify-center px-4 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 rounded-md transition-colors"
                 >
                   <i className="fas fa-sync text-base mr-2"></i>
                   Retry Connection
@@ -627,8 +692,8 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
             )}
 
             {/* Release Version */}
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between px-2 py-1.5">
+            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between py-0.5">
                 <span className="text-xs text-gray-500 dark:text-gray-400">Version:</span>
                 <span className="text-xs font-mono text-gray-700 dark:text-gray-300">
                   {import.meta.env.VITE_APP_VERSION || 'dev'}

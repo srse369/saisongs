@@ -456,6 +456,8 @@ export interface CreatePitchInput {
 
 export interface UpdatePitchInput {
   pitch?: string;
+  songId?: string;
+  singerId?: string;
 }
 
 export interface CreateNamedSessionInput {

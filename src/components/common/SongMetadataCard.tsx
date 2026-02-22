@@ -28,6 +28,8 @@ interface SongMetadataCardProps {
   isAuthenticated?: boolean; // Hide pitch count on mobile when not authenticated
   /** When provided, song name shows lyrics popup on 3s hover */
   lyricsHover?: { songId: string; songName: string; song?: Song | null };
+  /** When true (desktop only): show only song name; details expand on hover */
+  compactInDesktop?: boolean;
 }
 
 /**
@@ -45,14 +47,26 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
   onPreviewClick,
   isAuthenticated = true, // Default to true for backward compatibility
   lyricsHover,
+  compactInDesktop = false,
 }) => {
   const hasReferencePitches = song.refGents || song.refLadies;
 
   // Show background on desktop always, or on mobile when selected
   const shouldShowBackground = showBackground || isSelected;
+
+  // When compactInDesktop: on desktop, details are hidden until hover. Need group for group-hover.
+  const detailsDeityLangClass = compactInDesktop
+    ? `${(isSelected || alwaysShowDeityLanguage) ? 'flex' : 'hidden'} md:hidden md:group-hover:flex flex-wrap items-center`
+    : `${(isSelected || alwaysShowDeityLanguage) ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center`;
+  const detailsRagaBeatClass = compactInDesktop
+    ? `${isSelected ? 'flex' : 'hidden'} md:hidden md:group-hover:flex flex-wrap items-center`
+    : `${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center`;
+  const detailsRefPitchesClass = compactInDesktop
+    ? `${isSelected ? 'flex' : 'hidden'} md:hidden md:group-hover:flex flex-wrap items-center`
+    : `${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center`;
   
   return (
-    <div className={`${shouldShowBackground ? 'bg-slate-100/80 dark:bg-gray-900/60 px-[5px] pb-[5px]' : ''} md:px-2 md:pt-1 md:pb-1 md:mb-1.5 ${shouldShowBackground ? 'rounded-lg' : ''}`}>
+    <div className={`${compactInDesktop ? 'group' : ''} ${shouldShowBackground ? 'bg-slate-200/90 dark:bg-gray-950/85 px-[5px] pb-[5px]' : ''} md:px-2 md:pt-1 md:pb-1 md:mb-1.5 ${shouldShowBackground ? 'rounded-lg' : ''}`}>
       {/* Song Name with External Link and Lyrics Button */}
       <div className="flex items-center gap-2">
         {onNameClick ? (
@@ -108,9 +122,9 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
         )}
       </div>
 
-      {/* Deity, Language, and Tempo - Show on mobile when selected or alwaysShowDeityLanguage is true, always show on desktop */}
+      {/* Deity, Language, and Tempo - Show on mobile when selected or alwaysShowDeityLanguage; on desktop show always unless compactInDesktop (then on hover) */}
       {(song.deity || song.language || song.tempo) && (
-        <div className={`${(isSelected || alwaysShowDeityLanguage) ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center text-xs text-gray-600 dark:text-gray-400`}>
+        <div className={`${detailsDeityLangClass} text-xs text-gray-600 dark:text-gray-400`}>
           {song.deity && (
             <>
               <span>
@@ -138,9 +152,9 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
         </div>
       )}
 
-      {/* Raga and Beat - Show on mobile when selected */}
+      {/* Raga and Beat - Show on mobile when selected; on desktop show always unless compactInDesktop (then on hover) */}
       {(song.raga || song.beat) && (
-        <div className={`${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center text-xs text-gray-600 dark:text-gray-400`}>
+        <div className={`${detailsRagaBeatClass} text-xs text-gray-600 dark:text-gray-400`}>
           {song.raga && (
             <span>
               <span className={isSelected ? 'hidden md:inline' : ''}>Raga: </span>
@@ -157,9 +171,9 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
         </div>
       )}
 
-      {/* Reference Pitches - Show on mobile when selected */}
+      {/* Reference Pitches - Show on mobile when selected; on desktop show always unless compactInDesktop (then on hover) */}
       {hasReferencePitches && (
-        <div className={`${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400`}>
+        <div className={`${detailsRefPitchesClass} gap-2 text-xs text-gray-600 dark:text-gray-400`}>
           {song.refGents && (
             <span>
               <span className="text-blue-600 dark:text-blue-400 font-medium">Gents: </span>

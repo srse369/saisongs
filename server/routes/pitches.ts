@@ -159,7 +159,12 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { pitch } = req.body;
+    const { pitch, songId, singerId } = req.body;
+
+    // Need at least one field to update
+    if (pitch === undefined && songId === undefined && singerId === undefined) {
+      return res.status(400).json({ error: 'No fields to update. Provide pitch, songId, and/or singerId.' });
+    }
 
     // Check permissions: user must have editor access to the singer's centers
     const user = req.user;
@@ -173,43 +178,57 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Pitch association not found' });
     }
 
-    // Get the singer to check their center associations
-    const singer = await cacheService.getSinger(existingPitch.singerId);
-    
+    // Determine which singer to check for permissions (current or new if changing)
+    const singerIdToCheck = singerId ?? existingPitch.singerId;
+    const singer = await cacheService.getSinger(singerIdToCheck);
+
     // Handle orphaned pitch (singer was deleted but pitch still exists)
     if (!singer) {
-      console.warn(`⚠️  Orphaned pitch detected: ${id} (singer ${existingPitch.singerId} not found). Denying update.`);
-      return res.status(400).json({ 
+      console.warn(`⚠️  Orphaned pitch detected: ${id} (singer ${singerIdToCheck} not found). Denying update.`);
+      return res.status(400).json({
         error: 'Cannot update orphaned pitch',
         message: 'This pitch references a singer that no longer exists. Please delete this pitch instead of updating it.'
       });
     }
 
     const singerCenterIds = singer.centerIds || [];
-    
+
     // Allow if user is updating their own pitch (viewer can edit own pitches)
-    const isOwnPitch = user.id === existingPitch.singerId;
-    
+    const isOwnPitch = user.id === singerIdToCheck;
+
     if (!isOwnPitch) {
       // If not updating their own pitch, check editor permissions
       if (user.role === 'editor') {
         const editableCenterIds = user.editorFor || [];
         const hasAccess = singerCenterIds.some(cid => editableCenterIds.includes(cid));
-        
+
         if (!hasAccess) {
-          return res.status(403).json({ 
-            error: 'Access denied: You do not have editor access to this singer\'s centers' 
+          return res.status(403).json({
+            error: 'Access denied: You do not have editor access to this singer\'s centers'
           });
         }
       } else if (user.role === 'viewer') {
         // Viewers can only update their own pitches
-        return res.status(403).json({ 
-          error: 'You can only update your own pitches. Contact an editor to update pitches for other singers.' 
+        return res.status(403).json({
+          error: 'You can only update your own pitches. Contact an editor to update pitches for other singers.'
         });
       }
     }
 
-    await cacheService.updatePitch(id, { pitch, updatedBy: user.email });
+    // If changing song, verify song exists
+    if (songId !== undefined) {
+      const song = await cacheService.getSong(songId);
+      if (!song) {
+        return res.status(400).json({ error: 'Song not found', message: `Song ${songId} does not exist.` });
+      }
+    }
+
+    const updateData: { pitch?: string; songId?: string; singerId?: string; updatedBy: string } = { updatedBy: user.email };
+    if (pitch !== undefined) updateData.pitch = pitch;
+    if (songId !== undefined) updateData.songId = songId;
+    if (singerId !== undefined) updateData.singerId = singerId;
+
+    await cacheService.updatePitch(id, updateData);
     res.json({ message: 'Pitch association updated successfully' });
   } catch (error) {
     console.error('Error updating pitch:', error);

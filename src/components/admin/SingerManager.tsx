@@ -241,12 +241,20 @@ export const SingerManager: React.FC<SingerManagerProps> = ({ isActive = true })
       variant: 'secondary',
       disabled: loading,
     },
-    ...(isEditor ? [{
-      label: 'Add',
-      icon: 'fas fa-plus',
-      onClick: handleCreateClick,
-      variant: 'primary' as const,
-    }] : []),
+    ...(isEditor ? [
+      {
+        label: 'Merge',
+        icon: 'fas fa-code-merge',
+        onClick: () => startSelectionRef.current?.(),
+        variant: 'secondary' as const,
+      },
+      {
+        label: 'Add',
+        icon: 'fas fa-plus',
+        onClick: handleCreateClick,
+        variant: 'primary' as const,
+      },
+    ] : []),
   ];
 
   // Header actions content
@@ -295,14 +303,24 @@ export const SingerManager: React.FC<SingerManagerProps> = ({ isActive = true })
           Refresh
         </button>
         {isEditor && (
-          <button
-            onClick={handleCreateClick}
-            title="Add a new singer to the database with name and profile information"
-            className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-          >
-            <i className="fas fa-plus text-lg"></i>
-            Add New Singer
-          </button>
+          <>
+            <button
+              onClick={() => startSelectionRef.current?.()}
+              title="Select singers to merge duplicate profiles"
+              className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              <i className="fas fa-code-merge text-lg"></i>
+              Select Singers to Merge
+            </button>
+            <button
+              onClick={handleCreateClick}
+              title="Add a new singer to the database with name and profile information"
+              className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              <i className="fas fa-plus text-lg"></i>
+              Add New Singer
+            </button>
+          </>
         )}
       </div>
     </div>

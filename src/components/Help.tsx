@@ -264,7 +264,7 @@ export const Help: React.FC = () => {
           title: 'Creating & Editing Pitches',
           content: [
             '<strong>➕ Add New Pitch:</strong> Click "Add Pitch" and select a song, then a singer, then choose the pitch value from the dropdown.',
-            '<strong>✏️ Edit Pitch:</strong> Click the edit icon on any pitch card. You can only change the pitch value - the song and singer are locked to prevent errors.',
+            '<strong>✏️ Edit Pitch:</strong> Click the edit icon on any pitch card. You can change the song, singer, or pitch value to fix wrong associations from import.',
             '<strong>🗑️ Delete Pitch:</strong> Remove a pitch assignment when a singer no longer performs a song or when cleaning up duplicates.',
             '<strong>🚫 Uniqueness:</strong> You cannot create duplicate song-singer combinations. The system will show an error if you try.'
           ]

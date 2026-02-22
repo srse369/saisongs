@@ -4,6 +4,7 @@ import { usePitches } from '../../contexts/PitchContext';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 import { useToast } from '../../contexts/ToastContext';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
 import { PitchForm } from './PitchForm';
@@ -25,6 +26,7 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
   const location = useLocation();
   const navigate = useNavigate();
   const { isEditor, userId, isAuthenticated } = useAuth();
+  const { defaultPitchesView } = useUserPreferences();
   const toast = useToast();
 
   const {
@@ -67,7 +69,7 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
 
   const [viewingSong, setViewingSong] = useState<Song | null>(null);
   const [visibleCount, setVisibleCount] = useState(50);
-  const [showMyPitches, setShowMyPitches] = useState(true);
+  const [showMyPitches, setShowMyPitches] = useState(defaultPitchesView === 'my');
   const checkUnsavedChangesRef = useRef<(() => boolean) | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastFetchedUserIdRef = useRef<string | null>(null);
@@ -98,6 +100,11 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
 
   // User can create pitches if they're an editor OR if they have a singer profile
   const canCreatePitch = isEditor || !!userSinger;
+
+  // Sync showMyPitches with user preference when it changes (e.g. from profile dropdown)
+  useEffect(() => {
+    setShowMyPitches(defaultPitchesView === 'my');
+  }, [defaultPitchesView]);
 
   // Sync advanced filters with URL parameters (when navigating from Songs/Singers tab)
   useEffect(() => {
@@ -238,8 +245,11 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
     let result;
 
     if (editingPitch) {
-      // Update existing pitch
-      result = await updatePitch(editingPitch.id, { pitch: input.pitch });
+      // Update existing pitch (can change song, singer, or pitch)
+      const updateInput: { pitch?: string; songId?: string; singerId?: string } = { pitch: input.pitch };
+      if (input.songId !== editingPitch.songId) updateInput.songId = input.songId;
+      if (input.singerId !== editingPitch.singerId) updateInput.singerId = input.singerId;
+      result = await updatePitch(editingPitch.id, updateInput);
     } else {
       // Create new pitch
       result = await createPitch(input);

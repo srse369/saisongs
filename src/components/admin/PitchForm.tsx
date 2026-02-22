@@ -203,12 +203,9 @@ export const PitchForm: React.FC<PitchFormProps> = ({
           id="pitch-song"
           value={songId}
           onChange={(e) => setSongId(e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isEditMode
-              ? 'bg-gray-100 text-gray-500 cursor-not-allowed dark:!bg-gray-900 dark:!text-gray-500 dark:border-gray-700'
-              : 'dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100'
-            } ${errors.songId ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.songId ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100'
             }`}
-          disabled={isSubmitting || isEditMode}
+          disabled={isSubmitting}
         >
           <option value="">Select a song</option>
           {songs.map((song) => (
@@ -236,12 +233,12 @@ export const PitchForm: React.FC<PitchFormProps> = ({
           id="pitch-singer"
           value={singerId}
           onChange={(e) => setSingerId(e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${(isEditMode || isViewerCreatingForSelf)
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${isViewerCreatingForSelf
               ? 'bg-gray-100 text-gray-500 cursor-not-allowed dark:!bg-gray-900 dark:!text-gray-500 dark:border-gray-700'
               : 'dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100'
             } ${errors.singerId ? 'border-red-500 dark:border-red-400' : 'border-gray-300'
             }`}
-          disabled={isSubmitting || isEditMode || isViewerCreatingForSelf}
+          disabled={isSubmitting || isViewerCreatingForSelf}
         >
           <option value="">Select a singer</option>
           {singers.map((singer) => {

@@ -665,10 +665,10 @@ export const SongManagerRefactored: React.FC<SongManagerProps> = ({ isActive = t
         {isEditor && (
           <button
             onClick={handleCreateClick}
-            title="Add a new song to the library with name, lyrics, translation, and metadata"
-            className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-          >
-            <i className="fas fa-plus text-lg"></i>
+              title="Add a new song to the library with name, lyrics, translation, and metadata"
+              className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              <i className="fas fa-plus text-lg"></i>
             Create New Song
           </button>
         )}

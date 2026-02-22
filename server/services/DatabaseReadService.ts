@@ -782,17 +782,32 @@ class DatabaseReadService {
     pitches: number;
     templates: number;
     sessions: number;
+    songsWithLyrics?: number;
+    templatesWithSlides?: number;
   }> {
-    const [centers, songs, users, pitches, templates, sessions] = await Promise.all([
+    const getCnt = (r: any[]): number => r[0]?.CNT ?? r[0]?.cnt ?? 0;
+
+    const [centers, songs, users, pitches, templates, sessions, songsWithLyricsResult, templatesWithSlidesResult] = await Promise.all([
       this.query<any>('SELECT COUNT(*) as cnt FROM centers'),
       this.query<any>('SELECT COUNT(*) as cnt FROM songs'),
       this.query<any>('SELECT COUNT(*) as cnt FROM users'),
       this.query<any>('SELECT COUNT(*) as cnt FROM song_singer_pitches'),
       this.query<any>('SELECT COUNT(*) as cnt FROM presentation_templates'),
       this.query<any>('SELECT COUNT(*) as cnt FROM song_sessions'),
+      this.query<any>('SELECT COUNT(*) as cnt FROM songs WHERE lyrics IS NOT NULL AND DBMS_LOB.GETLENGTH(lyrics) > 0').catch(() => []),
+      this.query<any>(`SELECT COUNT(*) as cnt FROM presentation_templates WHERE template_json IS NOT NULL AND JSON_EXISTS(template_json FORMAT JSON, '$.slides[0]')`).catch(() => []),
     ]);
-    const getCnt = (r: any[]): number => r[0]?.CNT ?? r[0]?.cnt ?? 0;
-    return {
+
+    const result: {
+      centers: number;
+      songs: number;
+      users: number;
+      pitches: number;
+      templates: number;
+      sessions: number;
+      songsWithLyrics?: number;
+      templatesWithSlides?: number;
+    } = {
       centers: getCnt(centers),
       songs: getCnt(songs),
       users: getCnt(users),
@@ -800,6 +815,13 @@ class DatabaseReadService {
       templates: getCnt(templates),
       sessions: getCnt(sessions),
     };
+    if (songsWithLyricsResult && songsWithLyricsResult.length > 0) {
+      result.songsWithLyrics = getCnt(songsWithLyricsResult);
+    }
+    if (templatesWithSlidesResult && templatesWithSlidesResult.length > 0) {
+      result.templatesWithSlides = getCnt(templatesWithSlidesResult);
+    }
+    return result;
   }
 
   // =====================================================
@@ -1151,6 +1173,22 @@ class DatabaseReadService {
       JOIN users si ON ssp.singer_id = si.id
       WHERE RAWTOHEX(ssp.id) = :1
     `, [id]);
+  }
+
+  /**
+   * Get pitches for a song (id, singer_id) - for merge conflict detection
+   */
+  async getSongPitchesForMerge(songId: string): Promise<Array<{ id: string; singerId: string }>> {
+    const result = await this.query<any>(
+      `SELECT RAWTOHEX(id) as id, RAWTOHEX(singer_id) as singer_id 
+       FROM song_singer_pitches 
+       WHERE song_id = HEXTORAW(:1)`,
+      [songId]
+    );
+    return result.map((row: any) => ({
+      id: row.id || row.ID,
+      singerId: row.singer_id || row.SINGER_ID,
+    }));
   }
 
   /**

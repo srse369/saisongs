@@ -1,25 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSingers } from '../../contexts/SingerContext';
 import { useSongs } from '../../contexts/SongContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { CsvParserService, type CsvPitchData } from '../../services/CsvParserService';
-import { CsvImportService, type ImportPreviewItem, type ImportResult } from '../../services/CsvImportService';
+import { CsvImportService, type ImportPreviewItem, type ImportResult, type ImportProgressPhase, type ResolveSingerResult, type CreateImportPreviewResult } from '../../services/CsvImportService';
+import { pitchService } from '../../services';
 import { normalizePitch, addPitchMapping, removePitchMapping } from '../../utils/pitchNormalization';
 import { findTopSongMatches, normalizeSongNameForMapping } from '../../utils/songMatcher';
 import { saveSongMapping, savePitchMapping, getStoredPitchMappings, getStoredSongMappings, deleteSongMapping, deletePitchMapping } from '../../services/ImportMappingService';
 import { compareStringsIgnoringSpecialChars } from '../../utils';
 import { LoadingSpinner } from '../common/LoadingSpinner';
+import { Modal } from '../common/Modal';
+import { CenterMultiSelect } from '../common/CenterMultiSelect';
 
 type ImportStep = 'instructions' | 'scraping' | 'preview' | 'importing' | 'complete';
 
 export const CsvImportManager: React.FC = () => {
-  const { singers, loading: singersLoading } = useSingers();
+  const { singers, loading: singersLoading, createSinger } = useSingers();
   const { songs, loading: songsLoading } = useSongs();
+  const { editorFor, isAdmin } = useAuth();
   
   const [currentStep, setCurrentStep] = useState<ImportStep>('instructions');
   const [scrapedData, setScrapedData] = useState<CsvPitchData[]>([]);
   const [previewItems, setPreviewItems] = useState<ImportPreviewItem[]>([]);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [scrapeProgress, setScrapeProgress] = useState<string>('');
+  const [parsePreviewProgress, setParsePreviewProgress] = useState<{ current: number; total: number } | null>(null);
+  const [alreadyExistsCount, setAlreadyExistsCount] = useState<number>(0);
+  const [importProgress, setImportProgress] = useState<{ phase: ImportProgressPhase; current: number; total: number } | null>(null);
+  
+  // Singer resolution: when import encounters unknown singer, prompt user to map or create
+  const [pendingSingerName, setPendingSingerName] = useState<string | null>(null);
+  const [selectedExistingSingerId, setSelectedExistingSingerId] = useState<string>('');
+  const [newSingerCenterIds, setNewSingerCenterIds] = useState<number[]>([]);
+  const resolveSingerRef = useRef<{ resolve: (r: ResolveSingerResult) => void; reject: (err: Error) => void } | null>(null);
   
   // Manual input states
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
@@ -81,6 +95,13 @@ export const CsvImportManager: React.FC = () => {
       generatePreview();
     }
   }, [scrapedData, singersLoading, songsLoading]);
+
+  // When singer resolution modal opens, default center selection for editors
+  useEffect(() => {
+    if (pendingSingerName && editorFor && editorFor.length > 0 && newSingerCenterIds.length === 0) {
+      setNewSingerCenterIds([...editorFor]);
+    }
+  }, [pendingSingerName]);
   
   // Sort preview items with unmatched rows at top
   const sortPreview = (items: ImportPreviewItem[]): ImportPreviewItem[] => {
@@ -102,14 +123,28 @@ export const CsvImportManager: React.FC = () => {
   };
   
   const generatePreview = async () => {
-    const preview = await CsvImportService.createImportPreview(
-      scrapedData,
-      singers,
-      songs,
-      songMappings
-    );
-    setPreviewItems(preview);
-    setCurrentStep('preview');
+    setParsePreviewProgress({ current: 0, total: scrapedData.length });
+    try {
+      const existingPitches = await pitchService.getAllPitches(true).catch(() => []);
+      const pitchesForFilter = existingPitches.map((p) => ({
+        songId: p.songId,
+        singerId: p.singerId,
+        pitch: p.pitch,
+      }));
+      const { items, alreadyExistsCount: count } = await CsvImportService.createImportPreview(
+        scrapedData,
+        singers,
+        songs,
+        songMappings,
+        (current, total) => setParsePreviewProgress({ current, total }),
+        pitchesForFilter
+      );
+      setPreviewItems(items);
+      setAlreadyExistsCount(count);
+      setCurrentStep('preview');
+    } finally {
+      setParsePreviewProgress(null);
+    }
   };
   
   const handleManualSongName = async (index: number, songId: string) => {
@@ -398,10 +433,86 @@ export const CsvImportManager: React.FC = () => {
   
   const handleImport = async () => {
     setCurrentStep('importing');
+    setImportProgress(null);
+    setPendingSingerName(null);
     
-    const result = await CsvImportService.executeImport(previewItems, singers);
-    setImportResult(result);
-    setCurrentStep('complete');
+    const resolveSinger = (singerName: string): Promise<ResolveSingerResult> => {
+      return new Promise((resolve, reject) => {
+        setPendingSingerName(singerName);
+        setSelectedExistingSingerId('');
+        resolveSingerRef.current = { resolve, reject };
+      });
+    };
+    
+    try {
+      const result = await CsvImportService.executeImport(
+        previewItems,
+        singers,
+        (phase, current, total) => setImportProgress({ phase, current, total }),
+        resolveSinger
+      );
+      setImportResult(result);
+      setCurrentStep('complete');
+    } catch (err) {
+      console.error('Import failed:', err);
+      setImportResult({
+        success: false,
+        singersCreated: 0,
+        pitchesCreated: 0,
+        pitchesUpdated: 0,
+        pitchesSkipped: 0,
+        errors: [err instanceof Error ? err.message : 'Import cancelled'],
+      });
+      setCurrentStep('complete');
+    } finally {
+      setImportProgress(null);
+      setPendingSingerName(null);
+      resolveSingerRef.current = null;
+    }
+  };
+  
+  const handleResolveSingerMap = () => {
+    if (resolveSingerRef.current && selectedExistingSingerId) {
+      resolveSingerRef.current.resolve({ singerId: selectedExistingSingerId });
+      resolveSingerRef.current = null;
+      setPendingSingerName(null);
+      setSelectedExistingSingerId('');
+      setNewSingerCenterIds([]);
+    }
+  };
+  
+  const handleResolveSingerCreate = async () => {
+    if (!resolveSingerRef.current || !pendingSingerName) return;
+    if (newSingerCenterIds.length === 0) {
+      resolveSingerRef.current.reject(new Error('Select at least one center for the new singer.'));
+      return;
+    }
+    try {
+      const singer = await createSinger({ name: pendingSingerName, centerIds: newSingerCenterIds });
+      if (singer?.id) {
+        resolveSingerRef.current.resolve({ singerId: singer.id });
+      } else {
+        resolveSingerRef.current.reject(new Error('Failed to create singer'));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create singer';
+      resolveSingerRef.current.reject(new Error(msg));
+    } finally {
+      resolveSingerRef.current = null;
+      setPendingSingerName(null);
+      setSelectedExistingSingerId('');
+      setNewSingerCenterIds([]);
+    }
+  };
+  
+  const handleResolveSingerCancel = () => {
+    if (resolveSingerRef.current) {
+      resolveSingerRef.current.reject(new Error('Import cancelled'));
+      resolveSingerRef.current = null;
+    }
+    setPendingSingerName(null);
+    setSelectedExistingSingerId('');
+    setNewSingerCenterIds([]);
   };
   
   const handleAutoMatchAll = () => {
@@ -472,6 +583,10 @@ export const CsvImportManager: React.FC = () => {
     setPreviewItems([]);
     setImportResult(null);
     setScrapeProgress('');
+    setImportProgress(null);
+    setParsePreviewProgress(null);
+    setAlreadyExistsCount(0);
+    setPendingSingerName(null);
     setEditingItemIndex(null);
     setManualSongInput('');
     setManualPitchInput('');
@@ -486,8 +601,71 @@ export const CsvImportManager: React.FC = () => {
     return <LoadingSpinner />;
   }
   
+  const sortedSingers = [...singers].sort((a, b) => compareStringsIgnoringSpecialChars(a.name ?? '', b.name ?? ''));
+  
   return (
     <div className="space-y-6">
+      {/* Singer resolution modal - when import encounters unknown singer */}
+      <Modal
+        isOpen={!!pendingSingerName}
+        onClose={handleResolveSingerCancel}
+        title={`Singer not found: "${pendingSingerName ?? ''}"`}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            This singer is not in the database. Map to an existing singer or create a new one. The mapping will be used for all pitches with this singer in the CSV.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Map to existing singer:
+            </label>
+            <select
+              value={selectedExistingSingerId}
+              onChange={(e) => setSelectedExistingSingerId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="">-- Select singer --</option>
+              {sortedSingers.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <CenterMultiSelect
+              label="Center(s) for new singer (required when creating)"
+              selectedCenterIds={newSingerCenterIds}
+              onChange={setNewSingerCenterIds}
+              editableOnly={!isAdmin}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2 flex-col sm:flex-row">
+            <button
+              type="button"
+              onClick={handleResolveSingerMap}
+              disabled={!selectedExistingSingerId}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Use selected singer
+            </button>
+            <button
+              type="button"
+              onClick={handleResolveSingerCreate}
+              disabled={newSingerCenterIds.length === 0}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Create new singer &quot;{pendingSingerName}&quot;
+            </button>
+            <button
+              type="button"
+              onClick={handleResolveSingerCancel}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 rounded"
+            >
+              Cancel import
+            </button>
+          </div>
+        </div>
+      </Modal>
+      
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md p-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Singers and Pitches Import</h2>
         
@@ -497,7 +675,7 @@ export const CsvImportManager: React.FC = () => {
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
               <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">📋 CSV Import Instructions:</h3>
               <ol className="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
-                <li>Prepare a CSV file with 3 columns: <strong>Song Title, Singer, Pitch</strong></li>
+                <li>Prepare a CSV file with 3 columns: <strong>Song Name</strong> (or Song Title), <strong>Singer</strong>, <strong>Pitch</strong></li>
                 <li>Click "Start Import" below to paste your CSV data</li>
                 <li>Review the preview to see matched and unmatched items</li>
                 <li>For unmatched songs, manually select the correct song from the dropdown</li>
@@ -506,8 +684,8 @@ export const CsvImportManager: React.FC = () => {
               </ol>
               <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
                 <p className="text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">Example CSV format:</p>
-                <pre className="text-xs font-mono text-gray-600 dark:text-gray-400">Song Title,Singer,Pitch
-Om Namah Shivaya,Shambhavi,G
+                <pre className="text-xs font-mono text-gray-600 dark:text-gray-400">Song Name,Singer,Pitch<br/>
+Om Namah Shivaya,Shambhavi,G<br/>
 Raghu Pathey,Ameya,4m</pre>
               </div>
             </div>
@@ -517,7 +695,7 @@ Raghu Pathey,Ameya,4m</pre>
               <ul className="list-disc list-inside space-y-1 text-sm text-gray-700 dark:text-gray-300">
                 <li>You can import data from any external source in CSV format</li>
                 <li>You can create the CSV in Excel/Google Sheets and copy-paste</li>
-                <li>Make sure column order is: Song Title, Singer, Pitch</li>
+                <li>Include a header row (e.g. Song Name,Singer,Pitch) — column order can vary</li>
                 <li>The tool will automatically match songs and create new singers as needed</li>
               </ul>
             </div>
@@ -539,21 +717,34 @@ Raghu Pathey,Ameya,4m</pre>
                 <p className="text-sm text-green-700 dark:text-green-300">{scrapeProgress}</p>
               </div>
             )}
+            {parsePreviewProgress && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">
+                  Parsing and matching rows... {parsePreviewProgress.current} of {parsePreviewProgress.total}
+                </p>
+                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-200"
+                    style={{ width: parsePreviewProgress.total > 0 ? `${(parsePreviewProgress.current / parsePreviewProgress.total) * 100}%` : '0%' }}
+                  />
+                </div>
+              </div>
+            )}
             
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
               <p className="font-semibold mb-2">📋 CSV Import Instructions</p>
-              <p className="text-sm mb-3">Prepare your CSV file with 3 columns:</p>
+              <p className="text-sm mb-3">Prepare your CSV file with 3 columns (header row optional):</p>
               <ol className="list-decimal list-inside space-y-2 text-sm">
-                <li><strong>Song Title</strong> - The name of the bhajan</li>
+                <li><strong>Song Name</strong> (or Song Title) - The name of the bhajan</li>
                 <li><strong>Singer</strong> - Singer's name</li>
                 <li><strong>Pitch</strong> - The pitch/key (e.g., G, 4m, C major)</li>
               </ol>
               <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
                 <p className="text-xs font-mono text-gray-700 dark:text-gray-300 mb-1">Example CSV format:</p>
                 <pre className="text-xs font-mono text-gray-600 dark:text-gray-400">
-Song Title,Singer,Pitch
-Om Namah Shivaya,Shambhavi,G
-Raghu Pathey,Ameya,4m
+Song Name,Singer,Pitch<br/>
+Om Namah Shivaya,Shambhavi,G<br/>
+Raghu Pathey,Ameya,4m<br/>
 Why fear when I am here,Ameya,5m</pre>
               </div>
               <p className="text-xs mt-3 text-gray-600 dark:text-gray-400">
@@ -563,67 +754,86 @@ Why fear when I am here,Ameya,5m</pre>
             
             <div>
               <label className="block text-sm font-medium mb-2">
-                Paste CSV data (Song Title, Singer, Pitch):
+                Paste CSV data (Song Name, Singer, Pitch — header row optional):
               </label>
               <textarea
                 className="w-full h-64 p-2 border rounded font-mono text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                placeholder="Song Title,Singer,Pitch&#10;Example:&#10;Raghu Pathey Raaghava Raja Rama,Ameya,4m&#10;Why fear when I am here,Ameya,5m&#10;Om Namah Shivaya,Shambhavi,G"
+                placeholder="Song Name,Singer,Pitch&#10;Raghu Pathey Raaghava Raja Rama,Ameya,4m&#10;Why fear when I am here,Ameya,5m&#10;Om Namah Shivaya,Shambhavi,G"
                 onChange={(e) => {
-                  // Parse CSV data (Song Title, Singer, Pitch)
+                  // Parse CSV data (Song Name, Singer, Pitch) - supports header row for flexible column order
                   const lines = e.target.value.split('\n');
                   const parsed: CsvPitchData[] = [];
-                  
-                  // Proper CSV parser that handles quoted fields with commas
+
                   const parseCSVLine = (line: string): string[] => {
                     const fields: string[] = [];
                     let currentField = '';
                     let insideQuotes = false;
-                    
+
                     for (let i = 0; i < line.length; i++) {
                       const char = line[i];
                       const nextChar = line[i + 1];
-                      
+
                       if (char === '"') {
-                        // Handle escaped quotes ("")
                         if (insideQuotes && nextChar === '"') {
                           currentField += '"';
-                          i++; // Skip next quote
+                          i++;
                         } else {
-                          // Toggle quote state
                           insideQuotes = !insideQuotes;
                         }
                       } else if (char === ',' && !insideQuotes) {
-                        // Field separator (only outside quotes)
                         fields.push(currentField.trim());
                         currentField = '';
                       } else {
                         currentField += char;
                       }
                     }
-                    
-                    // Add last field
                     fields.push(currentField.trim());
                     return fields;
                   };
-                  
-                  for (const line of lines) {
+
+                  const findColumnIndex = (headers: string[], aliases: string[]): number => {
+                    const lower = headers.map((h) => h.toLowerCase().trim());
+                    for (const alias of aliases) {
+                      const idx = lower.findIndex((h) => h.includes(alias) || alias.includes(h));
+                      if (idx >= 0) return idx;
+                    }
+                    return -1;
+                  };
+
+                  let songIdx = 0;
+                  let singerIdx = 1;
+                  let pitchIdx = 2;
+                  let dataStartRow = 0;
+
+                  if (lines.length > 0) {
+                    const firstParts = parseCSVLine(lines[0]);
+                    const firstLower = firstParts[0]?.toLowerCase() ?? '';
+                    if (
+                      firstLower.includes('song') ||
+                      firstLower.includes('singer') ||
+                      firstLower.includes('pitch')
+                    ) {
+                      songIdx = findColumnIndex(firstParts, ['song', 'title', 'name']);
+                      singerIdx = findColumnIndex(firstParts, ['singer']);
+                      pitchIdx = findColumnIndex(firstParts, ['pitch', 'key']);
+                      if (songIdx < 0) songIdx = 0;
+                      if (singerIdx < 0) singerIdx = 1;
+                      if (pitchIdx < 0) pitchIdx = 2;
+                      dataStartRow = 1;
+                    }
+                  }
+
+                  for (let i = dataStartRow; i < lines.length; i++) {
+                    const line = lines[i];
                     if (!line.trim()) continue;
-                    // Skip header row if present
-                    if (line.toLowerCase().includes('song') && line.toLowerCase().includes('singer')) continue;
-                    
+
                     const parts = parseCSVLine(line);
-                    
-                    if (parts.length >= 3) {
-                      // Remove trailing punctuation (commas, periods, etc) and extra spaces
-                      const songName = parts[0].replace(/[,.\s]+$/, '').trim();
-                      const singerName = parts[1].trim();
-                      const pitch = parts[2].trim();
-                      
-                      parsed.push({
-                        songName,
-                        singerName,
-                        pitch,
-                      });
+                    const songName = (parts[songIdx] ?? '').replace(/[,.\s]+$/, '').trim();
+                    const singerName = (parts[singerIdx] ?? '').trim();
+                    const pitch = (parts[pitchIdx] ?? '').trim();
+
+                    if (songName && singerName && pitch) {
+                      parsed.push({ songName, singerName, pitch });
                     }
                   }
                   
@@ -631,7 +841,7 @@ Why fear when I am here,Ameya,5m</pre>
                   if (parsed.length > 0) {
                     setScrapeProgress(`✅ Parsed ${parsed.length} rows successfully!`);
                   } else if (e.target.value.trim()) {
-                    setScrapeProgress('⚠️ No valid data found. Format: Song Title,Singer,Pitch');
+                    setScrapeProgress('⚠️ No valid data found. Format: Song Name,Singer,Pitch');
                   } else {
                     setScrapeProgress('');
                   }
@@ -663,7 +873,7 @@ Why fear when I am here,Ameya,5m</pre>
         {/* Preview Step */}
         {currentStep === 'preview' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-4 mb-4">
               <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded">
                 <div className="text-2xl font-bold text-green-600">{readyCount}</div>
                 <div className="text-sm">Ready to Import</div>
@@ -680,6 +890,12 @@ Why fear when I am here,Ameya,5m</pre>
                 <div className="text-2xl font-bold text-red-600">{droppedCount}</div>
                 <div className="text-sm">Dropped (No Pitch)</div>
               </div>
+              {alreadyExistsCount > 0 && (
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded">
+                  <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{alreadyExistsCount}</div>
+                  <div className="text-sm">Already in DB (hidden)</div>
+                </div>
+              )}
             </div>
             
             <div className="overflow-x-auto max-h-96 border rounded">
@@ -716,12 +932,18 @@ Why fear when I am here,Ameya,5m</pre>
                       </td>
                       <td className="px-4 py-2 text-xs">{item.originalSongName}</td>
                       <td className="px-4 py-2 text-xs">
-                        {item.songName}
-                        {item.songMatch === 'fuzzy' && (
-                          <span className="ml-1 text-yellow-600">({item.songSimilarity}%)</span>
-                        )}
-                        {item.songMatch === 'manual' && (
-                          <span className="ml-1 text-blue-600">(Manual)</span>
+                        {item.status === 'needs_song' ? (
+                          <span className="text-amber-600 dark:text-amber-400 italic">No match — select below</span>
+                        ) : (
+                          <>
+                            {item.songName}
+                            {item.songMatch === 'fuzzy' && (
+                              <span className="ml-1 text-yellow-600">({item.songSimilarity}%)</span>
+                            )}
+                            {item.songMatch === 'manual' && (
+                              <span className="ml-1 text-blue-600">(Manual)</span>
+                            )}
+                          </>
                         )}
                       </td>
                       <td className="px-4 py-2 text-xs font-mono">
@@ -954,11 +1176,23 @@ Why fear when I am here,Ameya,5m</pre>
         
         {/* Importing Step */}
         {currentStep === 'importing' && (
-          <div className="text-center py-8">
+          <div className="text-center py-8 space-y-4">
             <LoadingSpinner />
-            <p className="mt-4 text-gray-600 dark:text-gray-400">
-              Importing data...
+            <p className="text-gray-600 dark:text-gray-400">
+              {importProgress
+                ? `Importing ${importProgress.phase}... ${importProgress.current} of ${importProgress.total}`
+                : 'Importing data...'}
             </p>
+            {importProgress && importProgress.total > 0 && (
+              <div className="max-w-md mx-auto">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-200"
+                    style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
         

@@ -4,6 +4,7 @@ import { Modal } from '../common';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSession } from '../../contexts/SessionContext';
+import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 import { formatNormalizedPitch } from '../../utils/pitchNormalization';
 import { CenterBadges } from '../common/CenterBadges';
 import { SongMetadataCard } from '../common/SongMetadataCard';
@@ -47,6 +48,7 @@ export const PitchList: React.FC<PitchListProps> = ({
   const navigate = useNavigate();
   const { addSong, songIds, entries } = useSession();
   const { isEditor, isAdmin } = useAuth();
+  const { showSongDetailsInDesktop } = useUserPreferences();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [pitchToDelete, setPitchToDelete] = useState<PitchWithDetails | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -202,6 +204,7 @@ export const PitchList: React.FC<PitchListProps> = ({
                   isSelected={isSelected}
                   onPreviewClick={() => handlePresent(pitch)}
                   lyricsHover={{ songId: pitch.songId, songName: pitch.songName || 'Unknown', song: songWithLyrics }}
+                  compactInDesktop={!showSongDetailsInDesktop}
                 />
                 
                 {/* Singer and Pitch */}

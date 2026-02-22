@@ -240,6 +240,13 @@ export class ApiClient {
     });
   }
 
+  async mergeSongs(targetSongId: string, duplicateSongId: string) {
+    return this.request('/songs/merge', {
+      method: 'POST',
+      body: JSON.stringify({ targetSongId, duplicateSongId }),
+    });
+  }
+
   // Singers API
   async getSingers(nocache: boolean = false) {
     const url = nocache ? '/singers?nocache=true' : '/singers';

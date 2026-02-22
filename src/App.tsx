@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { OfflineSyncProvider, useOfflineSyncContext } from './contexts/OfflineSyncContext';
 import { SessionProvider, useSession } from './contexts/SessionContext';
 import { NamedSessionProvider, useNamedSessions } from './contexts/NamedSessionContext';
+import { UserPreferencesProvider } from './contexts/UserPreferencesContext';
 import { useAdminShortcut } from './hooks';
 import { usePageTracking } from './hooks/usePageTracking';
 import { useVersionCheck } from './hooks/useVersionCheck';
@@ -26,7 +27,9 @@ const CentersManager = lazy(() => import('./components/admin/CentersManager'));
 const Analytics = lazy(() => import('./components/admin/Analytics'));
 const FeedbackManager = lazy(() => import('./components/admin/FeedbackManager'));
 const BulkImportUI = lazy(() => import('./components/admin/BulkImportUI'));
+const ValidateSongsCsv = lazy(() => import('./components/admin/ValidateSongsCsv').then(m => ({ default: m.ValidateSongsCsv })));
 const CsvImportManager = lazy(() => import('./components/admin/CsvImportManager'));
+const DedupeSongsUI = lazy(() => import('./components/admin/DedupeSongsUI').then(m => ({ default: m.DedupeSongsUI })));
 const Help = lazy(() => import('./components/Help'));
 import './App.css';
 
@@ -159,7 +162,16 @@ function AppContent() {
           {/* Admin Import Routes */}
           <Route path="/admin/import" element={
             <ProtectedRoute requireAdmin={true}>
-              <BulkImportPage />
+              <Suspense fallback={<LoadingFallback />}>
+                <BulkImportPage />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/dedupe-songs" element={
+            <ProtectedRoute requireAdmin={true}>
+              <Suspense fallback={<LoadingFallback />}>
+                <DedupeSongsPage />
+              </Suspense>
             </ProtectedRoute>
           } />
           <Route path="/admin/import-csv" element={
@@ -232,7 +244,7 @@ function AppContent() {
 // Bulk Import Page - wraps BulkImportUI with layout and explanation
 function BulkImportPage() {
   return (
-    <div className="px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
+    <div className="px-4 py-6 sm:py-8 space-y-6 sm:space-y-8">
       <div className="max-w-3xl">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
           Import Songs
@@ -242,7 +254,35 @@ function BulkImportPage() {
           or run a full discovery and import process. Admin authentication is required.
         </p>
       </div>
-      <BulkImportUI inline={true} />
+      <div className="space-y-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Validate Songs CSV</h2>
+          <ValidateSongsCsv />
+        </div>
+        <BulkImportUI inline={true} />
+      </div>
+    </div>
+  );
+}
+
+// Dedupe Songs Page (Admin only)
+function DedupeSongsPage() {
+  return (
+    <div className="px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
+      <div className="max-w-3xl">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          Deduplicate Songs
+        </h1>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+          Find and merge songs that are almost identical (e.g. spelling variations, extra spaces).
+          Choose which song to keep; pitches and session references will be transferred.
+        </p>
+      </div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6">
+        <Suspense fallback={<LoadingFallback />}>
+          <DedupeSongsUI />
+        </Suspense>
+      </div>
     </div>
   );
 }
@@ -270,6 +310,7 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
+          <UserPreferencesProvider>
           <ToastProvider>
             <OfflineSyncProvider>
             <SongProvider>
@@ -287,6 +328,7 @@ function App() {
             </SongProvider>
             </OfflineSyncProvider>
           </ToastProvider>
+          </UserPreferencesProvider>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>

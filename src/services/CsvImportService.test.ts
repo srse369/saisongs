@@ -33,6 +33,13 @@ vi.mock('../utils/songMatcher', () => ({
     }
     return null;
   }),
+  findBestSingerMatch: vi.fn((csvName: string, singers: Singer[], threshold: number) => {
+    const match = singers.find(s => s.name.toLowerCase() === csvName.toLowerCase());
+    if (match) {
+      return { singer: match, similarity: 100, matched: true };
+    }
+    return null;
+  }),
   normalizeSongNameForMapping: vi.fn((name: string) => name.toLowerCase().trim()),
 }));
 
@@ -64,7 +71,7 @@ describe('CsvImportService', () => {
 
   describe('createImportPreview', () => {
     it('should create preview with all items ready', async () => {
-      const preview = await CsvImportService.createImportPreview(
+      const { items: preview } = await CsvImportService.createImportPreview(
         mockCsvData,
         mockSingers,
         mockSongs
@@ -86,7 +93,7 @@ describe('CsvImportService', () => {
     });
 
     it('should mark singers that do not exist', async () => {
-      const preview = await CsvImportService.createImportPreview(
+      const { items: preview } = await CsvImportService.createImportPreview(
         mockCsvData,
         mockSingers,
         mockSongs
@@ -103,7 +110,7 @@ describe('CsvImportService', () => {
         { singerName: 'John Doe', songName: 'Unknown Song', pitch: 'C' },
       ];
 
-      const preview = await CsvImportService.createImportPreview(
+      const { items: preview } = await CsvImportService.createImportPreview(
         csvData,
         mockSingers,
         mockSongs
@@ -120,7 +127,7 @@ describe('CsvImportService', () => {
         { singerName: 'John Doe', songName: 'Om Sai Ram', pitch: 'Invalid Pitch' },
       ];
 
-      const preview = await CsvImportService.createImportPreview(
+      const { items: preview } = await CsvImportService.createImportPreview(
         csvData,
         mockSingers,
         mockSongs
@@ -142,7 +149,7 @@ describe('CsvImportService', () => {
         { singerName: 'Another', songName: 'Song', pitch: 'N/A' },
       ];
 
-      const preview = await CsvImportService.createImportPreview(
+      const { items: preview } = await CsvImportService.createImportPreview(
         csvData,
         mockSingers,
         mockSongs
@@ -164,7 +171,7 @@ describe('CsvImportService', () => {
         { singerName: 'John Doe', songName: 'Om Sai Ram', pitch: 'C' },
       ];
 
-      const preview = await CsvImportService.createImportPreview(
+      const { items: preview } = await CsvImportService.createImportPreview(
         csvData,
         mockSingers,
         mockSongs,
@@ -187,7 +194,7 @@ describe('CsvImportService', () => {
         { singerName: 'Another', songName: 'Song', pitch: '-' }, // dropped
       ];
 
-      const preview = await CsvImportService.createImportPreview(
+      const { items: preview } = await CsvImportService.createImportPreview(
         csvData,
         mockSingers,
         mockSongs
@@ -204,7 +211,7 @@ describe('CsvImportService', () => {
         { singerName: '  John Doe  ', songName: 'Om Sai Ram', pitch: 'C' },
       ];
 
-      const preview = await CsvImportService.createImportPreview(
+      const { items: preview } = await CsvImportService.createImportPreview(
         csvData,
         mockSingers,
         mockSongs
@@ -220,7 +227,7 @@ describe('CsvImportService', () => {
         { singerName: 'JOHN DOE', songName: 'Om Sai Ram', pitch: 'C' },
       ];
 
-      const preview = await CsvImportService.createImportPreview(
+      const { items: preview } = await CsvImportService.createImportPreview(
         csvData,
         mockSingers,
         mockSongs
@@ -235,7 +242,7 @@ describe('CsvImportService', () => {
         { singerName: 'John Doe', songName: 'Shiva', pitch: 'C' },
       ];
 
-      const preview = await CsvImportService.createImportPreview(
+      const { items: preview } = await CsvImportService.createImportPreview(
         csvData,
         mockSingers,
         mockSongs
@@ -245,6 +252,31 @@ describe('CsvImportService', () => {
       expect(preview[0].songId).toBe('song3');
       expect(preview[0].songMatch).toBe('fuzzy');
       expect(preview[0].songSimilarity).toBe(100);
+    });
+
+    it('should exclude pitches that already exist in database', async () => {
+      const existingPitches = [
+        { songId: 'song1', singerId: 'singer1', pitch: 'C' },
+      ];
+
+      const { items: preview, alreadyExistsCount } = await CsvImportService.createImportPreview(
+        mockCsvData,
+        mockSingers,
+        mockSongs,
+        undefined,
+        undefined,
+        existingPitches
+      );
+
+      // First row: John Doe, Om Sai Ram, C - already exists, should be excluded
+      const johnOmSaiC = preview.find(
+        (p) => p.singerName === 'John Doe' && p.originalSongName === 'Om Sai Ram' && p.normalizedPitch === 'C'
+      );
+      expect(johnOmSaiC).toBeUndefined();
+      expect(alreadyExistsCount).toBe(1);
+
+      // Other rows should still be in preview
+      expect(preview.length).toBe(2);
     });
   });
 

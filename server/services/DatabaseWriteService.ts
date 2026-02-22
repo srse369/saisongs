@@ -362,7 +362,7 @@ class DatabaseWriteService {
       p_meaning: songData.meaning ? String(songData.meaning) : null,
       p_song_tags: songData.song_tags ? String(songData.song_tags) : null
     }, {
-      autoCommit: false
+      autoCommit: true
     });
   }
 
@@ -421,6 +421,44 @@ class DatabaseWriteService {
   async deleteSongForCache(id: string): Promise<void> {
     await this.db.query(`DELETE FROM songs WHERE RAWTOHEX(id) = :1`, [id]);
     await this.recordDeletedEntity('song', id);
+  }
+
+  /**
+   * Merge duplicate song into target: transfer all references then delete duplicate.
+   * Updates: song_singer_pitches, song_session_items, csv_song_mappings.
+   * Handles pitch conflicts: if target already has a pitch for the same singer, delete the duplicate pitch.
+   */
+  async mergeSongsForCache(targetSongId: string, targetSongName: string, duplicateSongId: string): Promise<void> {
+    // 1. Transfer pitches from duplicate to target (handle unique constraint on song_id, singer_id)
+    const targetPitches = await this.db.getSongPitchesForMerge(targetSongId);
+    const targetSingerIds = new Set(targetPitches.map((p) => p.singerId));
+    const duplicatePitches = await this.db.getSongPitchesForMerge(duplicateSongId);
+
+    for (const pitch of duplicatePitches) {
+      if (targetSingerIds.has(pitch.singerId)) {
+        // Conflict: target already has this singer - delete duplicate pitch
+        await this.db.query(`DELETE FROM song_singer_pitches WHERE RAWTOHEX(id) = :1`, [pitch.id]);
+      } else {
+        // No conflict: transfer pitch to target
+        await this.db.query(
+          `UPDATE song_singer_pitches SET song_id = HEXTORAW(:1), updated_at = CURRENT_TIMESTAMP WHERE RAWTOHEX(id) = :2`,
+          [targetSongId, pitch.id]
+        );
+        targetSingerIds.add(pitch.singerId);
+      }
+    }
+    // 2. Transfer session items from duplicate to target
+    await this.db.query(
+      `UPDATE song_session_items SET song_id = HEXTORAW(:1) WHERE song_id = HEXTORAW(:2)`,
+      [targetSongId, duplicateSongId]
+    );
+    // 3. Update csv_song_mappings that pointed to duplicate
+    await this.db.query(
+      `UPDATE csv_song_mappings SET db_song_id = HEXTORAW(:1), db_song_name = :2, updated_at = CURRENT_TIMESTAMP WHERE db_song_id = HEXTORAW(:3)`,
+      [targetSongId, targetSongName, duplicateSongId]
+    );
+    // 4. Delete the duplicate song
+    await this.deleteSongForCache(duplicateSongId);
   }
 
   /**
@@ -508,15 +546,38 @@ class DatabaseWriteService {
 
   /**
    * Update a pitch (for CacheService)
+   * Supports partial updates: pitch, songId, singerId
    */
-  async updatePitchForCache(id: string, pitch: string, updatedBy: string | null): Promise<void> {
-    await this.db.query(`
-      UPDATE song_singer_pitches SET
-        pitch = :1,
-        updated_by = :2,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE RAWTOHEX(id) = :3
-    `, [pitch, updatedBy, id]);
+  async updatePitchForCache(
+    id: string,
+    updates: { pitch?: string; songId?: string; singerId?: string },
+    updatedBy: string | null
+  ): Promise<void> {
+    const setClauses: string[] = ['updated_by = :1', 'updated_at = CURRENT_TIMESTAMP'];
+    const params: any[] = [updatedBy];
+    let paramIdx = 2;
+
+    if (updates.pitch !== undefined) {
+      setClauses.push(`pitch = :${paramIdx}`);
+      params.push(updates.pitch);
+      paramIdx++;
+    }
+    if (updates.songId !== undefined) {
+      setClauses.push(`song_id = HEXTORAW(:${paramIdx})`);
+      params.push(updates.songId);
+      paramIdx++;
+    }
+    if (updates.singerId !== undefined) {
+      setClauses.push(`singer_id = HEXTORAW(:${paramIdx})`);
+      params.push(updates.singerId);
+      paramIdx++;
+    }
+
+    params.push(id);
+    await this.db.query(
+      `UPDATE song_singer_pitches SET ${setClauses.join(', ')} WHERE RAWTOHEX(id) = :${paramIdx}`,
+      params
+    );
   }
 
   /**

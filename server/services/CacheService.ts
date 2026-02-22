@@ -1160,14 +1160,14 @@ class CacheService {
     return null;
   }
 
-  async updatePitch(id: string, pitchData: Partial<SongSingerPitch>): Promise<void> {
-    let pitch: string;
-    let updated_by: string | null;
+  async updatePitch(id: string, pitchData: Partial<SongSingerPitch> & { updatedBy?: string | null }): Promise<void> {
+    const updated_by = pitchData.updatedBy ?? null;
+    const updates: { pitch?: string; songId?: string; singerId?: string } = {};
+    if (pitchData.pitch !== undefined) updates.pitch = pitchData.pitch;
+    if (pitchData.songId !== undefined) updates.songId = pitchData.songId;
+    if (pitchData.singerId !== undefined) updates.singerId = pitchData.singerId;
 
-    pitch = pitchData.pitch ?? '';
-    updated_by = pitchData.updatedBy ?? null;
-
-    await this.databaseWriteService.updatePitchForCache(id, pitch, updated_by);
+    await this.databaseWriteService.updatePitchForCache(id, updates, updated_by);
 
     // Write-through cache: Fetch only the updated pitch with joins
     const updatedPitches = await this.databaseReadService.getUpdatedPitchForCache(id);
