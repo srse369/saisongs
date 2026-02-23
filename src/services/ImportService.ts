@@ -101,21 +101,27 @@ class ImportService {
     // Extract reference pitches from the song URL
     const { refGents, refLadies } = await this.extractReferencePitches(discovered.url);
 
+    const d = discovered as any;
+    // Support both camelCase (from BulkImportUI) and snake_case (from raw JSON)
+    const audioLink = d.audioLink ?? d.audio_link;
+    const videoLink = d.videoLink ?? d.video_link;
+    const goldenVoiceVal = d.goldenVoice ?? d.golden_voice;
+
     const payload = {
       name: discovered.name,
       externalSourceUrl: discovered.url,
-      lyrics: (discovered as any).lyrics,
-      meaning: (discovered as any).meaning,
-      language: (discovered as any).language,
-      deity: (discovered as any).deity,
-      tempo: (discovered as any).tempo,
-      beat: (discovered as any).beat,
-      raga: (discovered as any).raga,
-      level: (discovered as any).level,
-      songTags: (discovered as any).songtags,
-      audioLink: (discovered as any).audio_link,
-      videoLink: (discovered as any).video_link,
-      goldenVoice: (discovered as any).golden_voice === 'yes',
+      lyrics: d.lyrics,
+      meaning: d.meaning,
+      language: d.language,
+      deity: d.deity,
+      tempo: d.tempo,
+      beat: d.beat,
+      raga: d.raga,
+      level: d.level,
+      songTags: d.songtags ?? d.songTags,
+      audioLink: Array.isArray(audioLink) ? audioLink[0] : audioLink,
+      videoLink: Array.isArray(videoLink) ? videoLink[0] : videoLink,
+      goldenVoice: goldenVoiceVal === 'yes' || goldenVoiceVal === true,
       refGents: refGents || undefined,
       refLadies: refLadies || undefined,
     };

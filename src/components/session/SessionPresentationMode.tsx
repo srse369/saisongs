@@ -10,13 +10,13 @@ import { generateSessionPresentationSlides } from '../../utils/slideUtils';
 import apiClient from '../../services/ApiClient';
 import templateService from '../../services/TemplateService';
 import { loadTemplateWithRetry } from '../../utils/templateRetry';
-import { getSelectedTemplateId, setSelectedTemplateId, clearSelectedTemplateId } from '../../utils/cacheUtils';
+import { getSelectedTemplateId, setSelectedTemplateId as persistSelectedTemplateId, clearSelectedTemplateId } from '../../utils/cacheUtils';
 import { openProjectorWindow } from '../../utils/projectorWindow';
 import { PROJECTOR_SESSION_KEY } from '../../contexts/SessionContext';
 import type { Slide, Song, PresentationTemplate } from '../../types';
 
 interface SessionPresentationModeProps {
-  onExit?: () => void;
+  onExit?: (templateId?: string) => void;
 }
 
 // Content scale bounds
@@ -31,6 +31,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
   const { singers } = useSingers();
   const presentationModalRef = useRef<PresentationModalHandle>(null);
   const projectorWindowRef = useRef<Window | null>(null);
+  const fellBackToDefaultRef = useRef(false);
 
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -49,6 +50,18 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
     return () => {
       if (projectorWindowRef.current && !projectorWindowRef.current.closed) {
         projectorWindowRef.current.close();
+      }
+    };
+  }, []);
+
+  // Persist template on unmount so Live tab restores it (catches Escape, back button, any exit path)
+  const selectedTemplateIdForUnmountRef = useRef<string | undefined>(selectedTemplateId);
+  selectedTemplateIdForUnmountRef.current = selectedTemplateId;
+  useEffect(() => {
+    return () => {
+      const id = selectedTemplateIdForUnmountRef.current;
+      if (id && !fellBackToDefaultRef.current) {
+        persistSelectedTemplateId(id);
       }
     };
   }, []);
@@ -102,6 +115,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
             if (isNotFoundError && templateId && templateId === persistedTemplateId) {
               clearSelectedTemplateId();
             }
+            fellBackToDefaultRef.current = true;
             try {
               const defaultTemplate = await templateService.getDefaultTemplate();
               if (defaultTemplate?.id) {
@@ -140,6 +154,7 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
             setSelectedTemplateId(template.id);
           }
         } else {
+          fellBackToDefaultRef.current = true;
           // Template failed after retries - try once more with reset (server may have recovered)
           try {
             apiClient.resetBackoff();
@@ -349,6 +364,11 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
       window.close();
       return;
     }
+    // Persist current template before exiting so Live tab restores it
+    // Skip if we fell back to default due to load failure - preserve user's original choice in storage
+    if (selectedTemplateId && !fellBackToDefaultRef.current) {
+      await persistSelectedTemplateId(selectedTemplateId);
+    }
     // Close projector window if open
     if (projectorWindowRef.current && !projectorWindowRef.current.closed) {
       projectorWindowRef.current.close();
@@ -359,9 +379,9 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
       await document.exitFullscreen();
     }
     if (onExit) {
-      onExit();
+      onExit(selectedTemplateId && !fellBackToDefaultRef.current ? selectedTemplateId : undefined);
     }
-  }, [onExit]);
+  }, [onExit, selectedTemplateId]);
 
   const handleZoomIn = useCallback(() => setContentScale(prev => Math.min(MAX_CONTENT_SCALE, prev + CONTENT_SCALE_STEP)), []);
   const handleZoomOut = useCallback(() => setContentScale(prev => Math.max(MIN_CONTENT_SCALE, prev - CONTENT_SCALE_STEP)), []);
@@ -437,14 +457,14 @@ export const SessionPresentationMode: React.FC<SessionPresentationModeProps> = (
       onZoomOut={handleZoomOut}
       onZoomReset={handleZoomReset}
       topRightControls={
-        <TemplateSelector 
+        <TemplateSelector
           currentTemplateId={selectedTemplateId}
-          onTemplateSelect={(template) => {
+          disableAutoSelect
+          onTemplateSelect={async (template) => {
             setSelectedTemplateId(template.id);
             setActiveTemplate(template);
-            // Persist template selection to localStorage for future previews
             if (template.id) {
-              setSelectedTemplateId(template.id);
+              await persistSelectedTemplateId(template.id);
             }
           }}
           onExpandedChange={setTemplatePickerExpanded}

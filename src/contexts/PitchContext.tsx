@@ -49,6 +49,7 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
           let updated: SongSingerPitch[];
           if (tempId) {
             updated = prev.filter(p => p.id !== tempId);
+            updated = [...updated, pitch];
           } else if (prev.some(p => p.id === pitch.id)) {
             updated = prev.map(p => p.id === pitch.id ? pitch : p);
           } else {

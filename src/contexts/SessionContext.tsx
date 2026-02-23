@@ -123,24 +123,25 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children }) =>
     setEntries([]);
   }, []);
 
+  const getEntryKey = (entry: SessionEntry) => `${entry.songId}|${entry.singerId ?? 'none'}`;
+
   const reorderSession = useCallback((order: string[]) => {
     setEntries((prev) => {
       if (!order || order.length === 0) return prev;
 
-      const map = new Map(prev.map((entry) => [entry.songId, entry]));
+      const map = new Map(prev.map((entry) => [getEntryKey(entry), entry]));
       const reordered: SessionEntry[] = [];
 
-      // Add entries in the specified order when they exist
-      for (const songId of order) {
-        const entry = map.get(songId);
+      for (const key of order) {
+        const entry = map.get(key);
         if (entry) {
           reordered.push(entry);
         }
       }
 
-      // Append any remaining entries that weren't mentioned in order
       for (const entry of prev) {
-        if (!order.includes(entry.songId)) {
+        const key = getEntryKey(entry);
+        if (!order.includes(key)) {
           reordered.push(entry);
         }
       }

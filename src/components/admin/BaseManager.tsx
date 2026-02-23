@@ -99,7 +99,7 @@ export const BaseManager: React.FC<BaseManagerProps> = ({
                 data-base-manager="header-title-row"
                 className="flex items-center gap-2 mb-2"
               >
-                <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-0">
+                <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white mb-0">
                   {title}
                 </h1>
                 {helpHref && (
@@ -108,12 +108,12 @@ export const BaseManager: React.FC<BaseManagerProps> = ({
                     className="text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 transition-colors"
                     title="View help documentation for this tab"
                   >
-                    <i className="fas fa-question-circle text-lg sm:text-xl"></i>
+                    <i className="fas fa-question-circle text-base sm:text-lg"></i>
                   </a>
                 )}
               </div>
               {subtitle && (
-                <p className="hidden sm:block text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                <p className="hidden sm:block text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   {subtitle}
                 </p>
               )}
@@ -173,7 +173,7 @@ export const BaseManager: React.FC<BaseManagerProps> = ({
           title="Scroll to top"
           aria-label="Scroll to top"
         >
-          <i className="fas fa-arrow-up text-lg"></i>
+          <i className="fas fa-arrow-up text-base"></i>
         </button>
       )}
 

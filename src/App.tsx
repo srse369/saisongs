@@ -409,12 +409,9 @@ function PresentationModePage() {
 function SessionPresentationPage() {
   const navigate = useNavigate();
 
-  const handleExit = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate('/session');
-    }
+  const handleExit = (templateId?: string) => {
+    // Always navigate to /session with template in state - reliable, no localStorage timing issues
+    navigate('/session', { state: templateId ? { templateId } : undefined, replace: true });
   };
 
   return <SessionPresentationMode onExit={handleExit} />;

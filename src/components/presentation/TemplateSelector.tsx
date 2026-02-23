@@ -8,9 +8,11 @@ interface TemplateSelectorProps {
   /** Fallback name when template is in use but not yet in context list (e.g. new tab) */
   currentTemplateName?: string;
   onExpandedChange?: (expanded: boolean) => void;
+  /** When true, parent handles restore (e.g. from localStorage) - don't auto-select default and overwrite */
+  disableAutoSelect?: boolean;
 }
 
-export default function TemplateSelector({ onTemplateSelect, currentTemplateId, currentTemplateName, onExpandedChange }: TemplateSelectorProps) {
+export default function TemplateSelector({ onTemplateSelect, currentTemplateId, currentTemplateName, onExpandedChange, disableAutoSelect }: TemplateSelectorProps) {
   const { templates: contextTemplates, loading: contextLoading, fetchTemplates } = useTemplates();
   const [expanded, setExpanded] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -23,14 +25,16 @@ export default function TemplateSelector({ onTemplateSelect, currentTemplateId, 
   }, [contextTemplates.length, contextLoading, fetchTemplates]);
 
   // Automatically select default template if no template is selected and templates are available
+  // Skip when disableAutoSelect - parent (e.g. SessionManager) restores from localStorage and would be overwritten
   useEffect(() => {
-    if (!currentTemplateId && contextTemplates.length > 0 && !contextLoading && onTemplateSelect) {
+    if (disableAutoSelect || !onTemplateSelect) return;
+    if (!currentTemplateId && contextTemplates.length > 0 && !contextLoading) {
       const defaultTemplate = contextTemplates.find(t => t.isDefault);
       if (defaultTemplate) {
         onTemplateSelect(defaultTemplate);
       }
     }
-  }, [currentTemplateId, contextTemplates, contextLoading, onTemplateSelect]);
+  }, [currentTemplateId, contextTemplates, contextLoading, onTemplateSelect, disableAutoSelect]);
 
   // Notify parent when expanded state changes
   useEffect(() => {

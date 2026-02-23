@@ -327,23 +327,28 @@ class DatabaseWriteService {
   // =====================================================
 
   /**
-   * Create a song (for CacheService)
+   * Create a song (for CacheService).
+   * @param id - Pre-generated UUID (hex without hyphens) for cache-then-database flow
    */
-  async createSongForCache(songData: any): Promise<void> {
+  async createSongForCache(songData: any, id?: string): Promise<void> {
+    const idHex = id ? id.replace(/-/g, '').toLowerCase() : null;
+    const idCol = idHex ? 'id, ' : '';
+    const idVal = idHex ? 'HEXTORAW(:p_id), ' : '';
     await this.db.query(`
       INSERT INTO songs (
-        name, external_source_url,
+        ${idCol}name, external_source_url,
         "LANGUAGE", deity, tempo, beat, raga, "LEVEL",
         audio_link, video_link, golden_voice,
         reference_gents_pitch, reference_ladies_pitch, created_by,
         lyrics, meaning, song_tags
       ) VALUES (
-        :p_name, :p_external_source_url, :p_language, :p_deity, :p_tempo, :p_beat, :p_raga, :p_level,
+        ${idVal}:p_name, :p_external_source_url, :p_language, :p_deity, :p_tempo, :p_beat, :p_raga, :p_level,
         :p_audio_link, :p_video_link, :p_golden_voice,
         :p_reference_gents_pitch, :p_reference_ladies_pitch, :p_created_by,
         :p_lyrics, :p_meaning, :p_song_tags
       )
     `, {
+      ...(idHex && { p_id: idHex }),
       p_name: String(songData.name || ''),
       p_external_source_url: songData.external_source_url ? String(songData.external_source_url) : null,
       p_language: String(songData.language || ''),
@@ -462,10 +467,16 @@ class DatabaseWriteService {
   }
 
   /**
-   * Create a singer (for CacheService)
+   * Create a singer (for CacheService).
+   * @param id - Optional pre-generated UUID (hex without hyphens) for cache-then-database flow
    */
-  async createSingerForCache(name: string, gender: string | null, email: string | null, centerIdsJson: string | null, editorForJson: string | null, createdBy: string | null): Promise<void> {
-    await this.db.query(`INSERT INTO users (name, gender, email, center_ids, editor_for, created_by) VALUES (:1, :2, :3, :4, :5, :6)`, [name, gender || null, email || null, centerIdsJson, editorForJson, createdBy || null]);
+  async createSingerForCache(name: string, gender: string | null, email: string | null, centerIdsJson: string | null, editorForJson: string | null, createdBy: string | null, id?: string): Promise<void> {
+    const idHex = id ? id.replace(/-/g, '').toLowerCase() : null;
+    if (idHex) {
+      await this.db.query(`INSERT INTO users (id, name, gender, email, center_ids, editor_for, created_by) VALUES (HEXTORAW(:1), :2, :3, :4, :5, :6, :7)`, [idHex, name, gender || null, email || null, centerIdsJson, editorForJson, createdBy || null]);
+    } else {
+      await this.db.query(`INSERT INTO users (name, gender, email, center_ids, editor_for, created_by) VALUES (:1, :2, :3, :4, :5, :6)`, [name, gender || null, email || null, centerIdsJson, editorForJson, createdBy || null]);
+    }
   }
 
   /**
@@ -535,13 +546,22 @@ class DatabaseWriteService {
   }
 
   /**
-   * Create a pitch (for CacheService)
+   * Create a pitch (for CacheService).
+   * @param id - Optional pre-generated UUID (hex without hyphens) for cache-then-database flow
    */
-  async createPitchForCache(songId: string, singerId: string, pitch: string, createdBy: string | null): Promise<void> {
-    await this.db.query(`
-      INSERT INTO song_singer_pitches (song_id, singer_id, pitch, created_at, created_by)
-      VALUES (HEXTORAW(:1), HEXTORAW(:2), :3, CURRENT_TIMESTAMP, :4)
-    `, [songId, singerId, pitch, createdBy || null]);
+  async createPitchForCache(songId: string, singerId: string, pitch: string, createdBy: string | null, id?: string): Promise<void> {
+    const idHex = id ? id.replace(/-/g, '').toLowerCase() : null;
+    if (idHex) {
+      await this.db.query(`
+        INSERT INTO song_singer_pitches (id, song_id, singer_id, pitch, created_at, created_by)
+        VALUES (HEXTORAW(:1), HEXTORAW(:2), HEXTORAW(:3), :4, CURRENT_TIMESTAMP, :5)
+      `, [idHex, songId, singerId, pitch, createdBy || null]);
+    } else {
+      await this.db.query(`
+        INSERT INTO song_singer_pitches (song_id, singer_id, pitch, created_at, created_by)
+        VALUES (HEXTORAW(:1), HEXTORAW(:2), :3, CURRENT_TIMESTAMP, :4)
+      `, [songId, singerId, pitch, createdBy || null]);
+    }
   }
 
   /**

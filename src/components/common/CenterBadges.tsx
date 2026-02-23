@@ -127,14 +127,14 @@ export const CenterBadges: React.FC<CenterBadgesProps> = ({
     
     if (showWarningIfEmpty) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded" title="No centers assigned - needs admin attention">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded" title="No centers assigned - needs admin attention">
           ⚠️ No Centers
         </span>
       );
     }
     
     return (
-      <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded">
+      <span className="inline-flex items-center px-2 py-1 text-[10px] font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded">
         🌐 {publicLabel}
       </span>
     );
@@ -142,7 +142,7 @@ export const CenterBadges: React.FC<CenterBadgesProps> = ({
 
   if (loading) {
     return (
-      <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded">
+      <span className="inline-flex items-center px-2 py-1 text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded">
         Loading...
       </span>
     );
@@ -160,7 +160,7 @@ export const CenterBadges: React.FC<CenterBadgesProps> = ({
       {selectedCenters.map(center => (
         <span
           key={center.id}
-          className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full border-2"
+          className="inline-flex items-center px-2.5 py-0.5 text-[10px] font-medium rounded-full border-2"
           style={{ 
             backgroundColor: (center.badgeTextColor || '#1e40af') + '20',
             borderColor: center.badgeTextColor || '#1e40af',

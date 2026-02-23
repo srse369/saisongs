@@ -926,16 +926,16 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
-          className="w-full pl-9 pr-9 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full pl-9 pr-9 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
+        <i className="fas fa-search text-sm text-gray-400 absolute left-3 top-2.5"></i>
         {searchTerm && (
           <button
             onClick={() => setSearchTerm('')}
             className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
             aria-label="Clear search"
           >
-            <i className="fas fa-times text-sm"></i>
+            <i className="fas fa-times text-xs"></i>
           </button>
         )}
       </div>
@@ -946,9 +946,9 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
           onClick={() => fetchTemplates(true)}
           disabled={loading}
           title="Reload templates from the database"
-          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+          className="w-full px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
         >
-          <RefreshIcon className="w-4 h-4" />
+          <RefreshIcon className="w-3 h-3" />
           Refresh
         </button>
         {!showForm && (
@@ -957,7 +957,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
               onClick={handleCreateClick}
               disabled={loading}
               title="Create a new presentation template with custom slides and styling"
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+              className="w-full px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
             >
               <i className="fas fa-plus text-lg"></i>
               Create Template
@@ -968,7 +968,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
               onClick={() => pptxInputRef.current?.click()}
               disabled={loading || importingPptx}
               title="Import slides from a PowerPoint file (.pptx) to create a new template"
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+              className="w-full px-4 py-2 text-xs font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
             >
               <i className="fas fa-upload text-lg"></i>
               {importingPptx ? 'Importing...' : 'Import PowerPoint'}
@@ -1001,7 +1001,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
       helpHref="/help#templates"
       headerActions={headerActions}
       headerBelow={!loading && filteredTemplates.length > 0 ? (
-        <div className={`text-sm text-gray-600 dark:text-gray-400 ${baseManager.isMobile ? '' : 'mt-2'}`}>
+        <div className={`text-xs text-gray-600 dark:text-gray-400 ${baseManager.isMobile ? '' : 'mt-2'}`}>
           {searchTerm.trim() && filteredTemplates.length !== templates.length
             ? `Showing ${filteredTemplates.length} of ${templates.length} templates`
             : `${filteredTemplates.length} template${filteredTemplates.length !== 1 ? 's' : ''}`}
@@ -1065,24 +1065,24 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                       }`
                     }`}
                   >
-                    <div className="flex flex-col gap-1.5 md:gap-3">
+                    <div className="flex flex-col gap-0">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                        <div className="flex items-center gap-0">
+                          <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">
                             {template.name}
                           </h3>
                           {template.isDefault && (
-                            <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded">
+                            <span className="inline-flex items-center px-2 py-1 text-[10px] font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded">
                               ⭐ Default
                             </span>
                           )}
                         </div>
                         {template.description && (
-                          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                          <p className="mt-0 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
                             {template.description}
                           </p>
                         )}
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
+                        <div className="mt-0 flex flex-wrap gap-2 text-[10px] text-gray-600 dark:text-gray-400">
                           {/* Aspect ratio indicator */}
                           <span className={`inline-flex items-center px-2 py-1 rounded ${template.aspectRatio === '4:3'
                               ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
@@ -1100,7 +1100,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                       </div>
 
                       {/* Actions Row - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}
-                      <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${baseManager.isMobile && !isSelected ? 'hidden' : ''}`}
+                      <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 ${baseManager.isMobile && !isSelected ? 'hidden' : ''}`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
@@ -1108,7 +1108,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                           title="Preview this template with sample content"
                           className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors flex items-center justify-center"
                         >
-                          <i className="fas fa-eye text-lg text-purple-600 dark:text-purple-400"></i>
+                          <i className="fas fa-eye text-base text-purple-600 dark:text-purple-400"></i>
                         </button>
                         {canEditTemplate(template) && (
                           <button
@@ -1116,8 +1116,8 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                             title="Edit template layout, styling, and slide configuration"
                             className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                           >
-                            <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                            <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
+                            <i className="fas fa-edit text-base text-blue-600 dark:text-blue-400"></i>
+                            <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Edit</span>
                           </button>
                         )}
                         {/* Anyone can duplicate a template */}
@@ -1126,8 +1126,8 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                           title="Create a copy of this template that you can modify"
                           className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                         >
-                          <i className="fas fa-copy text-lg text-green-600 dark:text-green-400"></i>
-                          <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Duplicate</span>
+                          <i className="fas fa-copy text-base text-green-600 dark:text-green-400"></i>
+                          <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Duplicate</span>
                         </button>
                         {/* Export PowerPoint */}
                         <button
@@ -1136,8 +1136,8 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                           title="Download this template as a PowerPoint file (.pptx)"
                           className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                          <i className={`fas ${exportingPptx === template.id ? 'fa-spinner fa-spin' : 'fa-download'} text-lg text-purple-600 dark:text-purple-400`}></i>
-                          <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">
+                          <i className={`fas ${exportingPptx === template.id ? 'fa-spinner fa-spin' : 'fa-download'} text-base text-purple-600 dark:text-purple-400`}></i>
+                          <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">
                             {exportingPptx === template.id ? 'Exporting...' : 'Export'}
                           </span>
                         </button>
@@ -1148,8 +1148,8 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                           title={!isOnline ? 'Connect to the internet to download for offline' : (template.id && templateMediaCachedIds.has(template.id)) ? 'Template media already cached for offline' : 'Download images, video, and audio for offline use'}
                           className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                          <i className={`fas ${takingOfflineTemplateId === template.id ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-down'} text-lg ${(template.id && templateMediaCachedIds.has(template.id)) ? 'text-[rgb(227,74,16)]' : 'text-cyan-600 dark:text-cyan-400'}`}></i>
-                          <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">
+                          <i className={`fas ${takingOfflineTemplateId === template.id ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-down'} text-base ${(template.id && templateMediaCachedIds.has(template.id)) ? 'text-[rgb(227,74,16)]' : 'text-cyan-600 dark:text-cyan-400'}`}></i>
+                          <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">
                             {takingOfflineTemplateId === template.id ? 'Downloading...' : (template.id && templateMediaCachedIds.has(template.id)) ? 'Offline ✓' : 'Take Offline'}
                           </span>
                         </button>
@@ -1160,8 +1160,8 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                             title="Make this the default template for new presentations"
                             className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                           >
-                            <i className="fas fa-star text-lg text-yellow-500 dark:text-yellow-400"></i>
-                            <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Set Default</span>
+                            <i className="fas fa-star text-base text-yellow-500 dark:text-yellow-400"></i>
+                            <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Set Default</span>
                           </button>
                         )}
                         {canEditTemplate(template) && (
@@ -1170,8 +1170,8 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
                             title="Permanently delete this template"
                             className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                           >
-                            <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                            <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
+                            <i className="fas fa-trash text-base text-red-600 dark:text-red-400"></i>
+                            <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Delete</span>
                           </button>
                         )}
                       </div>
@@ -1451,7 +1451,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
               onClick={handleFormSubmit}
               disabled={loading}
               title={editingTemplate?.id ? "Save changes to this template" : "Create a new template with these settings"}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {editingTemplate?.id ? 'Update Template' : 'Create Template'}
             </button>

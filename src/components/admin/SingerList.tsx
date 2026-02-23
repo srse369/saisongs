@@ -215,9 +215,9 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                   }`
             }`}
           >
-            <div className="flex flex-col gap-1.5 md:gap-3">
+            <div className="flex flex-col gap-0">
               {/* Main row: Checkbox + Singer Name + Badges */}
-              <div className="flex gap-1.5 md:gap-3">
+              <div className="flex gap-0">
                 {/* Checkbox for selection */}
                 {isEditor && onMerge && isSelectionMode && (
                   <div className="flex items-start pt-1">
@@ -225,15 +225,15 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                       type="checkbox"
                       checked={selectedSingerIds.includes(singer.id)}
                       onChange={() => handleToggleSelection(singer.id)}
-                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer"
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 cursor-pointer"
                     />
                   </div>
                 )}
                 
                 {/* Singer Name (color-coded by gender) */}
-                <div className="flex-1 flex items-center justify-between gap-3 min-w-0 overflow-hidden"
-                    style={{ display: 'grid', gridAutoFlow: 'column', gridTemplateColumns: '1fr auto', alignItems: 'center', columnGap: '8px' }}>
-                  <h3 className={`sm:text-lg font-semibold truncate min-w-0 ${
+                <div className="flex-1 flex items-center justify-between min-w-0 overflow-hidden"
+                    style={{ display: 'grid', gridAutoFlow: 'column', gridTemplateColumns: '1fr auto', alignItems: 'center', columnGap: 0 }}>
+                  <h3 className={`text-sm sm:text-base font-semibold truncate min-w-0 ${
                     singer.gender?.toLowerCase() === 'male' 
                       ? 'text-blue-600 dark:text-blue-400' 
                       : singer.gender?.toLowerCase() === 'boy' 
@@ -255,23 +255,23 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                         className="flex-shrink-0 relative inline-flex items-center justify-center gap-1.5 text-red-600 dark:text-red-400"
                       >
                         <span className="relative inline-flex items-center justify-center">
-                          <i className="fas fa-envelope text-base"></i>
-                          <i className="fas fa-circle-xmark absolute -top-1 -right-1 text-black dark:text-black text-base"></i>
+                        <i className="fas fa-envelope text-sm"></i>
+                        <i className="fas fa-circle-xmark absolute -top-1 -right-1 text-black dark:text-black text-sm"></i>
                         </span>
-                        <span className="hidden md:inline text-sm font-medium">No email</span>
+                        <span className="hidden md:inline text-xs font-medium">No email</span>
                       </span>
                     )}
                     <CenterBadges centerIds={singer.centerIds || []} showWarningIfEmpty={false} />
                     {/* Warning for Missing Centers - Desktop only */}
                     {(!singer.centerIds || singer.centerIds.length === 0) && (
-                      <span className="hidden md:inline text-xs text-yellow-600 dark:text-yellow-400 italic">
+                      <span className="hidden md:inline text-[10px] text-yellow-600 dark:text-yellow-400 italic">
                         (Needs center assignment)
                       </span>
                     )}
                     {/* Pitches count circle - just left of preview icon */}
                     <div 
                       title={`${singer.pitchCount ?? 0} pitch assignment${(singer.pitchCount ?? 0) !== 1 ? 's' : ''}`}
-                      className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-black dark:bg-black text-white text-xs font-semibold"
+                      className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-black dark:bg-black text-white text-[9px] font-semibold"
                     >
                       {singer.pitchCount ?? 0}
                     </div>
@@ -284,7 +284,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                         title="Preview singer details"
                         className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
                       >
-                        <i className="fas fa-eye text-base"></i>
+                        <i className="fas fa-eye text-sm"></i>
                       </button>
                     )}
                   </div>
@@ -292,7 +292,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
               </div>
               
               {/* Actions - On separate line below horizontal separator on desktop */}
-              <div className={`flex flex-wrap items-center justify-start gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected && !isSelectionMode ? 'hidden' : ''}`}
+              <div className={`flex flex-wrap items-center justify-start gap-2 pt-0 ${isMobile && !isSelected && !isSelectionMode ? 'hidden' : ''}`}
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
@@ -300,8 +300,8 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                   title={`View ${singer.pitchCount ?? 0} pitch assignment${(singer.pitchCount ?? 0) !== 1 ? 's' : ''}`}
                   className="relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
                 >
-                  <div className="relative">
-                    <MusicIcon className="w-5 h-5" />
+                  <div className="relative inline-flex items-center justify-center w-4 h-4 shrink-0 overflow-hidden">
+                    <MusicIcon className="w-4 h-4 flex-shrink-0" />
                     {/* Mobile: Badge overlay on icon */}
                     {(singer.pitchCount ?? 0) > 0 && (
                       <span className="absolute -top-1 -right-1 sm:hidden flex items-center justify-center min-w-[16px] h-[16px] px-0.5 text-[9px] font-bold text-white bg-black rounded-full z-10">
@@ -310,8 +310,8 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     )}
                   </div>
                   {/* Desktop: Text and inline badge */}
-                  <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Pitches</span>
-                  <span className={`hidden sm:inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold rounded-full ${
+                  <span className="hidden sm:inline text-xs font-medium whitespace-nowrap leading-none">Pitches</span>
+                  <span className={`hidden sm:inline-flex items-center justify-center min-w-[1rem] h-3 leading-none px-1 text-[9px] font-bold rounded-full shrink-0 ${
                     (singer.pitchCount ?? 0) > 0 
                       ? 'text-white bg-gray-900 dark:bg-black' 
                       : 'text-gray-500 bg-gray-300 dark:bg-gray-600 dark:text-gray-400'
@@ -326,8 +326,8 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     title="Edit singer profile (name, gender, centers)"
                     className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
                   >
-                    <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
+                    <i className="fas fa-edit text-base text-blue-600 dark:text-blue-400"></i>
+                    <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Edit</span>
                   </button>
                 )}
                 {/* Delete button - only for editors/admins */}
@@ -337,8 +337,8 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
                     title="Delete singer and all their pitch assignments"
                     className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 rounded-lg sm:rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
                   >
-                    <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
+                    <i className="fas fa-trash text-base text-red-600 dark:text-red-400"></i>
+                    <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Delete</span>
                   </button>
                 )}
               </div>

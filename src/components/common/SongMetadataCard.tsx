@@ -30,6 +30,8 @@ interface SongMetadataCardProps {
   lyricsHover?: { songId: string; songName: string; song?: Song | null };
   /** When true (desktop only): show only song name; details expand on hover */
   compactInDesktop?: boolean;
+  /** When true (desktop only): keep lyrics and preview icons immediately after song name */
+  iconsNextToNameOnDesktop?: boolean;
 }
 
 /**
@@ -48,83 +50,97 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
   isAuthenticated = true, // Default to true for backward compatibility
   lyricsHover,
   compactInDesktop = false,
+  iconsNextToNameOnDesktop = false,
 }) => {
   const hasReferencePitches = song.refGents || song.refLadies;
 
   // Show background on desktop always, or on mobile when selected
   const shouldShowBackground = showBackground || isSelected;
 
-  // When compactInDesktop: on desktop, details are hidden until hover. Need group for group-hover.
+  // When compactInDesktop: details never expand on song hover; show only on mobile when selected or via song name hover popup
   const detailsDeityLangClass = compactInDesktop
-    ? `${(isSelected || alwaysShowDeityLanguage) ? 'flex' : 'hidden'} md:hidden md:group-hover:flex flex-wrap items-center`
+    ? `${(isSelected || alwaysShowDeityLanguage) ? 'flex' : 'hidden'} md:hidden`
     : `${(isSelected || alwaysShowDeityLanguage) ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center`;
   const detailsRagaBeatClass = compactInDesktop
-    ? `${isSelected ? 'flex' : 'hidden'} md:hidden md:group-hover:flex flex-wrap items-center`
+    ? `${isSelected ? 'flex' : 'hidden'} md:hidden`
     : `${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center`;
   const detailsRefPitchesClass = compactInDesktop
-    ? `${isSelected ? 'flex' : 'hidden'} md:hidden md:group-hover:flex flex-wrap items-center`
+    ? `${isSelected ? 'flex' : 'hidden'} md:hidden`
     : `${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center`;
   
   return (
-    <div className={`${compactInDesktop ? 'group' : ''} ${shouldShowBackground ? 'bg-slate-200/90 dark:bg-gray-950/85 px-[5px] pb-[5px]' : ''} md:px-2 md:pt-1 md:pb-1 md:mb-1.5 ${shouldShowBackground ? 'rounded-lg' : ''}`}>
-      {/* Song Name with External Link and Lyrics Button */}
-      <div className="flex items-center gap-2">
-        {onNameClick ? (
-          <button
-            type="button"
-            onClick={onNameClick}
-            className="text-left text-base sm:text-lg font-semibold text-gray-900 dark:text-white hover:underline flex-1 min-w-0 truncate whitespace-nowrap"
-            {...(nameClickTitle ? { title: nameClickTitle } : {})}
-          >
-            {song.name}
-          </button>
-        ) : (
-          <span className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white flex-1 min-w-0 truncate whitespace-nowrap">
-            {song.name}
-          </span>
-        )}
-        {/* Pitch count circle - only show on mobile when there are pitches and user is authenticated */}
-        {isAuthenticated && pitchCount !== undefined && (pitchCount ?? 0) > 0 && (
-          <div className="flex-shrink-0 md:hidden">
-            <div className="w-6 h-6 flex items-center justify-center rounded-full bg-black dark:bg-black text-white text-xs font-semibold">
-              {pitchCount}
-            </div>
-          </div>
-        )}
-        {/* Lyrics button - small circle with "l" that shows lyrics on hover */}
-        {lyricsHover && (
-          <LyricsHoverPopup
-            songId={lyricsHover.songId}
-            songName={lyricsHover.songName}
-            song={lyricsHover.song}
-            className="flex-shrink-0"
-          >
-            <div
-              title="View lyrics"
-              className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 text-xs font-semibold cursor-default"
+    <div className={`md:px-2 md:pt-0 md:pb-0 md:mb-0`}>
+      {/* Song Name - hover shows metadata/lyrics popup when lyricsHover provided */}
+      <div className={`flex items-center min-w-0 ${iconsNextToNameOnDesktop ? 'md:flex-1' : ''}`}>
+        {/* On desktop when iconsNextToNameOnDesktop: name + lyrics + preview stay together; name truncates */}
+        <div className={`flex items-center gap-[5px] min-w-0 ${iconsNextToNameOnDesktop ? 'md:min-w-0 md:flex-1 md:overflow-hidden' : 'flex-1'}`}>
+          {lyricsHover ? (
+            <LyricsHoverPopup
+              songId={lyricsHover.songId}
+              songName={lyricsHover.songName}
+              song={lyricsHover.song}
+              className={`min-w-0 overflow-hidden ${iconsNextToNameOnDesktop ? 'md:flex-initial' : 'flex-1'}`}
             >
-              ℓ
+              {onNameClick ? (
+                <button
+                  type="button"
+                  onClick={onNameClick}
+                  className="text-left text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate whitespace-nowrap min-w-0 w-full"
+                  {...(nameClickTitle ? { title: nameClickTitle } : {})}
+                >
+                  {song.name}
+                </button>
+              ) : (
+                <span className="block text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate whitespace-nowrap min-w-0">
+                  {song.name}
+                </span>
+              )}
+            </LyricsHoverPopup>
+          ) : (
+            <>
+              {onNameClick ? (
+                <button
+                  type="button"
+                  onClick={onNameClick}
+                  className={`text-left text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate whitespace-nowrap min-w-0 ${iconsNextToNameOnDesktop ? 'md:flex-initial' : 'flex-1'}`}
+                  {...(nameClickTitle ? { title: nameClickTitle } : {})}
+                >
+                  {song.name}
+                </button>
+              ) : (
+                <span className={`text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate whitespace-nowrap min-w-0 ${iconsNextToNameOnDesktop ? 'md:flex-initial' : 'flex-1'}`}>
+                  {song.name}
+                </span>
+              )}
+            </>
+          )}
+          {/* Pitch count circle - only show on mobile when there are pitches and user is authenticated */}
+          {isAuthenticated && pitchCount !== undefined && (pitchCount ?? 0) > 0 && (
+            <div className="flex-shrink-0 md:hidden">
+              <div className="w-5 h-5 flex items-center justify-center rounded-full bg-black dark:bg-black text-white text-[9px] font-semibold">
+                {pitchCount}
+              </div>
             </div>
-          </LyricsHoverPopup>
-        )}
-        {onPreviewClick && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onPreviewClick();
-            }}
-            title="Preview song"
-            className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
-          >
-            <i className="fas fa-eye text-base"></i>
-          </button>
-        )}
+          )}
+          {onPreviewClick && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPreviewClick();
+              }}
+              title="Preview song"
+              className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
+            >
+              <i className="fas fa-eye text-sm"></i>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Deity, Language, and Tempo - Show on mobile when selected or alwaysShowDeityLanguage; on desktop show always unless compactInDesktop (then on hover) */}
       {(song.deity || song.language || song.tempo) && (
-        <div className={`${detailsDeityLangClass} text-xs text-gray-600 dark:text-gray-400`}>
+        <div className={`${detailsDeityLangClass} text-[10px] text-gray-600 dark:text-gray-400 mt-0`}>
           {song.deity && (
             <>
               <span>
@@ -154,7 +170,7 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
 
       {/* Raga and Beat - Show on mobile when selected; on desktop show always unless compactInDesktop (then on hover) */}
       {(song.raga || song.beat) && (
-        <div className={`${detailsRagaBeatClass} text-xs text-gray-600 dark:text-gray-400`}>
+        <div className={`${detailsRagaBeatClass} text-[10px] text-gray-600 dark:text-gray-400 mt-0`}>
           {song.raga && (
             <span>
               <span className={isSelected ? 'hidden md:inline' : ''}>Raga: </span>
@@ -173,7 +189,7 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
 
       {/* Reference Pitches - Show on mobile when selected; on desktop show always unless compactInDesktop (then on hover) */}
       {hasReferencePitches && (
-        <div className={`${detailsRefPitchesClass} gap-2 text-xs text-gray-600 dark:text-gray-400`}>
+        <div className={`${detailsRefPitchesClass} gap-2 text-[10px] text-gray-600 dark:text-gray-400 mt-0`}>
           {song.refGents && (
             <span>
               <span className="text-blue-600 dark:text-blue-400 font-medium">Gents: </span>

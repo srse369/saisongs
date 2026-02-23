@@ -52,7 +52,7 @@ export const NamedSessionList: React.FC<NamedSessionListProps> = ({
 
   if (sessions.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
         No sessions found. Create your first session to get started.
       </div>
     );
@@ -63,19 +63,19 @@ export const NamedSessionList: React.FC<NamedSessionListProps> = ({
       {sessions.map((session) => (
         <div
           key={session.id}
-          className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+          className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
         >
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold text-gray-900 truncate">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
                 {session.name}
               </h3>
               {session.description && (
-                <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
                   {session.description}
                 </p>
               )}
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                 Created: {new Date(session.createdAt).toLocaleDateString()}
               </p>
             </div>

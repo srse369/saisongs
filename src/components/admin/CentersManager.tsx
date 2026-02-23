@@ -568,16 +568,16 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
           onChange={handleSearchChange}
           placeholder="Search centers by name..."
           autoFocus={typeof window !== 'undefined' && window.innerWidth >= 768}
-          className="w-full pl-9 pr-9 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+          className="w-full pl-9 pr-9 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
         />
-        <i className="fas fa-search text-base text-gray-400 absolute left-3 top-2.5"></i>
+        <i className="fas fa-search text-sm text-gray-400 absolute left-3 top-2.5"></i>
         {searchTerm && (
           <button
             onClick={() => setSearchTerm('')}
             className="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
             aria-label="Clear search"
           >
-            <i className="fas fa-times text-sm"></i>
+            <i className="fas fa-times text-xs"></i>
           </button>
         )}
       </div>
@@ -588,16 +588,16 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
           onClick={() => fetchCenters()}
           disabled={loading}
           title="Refresh centers list"
-          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+          className="w-full px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
         >
-          <RefreshIcon className="w-4 h-4" />
+          <RefreshIcon className="w-3 h-3" />
           Refresh
         </button>
         <button
           onClick={() => handleOpenForm()}
           disabled={offline}
           title={offline ? 'Centers cannot be added or edited when offline' : undefined}
-          className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+          className="w-full px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
         >
           <i className="fas fa-plus text-lg"></i>
           Add Center
@@ -620,7 +620,7 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
       headerActions={headerActions}
       headerBelow={!loading && (centers.length > 0 || filteredCenters.length > 0) ? (
         <div className="max-w-7xl mx-auto px-1.5 sm:px-6 lg:px-8 pt-3">
-          <div className={`text-sm text-gray-600 dark:text-gray-400 ${baseManager.isMobile ? 'mt-2' : 'mb-2'}`}>
+          <div className={`text-xs text-gray-600 dark:text-gray-400 ${baseManager.isMobile ? 'mt-2' : 'mb-2'}`}>
             {searchTerm.trim() ? `${filteredCenters.length} of ${centers.length} center${centers.length !== 1 ? 's' : ''}` : `${centers.length} center${centers.length !== 1 ? 's' : ''}`}
           </div>
         </div>
@@ -665,16 +665,16 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
                   }`
                   }`}
               >
-                <div className="flex items-center gap-2 md:gap-4">
+                <div className="flex items-center gap-0">
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1.5 md:gap-3 flex-wrap">
-                      <div className="flex items-center gap-1.5 md:gap-3 flex-wrap">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <div className="flex items-center justify-between gap-0 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                           {center.name}
                         </h3>
                         <span
-                          className="px-2.5 py-0.5 text-xs font-medium rounded-full border-2"
+                          className="px-2.5 py-0.5 text-[10px] font-medium rounded-full border-2"
                           style={{
                             backgroundColor: (center.badgeTextColor || '#1e40af') + '20',
                             borderColor: center.badgeTextColor || '#1e40af',
@@ -692,10 +692,10 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
                         title="View center details"
                         className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
                       >
-                        <i className="fas fa-eye text-base"></i>
+                        <i className="fas fa-eye text-sm"></i>
                       </button>
                     </div>
-                    <div className="flex items-center gap-3 mt-2 text-xs">
+                    <div className="flex items-center gap-3 mt-[3px] text-[10px]">
                       <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
                         <i className="fas fa-users"></i>
                         <span className="font-medium">{center.singerCount ?? 0}</span>
@@ -723,7 +723,7 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
                 </div>
 
                 {/* Actions - Hidden on mobile until row is selected */}
-                <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 mt-1 md:pt-3 md:mt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${baseManager.isMobile && !isSelected ? 'hidden' : ''}`}
+                <div className={`flex flex-wrap items-center gap-1.5 sm:gap-2 pt-0 mt-[3px] ${baseManager.isMobile && !isSelected ? 'hidden' : ''}`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
@@ -732,8 +732,8 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
                     title={offline ? 'Centers cannot be edited when offline' : undefined}
                     className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
+                    <i className="fas fa-edit text-base text-blue-600 dark:text-blue-400"></i>
+                    <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Edit</span>
                   </button>
                   <button
                     onClick={() => !offline && handleDelete(center)}
@@ -741,8 +741,8 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
                     title={offline ? 'Centers cannot be deleted when offline' : undefined}
                     className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
+                    <i className="fas fa-trash text-base text-red-600 dark:text-red-400"></i>
+                    <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Delete</span>
                   </button>
                 </div>
               </div>
@@ -907,7 +907,7 @@ export const CentersManager: React.FC<CentersManagerProps> = ({ isActive = true 
                 type="submit"
                 disabled={isSubmitting}
                 title={editingCenter ? "Save changes to this center" : "Create a new center"}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
+                className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full sm:w-auto"
               >
                 {isSubmitting ? 'Saving...' : editingCenter ? 'Update Center' : 'Create Center'}
               </button>

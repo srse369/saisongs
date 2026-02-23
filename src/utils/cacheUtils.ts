@@ -69,12 +69,13 @@ export async function getCacheSizeEstimate(): Promise<number> {
 }
 
 /**
- * Get the selected template ID from cache (shared across all preview modes)
+ * Get the selected template ID (shared across all preview modes).
+ * Uses localStorage for reliability and immediate sync when returning to Live tab.
  */
 export async function getSelectedTemplateId(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
   try {
-    return await idbGet(CACHE_KEYS.SELECTED_SESSION_TEMPLATE_ID);
+    return localStorage.getItem(CACHE_KEYS.SELECTED_SESSION_TEMPLATE_ID);
   } catch (e) {
     console.warn('Failed to get selected template ID:', e);
     return null;
@@ -82,12 +83,14 @@ export async function getSelectedTemplateId(): Promise<string | null> {
 }
 
 /**
- * Set the selected template ID in cache (shared across all preview modes)
+ * Set the selected template ID (shared across all preview modes).
+ * Uses localStorage for reliability and immediate sync when returning to Live tab.
  */
 export async function setSelectedTemplateId(templateId: string): Promise<boolean> {
   if (typeof window === 'undefined') return false;
   try {
-    return await idbSet(CACHE_KEYS.SELECTED_SESSION_TEMPLATE_ID, templateId);
+    localStorage.setItem(CACHE_KEYS.SELECTED_SESSION_TEMPLATE_ID, templateId);
+    return true;
   } catch (e) {
     console.warn('Failed to save selected template ID:', e);
     return false;
@@ -95,12 +98,12 @@ export async function setSelectedTemplateId(templateId: string): Promise<boolean
 }
 
 /**
- * Clear the selected template ID from cache
+ * Clear the selected template ID from storage
  */
 export async function clearSelectedTemplateId(): Promise<void> {
   if (typeof window === 'undefined') return;
   try {
-    await idbRemove(CACHE_KEYS.SELECTED_SESSION_TEMPLATE_ID);
+    localStorage.removeItem(CACHE_KEYS.SELECTED_SESSION_TEMPLATE_ID);
   } catch (e) {
     console.warn('Failed to clear selected template ID:', e);
   }

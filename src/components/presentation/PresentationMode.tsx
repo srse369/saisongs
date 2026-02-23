@@ -495,6 +495,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ songId, onEx
         <TemplateSelector 
           currentTemplateId={selectedTemplateId}
           currentTemplateName={activeTemplate?.name}
+          disableAutoSelect
           onTemplateSelect={(template) => {
             updateSelectedTemplateId(template.id);
             setActiveTemplate(template);

@@ -1,8 +1,10 @@
 /**
  * CacheService - In-memory cache for database results
  * Reduces database load by caching query results with TTL
+ * Create flow: browser cache → backend cache → database
  */
 
+import { randomUUID } from 'crypto';
 import {
   BackgroundElement,
   ImageElement,
@@ -348,7 +350,6 @@ class CacheService {
   }
 
   async createSong(songData: any): Promise<any> {
-
     // Accept both camelCase (frontend) and snake_case (legacy) - normalize to snake_case for DB
     const data = {
       name: songData.name,
@@ -370,73 +371,65 @@ class CacheService {
       created_by: songData.createdBy ?? songData.created_by,
     };
 
-    // Step 1: Insert along with all CLOB fields
-    await this.databaseWriteService.createSongForCache(data);
+    // Flow: backend cache first, then database
+    const id = randomUUID();
+    const mappedSong = {
+      id,
+      name: data.name,
+      externalSourceUrl: data.external_source_url ?? '',
+      lyrics: data.lyrics ?? null,
+      meaning: data.meaning ?? null,
+      language: data.language ?? null,
+      deity: data.deity ?? null,
+      tempo: data.tempo ?? null,
+      beat: data.beat ?? null,
+      raga: data.raga ?? null,
+      level: data.level ?? null,
+      songTags: data.song_tags ?? null,
+      audioLink: data.audio_link ?? null,
+      goldenVoice: !!(data.golden_voice === true || data.golden_voice === 1),
+      refGents: data.reference_gents_pitch ?? null,
+      refLadies: data.reference_ladies_pitch ?? null,
+      pitchCount: 0,
+    };
 
-    // Write-through cache: Fetch only the newly created song
-    const newSongs = await this.databaseReadService.getNewSongByNameForCache(songData.name);
-
-    if (newSongs.length > 0) {
-      const newSong = newSongs[0];
-      const mappedSong = {
-        id: extractValue(newSong.ID),
-        name: extractValue(newSong.NAME),
-        externalSourceUrl: extractValue(newSong.EXTERNAL_SOURCE_URL),
-        lyrics: extractValue(newSong.LYRICS),
-        meaning: extractValue(newSong.MEANING),
-        language: extractValue(newSong.LANGUAGE),
-        deity: extractValue(newSong.DEITY),
-        tempo: extractValue(newSong.TEMPO),
-        beat: extractValue(newSong.BEAT),
-        raga: extractValue(newSong.RAGA),
-        level: extractValue(newSong.SONG_LEVEL),
-        songTags: extractValue(newSong.SONG_TAGS),
-        audioLink: extractValue(newSong.AUDIO_LINK),
-        goldenVoice: !!extractValue(newSong.GOLDEN_VOICE),
-        refGents: extractValue(newSong.REFERENCE_GENTS_PITCH),
-        refLadies: extractValue(newSong.REFERENCE_LADIES_PITCH),
-        pitchCount: 0, // New songs have no pitches yet
-      };
-
-      // Update cache directly - add to existing cache or invalidate to force fresh fetch
-      const cached = this.get('songs:all');
-      if (cached && Array.isArray(cached)) {
-        const updated = [...cached, { ...mappedSong, lyrics: null, meaning: null, songTags: null }].sort((a, b) =>
-          (a.name || '').localeCompare(b.name || '')
-        );
-        this.set('songs:all', updated, this.DEFAULT_TTL_MS);
-      } else {
-        this.invalidate('songs:all');
-      }
-
-      // Update bulk cache (songs:all:withClobs) so getSong(id) stays consistent
-      const fullCached = this.get<any[]>('songs:all:withClobs');
-      if (fullCached && Array.isArray(fullCached)) {
-        const updatedFull = [...fullCached, mappedSong].sort((a, b) =>
-          (a.name || '').localeCompare(b.name || '')
-        );
-        this.set('songs:all:withClobs', updatedFull, this.DEFAULT_TTL_MS);
-      } else {
-        this.invalidate('songs:all:withClobs');
-      }
-
-      this.set(`song:${mappedSong.id}`, mappedSong, this.DEFAULT_TTL_MS);
-
-      // Update zip cache for offline
-      const light = { ...mappedSong };
-      delete light.lyrics;
-      delete light.meaning;
-      delete light.songTags;
-      zipCacheService.setSong(mappedSong.id, light, {
-        lyrics: mappedSong.lyrics ?? null,
-        meaning: mappedSong.meaning ?? null,
-        songTags: mappedSong.songTags ?? null,
-      });
-
-      return mappedSong;
+    // Step 1: Update backend cache first
+    const cached = this.get('songs:all');
+    if (cached && Array.isArray(cached)) {
+      const updated = [...cached, { ...mappedSong, lyrics: null, meaning: null, songTags: null }].sort((a, b) =>
+        (a.name || '').localeCompare(b.name || '')
+      );
+      this.set('songs:all', updated, this.DEFAULT_TTL_MS);
+    } else {
+      this.invalidate('songs:all');
     }
 
-    return null;
+    const fullCached = this.get<any[]>('songs:all:withClobs');
+    if (fullCached && Array.isArray(fullCached)) {
+      const updatedFull = [...fullCached, mappedSong].sort((a, b) =>
+        (a.name || '').localeCompare(b.name || '')
+      );
+      this.set('songs:all:withClobs', updatedFull, this.DEFAULT_TTL_MS);
+    } else {
+      this.invalidate('songs:all:withClobs');
+    }
+
+    this.set(`song:${id}`, mappedSong, this.DEFAULT_TTL_MS);
+
+    const light = { ...mappedSong };
+    delete light.lyrics;
+    delete light.meaning;
+    delete light.songTags;
+    zipCacheService.setSong(id, light, {
+      lyrics: mappedSong.lyrics ?? null,
+      meaning: mappedSong.meaning ?? null,
+      songTags: mappedSong.songTags ?? null,
+    });
+
+    // Step 2: Persist to database
+    await this.databaseWriteService.createSongForCache(data, id);
+
+    return mappedSong;
   }
 
   async updateSong(id: string, songData: any): Promise<any> {
@@ -704,68 +697,36 @@ class CacheService {
         ? JSON.stringify(data.editorFor)
         : null;
 
-      await this.databaseWriteService.createSingerForCache(data.name, data.gender || null, data.email || null, centerIdsJson, editorForJson, data.createdBy || null);
+      // Flow: backend cache first, then database
+      const id = randomUUID();
+      const normalizedSinger = {
+        id,
+        name: data.name,
+        gender: data.gender ?? null,
+        email: data.email ?? null,
+        centerIds: data.centerIds ?? [],
+        editorFor: data.editorFor ?? [],
+        pitchCount: 0,
+      };
 
-      // Write-through cache: Fetch only the newly created singer
-      const newSingers = await this.databaseReadService.getNewSingerByNameForCache(data.name);
-
-      if (newSingers.length > 0) {
-        const rawSinger = newSingers[0];
-
-        let parsedCenterIds: number[] = [];
-        try {
-          if (rawSinger.CENTER_IDS || rawSinger.center_ids) {
-            parsedCenterIds = JSON.parse(rawSinger.CENTER_IDS || rawSinger.center_ids);
-          }
-        } catch (e) {
-          console.error('Error parsing center_ids:', e);
-        }
-
-        let parsedEditorFor: number[] = [];
-        try {
-          if (rawSinger.EDITOR_FOR || rawSinger.editor_for) {
-            parsedEditorFor = JSON.parse(rawSinger.EDITOR_FOR || rawSinger.editor_for);
-          }
-        } catch (e) {
-          console.error('Error parsing editor_for:', e);
-        }
-
-        // Normalize field names to lowercase (Oracle might return uppercase)
-        // New singer always has pitchCount = 0
-        const normalizedSinger = {
-          id: rawSinger.id || rawSinger.ID,
-          name: rawSinger.name || rawSinger.NAME,
-          gender: rawSinger.gender || rawSinger.GENDER,
-          email: rawSinger.email || rawSinger.EMAIL,
-          centerIds: parsedCenterIds,
-          editorFor: parsedEditorFor,
-          pitchCount: 0,
-        };
-
-        // Write-through cache: Add to cache or create minimal cache with new singer
-        const cached = this.get('singers:all');
-        if (cached && Array.isArray(cached)) {
-          const updated = [...cached, normalizedSinger].sort((a, b) =>
-            (a.name || '').localeCompare(b.name || '')
-          );
-          this.set('singers:all', updated, this.DEFAULT_TTL_MS);
-        } else {
-          // Cache doesn't exist - invalidate to force fresh fetch on next request
-          // This ensures the new singer will be included
-          this.invalidate('singers:all');
-        }
-
-        // Invalidate centers cache since singer count changed
-        this.invalidate('centers:all');
-
-        zipCacheService.setSinger(normalizedSinger.id, normalizedSinger);
-
-        // Return the normalized singer object
-        return normalizedSinger;
+      // Step 1: Update backend cache first
+      const cached = this.get('singers:all');
+      if (cached && Array.isArray(cached)) {
+        const updated = [...cached, normalizedSinger].sort((a, b) =>
+          (a.name || '').localeCompare(b.name || '')
+        );
+        this.set('singers:all', updated, this.DEFAULT_TTL_MS);
+      } else {
+        this.invalidate('singers:all');
       }
 
-      console.error(`  ❌ No singer found after INSERT`);
-      throw new Error('Failed to create singer: No singer returned after insert');
+      this.invalidate('centers:all');
+      zipCacheService.setSinger(id, normalizedSinger);
+
+      // Step 2: Persist to database
+      await this.databaseWriteService.createSingerForCache(data.name, data.gender || null, data.email || null, centerIdsJson, editorForJson, data.createdBy || null, id);
+
+      return normalizedSinger;
     } catch (error) {
       console.error(`❌ CacheService.createSinger failed for "${typeof singerData === 'string' ? singerData : singerData?.name}":`, error);
       throw error;
@@ -1107,57 +1068,46 @@ class CacheService {
     if (!data.song_id || !data.singer_id) {
       throw new Error('song_id and singer_id are required');
     }
-    await this.databaseWriteService.createPitchForCache(data.song_id, data.singer_id, data.pitch || '', data.created_by || null);
 
-    // Write-through cache: Fetch only the newly created pitch with joins
-    const newPitches = await this.databaseReadService.getNewPitchForCache(data.song_id, data.singer_id);
+    // Flow: backend cache first, then database
+    const id = randomUUID();
+    const song = await this.getSong(data.song_id);
+    const singer = await this.getSinger(data.singer_id);
+    const normalizedPitch: SongSingerPitch = {
+      id,
+      songId: data.song_id,
+      singerId: data.singer_id,
+      pitch: data.pitch || '',
+      songName: song?.name ?? pitchData.songName,
+      singerName: singer?.name ?? pitchData.singerName,
+    } as SongSingerPitch;
 
-    if (newPitches.length > 0) {
-      // Normalize the new pitch data
-      const rawPitch = newPitches[0];
-      const normalizedPitch: SongSingerPitch = {
-        id: rawPitch.id || rawPitch.ID,
-        songId: rawPitch.song_id || rawPitch.SONG_ID,
-        singerId: rawPitch.singer_id || rawPitch.SINGER_ID,
-        pitch: rawPitch.pitch || rawPitch.PITCH,
-        songName: rawPitch.song_name || rawPitch.SONG_NAME,
-        singerName: rawPitch.singer_name || rawPitch.SINGER_NAME,
-      } as SongSingerPitch;
-
-      // Write-through cache: Add to existing cache or invalidate
-      const cached = this.get('pitches:all');
-      if (cached && Array.isArray(cached)) {
-        // Add to cache and sort
-        const updated = [...cached, normalizedPitch].sort((a, b) => {
-          const songCompare = (a.songName || '').localeCompare(b.songName || '');
-          if (songCompare !== 0) return songCompare;
-          return (a.singer_name || '').localeCompare(b.singer_name || '');
-        });
-        this.set('pitches:all', updated, this.DEFAULT_TTL_MS);
-      } else {
-        this.set('pitches:all', [normalizedPitch], this.DEFAULT_TTL_MS);
-      }
-
-      // Update specific song and singer in cache instead of invalidating everything
-      // This is more efficient than refetching all songs/singers
-      // Fire-and-forget: these are cache updates, not critical for the response
-      if (normalizedPitch.songId) {
-        this.updateSongPitchCountInCache(normalizedPitch.songId).catch(() => {
-          // Silently fail - cache will be refreshed on next fetch
-        });
-      }
-      if (normalizedPitch.singerId) {
-        this.updateSingerPitchCountInCache(normalizedPitch.singerId).catch(() => {
-          // Silently fail - cache will be refreshed on next fetch
-        });
-      }
-
-      zipCacheService.setPitch(normalizedPitch.id, normalizedPitch);
-
-      return normalizedPitch;
+    // Step 1: Update backend cache first
+    const cached = this.get('pitches:all');
+    if (cached && Array.isArray(cached)) {
+      const updated = [...cached, normalizedPitch].sort((a, b) => {
+        const songCompare = (a.songName || '').localeCompare(b.songName || '');
+        if (songCompare !== 0) return songCompare;
+        return (a.singerName || '').localeCompare(b.singerName || '');
+      });
+      this.set('pitches:all', updated, this.DEFAULT_TTL_MS);
+    } else {
+      this.set('pitches:all', [normalizedPitch], this.DEFAULT_TTL_MS);
     }
 
-    return null;
+    if (normalizedPitch.songId) {
+      this.updateSongPitchCountInCache(normalizedPitch.songId).catch(() => {});
+    }
+    if (normalizedPitch.singerId) {
+      this.updateSingerPitchCountInCache(normalizedPitch.singerId).catch(() => {});
+    }
+
+    zipCacheService.setPitch(id, normalizedPitch);
+
+    // Step 2: Persist to database
+    await this.databaseWriteService.createPitchForCache(data.song_id, data.singer_id, data.pitch || '', data.created_by || null, id);
+
+    return normalizedPitch;
   }
 
   async updatePitch(id: string, pitchData: Partial<SongSingerPitch> & { updatedBy?: string | null }): Promise<void> {
@@ -1332,12 +1282,13 @@ class CacheService {
   }
 
   /**
-   * Create a template with write-through cache update
+   * Create a template (cache-then-database: backend cache first, then database)
    */
   async createTemplate(template: PresentationTemplate): Promise<any> {
-    const created = await this.templateBackendService.createTemplate(template);
+    const id = randomUUID();
+    const created = { ...template, id };
 
-    // Write-through: add to cache directly
+    // Step 1: Update backend cache first
     const cacheKey = 'templates:all';
     const cached = this.get(cacheKey);
     if (cached && Array.isArray(cached)) {
@@ -1345,7 +1296,10 @@ class CacheService {
       this.set(cacheKey, cached, this.DEFAULT_TTL_MS);
     }
 
-    zipCacheService.setTemplate(String(created.id), created);
+    zipCacheService.setTemplate(id, created);
+
+    // Step 2: Persist to database
+    await this.templateBackendService.createTemplateWithId(id, created);
 
     return created;
   }

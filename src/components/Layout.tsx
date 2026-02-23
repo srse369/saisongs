@@ -326,8 +326,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     const adminTabs: { tab: AdminTab; label: string }[] = [
       { tab: 'songs' as AdminTab, label: 'Songs' },
       ...(isAuthenticated ? [
-        { tab: 'singers' as AdminTab, label: 'Singers' },
         { tab: 'pitches' as AdminTab, label: 'Pitches' },
+        ...((userRole === 'admin' || userRole === 'editor') ? [{ tab: 'templates' as AdminTab, label: 'Templates' }] : []),
+        { tab: 'singers' as AdminTab, label: 'Singers' },
       ] : []),
     ];
     const tabs: Array<{ path: string; label: string; tab: AdminTab | null }> = [
@@ -431,7 +432,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           if (currentIndex > 0) {
             const prevTab = tabs[currentIndex - 1];
             if (prevTab.tab) {
-              handleAdminTabClick(prevTab.tab);
+              changeTab(prevTab.tab);
             } else {
               navigate(prevTab.path);
             }
@@ -441,7 +442,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           if (currentIndex < tabs.length - 1) {
             const nextTab = tabs[currentIndex + 1];
             if (nextTab.tab) {
-              handleAdminTabClick(nextTab.tab);
+              changeTab(nextTab.tab);
             } else {
               navigate(nextTab.path);
             }
@@ -461,7 +462,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       document.removeEventListener('touchstart', handleTouchStart);
       document.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [location.pathname, navigate, isAuthenticated]);
+  }, [location.pathname, navigate, searchParams, isAuthenticated, userRole, changeTab]);
 
   // Get link classes based on active state
   const getLinkClasses = (path: string) => {
@@ -496,18 +497,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Songs
               </button>
 
-              {/* Singers and Pitches tabs visible to all authenticated users */}
+              {/* Pitches tab visible to all authenticated users */}
               {isAuthenticated && (
-                <>
-                  <button onClick={() => handleAdminTabClick('singers')} className={getLinkClasses('/admin/singers')}>
-                    <i className="fas fa-users w-4 h-4 mr-1.5"></i>
-                    Singers
-                  </button>
-                  <button onClick={() => handleAdminTabClick('pitches')} className={getLinkClasses('/admin/pitches')}>
-                    <MusicIcon className="w-4 h-4 mr-1.5" />
-                    Pitches
-                  </button>
-                </>
+                <button onClick={() => handleAdminTabClick('pitches')} className={getLinkClasses('/admin/pitches')}>
+                  <MusicIcon className="w-4 h-4 mr-1.5" />
+                  Pitches
+                </button>
               )}
 
               <Link to="/session" className={getLinkClasses('/session')}>
@@ -519,6 +514,14 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <button onClick={() => handleAdminTabClick('templates')} className={getLinkClasses('/admin/templates')}>
                   <i className="fas fa-layer-group w-4 h-4 mr-1.5"></i>
                   Templates
+                </button>
+              )}
+
+              {/* Singers tab visible to all authenticated users */}
+              {isAuthenticated && (
+                <button onClick={() => handleAdminTabClick('singers')} className={getLinkClasses('/admin/singers')}>
+                  <i className="fas fa-users w-4 h-4 mr-1.5"></i>
+                  Singers
                 </button>
               )}
 
@@ -956,22 +959,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <span className="text-[9px] font-medium leading-none">Songs</span>
           </button>
 
-          {/* Singers and Pitches tabs visible to all authenticated users */}
+          {/* Pitches and Singers tabs visible to all authenticated users */}
           {isAuthenticated && (
             <>
-              <button
-                onClick={() => {
-                  handleAdminTabClick('singers');
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`flex flex-col items-center justify-center gap-0 px-2 transition-colors flex-1 ${isActive('/admin/singers')
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-gray-600 dark:text-gray-400'
-                  }`}
-              >
-                <i className="fas fa-users text-lg"></i>
-                <span className="text-[9px] font-medium leading-none">Singers</span>
-              </button>
               <button
                 onClick={() => {
                   handleAdminTabClick('pitches');
@@ -984,6 +974,34 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               >
                 <MusicIcon className="w-5 h-5" />
                 <span className="text-[9px] font-medium leading-none">Pitches</span>
+              </button>
+              {(userRole === 'admin' || userRole === 'editor') && (
+                <button
+                  onClick={() => {
+                    handleAdminTabClick('templates');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0 px-2 transition-colors flex-1 ${isActive('/admin/templates')
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-400'
+                    }`}
+                >
+                  <i className="fas fa-layer-group text-lg"></i>
+                  <span className="text-[9px] font-medium leading-none">Templates</span>
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  handleAdminTabClick('singers');
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`flex flex-col items-center justify-center gap-0 px-2 transition-colors flex-1 ${isActive('/admin/singers')
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-gray-600 dark:text-gray-400'
+                  }`}
+              >
+                <i className="fas fa-users text-lg"></i>
+                <span className="text-[9px] font-medium leading-none">Singers</span>
               </button>
             </>
           )}

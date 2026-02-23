@@ -266,15 +266,11 @@ class TemplateBackendService {
   }
 
   /**
-   * Create a new template
+   * Create a new template (cache-then-database: caller updates cache first, then we persist).
+   * @param id - Pre-generated UUID for cache-then-database flow
    */
-  async createTemplate(template: PresentationTemplate): Promise<PresentationTemplate> {
+  async createTemplateWithId(id: string, template: PresentationTemplate): Promise<PresentationTemplate> {
     try {
-      // Always generate a new id on the server to avoid unique constraint violations
-      // (e.g. client sending same id on retry or duplicate submit)
-      const id = randomUUID();
-
-      // If this is set as default, unset other defaults
       if (template.isDefault) {
         await databaseWriteService.unsetAllDefaultTemplates(template.createdBy || '');
       }
@@ -289,13 +285,10 @@ class TemplateBackendService {
         template.createdBy || ''
       );
 
-      const created = await this.getTemplate(id);
-      if (!created) throw new Error('Template not found after create');
-      return created;
+      return { ...template, id };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes('ORA-00001') || message.includes('unique constraint')) {
-        // Template was likely created by a prior request (e.g. double submit). Return existing.
         const all = await this.getAllTemplates();
         const existing = all.find(t => t.name === template.name);
         if (existing) return existing;
@@ -304,6 +297,15 @@ class TemplateBackendService {
       console.error('Error creating template:', error);
       throw error;
     }
+  }
+
+  /**
+   * Create a new template (generates ID, delegates to createTemplateWithId)
+   */
+  async createTemplate(template: PresentationTemplate): Promise<PresentationTemplate> {
+    const id = randomUUID();
+    const createdWithId = { ...template, id };
+    return this.createTemplateWithId(id, createdWithId);
   }
 
   /**

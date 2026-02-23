@@ -101,7 +101,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
 
   return (
     <>
-      <div className="space-y-0 md:space-y-3">
+      <div className="space-y-0 md:space-y-1.5">
         {songs.map((song, index) => {
           const isSelected = selectedSongId === song.id;
           return (
@@ -114,7 +114,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                 setSelectedSongId(isSelected ? null : song.id);
               }
             }}
-            className={`bg-white dark:bg-gray-800 p-2 md:p-4 transition-all duration-200 ${
+            className={`bg-white dark:bg-gray-800 p-2 md:p-2 transition-all duration-200 ${
               isMobile 
                 ? `cursor-pointer ${index > 0 ? 'border-t border-gray-300 dark:border-gray-600' : ''} ${
                     isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
@@ -127,13 +127,9 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
             }`}
           >
             {/* Unified layout for all screen sizes */}
-            <div className="flex flex-col gap-1.5 md:gap-3">
+            <div className="flex flex-col gap-[3px]">
               {/* Content Section - First */}
-              <div className="flex flex-1 min-w-0 items-start gap-2">
-                <span className="flex-shrink-0 text-sm font-medium text-gray-400 dark:text-gray-500 tabular-nums" title={`Song #${index + 1} in list`}>
-                  #{index + 1}
-                </span>
-                <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0">
                 {/* Song Metadata Section - Reusable component */}
                 <SongMetadataCard
                   song={song}
@@ -145,11 +141,12 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                   isAuthenticated={isAuthenticated}
                   lyricsHover={{ songId: song.id, songName: song.name, song }}
                   compactInDesktop={!showSongDetailsInDesktop}
+                  iconsNextToNameOnDesktop={true}
                 />
 
-                {/* Audio Player - Hidden on mobile until row is selected */}
-                {song.audioLink && (
-                  <div className={`mt-2 ${isMobile && !isSelected ? 'hidden' : ''}`}>
+                {/* Audio Player - Only when show song details is enabled; hidden on mobile until row is selected */}
+                {song.audioLink && showSongDetailsInDesktop && (
+                  <div className={`mt-0 ${isMobile && !isSelected ? 'hidden' : ''}`}>
                     <audio
                       controls
                       preload="none"
@@ -161,11 +158,10 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                     </audio>
                   </div>
                 )}
-                </div>
               </div>
 
               {/* Action Icons - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}
-              <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 pt-1 md:pt-3 md:border-t md:border-gray-200 md:dark:border-gray-700 ${isMobile && !isSelected ? 'hidden' : ''}`}
+              <div className={`flex flex-wrap items-center justify-start gap-1.5 sm:gap-2 ${isMobile && !isSelected ? 'hidden' : ''}`}
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
@@ -174,8 +170,8 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                   title={songIds.includes(song.id) ? 'In Live' : 'Add to Live'}
                   className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <i className={`fas ${songIds.includes(song.id) ? 'fa-check' : 'fa-plus'} text-lg text-emerald-600 dark:text-emerald-400`}></i>
-                  <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Add to Session</span>
+                  <i className={`fas ${songIds.includes(song.id) ? 'fa-check' : 'fa-plus'} text-base text-emerald-600 dark:text-emerald-400`}></i>
+                  <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Add to Session</span>
                 </button>
                 {/* Only show View Pitches button when authenticated (pitches contain private singer info) */}
                 {isAuthenticated && (
@@ -184,8 +180,8 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                     title={`View ${song.pitchCount ?? 0} pitch assignment${(song.pitchCount ?? 0) !== 1 ? 's' : ''}`}
                     className="relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
                   >
-                    <div className="relative">
-                    <MusicIcon className="w-5 h-5" />
+                    <div className="relative inline-flex items-center justify-center w-4 h-4 shrink-0 overflow-hidden">
+                      <MusicIcon className="w-4 h-4 flex-shrink-0" />
                       {/* Mobile: Badge overlay on icon */}
                       {(song.pitchCount ?? 0) > 0 && (
                         <span className="absolute -top-1 -right-1 sm:hidden flex items-center justify-center min-w-[16px] h-[16px] px-0.5 text-[9px] font-bold text-white bg-black rounded-full z-10">
@@ -194,8 +190,8 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                       )}
                     </div>
                     {/* Desktop: Text and inline badge */}
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Pitches</span>
-                    <span className={`hidden sm:inline-flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold rounded-full ${
+                    <span className="hidden sm:inline text-xs font-medium whitespace-nowrap leading-none">Pitches</span>
+                    <span className={`hidden sm:inline-flex items-center justify-center min-w-[1rem] h-3 leading-none px-1 text-[9px] font-bold rounded-full shrink-0 ${
                       (song.pitchCount ?? 0) > 0 
                         ? 'text-white bg-gray-900 dark:bg-black' 
                         : 'text-gray-500 bg-gray-300 dark:bg-gray-600 dark:text-gray-400'
@@ -212,8 +208,8 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                     title="View song on external source (YouTube, etc.)"
                     className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                   >
-                    <i className="fas fa-external-link-alt text-lg text-blue-600 dark:text-blue-400"></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">External URL</span>
+                    <i className="fas fa-external-link-alt text-base text-blue-600 dark:text-blue-400"></i>
+                    <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">External URL</span>
                   </a>
                 )}
                 {isEditor && (
@@ -222,8 +218,8 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                     title="Edit"
                     className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                   >
-                    <i className="fas fa-edit text-lg text-blue-600 dark:text-blue-400"></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Edit</span>
+                    <i className="fas fa-edit text-base text-blue-600 dark:text-blue-400"></i>
+                    <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Edit</span>
                   </button>
                 )}
                 {isAdmin && song.externalSourceUrl && (
@@ -235,13 +231,13 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                   >
                     {syncingSongId === song.id ? (
                       <>
-                        <i className="fas fa-sync text-lg text-yellow-600 dark:text-yellow-400 animate-spin"></i>
-                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Syncing...</span>
+                        <i className="fas fa-sync text-base text-yellow-600 dark:text-yellow-400 animate-spin"></i>
+                        <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Syncing...</span>
                       </>
                     ) : (
                       <>
-                        <i className="fas fa-sync text-lg text-yellow-600 dark:text-yellow-400"></i>
-                        <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Sync</span>
+                        <i className="fas fa-sync text-base text-yellow-600 dark:text-yellow-400"></i>
+                        <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Sync</span>
                       </>
                     )}
                   </button>
@@ -253,8 +249,8 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                     title="Delete"
                     className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
                   >
-                    <i className="fas fa-trash text-lg text-red-600 dark:text-red-400"></i>
-                    <span className="hidden sm:inline text-sm font-medium whitespace-nowrap">Delete</span>
+                    <i className="fas fa-trash text-base text-red-600 dark:text-red-400"></i>
+                    <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Delete</span>
                   </button>
                 )}
               </div>
