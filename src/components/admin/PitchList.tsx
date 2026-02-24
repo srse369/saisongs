@@ -7,6 +7,7 @@ import { useSession } from '../../contexts/SessionContext';
 import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 import { formatNormalizedPitch } from '../../utils/pitchNormalization';
 import { CenterBadges } from '../common/CenterBadges';
+import { LyricsHoverPopup } from '../common/LyricsHoverPopup';
 import { SongMetadataCard } from '../common/SongMetadataCard';
 
 interface PitchWithDetails extends SongSingerPitch {
@@ -205,13 +206,20 @@ export const PitchList: React.FC<PitchListProps> = ({
         {/* Singer/song + locations + pitch */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-600 dark:text-gray-400 min-w-0">
           {groupBySinger ? (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); handlePresent(pitch); }}
-              className="font-semibold text-left text-gray-900 dark:text-white hover:underline truncate max-w-full"
+            <LyricsHoverPopup
+              songId={pitch.songId}
+              songName={pitch.songName || 'Unknown'}
+              song={songs.find(s => s.id === pitch.songId) ?? undefined}
+              className="min-w-0 truncate max-w-full"
             >
-              {pitch.songName}
-            </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handlePresent(pitch); }}
+                className="font-semibold text-left text-gray-900 dark:text-white hover:underline truncate max-w-full"
+              >
+                {pitch.songName}
+              </button>
+            </LyricsHoverPopup>
           ) : (
             <span className={`font-semibold ${
               pitch.singerGender?.toLowerCase() === 'male'
@@ -230,7 +238,7 @@ export const PitchList: React.FC<PitchListProps> = ({
           {!groupBySinger && pitch.singerCenterIds && pitch.singerCenterIds.length > 0 && (
             <CenterBadges centerIds={pitch.singerCenterIds} />
           )}
-          <span className="font-bold text-gray-700 dark:text-gray-200">{formatNormalizedPitch(pitch.pitch)}</span>
+          <span className="font-bold text-green-600 dark:text-green-400">{formatNormalizedPitch(pitch.pitch)}</span>
         </div>
 
         {/* Actions */}

@@ -1455,7 +1455,7 @@ export const SessionManager: React.FC = () => {
                       {entry.pitch && (
                         <>
                           <span className="hidden md:inline">Pitch: </span>
-                          <span className="font-bold text-gray-700 dark:text-gray-200">{formatNormalizedPitch(entry.pitch)}</span>
+                          <span className="font-bold text-green-600 dark:text-green-400">{formatNormalizedPitch(entry.pitch)}</span>
                         </>
                       )}
                     </div>

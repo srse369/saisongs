@@ -676,7 +676,7 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
         }}
         loading={loading}
         userSingerId={userSinger?.id}
-        groupBySinger={showMyPitches}
+        groupBySinger={showMyPitches || sortBy === 'singerName'}
       />
 
       {/* Lazy-load sentinel */}
