@@ -92,7 +92,7 @@ export const LLMDrawer: React.FC<LLMDrawerProps> = ({ isOpen, onClose }) => {
       {/* Backdrop - only when open */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-xs z-40 transition-opacity"
+          className="fixed inset-0 bg-black/50 backdrop-blur-[1px] z-40 transition-opacity"
           onClick={onClose}
           aria-hidden="true"
         />

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { PresentationTemplate, ServiceError } from '../types';
 import templateService from '../services/TemplateService';
 import { useToast } from './ToastContext';
-import { getCacheItem, setCacheItem, removeCacheItem } from '../utils/cacheUtils';
+import { getCacheItem, setCacheItem, removeCacheItem, CACHE_KEYS } from '../utils/cacheUtils';
 
 const TEMPLATES_CACHE_KEY = 'saiSongs:templatesCache';
 const TEMPLATES_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -260,35 +260,46 @@ export const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) 
     setError(null);
     const templateToDelete = templates.find(t => t.id === id);
     try {
-      if (templateToDelete && typeof window !== 'undefined') {
-        setTemplates(prev => {
-          const updated = prev.filter(t => t.id !== id);
-          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: updated })).catch(() => {});
-          return updated;
-        });
-      }
+      // 1. Delete from database + 2. Delete from backend cache (API handles both)
       await templateService.deleteTemplate(id);
+
+      // 3. Delete from frontend browser cache
+      if (typeof window !== 'undefined') {
+        const updated = templates.filter(t => t.id !== id);
+        await setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: updated }));
+        await removeCacheItem(`${CACHE_KEYS.TEMPLATE_MEDIA_PREFIX}${id}`);
+        if (templateToDelete?.isDefault) {
+          await removeCacheItem(CACHE_KEYS.SAI_SONGS_DEFAULT_TEMPLATE);
+        }
+      }
+
+      // 4. Delete from template list on screen
+      setTemplates(prev => prev.filter(t => t.id !== id));
+
       toast.success('Template deleted successfully');
       return true;
     } catch (err) {
-      if (templateToDelete && typeof window !== 'undefined') {
-        setTemplates(prev => {
-          const reverted = [...prev, templateToDelete];
-          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: reverted })).catch(() => {});
-          return reverted;
-        });
-      }
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete template';
+      const isNotFound = errorMessage.toLowerCase().includes('not found') || errorMessage.toLowerCase().includes('404');
       setError({
         code: 'UNKNOWN_ERROR',
         message: errorMessage,
       });
       toast.error(errorMessage);
+      // If template not found on server, remove from screen (stale state)
+      if (isNotFound) {
+        setTemplates(prev => prev.filter(t => t.id !== id));
+        if (typeof window !== 'undefined') {
+          const updated = templates.filter(t => t.id !== id);
+          setCacheItem(TEMPLATES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), templates: updated })).catch(() => {});
+          removeCacheItem(`${CACHE_KEYS.TEMPLATE_MEDIA_PREFIX}${id}`).catch(() => {});
+        }
+      }
       return false;
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, templates]);
 
   const setAsDefault = useCallback(async (id: string): Promise<PresentationTemplate | null> => {
     setLoading(true);

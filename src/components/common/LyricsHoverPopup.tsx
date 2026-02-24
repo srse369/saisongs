@@ -177,7 +177,7 @@ export const LyricsHoverPopup: React.FC<LyricsHoverPopupProps> = ({
           <audio
             controls
             preload="none"
-            className="flex-shrink-0 max-w-[200px] dark:invert dark:brightness-90 dark:contrast-90 dark:hue-rotate-180"
+            className="flex-shrink-0 min-w-[280px] flex-1 dark:invert dark:brightness-90 dark:contrast-90 dark:hue-rotate-180"
             style={{ height: '28px' }}
             onClick={(e) => e.stopPropagation()}
           >

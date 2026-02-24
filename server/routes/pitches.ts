@@ -1,5 +1,6 @@
 import express from 'express';
 import { cacheService } from '../services/CacheService.js';
+import { toOracleHexId } from '../utils/uidUtils.js';
 
 const router = express.Router();
 
@@ -120,8 +121,14 @@ router.post('/', async (req, res) => {
     }
     
     // Check for duplicate pitch (same song + singer combination)
+    // Normalize IDs for comparison - cache may have hex format, request has UUID with hyphens
     const allPitches = await cacheService.getAllPitches();
-    const existing = allPitches.find(p => p.songId === songId && p.singerId === singerId);
+    const songIdNorm = toOracleHexId(songId);
+    const singerIdNorm = toOracleHexId(singerId);
+    const existing = allPitches.find(p =>
+      p.songId && p.singerId &&
+      toOracleHexId(p.songId) === songIdNorm && toOracleHexId(p.singerId) === singerIdNorm
+    );
     
     if (existing) {
       // Normalize both for comparison (trim whitespace, case-insensitive)

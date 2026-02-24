@@ -33,6 +33,8 @@ interface PitchListProps {
   onViewSong: (songId: string) => void;
   loading?: boolean;
   userSingerId?: string; // Current user's singer ID if they have a profile
+  /** When true (e.g. "My pitches" selected), group by singer instead of by song */
+  groupBySinger?: boolean;
 }
 
 export const PitchList: React.FC<PitchListProps> = ({ 
@@ -43,7 +45,8 @@ export const PitchList: React.FC<PitchListProps> = ({
   onDelete, 
   onViewSong,
   loading = false,
-  userSingerId
+  userSingerId,
+  groupBySinger = false
 }) => {
   const navigate = useNavigate();
   const { addSong, songIds, entries } = useSession();
@@ -114,6 +117,20 @@ export const PitchList: React.FC<PitchListProps> = ({
     return Array.from(groups.entries());
   }, [enrichedPitches]);
 
+  // Group pitches by singer (for "My pitches" view)
+  const groupedBySinger: [string, PitchWithDetails[]][] = useMemo(() => {
+    const groups = new Map<string, PitchWithDetails[]>();
+    for (const pitch of enrichedPitches) {
+      const existing = groups.get(pitch.singerId);
+      if (existing) {
+        existing.push(pitch);
+      } else {
+        groups.set(pitch.singerId, [pitch]);
+      }
+    }
+    return Array.from(groups.entries());
+  }, [enrichedPitches]);
+
   const handleDeleteClick = (pitch: PitchWithDetails) => {
     setPitchToDelete(pitch);
     setDeleteModalOpen(true);
@@ -169,148 +186,200 @@ export const PitchList: React.FC<PitchListProps> = ({
     );
   }
 
+  const renderPitchRow = (pitch: PitchWithDetails) => {
+    const isSelected = selectedPitchId === pitch.id;
+    return (
+      <div
+        key={pitch.id}
+        onClick={() => {
+          if (isMobile) {
+            setSelectedPitchId(isSelected ? null : pitch.id);
+          }
+        }}
+        className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 pt-0.5 pb-1 sm:pt-0 sm:pb-0.5 sm:min-h-0 first:pt-0 first:sm:pt-0 ${
+          isMobile
+            ? `cursor-pointer rounded px-1 -mx-1 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`
+            : 'border-t border-gray-100 dark:border-gray-700/50 first:border-t-0'
+        }`}
+      >
+        {/* Singer/song + locations + pitch */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-600 dark:text-gray-400 min-w-0">
+          {groupBySinger ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handlePresent(pitch); }}
+              className="font-semibold text-left text-gray-900 dark:text-white hover:underline truncate max-w-full"
+            >
+              {pitch.songName}
+            </button>
+          ) : (
+            <span className={`font-semibold ${
+              pitch.singerGender?.toLowerCase() === 'male'
+                ? 'text-blue-600 dark:text-blue-400'
+                : pitch.singerGender?.toLowerCase() === 'boy'
+                  ? 'text-blue-400 dark:text-blue-300'
+                  : pitch.singerGender?.toLowerCase() === 'female'
+                    ? 'text-pink-600 dark:text-pink-400'
+                    : pitch.singerGender?.toLowerCase() === 'girl'
+                      ? 'text-pink-400 dark:text-pink-300'
+                      : 'text-gray-600 dark:text-gray-400'
+            }`}>
+              {pitch.singerName}
+            </span>
+          )}
+          {!groupBySinger && pitch.singerCenterIds && pitch.singerCenterIds.length > 0 && (
+            <CenterBadges centerIds={pitch.singerCenterIds} />
+          )}
+          <span className="font-bold text-gray-700 dark:text-gray-200">{formatNormalizedPitch(pitch.pitch)}</span>
+        </div>
+
+        {/* Actions */}
+        <div
+          className={`flex flex-wrap items-center justify-start sm:justify-end gap-1.5 sm:gap-2 ${isMobile && !isSelected ? 'hidden' : ''}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => addSong(pitch.songId, pitch.singerId, pitch.pitch)}
+            disabled={isInLiveSession(pitch.songId, pitch.singerId)}
+            title={isInLiveSession(pitch.songId, pitch.singerId) ? 'Already in live session' : 'Add this song with singer and pitch to the live session'}
+            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isInLiveSession(pitch.songId, pitch.singerId) ? (
+              <i className="fas fa-check text-base text-emerald-600 dark:text-emerald-400"></i>
+            ) : (
+              <i className="fas fa-plus text-base text-emerald-600 dark:text-emerald-400"></i>
+            )}
+            <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Add to Session</span>
+          </button>
+          <button
+            onClick={() => navigate(`/admin/songs?songId=${pitch.songId}`)}
+            title="View song in Songs tab"
+            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+          >
+            <i className="fas fa-external-link-alt text-base text-blue-600 dark:text-blue-400" style={{ transform: 'scaleX(-1)' }}></i>
+            <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Song</span>
+          </button>
+          {pitch.externalSourceUrl && (
+            <a
+              href={pitch.externalSourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="View song on external source (YouTube, etc.)"
+              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+            >
+              <i className="fas fa-external-link-alt text-base text-blue-600 dark:text-blue-400"></i>
+              <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">External URL</span>
+            </a>
+          )}
+          {(isEditor || pitch.singerId === userSingerId) && (
+            <button
+              onClick={() => onEdit(pitch)}
+              title="Edit the pitch/key for this singer's performance"
+              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+            >
+              <i className="fas fa-edit text-base text-blue-600 dark:text-blue-400"></i>
+              <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Edit</span>
+            </button>
+          )}
+          {(isEditor || pitch.singerId === userSingerId) && (
+            <button
+              onClick={() => handleDeleteClick(pitch)}
+              title="Remove this pitch association permanently"
+              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
+            >
+              <i className="fas fa-trash text-base text-red-600 dark:text-red-400"></i>
+              <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Delete</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
-      {/* Grouped by song: song name + lyrics + preview on first line; singer + locations + pitch + buttons on same line per pitch */}
+      {/* Grouped by song or by singer (when "My pitches" selected) */}
       <div className="space-y-0 md:space-y-1.5">
-        {groupedBySong.map(([songId, pitchList]) => {
-          const firstPitch = pitchList[0];
-          const songWithLyrics = songs.find(s => s.id === songId);
-          return (
-            <div
-              key={songId}
-              className="bg-white dark:bg-gray-800 p-2 md:p-2 border rounded-lg shadow-md hover:shadow-lg border-gray-200 dark:border-gray-700"
-            >
-              {/* Song header: name, preview */}
-              <div className="mb-0.5">
-                <SongMetadataCard
-                  song={{
-                    name: firstPitch.songName || '',
-                    externalSourceUrl: firstPitch.externalSourceUrl,
-                    raga: firstPitch.raga,
-                    beat: firstPitch.beat,
-                    deity: firstPitch.deity,
-                    language: firstPitch.language,
-                    tempo: firstPitch.tempo,
-                    refGents: firstPitch.refGents,
-                    refLadies: firstPitch.refLadies,
-                  }}
-                  onNameClick={() => handlePresent(firstPitch)}
-                  showBackground={!isMobile}
-                  isSelected={false}
-                  onPreviewClick={() => handlePresent(firstPitch)}
-                  iconsNextToNameOnDesktop={true}
-                  lyricsHover={{ songId, songName: firstPitch.songName || 'Unknown', song: songWithLyrics }}
-                  compactInDesktop={true}
-                  pitchCount={pitchList.length}
-                />
-              </div>
+        {groupBySinger ? (
+          groupedBySinger.map(([singerId, pitchList]) => {
+            const firstPitch = pitchList[0];
+            return (
+              <div
+                key={singerId}
+                className="bg-white dark:bg-gray-800 p-2 md:p-2 border rounded-lg shadow-md hover:shadow-lg border-gray-200 dark:border-gray-700"
+              >
+                {/* Singer header */}
+                <div className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className={`text-base font-semibold ${
+                    firstPitch.singerGender?.toLowerCase() === 'male'
+                      ? 'text-blue-600 dark:text-blue-400'
+                      : firstPitch.singerGender?.toLowerCase() === 'boy'
+                        ? 'text-blue-400 dark:text-blue-300'
+                        : firstPitch.singerGender?.toLowerCase() === 'female'
+                          ? 'text-pink-600 dark:text-pink-400'
+                          : firstPitch.singerGender?.toLowerCase() === 'girl'
+                            ? 'text-pink-400 dark:text-pink-300'
+                            : 'text-gray-900 dark:text-white'
+                  }`}>
+                    {firstPitch.singerName}
+                  </span>
+                  {firstPitch.singerCenterIds && firstPitch.singerCenterIds.length > 0 && (
+                    <CenterBadges centerIds={firstPitch.singerCenterIds} />
+                  )}
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {pitchList.length} song{pitchList.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
 
-              {/* Pitch rows: singer | locations | pitch | buttons on same line */}
-              <div className="flex flex-col gap-0">
-                {pitchList.map((pitch) => {
-                  const isSelected = selectedPitchId === pitch.id;
-                  return (
-                    <div
-                      key={pitch.id}
-                      onClick={() => {
-                        if (isMobile) {
-                          setSelectedPitchId(isSelected ? null : pitch.id);
-                        }
-                      }}
-                      className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 pt-0.5 pb-1 sm:pt-0 sm:pb-0.5 sm:min-h-0 first:pt-0 first:sm:pt-0 ${
-                        isMobile
-                          ? `cursor-pointer rounded px-1 -mx-1 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`
-                          : 'border-t border-gray-100 dark:border-gray-700/50 first:border-t-0'
-                      }`}
-                    >
-                      {/* Singer, locations, pitch */}
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-600 dark:text-gray-400 min-w-0">
-                        <span className={`font-semibold ${
-                          pitch.singerGender?.toLowerCase() === 'male'
-                            ? 'text-blue-600 dark:text-blue-400'
-                            : pitch.singerGender?.toLowerCase() === 'boy'
-                              ? 'text-blue-400 dark:text-blue-300'
-                              : pitch.singerGender?.toLowerCase() === 'female'
-                                ? 'text-pink-600 dark:text-pink-400'
-                                : pitch.singerGender?.toLowerCase() === 'girl'
-                                  ? 'text-pink-400 dark:text-pink-300'
-                                  : 'text-gray-600 dark:text-gray-400'
-                        }`}>
-                          {pitch.singerName}
-                        </span>
-                        {pitch.singerCenterIds && pitch.singerCenterIds.length > 0 && (
-                          <CenterBadges centerIds={pitch.singerCenterIds} />
-                        )}
-                        <span className="font-bold text-gray-700 dark:text-gray-200">{formatNormalizedPitch(pitch.pitch)}</span>
-                      </div>
-
-                      {/* Actions */}
-                      <div
-                        className={`flex flex-wrap items-center justify-start sm:justify-end gap-1.5 sm:gap-2 ${isMobile && !isSelected ? 'hidden' : ''}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          onClick={() => addSong(pitch.songId, pitch.singerId, pitch.pitch)}
-                          disabled={isInLiveSession(pitch.songId, pitch.singerId)}
-                          title={isInLiveSession(pitch.songId, pitch.singerId) ? 'Already in live session' : 'Add this song with singer and pitch to the live session'}
-                          className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isInLiveSession(pitch.songId, pitch.singerId) ? (
-                            <i className="fas fa-check text-base text-emerald-600 dark:text-emerald-400"></i>
-                          ) : (
-                            <i className="fas fa-plus text-base text-emerald-600 dark:text-emerald-400"></i>
-                          )}
-                          <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Add to Session</span>
-                        </button>
-                        <button
-                          onClick={() => navigate(`/admin/songs?songId=${pitch.songId}`)}
-                          title="View song in Songs tab"
-                          className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                        >
-                          <i className="fas fa-external-link-alt text-base text-blue-600 dark:text-blue-400" style={{ transform: 'scaleX(-1)' }}></i>
-                          <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Song</span>
-                        </button>
-                        {pitch.externalSourceUrl && (
-                          <a
-                            href={pitch.externalSourceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="View song on external source (YouTube, etc.)"
-                            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg sm:rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                          >
-                            <i className="fas fa-external-link-alt text-base text-blue-600 dark:text-blue-400"></i>
-                            <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">External URL</span>
-                          </a>
-                        )}
-                        {(isEditor || pitch.singerId === userSingerId) && (
-                          <button
-                            onClick={() => onEdit(pitch)}
-                            title="Edit the pitch/key for this singer's performance"
-                            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                          >
-                            <i className="fas fa-edit text-base text-blue-600 dark:text-blue-400"></i>
-                            <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Edit</span>
-                          </button>
-                        )}
-                        {(isEditor || pitch.singerId === userSingerId) && (
-                          <button
-                            onClick={() => handleDeleteClick(pitch)}
-                            title="Remove this pitch association permanently"
-                            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center sm:justify-start gap-2 p-2.5 sm:p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg sm:rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors"
-                          >
-                            <i className="fas fa-trash text-base text-red-600 dark:text-red-400"></i>
-                            <span className="hidden sm:inline text-xs font-medium whitespace-nowrap">Delete</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                {/* Pitch rows: song | pitch | buttons */}
+                <div className="flex flex-col gap-0">
+                  {pitchList.map((pitch) => renderPitchRow(pitch))}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        ) : (
+          groupedBySong.map(([songId, pitchList]) => {
+            const firstPitch = pitchList[0];
+            const songWithLyrics = songs.find(s => s.id === songId);
+            return (
+              <div
+                key={songId}
+                className="bg-white dark:bg-gray-800 p-2 md:p-2 border rounded-lg shadow-md hover:shadow-lg border-gray-200 dark:border-gray-700"
+              >
+                {/* Song header: name, preview */}
+                <div className="mb-0.5">
+                  <SongMetadataCard
+                    song={{
+                      name: firstPitch.songName || '',
+                      externalSourceUrl: firstPitch.externalSourceUrl,
+                      raga: firstPitch.raga,
+                      beat: firstPitch.beat,
+                      deity: firstPitch.deity,
+                      language: firstPitch.language,
+                      tempo: firstPitch.tempo,
+                      refGents: firstPitch.refGents,
+                      refLadies: firstPitch.refLadies,
+                    }}
+                    onNameClick={() => handlePresent(firstPitch)}
+                    showBackground={!isMobile}
+                    isSelected={false}
+                    onPreviewClick={() => handlePresent(firstPitch)}
+                    iconsNextToNameOnDesktop={true}
+                    lyricsHover={{ songId, songName: firstPitch.songName || 'Unknown', song: songWithLyrics }}
+                    compactInDesktop={true}
+                    pitchCount={pitchList.length}
+                  />
+                </div>
+
+                {/* Pitch rows: singer | locations | pitch | buttons on same line */}
+                <div className="flex flex-col gap-0">
+                  {pitchList.map((pitch) => renderPitchRow(pitch))}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <Modal

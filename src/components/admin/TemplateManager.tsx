@@ -1564,7 +1564,7 @@ export const TemplateManager: React.FC<TemplateManagerProps> = ({ isActive = tru
 
       {/* PowerPoint Import Progress Modal */}
       {importingPptx && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[1px]">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
             <div className="flex flex-col items-center gap-4">
               <i className="fas fa-file-powerpoint text-6xl text-orange-500 animate-pulse"></i>

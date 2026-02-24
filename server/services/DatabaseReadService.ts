@@ -2,6 +2,7 @@ import oracledb from 'oracledb';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { toOracleHexId } from '../utils/uidUtils.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -444,9 +445,10 @@ class DatabaseReadService {
    * Count pitches for a song
    */
   async getSongPitchCount(songId: string): Promise<number> {
+    const idHex = toOracleHexId(songId);
     const result = await this.query<any>(
       'SELECT COUNT(*) as count FROM song_singer_pitches WHERE song_id = HEXTORAW(:1)',
-      [songId]
+      [idHex]
     );
     return result[0]?.COUNT || result[0]?.count || 0;
   }
@@ -455,9 +457,10 @@ class DatabaseReadService {
    * Count session items for a song
    */
   async getSongSessionItemCount(songId: string): Promise<number> {
+    const idHex = toOracleHexId(songId);
     const result = await this.query<any>(
       'SELECT COUNT(*) as count FROM song_session_items WHERE song_id = HEXTORAW(:1)',
-      [songId]
+      [idHex]
     );
     return result[0]?.COUNT || result[0]?.count || 0;
   }
@@ -537,9 +540,10 @@ class DatabaseReadService {
    * Count pitches for a singer
    */
   async getSingerPitchCount(singerId: string): Promise<number> {
+    const idHex = toOracleHexId(singerId);
     const result = await this.query<any>(
       'SELECT COUNT(*) as count FROM song_singer_pitches WHERE singer_id = HEXTORAW(:1)',
-      [singerId]
+      [idHex]
     );
     return result[0]?.COUNT || result[0]?.count || 0;
   }
@@ -548,11 +552,12 @@ class DatabaseReadService {
    * Get all pitches for a singer
    */
   async getSingerPitches(singerId: string): Promise<Array<{ id: string; songId: string }>> {
+    const idHex = toOracleHexId(singerId);
     const result = await this.query<any>(
       `SELECT RAWTOHEX(id) as id, RAWTOHEX(song_id) as song_id 
        FROM song_singer_pitches 
        WHERE singer_id = HEXTORAW(:1)`,
-      [singerId]
+      [idHex]
     );
     return result.map((row: any) => ({
       id: row.id || row.ID,
@@ -564,11 +569,13 @@ class DatabaseReadService {
    * Check if singer already has a pitch for a song
    */
   async checkSingerHasSongPitch(singerId: string, songId: string): Promise<boolean> {
+    const singerIdHex = toOracleHexId(singerId);
+    const songIdHex = toOracleHexId(songId);
     const result = await this.query<any>(
       `SELECT COUNT(*) as count 
        FROM song_singer_pitches 
        WHERE singer_id = HEXTORAW(:1) AND song_id = HEXTORAW(:2)`,
-      [singerId, songId]
+      [singerIdHex, songIdHex]
     );
     return (result[0]?.COUNT || result[0]?.count || 0) > 0;
   }
@@ -875,6 +882,7 @@ class DatabaseReadService {
    * Get a single song with CLOB fields (for caching)
    */
   async getSongWithClobsForCache(id: string): Promise<any[]> {
+    const idHex = toOracleHexId(id);
     return await this.query(`
       SELECT 
         RAWTOHEX(s.id) as id,
@@ -897,7 +905,7 @@ class DatabaseReadService {
         (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.song_id = s.id) as pitch_count
       FROM songs s
       WHERE RAWTOHEX(s.id) = :1
-    `, [id]);
+    `, [idHex]);
   }
 
   /**
@@ -1009,6 +1017,7 @@ class DatabaseReadService {
    * Get a single singer by ID (for caching)
    */
   async getSingerByIdForCache(id: string): Promise<any[]> {
+    const idHex = toOracleHexId(id);
     return await this.query(`
       SELECT 
         RAWTOHEX(u.id) as id,
@@ -1021,7 +1030,7 @@ class DatabaseReadService {
         (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
       FROM users u
       WHERE RAWTOHEX(u.id) = :1
-    `, [id]);
+    `, [idHex]);
   }
 
   /**
@@ -1047,6 +1056,7 @@ class DatabaseReadService {
    * Get singer admin/center data before update (for caching)
    */
   async getSingerForUpdateForCache(id: string): Promise<any[]> {
+    const idHex = toOracleHexId(id);
     return await this.query(`
       SELECT 
         RAWTOHEX(u.id) as id,
@@ -1055,13 +1065,14 @@ class DatabaseReadService {
         u.editor_for
       FROM users u
       WHERE RAWTOHEX(u.id) = :1
-    `, [id]);
+    `, [idHex]);
   }
 
   /**
    * Get updated singer by ID (for caching)
    */
   async getUpdatedSingerByIdForCache(id: string): Promise<any[]> {
+    const idHex = toOracleHexId(id);
     return await this.query(`
       SELECT 
         RAWTOHEX(u.id) as id,
@@ -1074,16 +1085,17 @@ class DatabaseReadService {
         (SELECT COUNT(*) FROM song_singer_pitches ssp WHERE ssp.singer_id = u.id) as pitch_count
       FROM users u
       WHERE RAWTOHEX(u.id) = :1
-    `, [id]);
+    `, [idHex]);
   }
 
   /**
    * Get user by ID for admin status check (for caching)
    */
   async getUserEmailByIdForCache(id: string): Promise<any[]> {
+    const idHex = toOracleHexId(id);
     return await this.query(
       `SELECT email FROM users WHERE RAWTOHEX(id) = :1`,
-      [id]
+      [idHex]
     );
   }
 
@@ -1091,9 +1103,10 @@ class DatabaseReadService {
    * Get user editor_for by ID (for caching)
    */
   async getUserEditorForByIdForCache(id: string): Promise<any[]> {
+    const idHex = toOracleHexId(id);
     return await this.query(
       `SELECT RAWTOHEX(id) as id, editor_for FROM users WHERE RAWTOHEX(id) = :1`,
-      [id]
+      [idHex]
     );
   }
 
@@ -1120,6 +1133,7 @@ class DatabaseReadService {
    * Get a single pitch by ID (for caching)
    */
   async getPitchByIdForCache(id: string): Promise<any[]> {
+    const idHex = toOracleHexId(id);
     return await this.query(`
       SELECT 
         RAWTOHEX(ssp.id) as id,
@@ -1132,13 +1146,15 @@ class DatabaseReadService {
       LEFT JOIN songs s ON ssp.song_id = s.id
       LEFT JOIN users si ON ssp.singer_id = si.id
       WHERE RAWTOHEX(ssp.id) = :1
-    `, [id]);
+    `, [idHex]);
   }
 
   /**
    * Get newly created pitch (for caching)
    */
   async getNewPitchForCache(songId: string, singerId: string): Promise<any[]> {
+    const songIdHex = toOracleHexId(songId);
+    const singerIdHex = toOracleHexId(singerId);
     return await this.query(`
       SELECT 
         RAWTOHEX(ssp.id) as id,
@@ -1153,13 +1169,14 @@ class DatabaseReadService {
       WHERE RAWTOHEX(ssp.song_id) = :1 AND RAWTOHEX(ssp.singer_id) = :2
       ORDER BY ssp.created_at DESC
       FETCH FIRST 1 ROWS ONLY
-    `, [songId, singerId]);
+    `, [songIdHex, singerIdHex]);
   }
 
   /**
    * Get updated pitch by ID (for caching)
    */
   async getUpdatedPitchForCache(id: string): Promise<any[]> {
+    const idHex = toOracleHexId(id);
     return await this.query(`
       SELECT 
         RAWTOHEX(ssp.id) as id,
@@ -1172,18 +1189,19 @@ class DatabaseReadService {
       JOIN songs s ON ssp.song_id = s.id
       JOIN users si ON ssp.singer_id = si.id
       WHERE RAWTOHEX(ssp.id) = :1
-    `, [id]);
+    `, [idHex]);
   }
 
   /**
    * Get pitches for a song (id, singer_id) - for merge conflict detection
    */
   async getSongPitchesForMerge(songId: string): Promise<Array<{ id: string; singerId: string }>> {
+    const songIdHex = toOracleHexId(songId);
     const result = await this.query<any>(
       `SELECT RAWTOHEX(id) as id, RAWTOHEX(singer_id) as singer_id 
        FROM song_singer_pitches 
        WHERE song_id = HEXTORAW(:1)`,
-      [songId]
+      [songIdHex]
     );
     return result.map((row: any) => ({
       id: row.id || row.ID,
@@ -1195,22 +1213,24 @@ class DatabaseReadService {
    * Get pitch count for a song (for caching)
    */
   async getSongPitchCountForCache(songId: string): Promise<any[]> {
+    const idHex = toOracleHexId(songId);
     return await this.query(`
       SELECT COUNT(*) as pitch_count
       FROM song_singer_pitches
       WHERE RAWTOHEX(song_id) = :1
-    `, [songId]);
+    `, [idHex]);
   }
 
   /**
    * Get pitch count for a singer (for caching)
    */
   async getSingerPitchCountForCache(singerId: string): Promise<any[]> {
+    const idHex = toOracleHexId(singerId);
     return await this.query(`
       SELECT COUNT(*) as pitch_count
       FROM song_singer_pitches
       WHERE RAWTOHEX(singer_id) = :1
-    `, [singerId]);
+    `, [idHex]);
   }
 
   /**
@@ -1299,6 +1319,7 @@ class DatabaseReadService {
    * Get session by ID (for caching)
    */
   async getSessionByIdForCache(id: string): Promise<any[]> {
+    const idHex = toOracleHexId(id);
     return await this.query(`
       SELECT 
         RAWTOHEX(id) as id,
@@ -1310,13 +1331,14 @@ class DatabaseReadService {
         updated_at
       FROM song_sessions 
       WHERE RAWTOHEX(id) = :1
-    `, [id]);
+    `, [idHex]);
   }
 
   /**
    * Get session items with details (for caching)
    */
   async getSessionItemsForCache(sessionId: string): Promise<any[]> {
+    const sessionIdHex = toOracleHexId(sessionId);
     return await this.query(`
       SELECT 
         RAWTOHEX(si.id) as id,
@@ -1340,13 +1362,14 @@ class DatabaseReadService {
       LEFT JOIN users sg ON si.singer_id = sg.id
       WHERE RAWTOHEX(si.session_id) = :1
       ORDER BY si.sequence_order
-    `, [sessionId]);
+    `, [sessionIdHex]);
   }
 
   /**
    * Get session items for reordering (for caching)
    */
   async getSessionItemsForReorderForCache(sessionId: string): Promise<any[]> {
+    const sessionIdHex = toOracleHexId(sessionId);
     return await this.query(`
       SELECT 
         RAWTOHEX(si.id) as id,
@@ -1364,7 +1387,7 @@ class DatabaseReadService {
       LEFT JOIN users sg ON si.singer_id = sg.id
       WHERE RAWTOHEX(si.session_id) = :1
       ORDER BY si.sequence_order
-    `, [sessionId]);
+    `, [sessionIdHex]);
   }
 
   /**
@@ -1389,6 +1412,7 @@ class DatabaseReadService {
    * Get updated session by ID (for caching)
    */
   async getUpdatedSessionByIdForCache(id: string): Promise<any[]> {
+    const idHex = toOracleHexId(id);
     return await this.query(`
       SELECT 
         RAWTOHEX(id) as id,
@@ -1399,18 +1423,19 @@ class DatabaseReadService {
         updated_at
       FROM song_sessions 
       WHERE RAWTOHEX(id) = :1
-    `, [id]);
+    `, [idHex]);
   }
 
   /**
    * Get session name and description for duplication (for caching)
    */
   async getSessionForDuplicateForCache(id: string): Promise<any[]> {
+    const idHex = toOracleHexId(id);
     return await this.query(`
       SELECT name, description 
       FROM song_sessions 
       WHERE RAWTOHEX(id) = :1
-    `, [id]);
+    `, [idHex]);
   }
 
   /**

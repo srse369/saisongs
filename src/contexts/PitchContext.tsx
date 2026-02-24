@@ -10,6 +10,19 @@ import { isOfflineError, addToOfflineQueue, generateTempId, resolveNameFromCache
 const PITCHES_CACHE_KEY = 'saiSongs:pitchesCache';
 const PITCHES_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
+/** Normalize ID for comparison (handles UUID vs hex formats from different sources) */
+function normalizeIdForCompare(id: string): string {
+  return (id || '').replace(/-/g, '').toUpperCase();
+}
+
+/** True if two pitches refer to the same song+singer association */
+function isSamePitchAssociation(a: SongSingerPitch, b: SongSingerPitch): boolean {
+  return (
+    normalizeIdForCompare(a.songId) === normalizeIdForCompare(b.songId) &&
+    normalizeIdForCompare(a.singerId) === normalizeIdForCompare(b.singerId)
+  );
+}
+
 interface PitchContextState {
   pitches: SongSingerPitch[];
   loading: boolean;
@@ -48,8 +61,11 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
         setPitches(prev => {
           let updated: SongSingerPitch[];
           if (tempId) {
-            updated = prev.filter(p => p.id !== tempId);
-            updated = [...updated, pitch];
+            // Replace optimistic (tempId) with real pitch; also remove any existing same song+singer
+            // (IDs can differ: fetched=hex, created=UUID with hyphens)
+            updated = prev
+              .filter(p => p.id !== tempId && !isSamePitchAssociation(p, pitch))
+              .concat(pitch);
           } else if (prev.some(p => p.id === pitch.id)) {
             updated = prev.map(p => p.id === pitch.id ? pitch : p);
           } else {
@@ -259,8 +275,20 @@ export const PitchProvider: React.FC<PitchProviderProps> = ({ children }) => {
       const pitch = await pitchService.createPitch(input);
 
       if (pitch) {
-        // Dispatch global event to notify other components
+        // Update state directly (replace tempId with real pitch) to avoid delete-before-sync race
         if (typeof window !== 'undefined') {
+          setPitches(prev => {
+            const updated = prev
+              .filter(p => p.id !== tempId && !isSamePitchAssociation(p, pitch))
+              .concat(pitch)
+              .sort((a, b) => {
+                const songCompare = (a.songName || '').localeCompare(b.songName || '');
+                if (songCompare !== 0) return songCompare;
+                return (a.singerName || '').localeCompare(b.singerName || '');
+              });
+            setCacheItem(PITCHES_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), pitches: updated })).catch(() => {});
+            return updated;
+          });
           globalEventBus.dispatch('pitchCreated', { type: 'pitchCreated', pitch, tempId });
         }
         toast.success(`Pitch association created successfully`);

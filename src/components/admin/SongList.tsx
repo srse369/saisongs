@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Song } from '../../types';
 import { Modal } from '../common/Modal';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +26,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [songToDelete, setSongToDelete] = useState<Song | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const isDeletingRef = useRef(false);
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
@@ -44,15 +45,17 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
   };
 
   const handleDeleteConfirm = async () => {
-    if (!songToDelete) return;
+    if (!songToDelete || isDeletingRef.current) return;
 
+    isDeletingRef.current = true;
     setIsDeleting(true);
     try {
       await onDelete(songToDelete.id);
+    } finally {
+      isDeletingRef.current = false;
+      setIsDeleting(false);
       setDeleteModalOpen(false);
       setSongToDelete(null);
-    } finally {
-      setIsDeleting(false);
     }
   };
 

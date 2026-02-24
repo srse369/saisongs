@@ -229,7 +229,8 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setError(null);
     const sessionToDelete = sessions.find(s => s.id === id);
     try {
-      if (sessionToDelete && typeof window !== 'undefined') {
+      // Always remove from state optimistically (use functional update to avoid stale closure)
+      if (typeof window !== 'undefined') {
         setSessions(prev => {
           const updated = prev.filter(s => s.id !== id);
           setCacheItem(CACHE_KEYS.SAI_SONGS_SESSIONS, JSON.stringify({ timestamp: Date.now(), sessions: updated })).catch(() => {});
@@ -272,7 +273,7 @@ export const NamedSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } finally {
       setLoading(false);
     }
-  }, [currentSession, showToast]);
+  }, [currentSession, sessions, showToast]);
 
   // Duplicate a session
   const duplicateSession = useCallback(async (id: string, newName: string): Promise<NamedSession | null> => {

@@ -1,4 +1,5 @@
 import { databaseReadService } from './DatabaseReadService.js';
+import { toOracleHexId } from '../utils/uidUtils.js';
 
 /**
  * DatabaseWriteService handles all WRITE operations (INSERT, UPDATE, DELETE).
@@ -424,7 +425,8 @@ class DatabaseWriteService {
    * Delete a song (for CacheService)
    */
   async deleteSongForCache(id: string): Promise<void> {
-    await this.db.query(`DELETE FROM songs WHERE RAWTOHEX(id) = :1`, [id]);
+    const idHex = toOracleHexId(id);
+    await this.db.query(`DELETE FROM songs WHERE RAWTOHEX(id) = :1`, [idHex]);
     await this.recordDeletedEntity('song', id);
   }
 
@@ -434,6 +436,8 @@ class DatabaseWriteService {
    * Handles pitch conflicts: if target already has a pitch for the same singer, delete the duplicate pitch.
    */
   async mergeSongsForCache(targetSongId: string, targetSongName: string, duplicateSongId: string): Promise<void> {
+    const targetHex = toOracleHexId(targetSongId);
+    const duplicateHex = toOracleHexId(duplicateSongId);
     // 1. Transfer pitches from duplicate to target (handle unique constraint on song_id, singer_id)
     const targetPitches = await this.db.getSongPitchesForMerge(targetSongId);
     const targetSingerIds = new Set(targetPitches.map((p) => p.singerId));
@@ -447,7 +451,7 @@ class DatabaseWriteService {
         // No conflict: transfer pitch to target
         await this.db.query(
           `UPDATE song_singer_pitches SET song_id = HEXTORAW(:1), updated_at = CURRENT_TIMESTAMP WHERE RAWTOHEX(id) = :2`,
-          [targetSongId, pitch.id]
+          [targetHex, pitch.id]
         );
         targetSingerIds.add(pitch.singerId);
       }
@@ -455,12 +459,12 @@ class DatabaseWriteService {
     // 2. Transfer session items from duplicate to target
     await this.db.query(
       `UPDATE song_session_items SET song_id = HEXTORAW(:1) WHERE song_id = HEXTORAW(:2)`,
-      [targetSongId, duplicateSongId]
+      [targetHex, duplicateHex]
     );
     // 3. Update csv_song_mappings that pointed to duplicate
     await this.db.query(
       `UPDATE csv_song_mappings SET db_song_id = HEXTORAW(:1), db_song_name = :2, updated_at = CURRENT_TIMESTAMP WHERE db_song_id = HEXTORAW(:3)`,
-      [targetSongId, targetSongName, duplicateSongId]
+      [targetHex, targetSongName, duplicateHex]
     );
     // 4. Delete the duplicate song
     await this.deleteSongForCache(duplicateSongId);
@@ -483,6 +487,7 @@ class DatabaseWriteService {
    * Update a singer (for CacheService)
    */
   async updateSingerForCache(id: string, name: string, gender: string | null, email: string | null, isAdmin: number, centerIdsJson: string | null, editorForJson: string | null, updatedBy: string | null): Promise<void> {
+    const idHex = toOracleHexId(id);
     await this.db.query(`
       UPDATE users SET
         name = :1,
@@ -494,14 +499,15 @@ class DatabaseWriteService {
         updated_by = :7,
         updated_at = CURRENT_TIMESTAMP
       WHERE RAWTOHEX(id) = :8
-      `, [name, gender || null, email || null, isAdmin, centerIdsJson, editorForJson, updatedBy || null, id]);
+      `, [name, gender || null, email || null, isAdmin, centerIdsJson, editorForJson, updatedBy || null, idHex]);
   }
 
   /**
    * Delete a singer (for CacheService)
    */
   async deleteSingerForCache(id: string): Promise<void> {
-    await this.db.query(`DELETE FROM users WHERE RAWTOHEX(id) = :1`, [id]);
+    const idHex = toOracleHexId(id);
+    await this.db.query(`DELETE FROM users WHERE RAWTOHEX(id) = :1`, [idHex]);
     await this.recordDeletedEntity('singer', id);
   }
 
@@ -509,9 +515,10 @@ class DatabaseWriteService {
    * Update user admin status (for CacheService)
    */
   async updateUserAdminStatusForCache(id: string, isAdmin: number): Promise<void> {
+    const idHex = toOracleHexId(id);
     await this.db.query(
       `UPDATE users SET is_admin = :1 WHERE RAWTOHEX(id) = :2`,
-      [isAdmin, id]
+      [isAdmin, idHex]
     );
   }
 
@@ -519,9 +526,10 @@ class DatabaseWriteService {
    * Update user editor_for (for CacheService)
    */
   async updateUserEditorForForCache(id: string, editorForJson: string | null): Promise<void> {
+    const idHex = toOracleHexId(id);
     await this.db.query(
       `UPDATE users SET editor_for = :1 WHERE RAWTOHEX(id) = :2`,
-      [editorForJson, id]
+      [editorForJson, idHex]
     );
   }
 
@@ -529,9 +537,10 @@ class DatabaseWriteService {
    * Add user editor access (for CacheService)
    */
   async addUserEditorAccessForCache(userId: string, editorForJson: string): Promise<void> {
+    const idHex = toOracleHexId(userId);
     await this.db.query(
       `UPDATE users SET editor_for = :1 WHERE RAWTOHEX(id) = :2`,
-      [editorForJson, userId]
+      [editorForJson, idHex]
     );
   }
 
@@ -539,9 +548,10 @@ class DatabaseWriteService {
    * Remove user editor access (for CacheService)
    */
   async removeUserEditorAccessForCache(userId: string, editorForJson: string | null): Promise<void> {
+    const idHex = toOracleHexId(userId);
     await this.db.query(
       `UPDATE users SET editor_for = :1 WHERE RAWTOHEX(id) = :2`,
-      [editorForJson, userId]
+      [editorForJson, idHex]
     );
   }
 
@@ -551,16 +561,18 @@ class DatabaseWriteService {
    */
   async createPitchForCache(songId: string, singerId: string, pitch: string, createdBy: string | null, id?: string): Promise<void> {
     const idHex = id ? id.replace(/-/g, '').toLowerCase() : null;
+    const songIdHex = toOracleHexId(songId);
+    const singerIdHex = toOracleHexId(singerId);
     if (idHex) {
       await this.db.query(`
         INSERT INTO song_singer_pitches (id, song_id, singer_id, pitch, created_at, created_by)
         VALUES (HEXTORAW(:1), HEXTORAW(:2), HEXTORAW(:3), :4, CURRENT_TIMESTAMP, :5)
-      `, [idHex, songId, singerId, pitch, createdBy || null]);
+      `, [idHex, songIdHex, singerIdHex, pitch, createdBy || null]);
     } else {
       await this.db.query(`
         INSERT INTO song_singer_pitches (song_id, singer_id, pitch, created_at, created_by)
         VALUES (HEXTORAW(:1), HEXTORAW(:2), :3, CURRENT_TIMESTAMP, :4)
-      `, [songId, singerId, pitch, createdBy || null]);
+      `, [songIdHex, singerIdHex, pitch, createdBy || null]);
     }
   }
 
@@ -584,16 +596,16 @@ class DatabaseWriteService {
     }
     if (updates.songId !== undefined) {
       setClauses.push(`song_id = HEXTORAW(:${paramIdx})`);
-      params.push(updates.songId);
+      params.push(toOracleHexId(updates.songId));
       paramIdx++;
     }
     if (updates.singerId !== undefined) {
       setClauses.push(`singer_id = HEXTORAW(:${paramIdx})`);
-      params.push(updates.singerId);
+      params.push(toOracleHexId(updates.singerId));
       paramIdx++;
     }
 
-    params.push(id);
+    params.push(toOracleHexId(id));
     await this.db.query(
       `UPDATE song_singer_pitches SET ${setClauses.join(', ')} WHERE RAWTOHEX(id) = :${paramIdx}`,
       params
@@ -604,7 +616,8 @@ class DatabaseWriteService {
    * Delete a pitch (for CacheService)
    */
   async deletePitchForCache(id: string): Promise<void> {
-    await this.db.query(`DELETE FROM song_singer_pitches WHERE RAWTOHEX(id) = :1`, [id]);
+    const idHex = toOracleHexId(id);
+    await this.db.query(`DELETE FROM song_singer_pitches WHERE RAWTOHEX(id) = :1`, [idHex]);
     await this.recordDeletedEntity('pitch', id);
   }
 
@@ -668,7 +681,8 @@ class DatabaseWriteService {
    * Delete a session (for CacheService)
    */
   async deleteSessionForCache(id: string): Promise<void> {
-    await this.db.query(`DELETE FROM song_sessions WHERE RAWTOHEX(id) = :1`, [id]);
+    const idHex = toOracleHexId(id);
+    await this.db.query(`DELETE FROM song_sessions WHERE RAWTOHEX(id) = :1`, [idHex]);
     await this.recordDeletedEntity('session', id);
   }
 

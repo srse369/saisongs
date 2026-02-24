@@ -279,26 +279,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       globalEventBus.requestRefresh('centers');
     }));
 
-    // When songs change, request refresh for songs
-    unsubscribes.push(globalEventBus.on('songCreated', () => {
-      globalEventBus.requestRefresh('songs');
-    }));
-    unsubscribes.push(globalEventBus.on('songUpdated', () => {
-      globalEventBus.requestRefresh('songs');
-    }));
-    unsubscribes.push(globalEventBus.on('songDeleted', () => {
-      globalEventBus.requestRefresh('songs');
-    }));
-
-    // When pitches change, request refresh for songs and singers (pitch counts change)
-    unsubscribes.push(globalEventBus.on('pitchCreated', () => {
-      globalEventBus.requestRefresh('songs');
-      globalEventBus.requestRefresh('singers');
-    }));
-    unsubscribes.push(globalEventBus.on('pitchDeleted', () => {
-      globalEventBus.requestRefresh('songs');
-      globalEventBus.requestRefresh('singers');
-    }));
+    // Songs: SongContext updates state and browser cache on create/update/delete - no full refetch needed
+    // Pitches: SongContext and SingerContext update pitch counts via event listeners - no full refetch needed
 
     // When centers change, request refresh for centers
     unsubscribes.push(globalEventBus.on('centerUpdated', () => {

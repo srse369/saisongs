@@ -136,7 +136,10 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
         setSingers(prev => {
           let updated: Singer[];
           if (tempId) {
-            updated = prev.filter(s => s.id !== tempId);
+            // Replace optimistic (tempId) with real singer - remove both to avoid duplicates, then add real
+            updated = prev
+              .filter(s => s.id !== tempId && s.id !== singer.id)
+              .concat(singer as Singer);
           } else if (prev.some(s => s.id === singer.id)) {
             updated = prev.map(s => s.id === singer.id ? (singer as Singer) : s);
           } else {
@@ -309,6 +312,14 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
 
       if (singer) {
         if (typeof window !== 'undefined') {
+          setSingers(prev => {
+            const updated = prev
+              .filter(s => s.id !== tempId)
+              .concat(singer)
+              .sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
+            setCacheItem(SINGERS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), singers: updated })).catch(() => {});
+            return updated;
+          });
           const centerIds = singer.centerIds || input.centerIds || [];
           globalEventBus.dispatch('singerCreated', { type: 'singerCreated', singer, centerIds, tempId });
         }
@@ -440,74 +451,68 @@ export const SingerProvider: React.FC<SingerProviderProps> = ({ children }) => {
   const deleteSinger = useCallback(async (id: string): Promise<void> => {
     setLoading(true);
     setError(null);
+    let singerToDelete = singers.find(s => s.id === id);
+    let centerIds = singerToDelete?.centerIds || [];
+
+    if (!singerToDelete || !centerIds.length) {
+      const fetchedSinger = await singerService.getSingerById(id);
+      if (fetchedSinger) {
+        singerToDelete = fetchedSinger;
+        centerIds = fetchedSinger.centerIds || [];
+      }
+    }
+
     try {
-      // Get the singer before deleting to know which centers to update
-      // Try from state first (fast), but fallback to fetching from backend if not found
-      let singerToDelete = singers.find(s => s.id === id);
-      let centerIds = singerToDelete?.centerIds || [];
+      // 1. Delete from database + 2. Delete from backend cache (API handles both)
+      await singerService.deleteSinger(id);
 
-      // If singer not in state, fetch from backend to get centerIds
-      if (!singerToDelete || !centerIds.length) {
-        const fetchedSinger = await singerService.getSingerById(id);
-        if (fetchedSinger) {
-          singerToDelete = fetchedSinger;
-          centerIds = fetchedSinger.centerIds || [];
-        }
+      // 3. Delete from frontend browser cache
+      if (typeof window !== 'undefined') {
+        const updated = singers.filter(s => s.id !== id);
+        await setCacheItem(SINGERS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), singers: updated }));
       }
 
-      if (singerToDelete) {
-        if (typeof window !== 'undefined') {
-          setSingers(prev => {
-            const updated = prev.filter(s => s.id !== id);
-            setCacheItem(SINGERS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), singers: updated })).catch(() => {});
-            return updated;
-          });
-        }
-        await singerService.deleteSinger(id);
-        if (typeof window !== 'undefined') {
-          // Dispatch global event to notify other components
-          // Always dispatch, even if no centers, so other components can refresh
-          globalEventBus.dispatch('singerDeleted', {
-            type: 'singerDeleted',
-            singer: singerToDelete || null,
-            centerIds: centerIds || []
-          });
-        }
-        toast.success(`Singer ${singerToDelete.name} deleted successfully`);
-      } else {
-        console.error(`Failed to delete singer ${id}`);
-        toast.error('Failed to delete singer');
-      }
-    } catch (err) {
-      if (singerToDelete && typeof window !== 'undefined') {
-        setSingers(prev => {
-          const reverted = [...prev, singerToDelete].sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
-          setCacheItem(SINGERS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), singers: reverted })).catch(() => {});
-          return reverted;
+      // 4. Delete from singer list on screen
+      setSingers(prev => prev.filter(s => s.id !== id));
+
+      if (typeof window !== 'undefined') {
+        globalEventBus.dispatch('singerDeleted', {
+          type: 'singerDeleted',
+          singer: singerToDelete || null,
+          centerIds: centerIds || []
         });
       }
-      if (isOfflineError(err)) {
-        let singerToDelete = singers.find((s) => s.id === id);
-        if (!singerToDelete) {
-          const fetched = await singerService.getSingerById(id);
-          if (fetched) singerToDelete = fetched;
+      toast.success(singerToDelete ? `Singer ${singerToDelete.name} deleted successfully` : 'Singer deleted successfully');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : `Error deleting singer: ${err.message}`;
+      const isNotFound = errorMessage.toLowerCase().includes('not found') || errorMessage.toLowerCase().includes('does not exist') || errorMessage.toLowerCase().includes('404');
+      const isOffline = isOfflineError(err);
+
+      if (isOffline && singerToDelete) {
+        addToOfflineQueue({ type: 'delete', entity: 'singer', payload: { id }, displayLabel: `Singer: ${singerToDelete.name}` });
+        globalEventBus.dispatch('singerDeleted', {
+          type: 'singerDeleted',
+          singer: singerToDelete,
+          centerIds: singerToDelete.centerIds || [],
+        });
+        toast.success(`Singer removed offline. Will sync when online.`);
+        setSingers(prev => prev.filter(s => s.id !== id));
+        if (typeof window !== 'undefined') {
+          const updated = singers.filter(s => s.id !== id);
+          setCacheItem(SINGERS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), singers: updated })).catch(() => {});
         }
-        if (singerToDelete) {
-          addToOfflineQueue({ type: 'delete', entity: 'singer', payload: { id }, displayLabel: `Singer: ${singerToDelete.name}` });
-          globalEventBus.dispatch('singerDeleted', {
-            type: 'singerDeleted',
-            singer: singerToDelete,
-            centerIds: singerToDelete.centerIds || [],
-          });
-          toast.success(`Singer removed offline. Will sync when online.`);
-          setLoading(false);
-          return;
+      } else {
+        setError({ code: 'UNKNOWN_ERROR', message: errorMessage });
+        toast.error(errorMessage);
+        // If singer not found on server, remove from screen (stale state)
+        if (isNotFound) {
+          setSingers(prev => prev.filter(s => s.id !== id));
+          if (typeof window !== 'undefined') {
+            const updated = singers.filter(s => s.id !== id);
+            setCacheItem(SINGERS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), singers: updated })).catch(() => {});
+          }
         }
       }
-      console.error(`Error deleting singer ${id}:`, err);
-      const errorMessage = err instanceof Error ? err.message : `Error deleting singer: ${err.message}`;
-      setError({ code: 'UNKNOWN_ERROR', message: errorMessage });
-      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

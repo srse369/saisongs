@@ -54,7 +54,8 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
         setSongs(prev => {
           let updated: Song[];
           if (tempId) {
-            updated = prev.filter(s => s.id !== tempId);
+            // Replace optimistic (tempId) with real song - filter both to avoid duplicates
+            updated = prev.filter(s => s.id !== tempId && s.id !== song.id).concat(song);
             if (typeof window !== 'undefined') {
               removeCacheItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${tempId}`).catch(() => {});
             }
@@ -346,7 +347,17 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
       const song = await songService.createSong(input);
 
       if (song) {
+        // Update state directly (replace tempId with real song) - no full refetch needed
         if (typeof window !== 'undefined') {
+          setSongs(prev => {
+            const updated = prev
+              .filter(s => s.id !== tempId && s.id !== song.id)
+              .concat(song)
+              .sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
+            setCacheItem(SONGS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), songs: updated })).catch(() => {});
+            setCacheItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${song.id}`, JSON.stringify({ timestamp: Date.now(), song })).catch(() => {});
+            return updated;
+          });
           globalEventBus.dispatch('songCreated', { type: 'songCreated', song, tempId });
         }
         const displayName = song.name ?? (song as { song_name?: string }).song_name ?? input.name;
@@ -471,52 +482,35 @@ export const SongProvider: React.FC<SongProviderProps> = ({ children }) => {
   const deleteSong = useCallback(async (id: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
+    const songToDelete = songs.find(s => s.id === id);
     try {
-      // Get the song before deleting to know which song to update
-      // Try from state first (fast), but fallback to fetching from backend if not found
-      let songToDelete = songs.find(s => s.id === id);
-
-      // If song not in state, fetch from backend to get full song data
-      if (!songToDelete) {
-        const fetchedSong = await songService.getSongById(id);
-        if (fetchedSong) {
-          songToDelete = fetchedSong;
-        }
+      // Always remove from state optimistically (use functional update)
+      if (typeof window !== 'undefined') {
+        setSongs(prev => {
+          const updated = prev.filter(s => s.id !== id);
+          setCacheItem(SONGS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), songs: updated })).catch(() => {});
+          removeCacheItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`).catch(() => {});
+          return updated;
+        });
       }
-
-      if (songToDelete) {
+      const success = await songService.deleteSong(id);
+      if (success) {
         if (typeof window !== 'undefined') {
-          setSongs(prev => {
-            const updated = prev.filter(s => s.id !== id);
-            setCacheItem(SONGS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), songs: updated })).catch(() => {});
-            removeCacheItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`).catch(() => {});
-            return updated;
-          });
+          globalEventBus.dispatch('songDeleted', { type: 'songDeleted', song: songToDelete || { id, name: '' } });
         }
-        const success = await songService.deleteSong(id);
-        if (success) {
-          if (typeof window !== 'undefined') {
-            globalEventBus.dispatch('songDeleted', { type: 'songDeleted', song: songToDelete });
-          }
-          toast.success(`Song ${songToDelete.name} deleted successfully`);
-          return true;
-        }
-        if (typeof window !== 'undefined') {
-          setSongs(prev => {
-            const reverted = [...prev, songToDelete].sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
-            setCacheItem(SONGS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), songs: reverted })).catch(() => {});
-            setCacheItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`, JSON.stringify({ timestamp: Date.now(), song: songToDelete })).catch(() => {});
-            return reverted;
-          });
-        }
-        console.error(`Failed to delete song ${id}`);
-        toast.error('Failed to delete song');
-        return false;
-      } else {
-        console.error(`Failed to delete song ${id}`);
-        toast.error('Failed to delete song');
-        return false;
+        toast.success(`Song ${songToDelete?.name ?? 'Unknown'} deleted successfully`);
+        return true;
       }
+      if (songToDelete && typeof window !== 'undefined') {
+        setSongs(prev => {
+          const reverted = [...prev, songToDelete].sort((a, b) => compareStringsIgnoringSpecialChars(a.name, b.name));
+          setCacheItem(SONGS_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), songs: reverted })).catch(() => {});
+          setCacheItem(`${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`, JSON.stringify({ timestamp: Date.now(), song: songToDelete })).catch(() => {});
+          return reverted;
+        });
+      }
+      toast.error('Failed to delete song');
+      return false;
     } catch (err) {
       if (isOfflineError(err)) {
         let songToDelete = songs.find((s) => s.id === id);

@@ -216,8 +216,6 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
     setEditingPitch(null);
     setShowForm(true);
     clearPitchError();
-    // Refresh singers list to include any newly created singers
-    fetchSingers(true);
   };
 
   const handleEditClick = (pitch: SongSingerPitch) => {
@@ -678,6 +676,7 @@ export const PitchManager: React.FC<PitchManagerProps> = ({ isActive = true }) =
         }}
         loading={loading}
         userSingerId={userSinger?.id}
+        groupBySinger={showMyPitches}
       />
 
       {/* Lazy-load sentinel */}
