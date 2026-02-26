@@ -579,7 +579,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                 )}
 
                 {/* Clear Local Storage Button (All Users) */}
-                <div className="border-gray-200 dark:border-gray-700">
+                <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                   {(() => {
                     const onCooldown = (cooldownRemainingSeconds ?? 0) > 0;
                     const progress = onCooldown

@@ -83,13 +83,14 @@ function AppContent() {
 
   // Warm up cache for protected data (singers, pitches, templates) when user authenticates
   // Skip on presentation route to avoid concurrent fetches that can cause "Failed to fetch" errors
+  // Always force-refresh templates on login/logout so we get the correct set (public-only vs full/center-filtered)
   useEffect(() => {
     if (isPresentationOnly) return;
     if (isAuthenticated && !authFetchDone.current) {
       authFetchDone.current = true;
       fetchSingers();
       fetchAllPitches();
-      fetchTemplates();
+      fetchTemplates(true); // Fresh fetch so we get full list after login (not cached public-only)
     } else if (!isAuthenticated && authFetchDone.current) {
       // User logged out - clear all protected data immediately
       authFetchDone.current = false;
