@@ -5,6 +5,7 @@ import { toTitleCase } from '../../utils/textUtils';
 import { formatNormalizedPitch } from '../../utils/pitchNormalization';
 import type { Song } from '../../types';
 
+const MOBILE_BREAKPOINT = 768;
 const HOVER_DELAY_MS = 750; // Wait before showing popup on hover
 const LEAVE_DELAY_MS = 1000; // 1s grace period so user can move cursor to popup (e.g. to play audio)
 
@@ -32,6 +33,7 @@ export const LyricsHoverPopup: React.FC<LyricsHoverPopupProps> = ({
   children,
   className = '',
 }) => {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT);
   const [showPopup, setShowPopup] = useState(false);
   const [lyrics, setLyrics] = useState<string | null>(null);
   const [audioLink, setAudioLink] = useState<string | null>(null);
@@ -156,7 +158,19 @@ export const LyricsHoverPopup: React.FC<LyricsHoverPopupProps> = ({
     clearLeaveTimer();
   }, [clearHoverTimer, clearLeaveTimer]);
 
+  // Track mobile state for resize
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   if (typeof document === 'undefined') {
+    return <span className={className}>{children}</span>;
+  }
+
+  // On mobile: never show popup, just render children (lyrics shown inline in expanded metadata)
+  if (isMobile) {
     return <span className={className}>{children}</span>;
   }
 

@@ -642,7 +642,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                       <i className="fas fa-times-circle w-5 h-5 text-red-600 dark:text-red-400"></i>
                       <button
                         onClick={resetConnection}
-                        className="text-sm text-red-600 dark:text-red-400 hover:underline"
+                        className="text-sm text-red-600 dark:text-red-400"
                       >
                         Reconnect Database
                       </button>

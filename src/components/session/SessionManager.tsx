@@ -1422,7 +1422,7 @@ export const SessionManager: React.FC = () => {
                     {/* Song Metadata Section - Reusable component */}
                     <SongMetadataCard
                       song={song}
-                      onNameClick={isMobile ? undefined : () => handlePreviewSong(song.id)}
+                      onNameClick={undefined}
                       showBackground={!isMobile}
                       isSelected={isSelected}
                       alwaysShowDeityLanguage={true}

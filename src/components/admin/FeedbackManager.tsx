@@ -565,7 +565,7 @@ export const FeedbackManager: React.FC<FeedbackManagerProps> = ({ isActive = tru
                   href={selectedFeedback.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
+                  className="text-sm text-blue-600 dark:text-blue-400 break-all"
                 >
                   {selectedFeedback.url}
                 </a>

@@ -112,10 +112,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
             id={`song-${song.id}`}
             key={song.id}
             onClick={() => {
-              // On mobile, toggle selection on row click
-              if (isMobile) {
-                setSelectedSongId(isSelected ? null : song.id);
-              }
+              setSelectedSongId(isSelected ? null : song.id);
             }}
             className={`bg-white dark:bg-gray-800 p-2 md:p-2 transition-all duration-200 ${
               isMobile 
@@ -136,7 +133,7 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                 {/* Song Metadata Section - Reusable component */}
                 <SongMetadataCard
                   song={song}
-                  onNameClick={isMobile ? undefined : () => handlePresent(song)}
+                  onNameClick={() => setSelectedSongId(isSelected ? null : song.id)}
                   showBackground={!isMobile}
                   pitchCount={song.pitchCount}
                   isSelected={isSelected}
@@ -146,21 +143,6 @@ export const SongList: React.FC<SongListProps> = ({ songs, onEdit, onDelete, onS
                   compactInDesktop={!showSongDetailsInDesktop}
                   iconsNextToNameOnDesktop={true}
                 />
-
-                {/* Audio Player - Only when show song details is enabled; hidden on mobile until row is selected */}
-                {song.audioLink && showSongDetailsInDesktop && (
-                  <div className={`mt-0 ${isMobile && !isSelected ? 'hidden' : ''}`}>
-                    <audio
-                      controls
-                      preload="none"
-                      className="w-full max-w-xs dark:invert dark:brightness-90 dark:contrast-90 dark:hue-rotate-180"
-                      style={{ height: '32px' }}
-                    >
-                      <source src={song.audioLink} />
-                      Your browser does not support the audio element.
-                    </audio>
-                  </div>
-                )}
               </div>
 
               {/* Action Icons - Icon-only on mobile, text on desktop - Hidden on mobile until row is selected */}

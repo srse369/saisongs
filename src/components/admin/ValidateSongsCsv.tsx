@@ -594,7 +594,7 @@ export const ValidateSongsCsv: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  className="text-sm text-blue-600 dark:text-blue-400"
                 >
                   Cancel
                 </button>
@@ -744,7 +744,7 @@ export const ValidateSongsCsv: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  className="text-sm text-blue-600 dark:text-blue-400"
                 >
                   Validate another file
                 </button>
@@ -780,7 +780,7 @@ export const ValidateSongsCsv: React.FC = () => {
                           setSelectedToAdd(new Set(rejectedWithIndices.map(({ index }) => index)));
                         }
                       }}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      className="text-xs text-blue-600 dark:text-blue-400"
                     >
                       {selectedToAdd.size === rejectedWithIndices.length ? 'Deselect all' : 'Select all'}
                     </button>

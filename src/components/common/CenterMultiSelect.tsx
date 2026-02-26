@@ -176,7 +176,7 @@ export const CenterMultiSelect: React.FC<CenterMultiSelectProps> = ({
       {/* Error message */}
       {error && !loading && (
         <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-          {error} - <button type="button" onClick={fetchCenters} className="underline hover:no-underline">Retry</button>
+          {error} - <button type="button" onClick={fetchCenters} className="cursor-pointer">Retry</button>
         </p>
       )}
 

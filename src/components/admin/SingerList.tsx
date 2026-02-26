@@ -166,7 +166,7 @@ export const SingerList: React.FC<SingerListProps> = ({ singers, onEdit, onDelet
             {selectedSingerIds.length > 0 && (
               <button
                 onClick={() => setSelectedSingerIds([])}
-                className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 underline"
+                className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
               >
                 Clear
               </button>

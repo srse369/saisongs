@@ -37,7 +37,7 @@ export const ExternalSongsMetadata: React.FC<ExternalSongsMetadataProps> = ({
           href={externalsongsUrl} 
           target="_blank" 
           rel="noopener noreferrer"
-          className="hover:text-blue-600 dark:hover:text-blue-400 underline"
+          className="hover:text-blue-600 dark:hover:text-blue-400"
         >
           View on ExternalSongs.org
         </a>
@@ -75,7 +75,7 @@ export const ExternalSongsMetadata: React.FC<ExternalSongsMetadataProps> = ({
           href={externalsongsUrl} 
           target="_blank" 
           rel="noopener noreferrer"
-          className="text-blue-600 dark:text-blue-400 hover:underline"
+          className="text-blue-600 dark:text-blue-400"
         >
           View on ExternalSongs.org
         </a>

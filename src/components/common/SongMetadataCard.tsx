@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatNormalizedPitch } from '../../utils/pitchNormalization';
 import { toTitleCase } from '../../utils/textUtils';
-import { LyricsHoverPopup } from './LyricsHoverPopup';
+import songService from '../../services/SongService';
 import type { Song } from '../../types';
 
 export interface SongMetadata {
   name: string;
   externalSourceUrl?: string;
+  audioLink?: string;
   raga?: string;
   beat?: string;
   deity?: string;
@@ -26,12 +27,14 @@ interface SongMetadataCardProps {
   alwaysShowDeityLanguage?: boolean;
   onPreviewClick?: () => void;
   isAuthenticated?: boolean; // Hide pitch count on mobile when not authenticated
-  /** When provided, song name shows lyrics popup on 3s hover */
+  /** When provided, lyrics and metadata show inline when expanded (isSelected) */
   lyricsHover?: { songId: string; songName: string; song?: Song | null };
   /** When true (desktop only): show only song name; details expand on hover */
   compactInDesktop?: boolean;
   /** When true (desktop only): keep lyrics and preview icons immediately after song name */
   iconsNextToNameOnDesktop?: boolean;
+  /** When false, hide song name (e.g. when showing metadata+lyrics inline in an expanded row) */
+  showName?: boolean;
 }
 
 /**
@@ -51,68 +54,74 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
   lyricsHover,
   compactInDesktop = false,
   iconsNextToNameOnDesktop = false,
+  showName = true,
 }) => {
   const hasReferencePitches = song.refGents || song.refLadies;
+
+  // Lyrics for mobile expanded view - fetch when isSelected and lyricsHover
+  const [lyrics, setLyrics] = useState<string | null>(lyricsHover?.song?.lyrics ?? null);
+  const [lyricsLoading, setLyricsLoading] = useState(false);
+  useEffect(() => {
+    if (!isSelected || !lyricsHover) {
+      setLyrics(null);
+      setLyricsLoading(false);
+      return;
+    }
+    if (lyricsHover.song?.lyrics) {
+      setLyrics(lyricsHover.song.lyrics);
+      setLyricsLoading(false);
+      return;
+    }
+    setLyrics(null);
+    setLyricsLoading(true);
+    songService.getSongById(lyricsHover.songId)
+      .then((s) => {
+        setLyrics(s?.lyrics ?? null);
+      })
+      .catch(() => setLyrics(null))
+      .finally(() => setLyricsLoading(false));
+  }, [isSelected, lyricsHover?.songId, lyricsHover?.song?.lyrics]);
 
   // Show background on desktop always, or on mobile when selected
   const shouldShowBackground = showBackground || isSelected;
 
-  // When compactInDesktop: details never expand on song hover; show only on mobile when selected or via song name hover popup
+  // When compactInDesktop: details expand on click (isSelected) - both mobile and desktop
   const detailsDeityLangClass = compactInDesktop
-    ? `${(isSelected || alwaysShowDeityLanguage) ? 'flex' : 'hidden'} md:hidden`
+    ? `${(isSelected || alwaysShowDeityLanguage) ? 'flex' : 'hidden'}`
     : `${(isSelected || alwaysShowDeityLanguage) ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center`;
   const detailsRagaBeatClass = compactInDesktop
-    ? `${isSelected ? 'flex' : 'hidden'} md:hidden`
+    ? `${isSelected ? 'flex' : 'hidden'}`
     : `${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center`;
   const detailsRefPitchesClass = compactInDesktop
-    ? `${isSelected ? 'flex' : 'hidden'} md:hidden`
+    ? `${isSelected ? 'flex' : 'hidden'}`
     : `${isSelected ? 'flex md:flex' : 'hidden md:flex'} flex-wrap items-center`;
-  
+
+  // Lyrics section - when expanded (isSelected), both mobile and desktop
+  const detailsLyricsClass = isSelected ? 'flex' : 'hidden';
+
   return (
     <div className={`md:px-2 md:pt-0 md:pb-0 md:mb-0`}>
-      {/* Song Name - hover shows metadata/lyrics popup when lyricsHover provided */}
+      {/* Song Name - click to expand lyrics/metadata (hidden when showName=false) */}
+      {showName && (
       <div className={`flex items-center min-w-0 ${iconsNextToNameOnDesktop ? 'md:flex-1' : ''}`}>
         {/* On desktop when iconsNextToNameOnDesktop: name + lyrics + preview stay together; name truncates */}
         <div className={`flex items-center gap-[5px] min-w-0 ${iconsNextToNameOnDesktop ? 'md:min-w-0 md:flex-1 md:overflow-hidden' : 'flex-1'}`}>
-          {lyricsHover ? (
-            <LyricsHoverPopup
-              songId={lyricsHover.songId}
-              songName={lyricsHover.songName}
-              song={lyricsHover.song}
-              className={`min-w-0 overflow-hidden ${iconsNextToNameOnDesktop ? 'md:flex-initial' : 'flex-1'}`}
+          {onNameClick ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onNameClick();
+              }}
+              className={`text-left text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate whitespace-nowrap min-w-0 ${iconsNextToNameOnDesktop ? 'md:flex-initial' : 'flex-1'} ${!lyricsHover ? 'w-full' : ''}`}
+              {...(nameClickTitle ? { title: nameClickTitle } : {})}
             >
-              {onNameClick ? (
-                <button
-                  type="button"
-                  onClick={onNameClick}
-                  className="text-left text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate whitespace-nowrap min-w-0 w-full"
-                  {...(nameClickTitle ? { title: nameClickTitle } : {})}
-                >
-                  {song.name}
-                </button>
-              ) : (
-                <span className="block text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate whitespace-nowrap min-w-0">
-                  {song.name}
-                </span>
-              )}
-            </LyricsHoverPopup>
+              {song.name}
+            </button>
           ) : (
-            <>
-              {onNameClick ? (
-                <button
-                  type="button"
-                  onClick={onNameClick}
-                  className={`text-left text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate whitespace-nowrap min-w-0 ${iconsNextToNameOnDesktop ? 'md:flex-initial' : 'flex-1'}`}
-                  {...(nameClickTitle ? { title: nameClickTitle } : {})}
-                >
-                  {song.name}
-                </button>
-              ) : (
-                <span className={`text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate whitespace-nowrap min-w-0 ${iconsNextToNameOnDesktop ? 'md:flex-initial' : 'flex-1'}`}>
-                  {song.name}
-                </span>
-              )}
-            </>
+            <span className={`block text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate whitespace-nowrap min-w-0 ${iconsNextToNameOnDesktop ? 'md:flex-initial' : 'flex-1'}`}>
+              {song.name}
+            </span>
           )}
           {/* Pitch count circle - only show on mobile when there are pitches and user is authenticated */}
           {isAuthenticated && pitchCount !== undefined && (pitchCount ?? 0) > 0 && (
@@ -132,11 +141,29 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
               title="Preview song"
               className="flex-shrink-0 text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 transition-colors"
             >
-              <i className="fas fa-eye text-sm"></i>
+              <i className="fas fa-eye text-sm md:text-[1.1rem]"></i>
             </button>
           )}
         </div>
       </div>
+      )}
+
+      {/* Lyrics - right below song name when expanded */}
+      {lyricsHover && (
+        <div className={`${detailsLyricsClass} flex-col ${showName ? 'mt-1' : 'mt-0.5'} pb-1 mb-1 border-b border-gray-100 dark:border-gray-700/50`}>
+          <div className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap overflow-y-auto max-h-48">
+            {lyricsLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+              </div>
+            ) : lyrics ? (
+              lyrics
+            ) : (
+              <span className="text-gray-500 dark:text-gray-400">No lyrics available</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Deity, Language, and Tempo - Show on mobile when selected or alwaysShowDeityLanguage; on desktop show always unless compactInDesktop (then on hover) */}
       {(song.deity || song.language || song.tempo) && (
@@ -202,6 +229,21 @@ export const SongMetadataCard: React.FC<SongMetadataCardProps> = ({
               <span className="font-medium text-gray-800 dark:text-gray-300">{formatNormalizedPitch(song.refLadies)}</span>
             </span>
           )}
+        </div>
+      )}
+
+      {/* Audio Player - below metadata when expanded */}
+      {isSelected && (song.audioLink || lyricsHover?.song?.audioLink) && (
+        <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+          <audio
+            controls
+            preload="none"
+            className="w-full max-w-xs dark:invert dark:brightness-90 dark:contrast-90 dark:hue-rotate-180"
+            style={{ height: '32px' }}
+          >
+            <source src={song.audioLink || lyricsHover?.song?.audioLink} />
+            Your browser does not support the audio element.
+          </audio>
         </div>
       )}
     </div>

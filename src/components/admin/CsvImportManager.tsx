@@ -967,7 +967,7 @@ Why fear when I am here,Ameya,5m</pre>
                                 setManualSongInput(topMatches[0].song.id || '');
                               }
                             }}
-                            className="text-blue-600 hover:underline text-xs"
+                            className="text-blue-600 text-xs"
                           >
                             Select Song
                           </button>
@@ -1020,7 +1020,7 @@ Why fear when I am here,Ameya,5m</pre>
                               setEditingItemIndex(index);
                               setManualPitchInput('');
                             }}
-                            className="text-blue-600 hover:underline text-xs"
+                            className="text-blue-600 text-xs"
                           >
                             Map Pitch
                           </button>
@@ -1085,7 +1085,7 @@ Why fear when I am here,Ameya,5m</pre>
                         {item.status === 'ready' && item.songMatch === 'manual' && (
                           <button
                             onClick={() => handleUndoSongMatch(index)}
-                            className="text-orange-600 hover:underline text-xs"
+                            className="text-orange-600 text-xs"
                             title="Undo this manual song match"
                           >
                             ↶ Undo Song
@@ -1094,7 +1094,7 @@ Why fear when I am here,Ameya,5m</pre>
                         {item.status === 'ready' && item.pitchRecognized && item.songMatch !== 'manual' && (
                           <button
                             onClick={() => handleUndoPitchMatch(index)}
-                            className="text-orange-600 hover:underline text-xs"
+                            className="text-orange-600 text-xs"
                             title="Undo this pitch mapping"
                           >
                             ↶ Undo Pitch
