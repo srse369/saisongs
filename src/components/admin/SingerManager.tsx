@@ -12,6 +12,7 @@ import { Modal } from '../common/Modal';
 import type { Singer, CreateSingerInput } from '../../types';
 import { BaseManager } from './BaseManager';
 import { useBaseManager } from '../../hooks/useBaseManager';
+import { API_BASE_URL } from '../../services/ApiClient';
 
 interface SingerManagerProps {
   isActive?: boolean;
@@ -99,6 +100,31 @@ export const SingerManager: React.FC<SingerManagerProps> = ({ isActive = true })
     setIsPreviewMode(false);
   };
 
+  const applyAdminFields = async (singerId: string, adminFields: { isAdmin: boolean; editorFor: number[] }) => {
+    const patch = async (path: string, body: object) => {
+      const res = await fetch(`${API_BASE_URL}/singers/${singerId}/${path}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Failed to update ${path} (${res.status})`);
+      }
+    };
+
+    try {
+      await patch('admin', { isAdmin: adminFields.isAdmin ? 1 : 0 });
+      await patch('editor-for', { editorFor: adminFields.editorFor });
+      removeCacheItem('saiSongs:centersCache').catch(() => {});
+      await fetchSingers(true);
+    } catch (error) {
+      console.error('Error updating admin fields:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update admin fields');
+    }
+  };
+
   const handleFormSubmit = async (input: CreateSingerInput, adminFields?: { isAdmin: boolean; editorFor: number[] }) => {
     if (editingSinger) {
       // Check if user is updating their own email
@@ -106,36 +132,7 @@ export const SingerManager: React.FC<SingerManagerProps> = ({ isActive = true })
 
       const result = await updateSinger(editingSinger.id, input);
       if (result && adminFields) {
-        // If admin fields provided, update them via separate API calls
-        const API_BASE_URL = (window as any).__API_URL__ || (
-          (window as any).__DEV__ ? '/api' : 'http://localhost:3111/api'
-        );
-
-        try {
-          // Update isAdmin status
-          await fetch(`${API_BASE_URL}/singers/${editingSinger.id}/admin`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ isAdmin: adminFields.isAdmin ? 1 : 0 }),
-          });
-
-          // Update editorFor
-          await fetch(`${API_BASE_URL}/singers/${editingSinger.id}/editor-for`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ editorFor: adminFields.editorFor }),
-          });
-
-          // Clear centers cache since editor assignments affect center data
-          removeCacheItem('saiSongs:centersCache').catch(() => {});
-
-          // Refresh singers to get updated data
-          await fetchSingers(true);
-        } catch (error) {
-          console.error('Error updating admin fields:', error);
-        }
+        await applyAdminFields(editingSinger.id, adminFields);
       }
       if (result) {
         setIsFormOpen(false);
@@ -150,6 +147,9 @@ export const SingerManager: React.FC<SingerManagerProps> = ({ isActive = true })
     } else {
       const result = await createSinger(input);
       if (result) {
+        if (adminFields && (adminFields.isAdmin || adminFields.editorFor.length > 0)) {
+          await applyAdminFields(result.id, adminFields);
+        }
         setIsFormOpen(false);
       }
     }
