@@ -786,16 +786,18 @@ class CacheService {
     }
 
     // Prepare is_admin as number
-    incomingIsAdmin = incomingData.isAdmin ?? incomingData.isAdmin ?? 0;
+    // Preserve existing DB values when the caller doesn't supply them
+    const rawIsAdmin = incomingData.isAdmin ?? dbIsAdmin;
+    incomingIsAdmin = (rawIsAdmin === true || rawIsAdmin === 1 || rawIsAdmin === '1') ? 1 : 0;
 
-    // Prepare center_ids as JSON string
-    const incomingCenterIdsJson = incomingData.centerIds && incomingData.centerIds.length > 0
-      ? JSON.stringify(incomingData.centerIds)
+    const effectiveCenterIds = incomingData.centerIds ?? dbParsedCenterIds;
+    const incomingCenterIdsJson = effectiveCenterIds && effectiveCenterIds.length > 0
+      ? JSON.stringify(effectiveCenterIds)
       : null;
 
-    // Prepare editor_for as JSON string
-    const incomingEditorForJson = incomingData.editorFor && incomingData.editorFor.length > 0
-      ? JSON.stringify(incomingData.editorFor)
+    const effectiveEditorFor = incomingData.editorFor ?? dbParsedEditorFor;
+    const incomingEditorForJson = effectiveEditorFor && effectiveEditorFor.length > 0
+      ? JSON.stringify(effectiveEditorFor)
       : null;
 
     await this.databaseWriteService.updateSingerForCache(id, incomingData.name, incomingData.gender || null, incomingData.email || null, incomingIsAdmin, incomingCenterIdsJson, incomingEditorForJson, incomingData.updatedBy || null);
