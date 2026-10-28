@@ -185,6 +185,10 @@ export async function takeOfflineIfNeeded(
 
   try {
     onProgress?.({ phase: 'songs', current: 0, total: 1, message: 'Checking cache...' });
+
+    // Remove tombstoned entities first so skip decision isn't based on stale deleted rows
+    await fetchDeletedAndCleanCache();
+
     const cacheCounts = await getBrowserCacheEntityCounts();
     let cacheSongs = cacheCounts.songs ?? 0;
 
@@ -237,16 +241,15 @@ export async function takeOfflineIfNeeded(
     const cacheCenters = cacheCounts.centers ?? 0;
 
     // Require both song count AND lyrics: skip only when we have all songs AND lyrics for them.
-    // Songs list cache often has metadata only (no lyrics); lyrics come from individual cache.
-    // Server provides withLyrics count; we need cacheSongsWithLyrics >= that to skip.
+    // Use exact equality so orphaned cache rows force a refresh download.
     const cacheComplete =
-      cacheSongs >= serverSongs &&
+      cacheSongs === serverSongs &&
       cacheSongsWithLyrics >= serverSongsWithLyrics &&
-      cacheSingers >= serverSingers &&
-      cachePitches >= serverPitches &&
-      cacheTemplates >= serverTemplates &&
-      cacheSessions >= serverSessions &&
-      cacheCenters >= serverCenters;
+      cacheSingers === serverSingers &&
+      cachePitches === serverPitches &&
+      cacheTemplates === serverTemplates &&
+      cacheSessions === serverSessions &&
+      cacheCenters === serverCenters;
 
     if (cacheComplete && serverSongs > 0) {
       onProgress?.({ phase: 'done', current: 1, total: 1, message: 'Already have all data offline.' });

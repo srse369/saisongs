@@ -60,6 +60,8 @@ class PitchService {
     const id = row.id ?? row.ID;
     const songId = row.songId ?? row.song_id ?? row.SONG_ID;
     const singerId = row.singerId ?? row.singer_id ?? row.SINGER_ID;
+    const createdAtRaw = row.createdAt ?? row.created_at ?? row.CREATED_AT;
+    const updatedAtRaw = row.updatedAt ?? row.updated_at ?? row.UPDATED_AT;
 
     return {
       id,
@@ -67,6 +69,10 @@ class PitchService {
       singerId,
       // Oracle / driver may expose this as `pitch` or `PITCH`
       pitch: row.pitch ?? row.PITCH,
+      songName: row.songName ?? row.song_name ?? row.SONG_NAME,
+      singerName: row.singerName ?? row.singer_name ?? row.SINGER_NAME,
+      createdAt: createdAtRaw ? new Date(createdAtRaw) : undefined,
+      updatedAt: updatedAtRaw ? new Date(updatedAtRaw) : undefined,
     };
   }
 
@@ -180,6 +186,19 @@ class PitchService {
         'Failed to create pitch association',
         error
       );
+    }
+  }
+
+  /**
+   * Gets a pitch association by ID (read-only).
+   */
+  async getPitchById(id: string, nocache: boolean = false): Promise<SongSingerPitch | null> {
+    try {
+      const raw = await apiClient.getPitch(id, nocache);
+      return raw ? this.mapRowToPitch(raw as any) : null;
+    } catch (error) {
+      console.error('Error fetching pitch by ID:', error);
+      return null;
     }
   }
 

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../../services/ApiClient';
-import { clearAllCaches, checkCacheClearCooldown, CACHE_KEYS, getCacheItem, getBrowserCacheEntityCounts } from '../../utils/cacheUtils';
+import { clearAllCaches, checkCacheClearCooldown, CACHE_CLEAR_COOLDOWN_MS, getBrowserCacheEntityCounts } from '../../utils/cacheUtils';
 import { takeOfflineIfNeeded, getLastOfflineDownloadTime } from '../../utils/offlineDownload';
 import { useSongs } from '../../contexts/SongContext';
 import { useSingers } from '../../contexts/SingerContext';
@@ -8,7 +8,6 @@ import { usePitches } from '../../contexts/PitchContext';
 import { useTemplates } from '../../contexts/TemplateContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useOfflineSyncContext } from '../../contexts/OfflineSyncContext';
-import { getPendingCount } from '../../utils/offlineQueue';
 import { globalEventBus } from '../../utils/globalEventBus';
 
 // Cache health stats for 60 seconds
@@ -19,7 +18,7 @@ const HEALTH_STATS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
 let brevoStatusCache: { status: any; timestamp: number } | null = null;
 const BREVO_STATUS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
 
-const CACHE_CLEAR_COOLDOWN_SECONDS = 120; // 2 minutes - must match cacheUtils checkCacheClearCooldown
+const CACHE_CLEAR_COOLDOWN_SECONDS = CACHE_CLEAR_COOLDOWN_MS / 1000;
 
 interface DatabaseStatusDropdownProps {
   isConnected: boolean;
@@ -64,7 +63,6 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
   const [reloadMessage, setReloadMessage] = useState<string | null>(null);
   const [clearingLocalStorage, setClearingLocalStorage] = useState(false);
   const [localStorageMessage, setLocalStorageMessage] = useState<string | null>(null);
-  const [lastLocalStorageClear, setLastLocalStorageClear] = useState<number | null>(null);
   const [brevoStatus, setBrevoStatus] = useState<BrevoStatus | null>(null);
   const [brevoLoading, setBrevoLoading] = useState(false);
   const [takingOffline, setTakingOffline] = useState(false);
@@ -79,15 +77,11 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
   const { fetchAllPitches } = usePitches();
   const { fetchTemplates } = useTemplates();
   const toast = useToast();
-  const { setShowSyncModal } = useOfflineSyncContext();
-  const pendingCount = getPendingCount();
+  const { setShowSyncModal, pendingCount } = useOfflineSyncContext();
 
-  // Load lastOfflineTime and lastLocalStorageClear on mount
+  // Load lastOfflineTime on mount
   useEffect(() => {
     getLastOfflineDownloadTime().then(setLastOfflineTime);
-    getCacheItem(CACHE_KEYS.LAST_LOCAL_STORAGE_CLEAR).then((saved) => {
-      setLastLocalStorageClear(saved ? parseInt(saved, 10) : null);
-    });
   }, []);
 
   // Load cache counts when dropdown opens
@@ -271,11 +265,7 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
         updateLastClearTimestamp: true,
       });
 
-      // Update local state for cooldown tracking
-      const timestamp = Date.now();
-      setLastLocalStorageClear(timestamp);
-
-      setLocalStorageMessage('Web page, JavaScript, and CSS cache cleared! Reloading...');
+      setLocalStorageMessage('Cache cleared! Reloading...');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to clear cache';
       setLocalStorageMessage(`Error: ${errorMsg}`);
@@ -535,106 +525,9 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                   </div>
                 )}
 
-                {/* Sync Offline Changes (when pending) */}
-                {pendingCount > 0 && (
-                <div className={`${isAuthenticated && 'mt-2 pt-2 border-t'} border-gray-200 dark:border-gray-700`}>
-                  <button
-                    onClick={() => { setShowSyncModal(true); setIsOpen(false); }}
-                    title="Review and sync offline changes"
-                    className="w-full flex items-center justify-center px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors mb-2"
-                  >
-                    <i className="fas fa-cloud-upload-alt text-base mr-2"></i>
-                    Sync {pendingCount} offline change{pendingCount !== 1 ? 's' : ''}
-                  </button>
-                </div>
-                )}
-
-                {/* Take Offline Button (Editors and Admins only) */}
-                {canTakeOffline && (
-                <div className={`${isAuthenticated && 'mt-2 pt-2 border-t'} border-gray-200 dark:border-gray-700`}>
-                  <button
-                    onClick={handleTakeOffline}
-                    disabled={takingOffline || !isOnline}
-                    title={!isOnline ? 'Connect to the internet to download for offline' : 'Download all song details for offline use'}
-                    className="w-full flex items-center justify-center px-4 py-1.5 text-sm font-medium text-white bg-[rgb(227,74,16)] hover:bg-[rgb(200,65,14)] dark:bg-[rgb(227,74,16)] dark:hover:bg-[rgb(200,65,14)] rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-2"
-                  >
-                    {takingOffline ? (
-                      <>
-                        <i className="fas fa-spinner fa-spin text-base mr-2"></i>
-                        <span className="truncate">{offlineProgress || 'Downloading...'}</span>
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-download text-base mr-2"></i>
-                        Take Offline
-                      </>
-                    )}
-                  </button>
-                  {lastOfflineTime && !takingOffline && (
-                    <p className="text-xs text-center text-gray-500 dark:text-gray-400 mb-2">
-                      Last downloaded: {new Date(lastOfflineTime).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-                )}
-
-                {/* Clear Local Storage Button (All Users) */}
-                <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                  {(() => {
-                    const onCooldown = (cooldownRemainingSeconds ?? 0) > 0;
-                    const progress = onCooldown
-                      ? 1 - cooldownRemainingSeconds! / CACHE_CLEAR_COOLDOWN_SECONDS
-                      : 1;
-                    // Only 2 shades: light green (base) and dark green (fill / ready)
-                    const lightGreen = 'rgb(134, 239, 172)';
-                    const darkGreen = 'rgb(22, 163, 74)';
-                    const bgColor = onCooldown ? lightGreen : darkGreen;
-                    return (
-                  <button
-                    onClick={handleClearLocalStorage}
-                    disabled={clearingLocalStorage || onCooldown}
-                    className="relative w-full flex items-center justify-center px-4 py-1.5 text-sm font-medium text-white rounded-md overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: bgColor }}
-                  >
-                    {onCooldown && (
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-l-md transition-[width] duration-1000 ease-linear"
-                        style={{ width: `${progress * 100}%`, backgroundColor: darkGreen }}
-                        aria-hidden
-                      />
-                    )}
-                    <span className="relative z-10 flex items-center justify-center">
-                      {clearingLocalStorage ? (
-                        <>
-                          <i className="fas fa-spinner fa-spin text-base mr-2"></i>
-                          Clearing...
-                        </>
-                      ) : (
-                        <>
-                          <i className="fas fa-trash-alt text-base mr-2"></i>
-                          Clear Local Cache
-                        </>
-                      )}
-                    </span>
-                  </button>
-                    );
-                  })()}
-                  {localStorageMessage && (
-                    <p className={`mt-1 text-xs text-center ${localStorageMessage.startsWith('Error') || localStorageMessage.startsWith('Please wait')
-                        ? 'text-red-600 dark:text-red-400'
-                        : 'text-green-600 dark:text-green-400'
-                      }`}>
-                      {localStorageMessage}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-center text-gray-500 dark:text-gray-400">
-                    Clears web page (HTML), JavaScript, CSS cache, and localStorage data. Preserves images. 2-minute cooldown.
-                  </p>
-                </div>
-
                 {/* Reload Cache Button (Admin Only) */}
                 {isAdmin && (
-                  <div className="mt-2">
+                  <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                     <button
                       onClick={handleReloadBackendCache}
                       disabled={reloadingBackendCache}
@@ -690,6 +583,101 @@ export const DatabaseStatusDropdown: React.FC<DatabaseStatusDropdownProps> = ({
                 </button>
               </>
             )}
+
+            {/* Actions available whether DB is connected or not */}
+            {pendingCount > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => { setShowSyncModal(true); setIsOpen(false); }}
+                  title="Review and sync offline changes"
+                  className="w-full flex items-center justify-center px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 rounded-md transition-colors mb-2"
+                >
+                  <i className="fas fa-cloud-upload-alt text-base mr-2"></i>
+                  Sync {pendingCount} offline change{pendingCount !== 1 ? 's' : ''}
+                </button>
+              </div>
+            )}
+
+            {canTakeOffline && (
+              <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={handleTakeOffline}
+                  disabled={takingOffline || !isOnline}
+                  title={!isOnline ? 'Connect to the internet to download for offline' : 'Download all song details for offline use'}
+                  className="w-full flex items-center justify-center px-4 py-1.5 text-sm font-medium text-white bg-[rgb(227,74,16)] hover:bg-[rgb(200,65,14)] dark:bg-[rgb(227,74,16)] dark:hover:bg-[rgb(200,65,14)] rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-2"
+                >
+                  {takingOffline ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin text-base mr-2"></i>
+                      <span className="truncate">{offlineProgress || 'Downloading...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-download text-base mr-2"></i>
+                      Take Offline
+                    </>
+                  )}
+                </button>
+                {lastOfflineTime && !takingOffline && (
+                  <p className="text-xs text-center text-gray-500 dark:text-gray-400 mb-2">
+                    Last downloaded: {new Date(lastOfflineTime).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Clear Local Cache (All Users) — available even when DB disconnected */}
+            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+              {(() => {
+                const onCooldown = (cooldownRemainingSeconds ?? 0) > 0;
+                const progress = onCooldown
+                  ? 1 - cooldownRemainingSeconds! / CACHE_CLEAR_COOLDOWN_SECONDS
+                  : 1;
+                const lightGreen = 'rgb(134, 239, 172)';
+                const darkGreen = 'rgb(22, 163, 74)';
+                const bgColor = onCooldown ? lightGreen : darkGreen;
+                return (
+                  <button
+                    onClick={handleClearLocalStorage}
+                    disabled={clearingLocalStorage || onCooldown}
+                    className="relative w-full flex items-center justify-center px-4 py-1.5 text-sm font-medium text-white rounded-md overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: bgColor }}
+                  >
+                    {onCooldown && (
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-l-md transition-[width] duration-1000 ease-linear"
+                        style={{ width: `${progress * 100}%`, backgroundColor: darkGreen }}
+                        aria-hidden
+                      />
+                    )}
+                    <span className="relative z-10 flex items-center justify-center">
+                      {clearingLocalStorage ? (
+                        <>
+                          <i className="fas fa-spinner fa-spin text-base mr-2"></i>
+                          Clearing...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-trash-alt text-base mr-2"></i>
+                          Clear Local Cache
+                        </>
+                      )}
+                    </span>
+                  </button>
+                );
+              })()}
+              {localStorageMessage && (
+                <p className={`mt-1 text-xs text-center ${localStorageMessage.startsWith('Error') || localStorageMessage.startsWith('Please wait')
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-green-600 dark:text-green-400'
+                  }`}>
+                  {localStorageMessage}
+                </p>
+              )}
+              <p className="mt-1 text-xs text-center text-gray-500 dark:text-gray-400">
+                Clears offline data (IndexedDB) and web page/JS/CSS caches. Preserves images. 2-minute cooldown.
+              </p>
+            </div>
 
             {/* Release Version */}
             <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">

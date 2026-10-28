@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { flushSync } from 'react-dom';
 import type { ReactNode } from 'react';
 import { clearLocalStorageCache } from '../utils/cacheUtils';
+import { clearOfflineQueue } from '../utils/offlineQueue';
 
 export type UserRole = 'public' | 'viewer' | 'editor' | 'admin';
 
@@ -100,8 +101,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const setAuthenticatedUser = useCallback((role: UserRole, userId: string, email: string, name?: string, centerIds?: number[], editorFor?: number[]) => {
-    // Clear all app-specific localStorage caches on login to ensure fresh data
-    clearLocalStorageCache();
+    // Clear offline queue (localStorage) so another user's pending ops aren't synced
+    clearOfflineQueue();
+    // Clear IndexedDB app caches on login to ensure fresh data (fire-and-forget; queue clear is sync)
+    void clearLocalStorageCache();
 
     // Use flushSync to ensure state is updated synchronously
     flushSync(() => {
@@ -131,9 +134,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setCenterIds([]);
       setEditorFor([]);
       
-      // Clear all data caches so logged-out users don't see cached center-restricted content
+      // Clear offline queue and data caches so logged-out users don't see cached center-restricted content
       if (typeof window !== 'undefined') {
-        clearLocalStorageCache();
+        clearOfflineQueue();
+        await clearLocalStorageCache();
       }
       
       // Clear in-memory centers cache from CenterBadges

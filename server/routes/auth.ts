@@ -1,4 +1,5 @@
 import express from 'express';
+import { createHash, timingSafeEqual } from 'crypto';
 import { databaseReadService } from '../services/DatabaseReadService.js';
 import { databaseWriteService } from '../services/DatabaseWriteService.js';
 import { emailService } from '../services/EmailService.js';
@@ -45,6 +46,85 @@ function getClientIP(req: express.Request): string {
     'unknown'
   );
 }
+
+function reviewLoginCredentials() {
+  const email = process.env.APP_REVIEW_EMAIL?.trim().toLowerCase();
+  const password = process.env.APP_REVIEW_PASSWORD;
+  return email && password ? { email, password } : null;
+}
+
+function matchesSecret(candidate: string, expected: string) {
+  const candidateHash = createHash('sha256').update(candidate, 'utf8').digest();
+  const expectedHash = createHash('sha256').update(expected, 'utf8').digest();
+  return timingSafeEqual(candidateHash, expectedHash);
+}
+
+function getUserRole(user: { isAdmin?: boolean; editorFor?: number[] }): 'admin' | 'editor' | 'viewer' {
+  if (user.isAdmin) return 'admin';
+  if (Array.isArray(user.editorFor) && user.editorFor.length > 0) return 'editor';
+  return 'viewer';
+}
+
+router.get('/review-login/config', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ enabled: reviewLoginCredentials() !== null });
+});
+
+router.post('/review-login', async (req, res) => {
+  const configured = reviewLoginCredentials();
+  if (!configured) return res.status(404).json({ error: 'Review sign-in is unavailable' });
+
+  const ip = getClientIP(req);
+  const attempts = loginAttempts.get(ip);
+  if (attempts && attempts.count >= MAX_ATTEMPTS && Date.now() < attempts.resetAt) {
+    return res.status(429).json({ error: 'Too many attempts', message: 'Please try again later.' });
+  }
+
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (email !== configured.email || !password || !matchesSecret(password, configured.password)) {
+    const current = loginAttempts.get(ip) || { count: 0, resetAt: 0 };
+    loginAttempts.set(ip, { count: current.count + 1, resetAt: Date.now() + LOCKOUT_DURATION });
+    return res.status(401).json({ error: 'Invalid review credentials' });
+  }
+
+  try {
+    const user = await databaseReadService.getUserByEmail(configured.email);
+    if (!user) {
+      console.error('[AUTH] Configured App Review account was not found');
+      return res.status(503).json({ error: 'Review sign-in is unavailable' });
+    }
+
+    const role = getUserRole(user);
+    if (!req.session) return res.status(500).json({ error: 'Unable to create review session' });
+    req.session.userId = user.id;
+    req.session.userEmail = user.email;
+    req.session.userName = user.name;
+    req.session.userRole = role;
+    req.session.centerIds = user.centerIds;
+    req.session.editorFor = user.editorFor;
+
+    await new Promise<void>((resolve, reject) => {
+      req.session!.save((error) => error ? reject(error) : resolve());
+    });
+
+    loginAttempts.delete(ip);
+    return res.json({
+      success: true,
+      role,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        centerIds: user.centerIds,
+        editorFor: user.editorFor,
+      },
+    });
+  } catch (error) {
+    console.error('[AUTH] App Review sign-in failed:', error);
+    return res.status(500).json({ error: 'Review sign-in failed' });
+  }
+});
 
 /**
  * POST /api/auth/request-otp

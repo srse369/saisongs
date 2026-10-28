@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useCallback, useState } from 'react';
-import { getPendingCount } from '../utils/offlineQueue';
+import { getPendingCount, OFFLINE_QUEUE_CHANGED_EVENT } from '../utils/offlineQueue';
 import { useToast } from './ToastContext';
 
 interface OfflineSyncContextType {
@@ -14,9 +14,15 @@ const OfflineSyncContext = createContext<OfflineSyncContextType | undefined>(und
 export const OfflineSyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const toast = useToast();
   const [showSyncModal, setShowSyncModal] = useState(false);
+  const [pendingCount, setPendingCount] = useState(() => getPendingCount());
+
+  const refreshPendingCount = useCallback(() => {
+    setPendingCount(getPendingCount());
+  }, []);
 
   const onSyncComplete = useCallback(
     (synced: number, failed: number) => {
+      refreshPendingCount();
       if (synced > 0) {
         toast.success(`Synced ${synced} offline change${synced > 1 ? 's' : ''} to server`);
       }
@@ -24,27 +30,38 @@ export const OfflineSyncProvider: React.FC<{ children: React.ReactNode }> = ({ c
         toast.error(`Failed to sync ${failed} change${failed > 1 ? 's' : ''}. Will retry when online.`);
       }
     },
-    [toast]
+    [toast, refreshPendingCount]
   );
 
   useEffect(() => {
     const handleOnline = () => {
+      refreshPendingCount();
       if (getPendingCount() > 0) {
         setShowSyncModal(true);
       }
     };
 
     window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
-  }, []);
+    window.addEventListener(OFFLINE_QUEUE_CHANGED_EVENT, refreshPendingCount);
+    // Cross-tab queue updates
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'saiSongs:offlineQueue') refreshPendingCount();
+    };
+    window.addEventListener('storage', handleStorage);
 
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener(OFFLINE_QUEUE_CHANGED_EVENT, refreshPendingCount);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [refreshPendingCount]);
 
   return (
     <OfflineSyncContext.Provider
       value={{
         showSyncModal,
         setShowSyncModal,
-        pendingCount: getPendingCount(),
+        pendingCount,
         onSyncComplete,
       }}
     >

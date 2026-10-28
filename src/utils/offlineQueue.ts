@@ -54,8 +54,15 @@ import NamedSessionService from '../services/NamedSessionService';
 import type { Song, Singer, SongSingerPitch } from '../types';
 
 const QUEUE_KEY = 'saiSongs:offlineQueue';
+export const OFFLINE_QUEUE_CHANGED_EVENT = 'saiSongs:offlineQueueChanged';
 
 export type OfflineEntity = 'song' | 'singer' | 'pitch' | 'session';
+
+function notifyQueueChanged(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(OFFLINE_QUEUE_CHANGED_EVENT));
+  }
+}
 
 export interface QueuedOperation {
   id: string;
@@ -121,6 +128,7 @@ export function addToOfflineQueue(op: Omit<QueuedOperation, 'id' | 'timestamp'>)
   };
   queue.push(fullOp);
   saveQueue(queue);
+  notifyQueueChanged();
   return id;
 }
 
@@ -171,7 +179,7 @@ export async function checkOfflineQueueConflicts(): Promise<OfflineSyncConflict[
           }
         }
       } else if (op.entity === 'pitch') {
-        const pitch = await pitchService.updatePitch(id, {} as any);
+        const pitch = await pitchService.getPitchById(id, true);
         if (!pitch) {
           if (op.type === 'delete') continue;
           conflicts.push({ opId: op.id, displayLabel: op.displayLabel || `Pitch ${id}`, reason: 'deleted_on_server' });
@@ -223,6 +231,7 @@ export function getPendingCount(): number {
 
 export function clearOfflineQueue(): void {
   saveQueue([]);
+  notifyQueueChanged();
 }
 
 /**
@@ -297,25 +306,32 @@ export async function processOfflineQueue(
               songId: tempToReal.get(item.songId) || item.songId,
               singerId: item.singerId ? tempToReal.get(item.singerId) || item.singerId : undefined,
             }));
-            const session = await NamedSessionService.createSession({
-              name: resolved.name as string,
-              description: resolved.description as string,
-              centerIds: resolved.centerIds as number[],
-            });
-            if (session) {
-              if (resolvedItems.length > 0) {
-                await NamedSessionService.setSessionItems(session.id, resolvedItems);
-              }
-              if (op.tempId) {
-                tempToReal.set(op.tempId, session.id);
-              }
-              globalEventBus.dispatch('dataRefreshNeeded', { type: 'dataRefreshNeeded', resource: 'all' });
+            // Persist realSessionId after create so a partial failure (items) won't duplicate on retry
+            let sessionId = (op.payload.realSessionId as string) || '';
+            if (!sessionId) {
+              const session = await NamedSessionService.createSession({
+                name: resolved.name as string,
+                description: resolved.description as string,
+                centerIds: resolved.centerIds as number[],
+              });
+              if (!session) throw new Error('Failed to create session');
+              sessionId = session.id;
+              op.payload.realSessionId = sessionId;
+              saveQueue(remaining);
             }
+            if (op.tempId) {
+              tempToReal.set(op.tempId, sessionId);
+            }
+            if (resolvedItems.length > 0) {
+              await NamedSessionService.setSessionItems(sessionId, resolvedItems);
+            }
+            globalEventBus.dispatch('dataRefreshNeeded', { type: 'dataRefreshNeeded', resource: 'all' });
           }
         } else if (op.type === 'update') {
           let id = (op.payload.id as string) || (op.payload.sessionId as string) || '';
-          if (entity === 'session') {
-            id = tempToReal.get(id) || id;
+          id = tempToReal.get(id) || id;
+          if (id.startsWith('temp-')) {
+            throw new Error(`Cannot update ${entity}: temp ID not yet created on server`);
           }
           if (entity === 'song') {
             const { id: _id, ...input } = op.payload;
@@ -326,7 +342,8 @@ export async function processOfflineQueue(
             const singer = await singerService.updateSinger(id, input as any);
             if (singer) globalEventBus.dispatch('singerUpdated', { type: 'singerUpdated', singer, centerIdsRemoved: [], centerIdsAdded: [] });
           } else if (entity === 'pitch') {
-            const { id: _id, ...input } = op.payload;
+            const resolved = resolvePayload(op.payload, tempToReal, ['songId', 'singerId']);
+            const { id: _id, ...input } = resolved;
             const pitch = await pitchService.updatePitch(id, input as any);
             if (pitch) globalEventBus.dispatch('pitchUpdated', { type: 'pitchUpdated', pitch });
           } else if (entity === 'session') {
@@ -345,7 +362,17 @@ export async function processOfflineQueue(
             globalEventBus.dispatch('dataRefreshNeeded', { type: 'dataRefreshNeeded', resource: 'all' });
           }
         } else if (op.type === 'delete') {
-          const id = op.payload.id as string;
+          let id = op.payload.id as string;
+          id = tempToReal.get(id) || id;
+          // Create-then-delete of a never-synced temp: no-op success
+          if (id.startsWith('temp-')) {
+            remaining.splice(remaining.indexOf(op), 1);
+            saveQueue(remaining);
+            notifyQueueChanged();
+            synced++;
+            onProgress?.(op, 'success');
+            continue;
+          }
           if (entity === 'song') {
             await songService.deleteSong(id);
             globalEventBus.dispatch('songDeleted', { type: 'songDeleted', song: { id } as Song });
@@ -363,6 +390,7 @@ export async function processOfflineQueue(
 
         remaining.splice(remaining.indexOf(op), 1);
         saveQueue(remaining);
+        notifyQueueChanged();
         synced++;
         onProgress?.(op, 'success');
       } catch (err) {

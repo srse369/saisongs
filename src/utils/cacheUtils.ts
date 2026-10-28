@@ -264,22 +264,25 @@ export async function getSongsFromCache(): Promise<Array<{ id: string; name: str
 
 /**
  * Check if a song has lyrics cached (individual song cache or in songs list).
+ * Empty / whitespace-only lyrics do not count as present.
  */
 export async function songHasLyricsInCache(id: string): Promise<boolean> {
   if (typeof window === 'undefined') return false;
+  const hasLyrics = (l: string | null | undefined) =>
+    l != null && String(l).trim().length > 0;
   try {
     const songKey = `${CACHE_KEYS.SAI_SONGS_SONG_PREFIX}${id}`;
     const cachedRaw = await idbGet(songKey);
     if (cachedRaw) {
       const { song } = JSON.parse(cachedRaw) as { timestamp: number; song: { lyrics?: string | null } };
-      if (song && song.lyrics != null && song.lyrics !== undefined) return true;
+      if (song && hasLyrics(song.lyrics)) return true;
     }
     const listRaw = await idbGet(CACHE_KEYS.SAI_SONGS_SONGS);
     if (listRaw) {
       const { songs } = JSON.parse(listRaw) as { timestamp: number; songs: { id?: string; lyrics?: string | null }[] };
       if (Array.isArray(songs)) {
         const found = songs.find((s) => s?.id === id);
-        if (found && found.lyrics != null && found.lyrics !== undefined) return true;
+        if (found && hasLyrics(found.lyrics)) return true;
       }
     }
   } catch {
@@ -558,15 +561,29 @@ export async function clearAllCaches(options: ClearCacheOptions = {}): Promise<v
 }
 
 /**
+ * Default cooldown for clearing local/SW cache (2 minutes).
+ * Keep in sync with UI progress bars that assume this duration.
+ */
+export const CACHE_CLEAR_COOLDOWN_MS = 2 * 60 * 1000;
+
+/**
  * Check if cache clear cooldown is active
  * @param cooldownMs - Cooldown period in milliseconds (default: 2 minutes)
  * @returns Object with isOnCooldown flag and remaining seconds
  */
-export function checkCacheClearCooldown(cooldownMs: number = 2 * 60 * 1000): {
+export function checkCacheClearCooldown(cooldownMs: number = CACHE_CLEAR_COOLDOWN_MS): {
   isOnCooldown: boolean;
   remainingSeconds: number;
 } {
-  const lastClear = localStorage.getItem(CACHE_KEYS.LAST_LOCAL_STORAGE_CLEAR);
+  if (typeof window === 'undefined') {
+    return { isOnCooldown: false, remainingSeconds: 0 };
+  }
+  let lastClear: string | null = null;
+  try {
+    lastClear = localStorage.getItem(CACHE_KEYS.LAST_LOCAL_STORAGE_CLEAR);
+  } catch {
+    return { isOnCooldown: false, remainingSeconds: 0 };
+  }
   
   if (!lastClear) {
     return { isOnCooldown: false, remainingSeconds: 0 };

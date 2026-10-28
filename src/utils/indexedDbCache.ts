@@ -184,7 +184,7 @@ export async function getAllCacheKeys(): Promise<string[]> {
 
 /**
  * Clear all saiSongs cache entries from IndexedDB.
- * Preserves APP_VERSION and LAST_LOCAL_STORAGE_CLEAR if requested.
+ * Preserves APP_VERSION if requested.
  */
 export async function clearCacheStore(preserveKeys?: string[]): Promise<void> {
   try {

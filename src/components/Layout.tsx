@@ -135,7 +135,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const handleClearLocalStorage = async () => {
-    const cooldown = checkCacheClearCooldown(60000); // 60 second cooldown
+    const cooldown = checkCacheClearCooldown(); // 2-minute cooldown (shared with status dropdown)
     if (cooldown.isOnCooldown && cooldown.remainingSeconds > 0) {
       alert(`Please wait ${cooldown.remainingSeconds} seconds before clearing cache again.`);
       return;
