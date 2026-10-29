@@ -190,7 +190,8 @@ app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/songs', songsRouter);  // Songs remain public
 app.use('/api/sessions', sessionsRouter);  // Sessions public for presentation mode
 app.use('/api/analytics', analyticsRouter);  // Analytics (routes handle their own auth)
-app.use('/api/feedback', feedbackLimiter, feedbackRouter);  // Feedback is public
+app.post('/api/feedback', feedbackLimiter);  // Rate limit submissions only
+app.use('/api/feedback', feedbackRouter);  // POST is public; GET/PATCH/DELETE require admin (enforced in routes)
 app.use('/api/templates', templatesRouter);  // Templates public for presentation mode
 app.use('/api/centers', centersRouter);  // Centers GET is public for UI, but POST/PUT/DELETE require admin (enforced in routes)
 app.use('/api', mediaRouter);  // Media upload routes (handles own auth)

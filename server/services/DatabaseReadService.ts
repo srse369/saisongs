@@ -1531,7 +1531,7 @@ class DatabaseReadService {
       SELECT RAWTOHEX(id) as id, feedback, category, email, user_agent, url, ip_address, 
               status, admin_notes, created_at, updated_at, updated_by
        FROM feedback 
-       ORDER BY updated_at, created_at DESC
+       ORDER BY created_at DESC
     `);
   }
 

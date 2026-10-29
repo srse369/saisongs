@@ -1,5 +1,6 @@
 import express from 'express';
 import { cacheService } from '../services/CacheService.js';
+import { requireAdmin } from '../middleware/simpleAuth.js';
 
 const router = express.Router();
 
@@ -86,7 +87,7 @@ router.post('/', async (req, res) => {
 });
 
 // Get all feedback (admin only)
-router.get('/', async (req, res) => {
+router.get('/', requireAdmin, async (req, res) => {
   try {
     const { status, category, limit = 100, offset = 0 } = req.query;
 
@@ -120,7 +121,7 @@ router.get('/', async (req, res) => {
 });
 
 // Update feedback status and admin notes
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, adminNotes } = req.body;
@@ -153,7 +154,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 // Delete feedback
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
